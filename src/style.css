@@ -1,0 +1,290 @@
+:root {
+  --ink: #2a1a10;
+  --ink-soft: #5c4330;
+  --parchment: #ead8b8;
+  --parchment-dark: #d7c09a;
+  --seal: #c45a32;
+  --gold: #e3b34a;
+  --wood: #4a301c;
+  --panel: rgba(36, 22, 12, 0.78);
+  --line: rgba(236, 214, 176, 0.28);
+  font-family: Palatino, "Palatino Linotype", Georgia, "Times New Roman", serif;
+  color: var(--parchment);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #1c120c;
+}
+
+#view {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+#hud {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  pointer-events: none;
+}
+
+#hud .panel,
+#hud .ledger,
+#hud .drop,
+#hud .selected,
+#hud .log,
+#hud button {
+  pointer-events: auto;
+}
+
+.ledger,
+.panel,
+.drop,
+.selected,
+.log,
+.sheet {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.ledger {
+  padding: 14px 16px 12px;
+  border-radius: 6px 18px 6px 6px;
+}
+
+.place {
+  margin: 0;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  color: #cbb48a;
+}
+
+h1 {
+  margin: 2px 0 8px;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f3e2c0;
+}
+
+.gold {
+  margin: 0;
+  display: inline-block;
+  padding: 4px 12px 5px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, #f0d27a, #b8862f);
+  color: #3a240e;
+  font-weight: 700;
+}
+
+.panel {
+  padding: 10px 12px 12px;
+  border-radius: 6px;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d7c09a;
+}
+
+.mat {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.95rem;
+}
+
+.mat:first-child {
+  border-top: 0;
+}
+
+.mat-count {
+  color: #f0d9a8;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid #8a6238;
+  background: linear-gradient(#6b4328, #3e2616);
+  color: #f6e4c4;
+  border-radius: 4px;
+  padding: 6px 9px;
+}
+
+button:hover:not(:disabled) {
+  background: linear-gradient(#7c5132, #4a2e1a);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.craft {
+  position: relative;
+  display: grid;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.craft::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--t, 0) * 100%);
+  background: rgba(227, 179, 74, 0.22);
+}
+
+.craft strong,
+.craft .meta,
+.craft .timer {
+  position: relative;
+}
+
+.meta {
+  font-size: 0.78rem;
+  color: #d9c4a0;
+}
+
+.timer {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  color: var(--gold);
+}
+
+.selected {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.drop {
+  padding: 12px;
+  border-radius: 6px;
+  border-style: dashed;
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop span {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #d7c09a;
+}
+
+.drop.is-hot {
+  border-color: var(--gold);
+  background: rgba(70, 42, 18, 0.9);
+}
+
+.log {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: #e6d3b2;
+}
+
+.modal {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(16, 10, 6, 0.55);
+  z-index: 5;
+}
+
+.modal[hidden],
+#nowebgl[hidden],
+#stock[hidden] {
+  display: none;
+}
+
+.sheet {
+  width: min(420px, calc(100vw - 32px));
+  padding: 22px 22px 18px;
+  border-radius: 10px;
+  color: var(--parchment);
+}
+
+.sheet h2 {
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: #f3e2c0;
+}
+
+.sheet p {
+  color: #e6d3b2;
+  line-height: 1.4;
+}
+
+.row {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.ghost {
+  background: transparent;
+  width: 100%;
+}
+
+.error {
+  color: #f0a07a;
+}
+
+#nowebgl {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  background: #24160e;
+}
+
+#stock button {
+  margin: 4px 4px 0 0;
+}
+
+@media (max-width: 720px) {
+  #hud {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 46vh;
+    padding: 8px;
+  }
+}

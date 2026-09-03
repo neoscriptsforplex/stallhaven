@@ -1,0 +1,22 @@
+{
+  "name": "stallhaven",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A free browser stall-keeping game set in the roadside town of Stallhaven.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test src/game/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "vite": "^8.2.2"
+  }
+}

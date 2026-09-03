@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stallhaven — roadside stall</title>
+    <meta name="description" content="Keep a dusty roadside stall in Stallhaven. Craft wares, serve travelers, restock with gold." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%236b4423' width='64' height='64' rx='10'/%3E%3Cpath fill='%23e8c37a' d='M12 40h40v8H12z'/%3E%3Cpath fill='%238b4336' d='M8 20h48l-6 12H14z'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <canvas id="view" aria-label="Stallhaven stall"></canvas>
+
+    <aside id="hud">
+      <header class="ledger">
+        <p class="place">Roadside market town</p>
+        <h1>Stallhaven</h1>
+        <p id="gold" class="gold">40g</p>
+      </header>
+
+      <section class="panel" aria-label="Materials">
+        <h2>Materials</h2>
+        <div id="materials"></div>
+      </section>
+
+      <section class="panel" aria-label="Craft">
+        <h2>Craft</h2>
+        <div id="crafts"></div>
+      </section>
+
+      <section class="panel" id="stock" hidden aria-label="Ready wares"></section>
+
+      <p id="selected" class="selected">Selected: Left stall</p>
+
+      <section class="panel drop-wrap" aria-label="Model upload">
+        <div id="drop" class="drop" role="button" tabindex="0">
+          <input type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
+          <strong>Drop a .glb / .gltf</strong>
+          <span>or click to choose. Tag it furniture or ware.</span>
+        </div>
+      </section>
+
+      <ol id="log" class="log" aria-live="polite"></ol>
+    </aside>
+
+    <div id="tooltip" class="modal" hidden>
+      <div class="sheet">
+        <h2>Keep the stall</h2>
+        <p>Craft a ware. It appears on the highlighted table. Click a table to choose which one.</p>
+        <p>Travelers walk in from the door. If they like what is out, they pay at the counter.</p>
+        <p>Spend gold to restock grain and the other materials. Drag a model onto the drop zone if you want a custom table or ware look — nothing uploaded leaves your browser.</p>
+        <button type="button" data-dismiss>Got it</button>
+      </div>
+    </div>
+
+    <div id="import-modal" class="modal" hidden>
+      <div class="sheet">
+        <h2>Place this model</h2>
+        <p data-import-name></p>
+        <p data-error class="error" hidden></p>
+        <div class="row">
+          <button type="button" data-tag="furniture">Furniture — replace selected table</button>
+          <button type="button" data-tag="ware">Ware — sit on a table</button>
+        </div>
+        <div data-recipes class="row" hidden></div>
+        <button type="button" class="ghost" data-cancel>Cancel</button>
+      </div>
+    </div>
+
+    <p id="nowebgl" hidden>This stall needs WebGL. Try another browser, then open the same page again.</p>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

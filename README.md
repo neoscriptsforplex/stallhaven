@@ -6,7 +6,17 @@ A free browser game. You keep a dusty roadside stall in the market town of **Sta
 
 **https://neoscriptsforplex.github.io/stallhaven/**
 
-No account, no download, no paywall. Open that link in a modern browser.
+No account, no download, no paywall.
+
+If GitHub shows “Site not found”, play here while Pages is switched on:
+
+**https://raw.githack.com/neoscriptsforplex/stallhaven/play/index.html**
+
+To turn on the official GitHub Pages link (one time, free, no coding):
+
+1. Open [Settings → Pages](https://github.com/neoscriptsforplex/stallhaven/settings/pages)
+2. Under **Build and deployment**, set **Source** to **GitHub Actions** (or Branch `gh-pages`, folder `/`)
+3. Save, wait a minute, then open https://neoscriptsforplex.github.io/stallhaven/
 
 ## How to play
 
@@ -30,7 +40,7 @@ You start with 40 gold and a little Grain, Embercap, Ironbark, and Woolspool.
 
 ## For tinkerers
 
-This is a static [Vite](https://vitejs.dev/) + [Three.js](https://threejs.org/) app. GitHub Pages serves the built files from the `main` branch.
+This is a static [Vite](https://vitejs.dev/) + [Three.js](https://threejs.org/) app. GitHub Pages serves the built files.
 
 ```bash
 npm install

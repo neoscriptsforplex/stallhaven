@@ -4,21 +4,24 @@ import {
   CUSTOMERS,
   FIRST_CUSTOMER_DELAY,
   MAX_CUSTOMERS,
-  PATIENT_RECHECKS,
-  PATIENT_WAIT,
+  RECIPES,
+  REQUEST_WAIT,
   SHOP,
   SPAWN_GAP_MAX,
   SPAWN_GAP_MIN,
-  RECIPES,
+  decideRequest,
 } from './catalog.js';
-import { collectSale, decideAfterWait, decidePurchase, displayedWares, pushLog, removeWare } from './economy.js';
+import { pushLog } from './economy.js';
 import {
   buildAdventurer,
+  buildChest,
   buildDefaultTable,
   buildDust,
   buildStall,
   buildWare,
   normalizeImported,
+  setChestLid,
+  setSpeechText,
   wareTopY,
 } from './models.js';
 
@@ -78,6 +81,26 @@ export function createWorld(canvas, state) {
   const dust = buildDust();
   scene.add(dust);
 
+  const chest = buildChest();
+  chest.position.set(SHOP.chest.x, 0, SHOP.chest.z);
+  chest.rotation.y = -0.45;
+  scene.add(chest);
+  const chestPick = new THREE.Mesh(
+    new THREE.BoxGeometry(1.05, 0.85, 0.8),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  chestPick.position.set(SHOP.chest.x, 0.4, SHOP.chest.z);
+  chestPick.userData.kind = 'chest';
+  scene.add(chestPick);
+  const chestGlow = new THREE.Mesh(
+    new THREE.RingGeometry(0.62, 0.74, 24),
+    new THREE.MeshBasicMaterial({ color: 0xe8b45a, transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
+  );
+  chestGlow.rotation.x = -Math.PI / 2;
+  chestGlow.position.set(SHOP.chest.x, 0.08, SHOP.chest.z);
+  scene.add(chestGlow);
+  let chestOpen = false;
+
   const displays = SHOP.displays.map((spot, index) => {
     const anchor = new THREE.Group();
     anchor.position.set(spot.x, 0, spot.z);
@@ -92,6 +115,7 @@ export function createWorld(canvas, state) {
       new THREE.MeshBasicMaterial({ visible: false }),
     );
     pick.position.y = 0.6;
+    pick.userData.kind = 'display';
     pick.userData.displayIndex = index;
     anchor.add(pick);
     const glow = new THREE.Mesh(
@@ -108,10 +132,11 @@ export function createWorld(canvas, state) {
   let nextSpawnAt = FIRST_CUSTOMER_DELAY;
   let firstSpawn = true;
   let customerSerial = 1;
+  let pickHandler = null;
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  const pickables = displays.map((d) => d.pick);
+  const pointerDown = { x: 0, y: 0, t: 0 };
 
   function resize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -120,16 +145,49 @@ export function createWorld(canvas, state) {
   }
   window.addEventListener('resize', resize);
 
-  renderer.domElement.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return;
+  function allPicks() {
+    return [
+      ...displays.map((d) => d.pick),
+      chestPick,
+      ...customers.map((c) => c.mesh.userData.pick).filter(Boolean),
+    ];
+  }
+
+  function setPointer(event) {
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  renderer.domElement.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    pointerDown.x = event.clientX;
+    pointerDown.y = event.clientY;
+    pointerDown.t = performance.now();
+  });
+
+  renderer.domElement.addEventListener('pointerup', (event) => {
+    if (event.button !== 0) return;
+    const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+    if (moved > 7) return;
+    setPointer(event);
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(pickables, false);
-    if (hits.length) {
-      state.selectedDisplay = hits[0].object.userData.displayIndex;
+    const hits = raycaster.intersectObjects(allPicks(), false);
+    if (!hits.length) return;
+    const data = hits[0].object.userData;
+    if (data.kind === 'customer') {
+      const actor = customers.find((c) => c.mesh.userData.pick === hits[0].object);
+      if (actor && actor.state !== 'leave') pickHandler?.({ type: 'customer', actor });
+      return;
+    }
+    if (data.kind === 'chest') {
+      pickHandler?.({ type: 'chest' });
+      return;
+    }
+    if (data.kind === 'display') {
+      state.selectedDisplay = data.displayIndex;
       refreshSelection();
+      pickHandler?.({ type: 'display', index: data.displayIndex });
     }
   });
 
@@ -158,8 +216,7 @@ export function createWorld(canvas, state) {
   function syncDisplays() {
     state.displays.forEach((d, i) => {
       const want = d.ware?.recipeId ?? null;
-      const have = displays[i].wareMesh?.userData.recipeId ?? displays[i].wareMesh?.name ?? null;
-      const haveId = displays[i].wareMesh ? (displays[i].wareMesh.userData.recipeId || want) : null;
+      const haveId = displays[i].wareMesh?.userData.recipeId ?? null;
       if (want !== haveId) setDisplayWare(i, want);
     });
   }
@@ -185,7 +242,15 @@ export function createWorld(canvas, state) {
     });
   }
 
-  function takeWare(index) {
+  function takeWareMesh(recipeId) {
+    const index = state.displays.findIndex((d) => d.ware?.recipeId === recipeId);
+    if (index < 0) {
+      const mesh = state.wareLooks[recipeId]
+        ? state.wareLooks[recipeId].clone(true)
+        : buildWare(recipeId);
+      mesh.scale.setScalar(0.7);
+      return mesh;
+    }
     const slot = displays[index];
     const mesh = slot.wareMesh;
     slot.wareMesh = null;
@@ -198,24 +263,32 @@ export function createWorld(canvas, state) {
     const types = Object.keys(CUSTOMERS);
     const typeId = firstSpawn ? 'pilgrim' : types[Math.floor(Math.random() * types.length)];
     firstSpawn = false;
+    const request = decideRequest(typeId);
     const mesh = buildAdventurer(typeId);
+    mesh.userData.pick.userData.customerId = customerSerial;
     mesh.position.set(SHOP.door.x, 0, SHOP.door.z + 0.4);
+    setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
     scene.add(mesh);
+    const browse = customers.length
+      ? { x: SHOP.browse.x + 0.85, z: SHOP.browse.z - 0.15 }
+      : { x: SHOP.browse.x - 0.35, z: SHOP.browse.z };
     const actor = {
       id: customerSerial,
       typeId,
       mesh,
       state: 'enter',
-      path: [{ x: SHOP.browse.x, z: SHOP.browse.z }],
+      path: [browse],
       waitUntil: 0,
-      rechecks: 0,
-      targetDisplay: -1,
+      requestRecipeId: request.recipeId,
+      offerGold: request.gold,
+      offer: request.offer,
       carried: null,
+      browse,
     };
     customerSerial += 1;
     customers.push(actor);
     nextSpawnAt = now + SPAWN_GAP_MIN + Math.random() * (SPAWN_GAP_MAX - SPAWN_GAP_MIN);
-    pushLog(state, `${CUSTOMERS[typeId].name} comes in from the road.`);
+    pushLog(state, `${CUSTOMERS[typeId].name} asks for ${RECIPES[request.recipeId].name}.`);
   }
 
   function walkToward(actor, goal, dt) {
@@ -233,28 +306,25 @@ export function createWorld(canvas, state) {
     return false;
   }
 
-  function think(actor, now) {
-    const wares = displayedWares(state);
-    const choice = actor.rechecks === 0
-      ? decidePurchase(actor.typeId, wares)
-      : decideAfterWait(actor.typeId, wares);
-    if (choice.action === 'buy') {
-      actor.targetDisplay = choice.displayIndex;
-      const spot = SHOP.displays[choice.displayIndex];
-      actor.path = [{ x: spot.x, z: spot.z + 0.7 }];
-      actor.state = 'toWare';
-      return;
+  function beginRequest(actor, now) {
+    actor.state = 'request';
+    actor.waitUntil = now + REQUEST_WAIT;
+    actor.path = [];
+    actor.mesh.rotation.y = Math.PI;
+  }
+
+  function dismissCustomer(actor, sold) {
+    if (!actor || actor.state === 'leave') return;
+    if (sold && actor.pendingCarry) {
+      actor.mesh.userData.hand.add(actor.pendingCarry);
+      actor.pendingCarry.position.set(0, 0, 0);
+      actor.pendingCarry.scale.setScalar(0.7);
+      actor.carried = actor.pendingCarry;
+      actor.pendingCarry = null;
     }
-    if (choice.action === 'wait' && actor.rechecks < PATIENT_RECHECKS) {
-      actor.rechecks += 1;
-      actor.waitUntil = now + PATIENT_WAIT / PATIENT_RECHECKS;
-      actor.state = 'wait';
-      actor.path = [{ x: SHOP.browse.x, z: SHOP.browse.z }];
-      return;
-    }
+    setSpeechText(actor.mesh, sold ? 'Thanks!' : null);
     actor.state = 'leave';
-    actor.path = [{ x: SHOP.door.x, z: SHOP.door.z + 0.5 }];
-    pushLog(state, `${CUSTOMERS[actor.typeId].name} leaves without a purchase.`);
+    actor.path = [{ x: SHOP.door.x, z: SHOP.door.z + 0.6 }];
   }
 
   function updateCustomers(dt, now) {
@@ -263,51 +333,20 @@ export function createWorld(canvas, state) {
       const actor = customers[i];
       if (actor.state === 'enter') {
         if (!actor.path.length || walkToward(actor, actor.path[0], dt)) {
-          actor.path.shift();
-          think(actor, now);
+          beginRequest(actor, now);
         }
-      } else if (actor.state === 'wait') {
-        if (actor.path.length && !walkToward(actor, actor.path[0], dt)) {
-          // still walking to the browse spot
-        } else {
-          actor.path = [];
-          actor.mesh.rotation.y += dt * 0.6;
-          if (now >= actor.waitUntil) think(actor, now);
+      } else if (actor.state === 'request') {
+        actor.mesh.rotation.y += dt * 0.25;
+        if (now >= actor.waitUntil) {
+          pushLog(state, `${CUSTOMERS[actor.typeId].name} grows tired and leaves.`);
+          dismissCustomer(actor, false);
         }
-      } else if (actor.state === 'toWare') {
+      } else if (actor.state === 'leave') {
         if (!actor.path.length || walkToward(actor, actor.path[0], dt)) {
-          const ware = state.displays[actor.targetDisplay]?.ware;
-          if (!ware) {
-            think(actor, now);
-          } else {
-            actor.carried = takeWare(actor.targetDisplay);
-            const recipeId = removeWare(state, actor.targetDisplay);
-            if (actor.carried) {
-              actor.mesh.userData.hand.add(actor.carried);
-              actor.carried.position.set(0, 0, 0);
-              actor.carried.scale.setScalar(0.7);
-            }
-            actor.pendingRecipeId = recipeId;
-            actor.pendingGold = RECIPES[recipeId].price;
-            actor.pendingName = RECIPES[recipeId].name;
-            actor.path = [{ x: SHOP.counter.x, z: SHOP.counter.z + 0.85 }];
-            actor.state = 'toCounter';
-            syncDisplays();
-          }
-        }
-      } else if (actor.state === 'toCounter') {
-        if (!actor.path.length || walkToward(actor, actor.path[0], dt)) {
-          collectSale(state, actor.pendingRecipeId);
-          pushLog(state, `${CUSTOMERS[actor.typeId].name} buys ${actor.pendingName} for ${actor.pendingGold}g.`);
           if (actor.carried) {
             actor.mesh.userData.hand.remove(actor.carried);
             actor.carried = null;
           }
-          actor.state = 'leave';
-          actor.path = [{ x: SHOP.door.x, z: SHOP.door.z + 0.6 }];
-        }
-      } else if (actor.state === 'leave') {
-        if (!actor.path.length || walkToward(actor, actor.path[0], dt)) {
           scene.remove(actor.mesh);
           customers.splice(i, 1);
         }
@@ -325,6 +364,8 @@ export function createWorld(canvas, state) {
       positions.setY(i, y);
     }
     positions.needsUpdate = true;
+    setChestLid(chest, chestOpen, dt);
+    chestGlow.material.opacity = 0.28 + Math.sin(now * 2.2) * 0.08;
     syncDisplays();
     refreshSelection();
     updateCustomers(dt, now);
@@ -338,5 +379,26 @@ export function createWorld(canvas, state) {
     replaceFurniture,
     bindWareLook,
     getSelectedName: () => SHOP.displays[state.selectedDisplay].name,
+    setChestOpen(open) {
+      chestOpen = Boolean(open);
+    },
+    onPick(handler) {
+      pickHandler = handler;
+    },
+    getCustomer(id) {
+      return customers.find((c) => c.id === id) ?? null;
+    },
+    listCustomers() {
+      return customers.filter((c) => c.state !== 'leave');
+    },
+    sellToActor(actor) {
+      if (!actor || actor.state === 'leave') return;
+      actor.pendingCarry = takeWareMesh(actor.requestRecipeId);
+      dismissCustomer(actor, true);
+      syncDisplays();
+    },
+    refuseActor(actor) {
+      dismissCustomer(actor, false);
+    },
   };
 }

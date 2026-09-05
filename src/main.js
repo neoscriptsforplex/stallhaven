@@ -23,7 +23,7 @@ if (!hasWebGL()) {
   fallback.hidden = false;
 } else {
   const state = createState();
-  pushLog(state, 'The stall is open. Craft a ware and wait for the road.');
+  pushLog(state, 'The stall is open. Craft into the chest, then click a traveler.');
   const world = createWorld(canvas, state);
   const hud = bindHud(hudRoot, state, world);
   bindUploadUI({
@@ -60,7 +60,7 @@ if (!hasWebGL()) {
     last = nowMs;
     const finished = completeCrafts(state, now);
     for (const id of finished) {
-      pushLog(state, `Finished ${RECIPES[id].name}.`);
+      pushLog(state, `Finished ${RECIPES[id].name}. Into the chest.`);
     }
     if (finished.length) world.syncDisplays();
     world.tick(dt, now);

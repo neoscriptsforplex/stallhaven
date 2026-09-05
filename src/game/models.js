@@ -299,10 +299,193 @@ export function buildWare(recipeId) {
     const hood = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), cloth(0x3c4c56)));
     hood.position.set(0, 0.52, 0.02);
     group.add(hood);
+  } else if (recipe?.slot === 'sword') {
+    addSword(group, recipe.tint);
+  } else if (recipe?.slot === 'bow') {
+    addBow(group, recipe.tint);
+  } else if (recipe?.slot === 'staff') {
+    addStaff(group, recipe.tint);
+  } else if (recipe?.slot === 'helm') {
+    addHelm(group, recipe.tint, recipe.combatClass);
+  } else if (recipe?.slot === 'body') {
+    addBody(group, recipe.tint, recipe.combatClass);
+  } else {
+    const lump = addShadow(new THREE.Mesh(
+      new THREE.BoxGeometry(0.28, 0.18, 0.22),
+      new THREE.MeshStandardMaterial({ color: recipe?.tint ?? 0x888888, roughness: 0.6 }),
+    ));
+    lump.position.y = 0.1;
+    group.add(lump);
   }
 
   group.userData.recipeId = recipeId;
   return group;
+}
+
+function metal(color) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.35,
+    metalness: 0.72,
+  });
+}
+
+function addSword(group, tint) {
+  const blade = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.62, 0.016), metal(tint)));
+  blade.position.set(0.08, 0.42, 0);
+  blade.rotation.z = -0.45;
+  group.add(blade);
+  const tip = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 6), metal(tint)));
+  tip.position.set(0.22, 0.7, 0);
+  tip.rotation.z = -0.45;
+  group.add(tip);
+  const guard = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.05), metal(0xc4a05a)));
+  guard.position.set(-0.02, 0.18, 0);
+  guard.rotation.z = -0.45;
+  group.add(guard);
+  const grip = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.022, 0.16, 8), wood(0x4a301c)));
+  grip.position.set(-0.08, 0.08, 0);
+  grip.rotation.z = -0.45;
+  group.add(grip);
+}
+
+function addBow(group, tint) {
+  const limb = addShadow(new THREE.Mesh(
+    new THREE.TorusGeometry(0.28, 0.018, 8, 16, Math.PI),
+    wood(tint),
+  ));
+  limb.rotation.y = Math.PI / 2;
+  limb.rotation.z = Math.PI / 2;
+  limb.position.set(0, 0.32, 0);
+  group.add(limb);
+  const string = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.006, 0.006, 0.54, 6),
+    new THREE.MeshStandardMaterial({ color: 0xead3ae, roughness: 0.5 }),
+  ));
+  string.position.set(0.18, 0.32, 0);
+  group.add(string);
+}
+
+function addStaff(group, tint) {
+  const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.82, 8), wood(0x3a2a1c)));
+  shaft.position.set(0, 0.4, 0);
+  shaft.rotation.z = 0.28;
+  group.add(shaft);
+  const orb = addShadow(new THREE.Mesh(
+    new THREE.SphereGeometry(0.09, 12, 10),
+    new THREE.MeshStandardMaterial({
+      color: tint,
+      emissive: tint,
+      emissiveIntensity: 0.45,
+      roughness: 0.25,
+    }),
+  ));
+  orb.position.set(0.12, 0.82, 0);
+  group.add(orb);
+}
+
+function addHelm(group, tint, combatClass) {
+  if (combatClass === 'magic') {
+    const band = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.02, 8, 16), metal(tint)));
+    band.rotation.x = Math.PI / 2;
+    band.position.y = 0.16;
+    group.add(band);
+    const gem = addShadow(new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.05),
+      new THREE.MeshStandardMaterial({ color: tint, emissive: tint, emissiveIntensity: 0.35 }),
+    ));
+    gem.position.y = 0.22;
+    group.add(gem);
+    return;
+  }
+  if (combatClass === 'range') {
+    const cap = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), cloth(tint)));
+    cap.position.y = 0.12;
+    group.add(cap);
+    const brim = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.02, 12), cloth(0x3a2a1c)));
+    brim.position.y = 0.12;
+    group.add(brim);
+    return;
+  }
+  const dome = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.7), metal(tint)));
+  dome.position.y = 0.12;
+  group.add(dome);
+  const visor = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.08), metal(0x2a2a2a)));
+  visor.position.set(0, 0.12, 0.1);
+  group.add(visor);
+}
+
+function addBody(group, tint, combatClass) {
+  if (combatClass === 'magic') {
+    const robe = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.48, 10), cloth(tint)));
+    robe.position.y = 0.24;
+    group.add(robe);
+    return;
+  }
+  if (combatClass === 'range') {
+    const vest = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.34, 0.14), cloth(tint)));
+    vest.position.y = 0.22;
+    group.add(vest);
+    const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.36, 0.16), cloth(0x3a2a1c)));
+    strap.position.set(0.08, 0.22, 0);
+    strap.rotation.z = -0.3;
+    group.add(strap);
+    return;
+  }
+  const plate = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.36, 0.16), metal(tint)));
+  plate.position.y = 0.22;
+  group.add(plate);
+  const collar = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.18), metal(0xc4a05a)));
+  collar.position.y = 0.42;
+  group.add(collar);
+}
+
+export function buildChest() {
+  const root = new THREE.Group();
+  root.name = 'chest';
+  const oak = wood(0x6a4324, 0.8);
+  const dark = wood(0x3d2414, 0.78);
+  const band = metal(0xb08a3c);
+
+  const base = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.42, 0.62), oak));
+  base.position.y = 0.27;
+  root.add(base);
+  const trim = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.06, 0.66), dark));
+  trim.position.y = 0.48;
+  root.add(trim);
+  const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.64), band));
+  strap.position.set(-0.22, 0.27, 0);
+  root.add(strap);
+  const strap2 = strap.clone();
+  strap2.position.x = 0.22;
+  root.add(strap2);
+
+  const lid = new THREE.Group();
+  lid.position.set(0, 0.48, -0.28);
+  const lidBoard = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.08, 0.62), oak));
+  lidBoard.position.set(0, 0.04, 0.31);
+  lid.add(lidBoard);
+  const lidRound = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.31, 0.31, 0.9, 12, 1, false, 0, Math.PI),
+    oak,
+  ));
+  lidRound.rotation.z = Math.PI / 2;
+  lidRound.position.set(0, 0.08, 0.31);
+  lid.add(lidRound);
+  const latch = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.06), band));
+  latch.position.set(0, 0.02, 0.62);
+  lid.add(latch);
+  root.add(lid);
+  root.userData.lid = lid;
+
+  return root;
+}
+
+export function setChestLid(chest, open, dt = 1) {
+  const lid = chest.userData.lid;
+  if (!lid) return;
+  const target = open ? -1.15 : 0;
+  lid.rotation.x += (target - lid.rotation.x) * Math.min(1, dt * 8);
 }
 
 export function buildAdventurer(typeId) {
@@ -335,6 +518,17 @@ export function buildAdventurer(typeId) {
     const pauldron = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.12, 0.22), accent));
     pauldron.position.y = 0.86;
     group.add(pauldron);
+  } else if (typeId === 'ranger') {
+    const hood = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.8), robe));
+    hood.position.y = 1.1;
+    group.add(hood);
+    const bow = addShadow(new THREE.Mesh(
+      new THREE.TorusGeometry(0.22, 0.014, 6, 14, Math.PI),
+      wood(0x7a5a32),
+    ));
+    bow.rotation.y = Math.PI / 2;
+    bow.position.set(-0.2, 0.7, -0.08);
+    group.add(bow);
   } else {
     const hat = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.28, 8), accent));
     hat.position.y = 1.28;
@@ -354,33 +548,88 @@ export function buildAdventurer(typeId) {
   label.position.y = 1.48;
   group.add(label);
 
+  const speech = makeSpeechSprite('…');
+  speech.position.y = 1.78;
+  speech.visible = false;
+  group.add(speech);
+
+  const pick = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 1.55, 0.5),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  pick.position.y = 0.78;
+  pick.userData.kind = 'customer';
+  group.add(pick);
+
   const hand = new THREE.Group();
   hand.name = 'hand';
   hand.position.set(0.18, 0.72, 0.12);
   group.add(hand);
 
   group.userData.hand = hand;
+  group.userData.pick = pick;
+  group.userData.speech = speech;
   return group;
 }
 
-function makeNameSprite(text) {
+export function setSpeechText(adventurer, text) {
+  const speech = adventurer.userData.speech;
+  if (!speech) return;
+  if (!text) {
+    speech.visible = false;
+    return;
+  }
+  speech.visible = true;
+  speech.material.map = speechTexture(text, true);
+  speech.material.needsUpdate = true;
+}
+
+function speechTexture(text, bubble = false) {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 64;
+  canvas.width = 320;
+  canvas.height = 80;
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 256, 64);
-  ctx.fillStyle = 'rgba(28, 18, 10, 0.72)';
-  roundRect(ctx, 16, 12, 224, 40, 10);
+  ctx.clearRect(0, 0, 320, 80);
+  ctx.fillStyle = bubble ? 'rgba(248, 232, 196, 0.92)' : 'rgba(28, 18, 10, 0.72)';
+  roundRect(ctx, 16, 10, 288, 48, 12);
   ctx.fill();
-  ctx.fillStyle = '#f6e4c4';
-  ctx.font = '600 28px Georgia, serif';
+  if (bubble) {
+    ctx.beginPath();
+    ctx.moveTo(150, 56);
+    ctx.lineTo(162, 56);
+    ctx.lineTo(156, 72);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = bubble ? '#3a240e' : '#f6e4c4';
+  ctx.font = bubble ? '700 26px Georgia, serif' : '600 28px Georgia, serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 128, 34);
+  ctx.fillText(text, 160, 35);
   const map = new THREE.CanvasTexture(canvas);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map, transparent: true, depthTest: false }));
+  map.needsUpdate = true;
+  return map;
+}
+
+function makeNameSprite(text) {
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: speechTexture(text, false),
+    transparent: true,
+    depthTest: false,
+  }));
   sprite.scale.set(0.9, 0.22, 1);
   sprite.renderOrder = 2;
+  return sprite;
+}
+
+function makeSpeechSprite(text) {
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: speechTexture(text, true),
+    transparent: true,
+    depthTest: false,
+  }));
+  sprite.scale.set(1.15, 0.3, 1);
+  sprite.renderOrder = 3;
   return sprite;
 }
 

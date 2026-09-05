@@ -20,23 +20,43 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 
 ## How to play
 
-1. Press a craft button. Each recipe spends one material and a short wait.
-2. Finished wares appear on a table. Click a table if you want to choose the stall.
-3. Travelers come in through the door. Pilgrims like Trailbread and Waycloak. Mercenaries look for a Thornpike. Hedge mages look for an Emberflask or a Waycloak.
-4. A sale happens at the counter, then your gold goes up.
+1. Press a craft button under **Arms**, **Armour**, or **Provisions**. Recipes spend materials, sometimes gold, and a short wait.
+2. Finished gear goes in the wooden **chest** by the counter. Click the chest — or the Chest button — to see it. Click a table, then **Place on stall** if you want it on display.
+3. Adventurers walk in and ask for a named piece (speech bubble). Mercenaries want melee gear, rangers want bows and hide, hedge mages want staves and veils.
+4. **Click the traveler** to open trade: **Sell** if you have the item, **Refuse** to send them off, or **Buy their goods** for a scrap of material.
 5. Restock materials with gold when the bins run low.
 6. Optional: drop a `.glb` or `.gltf` file onto the upload box. Tag it **Furniture** to replace the selected table, or **Ware** to change how a recipe looks. Models stay in this browser only.
 
-You start with 40 gold and a little Grain, Embercap, Ironbark, and Woolspool.
+You start with 40 gold and a little of each material, enough to craft a first Ironedge, Ashlong, or Emberrod.
 
 ## Recipes
 
-| Ware | Material | Time | Sells | Likely buyers |
+Provisions from the old roadside stall still sell.
+
+| Ware | Cost | Time | Sells | Likely buyers |
 | --- | --- | --- | --- | --- |
 | Trailbread | Grain | 8s | 12g | Pilgrim |
 | Emberflask | Embercap | 12s | 22g | Hedge mage |
 | Thornpike | Ironbark | 16s | 30g | Mercenary |
 | Waycloak | Woolspool | 14s | 26g | Pilgrim, Hedge mage |
+
+### Arms
+
+| Ware | Class | Cost | Time | Sells |
+| --- | --- | --- | --- | --- |
+| Ironedge | Melee | Dulliron + 3g | 8s | 20g |
+| Steelcleaver | Melee | Brightsteel + Dulliron + 6g | 12s | 38g |
+| Starfang | Melee | Starvein + Brightsteel + 10g | 16s | 62g |
+| Ashlong | Range | Bowheart + 3g | 8s | 20g |
+| Heartstring | Range | Bowheart + Moonstring + 6g | 12s | 36g |
+| Skysplit | Range | Bowheart + Moonstring + Gleamcrystal + 10g | 16s | 60g |
+| Emberrod | Magic | Embercap + Ironbark + 3g | 8s | 22g |
+| Gleamstave | Magic | Gleamcrystal + Ironbark + 6g | 12s | 40g |
+| Veilstaff | Magic | Gleamcrystal + Veilsilk + 10g | 16s | 64g |
+
+### Armour
+
+Each class has a helm and a body in two tiers (Iron / Steel, Hide / Scout, Veil / Gleam). Recipes use Platescrap, Hideleather, or Veilsilk plus the matching metal, string, or crystal.
 
 ## For tinkerers
 

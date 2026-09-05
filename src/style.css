@@ -41,6 +41,7 @@ body {
   display: grid;
   gap: 10px;
   pointer-events: none;
+  z-index: 2;
 }
 
 #hud .panel,
@@ -277,7 +278,12 @@ button:disabled {
   display: grid;
   place-items: center;
   background: rgba(16, 10, 6, 0.55);
-  z-index: 5;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+body.modal-open #view {
+  pointer-events: none;
 }
 
 .modal[hidden],

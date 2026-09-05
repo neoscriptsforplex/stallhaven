@@ -372,7 +372,7 @@ export const CUSTOMERS = {
     id: 'pilgrim',
     name: 'Pilgrim',
     combatClass: null,
-    prefers: ['trailbread', 'waycloak'],
+    prefers: ['trailbread', 'trailbread', 'waycloak'],
     patient: true,
     leaveIfEmpty: false,
     robe: 0xc8b48a,

@@ -125,16 +125,24 @@ export function bindHud(root, state, world) {
     }
   });
 
+  function setModalOpen() {
+    const open = !chestModal.hidden || !tradeModal.hidden || !tooltip.hidden;
+    document.body.classList.toggle('modal-open', open);
+  }
+
   function openChest() {
     closeTrade();
     paintChest();
     chestModal.hidden = false;
     world.setChestOpen(true);
+    setModalOpen();
   }
 
   function closeChest() {
     chestModal.hidden = true;
     world.setChestOpen(false);
+    world.ignorePicks(280);
+    setModalOpen();
   }
 
   function paintChest() {
@@ -158,13 +166,18 @@ export function bindHud(root, state, world) {
     if (!actor || actor.state === 'leave') return;
     closeChest();
     tradeActor = actor;
+    world.setTrading(actor.id);
     paintTrade();
     tradeModal.hidden = false;
+    setModalOpen();
   }
 
   function closeTrade() {
     tradeModal.hidden = true;
     tradeActor = null;
+    world.setTrading(null);
+    world.ignorePicks(280);
+    setModalOpen();
   }
 
   function paintTrade() {
@@ -200,12 +213,13 @@ export function bindHud(root, state, world) {
       closeTrade();
       return;
     }
-    const paid = sellToCustomer(state, actor.requestRecipeId, actor.offerGold);
+    const recipeId = actor.requestRecipeId;
+    const paid = sellToCustomer(state, recipeId, actor.offerGold);
     if (!paid) {
       paintTrade();
       return;
     }
-    pushLog(state, `Sold ${RECIPES[actor.requestRecipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${paid}g.`);
+    pushLog(state, `Sold ${RECIPES[recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${paid}g.`);
     world.sellToActor(actor);
     world.syncDisplays();
     closeTrade();
@@ -249,7 +263,10 @@ export function bindHud(root, state, world) {
   dismiss.addEventListener('click', () => {
     tooltip.hidden = true;
     localStorage.setItem('stallhaven-tip', '1');
+    world.ignorePicks(280);
+    setModalOpen();
   });
+  setModalOpen();
 
   let lastStockKey = null;
   let lastLogKey = null;

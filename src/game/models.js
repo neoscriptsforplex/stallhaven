@@ -554,12 +554,21 @@ export function buildAdventurer(typeId) {
   group.add(speech);
 
   const pick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.55, 1.55, 0.5),
+    new THREE.BoxGeometry(0.7, 1.7, 0.62),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  pick.position.y = 0.78;
+  pick.position.y = 0.85;
   pick.userData.kind = 'customer';
   group.add(pick);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.28, 0.4, 24),
+    new THREE.MeshBasicMaterial({ color: 0xe8b45a, transparent: true, opacity: 0.0, side: THREE.DoubleSide }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.04;
+  ring.visible = false;
+  group.add(ring);
 
   const hand = new THREE.Group();
   hand.name = 'hand';
@@ -569,6 +578,7 @@ export function buildAdventurer(typeId) {
   group.userData.hand = hand;
   group.userData.pick = pick;
   group.userData.speech = speech;
+  group.userData.ring = ring;
   return group;
 }
 

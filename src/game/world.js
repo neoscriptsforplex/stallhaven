@@ -11,7 +11,7 @@ import {
   SPAWN_GAP_MIN,
   decideRequest,
 } from './catalog.js';
-import { pushLog } from './economy.js';
+import { hasStock, pushLog } from './economy.js';
 import {
   buildAdventurer,
   buildChest,
@@ -32,7 +32,7 @@ export function createWorld(canvas, state) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
@@ -133,6 +133,8 @@ export function createWorld(canvas, state) {
   let firstSpawn = true;
   let customerSerial = 1;
   let pickHandler = null;
+  let ignorePicksUntil = 0;
+  let tradingId = null;
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -166,20 +168,27 @@ export function createWorld(canvas, state) {
     pointerDown.t = performance.now();
   });
 
+  function modalBlocksWorld() {
+    return Boolean(document.querySelector('.modal:not([hidden])'));
+  }
+
   renderer.domElement.addEventListener('pointerup', (event) => {
     if (event.button !== 0) return;
+    if (performance.now() < ignorePicksUntil) return;
+    if (modalBlocksWorld()) return;
     const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
-    if (moved > 7) return;
+    if (moved > 8) return;
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
     const hits = raycaster.intersectObjects(allPicks(), false);
     if (!hits.length) return;
-    const data = hits[0].object.userData;
-    if (data.kind === 'customer') {
-      const actor = customers.find((c) => c.mesh.userData.pick === hits[0].object);
-      if (actor && actor.state !== 'leave') pickHandler?.({ type: 'customer', actor });
+    const customerHit = hits.find((h) => h.object.userData.kind === 'customer');
+    if (customerHit) {
+      const actor = customers.find((c) => c.mesh.userData.pick === customerHit.object);
+      if (actor && actor.state === 'request') pickHandler?.({ type: 'customer', actor });
       return;
     }
+    const data = hits[0].object.userData;
     if (data.kind === 'chest') {
       pickHandler?.({ type: 'chest' });
       return;
@@ -269,9 +278,10 @@ export function createWorld(canvas, state) {
     mesh.position.set(SHOP.door.x, 0, SHOP.door.z + 0.4);
     setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
     scene.add(mesh);
-    const browse = customers.length
-      ? { x: SHOP.browse.x + 0.85, z: SHOP.browse.z - 0.15 }
-      : { x: SHOP.browse.x - 0.35, z: SHOP.browse.z };
+    const usedRight = customers.some((c) => c.browse?.x > 0);
+    const browse = usedRight
+      ? { x: -1.25, z: 2.35 }
+      : { x: 1.25, z: 2.35 };
     const actor = {
       id: customerSerial,
       typeId,
@@ -311,6 +321,7 @@ export function createWorld(canvas, state) {
     actor.waitUntil = now + REQUEST_WAIT;
     actor.path = [];
     actor.mesh.rotation.y = Math.PI;
+    if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = true;
   }
 
   function dismissCustomer(actor, sold) {
@@ -323,6 +334,7 @@ export function createWorld(canvas, state) {
       actor.pendingCarry = null;
     }
     setSpeechText(actor.mesh, sold ? 'Thanks!' : null);
+    if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = false;
     actor.state = 'leave';
     actor.path = [{ x: SHOP.door.x, z: SHOP.door.z + 0.6 }];
   }
@@ -336,7 +348,12 @@ export function createWorld(canvas, state) {
           beginRequest(actor, now);
         }
       } else if (actor.state === 'request') {
-        actor.mesh.rotation.y += dt * 0.25;
+        actor.mesh.rotation.y = Math.PI + Math.sin(now * 1.4 + actor.id) * 0.12;
+        const have = hasStock(state, actor.requestRecipeId);
+        actor.mesh.userData.ring.material.opacity = actor.id === tradingId ? 0.95 : have ? 0.8 : 0.4;
+        actor.mesh.userData.ring.material.color.setHex(
+          actor.id === tradingId ? 0xf0d27a : have ? 0x8ecf4a : 0xe8b45a,
+        );
         if (now >= actor.waitUntil) {
           pushLog(state, `${CUSTOMERS[actor.typeId].name} grows tired and leaves.`);
           dismissCustomer(actor, false);
@@ -381,6 +398,12 @@ export function createWorld(canvas, state) {
     getSelectedName: () => SHOP.displays[state.selectedDisplay].name,
     setChestOpen(open) {
       chestOpen = Boolean(open);
+    },
+    ignorePicks(ms = 250) {
+      ignorePicksUntil = performance.now() + ms;
+    },
+    setTrading(id) {
+      tradingId = id;
     },
     onPick(handler) {
       pickHandler = handler;

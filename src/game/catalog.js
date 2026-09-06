@@ -543,8 +543,8 @@ export const SHOP = {
     { id: 'stand-left', name: 'Left armour stand', x: -3.15, z: 0.55, kind: 'stand' },
     { id: 'stand-right', name: 'Right armour stand', x: 3.15, z: 0.55, kind: 'stand' },
   ],
-  cameraStart: { x: 2.55, y: 3.15, z: -2.35 },
-  cameraTarget: { x: 0.05, y: 0.72, z: 0.85 },
+  cameraStart: { x: 1.15, y: 2.55, z: 6.15 },
+  cameraTarget: { x: 0, y: 0.85, z: -0.35 },
 };
 
 export const ARMOUR_SLOTS = ['helm', 'body', 'legs'];

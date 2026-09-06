@@ -97,6 +97,7 @@ export function createWorld(canvas, state) {
   const shopkeeper = buildShopkeeper();
   shopkeeper.position.set(SHOP.keeper.x, 0, SHOP.keeper.z);
   shopkeeper.rotation.y = 0;
+  shopkeeper.scale.setScalar(1.12);
   scene.add(shopkeeper);
 
   const anvil = buildAnvil();

@@ -169,8 +169,44 @@ export function createWorld(canvas, state) {
     glow.rotation.x = -Math.PI / 2;
     glow.position.y = 0.1;
     anchor.add(glow);
-    return { spot, anchor, furniture, wareAnchor, pick, glow, wareMesh: null, slotMeshes: emptySlots() };
+    return {
+      spot,
+      anchor,
+      furniture,
+      wareAnchor,
+      pick,
+      glow,
+      outline: null,
+      wareMesh: null,
+      slotMeshes: emptySlots(),
+    };
   });
+
+  const outlineEdgeMat = new THREE.LineBasicMaterial({
+    color: 0xf0d27a,
+    transparent: true,
+    opacity: 0.95,
+  });
+  const outlineBoxMat = new THREE.LineBasicMaterial({
+    color: 0xe3b34a,
+    transparent: true,
+    opacity: 0.82,
+  });
+  const outlineHaloMat = new THREE.MeshBasicMaterial({
+    color: 0xe3b34a,
+    side: THREE.BackSide,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+  });
+  const outlineScratch = {
+    box: new THREE.Box3(),
+    size: new THREE.Vector3(),
+    center: new THREE.Vector3(),
+    local: new THREE.Matrix4(),
+    inverse: new THREE.Matrix4(),
+  };
+  let outlineKey = '';
 
   const customers = [];
   let nextSpawnAt = FIRST_CUSTOMER_DELAY;
@@ -249,12 +285,88 @@ export function createWorld(canvas, state) {
     }
   });
 
-  function refreshSelection() {
-    displays.forEach((d, i) => {
-      d.glow.material.opacity = i === state.selectedDisplay ? 0.85 : 0.0;
+  function disposeOutline(slot) {
+    if (!slot.outline) return;
+    slot.anchor.remove(slot.outline);
+    slot.outline.traverse((child) => {
+      if (child.userData.outlineGeom && child.geometry) child.geometry.dispose();
     });
+    slot.outline = null;
   }
-  refreshSelection();
+
+  function addMeshOutline(slot, child, group) {
+    if (!child.isMesh || !child.geometry) return;
+    if (child.material?.visible === false) return;
+    child.updateWorldMatrix(true, false);
+    outlineScratch.inverse.copy(slot.anchor.matrixWorld).invert();
+    outlineScratch.local.copy(child.matrixWorld).premultiply(outlineScratch.inverse);
+
+    const halo = new THREE.Mesh(child.geometry, outlineHaloMat);
+    halo.applyMatrix4(outlineScratch.local);
+    halo.scale.multiplyScalar(1.06);
+    halo.renderOrder = 8;
+    group.add(halo);
+
+    const edges = new THREE.EdgesGeometry(child.geometry, 22);
+    const lines = new THREE.LineSegments(edges, outlineEdgeMat);
+    lines.applyMatrix4(outlineScratch.local);
+    lines.userData.outlineGeom = true;
+    lines.renderOrder = 9;
+    group.add(lines);
+  }
+
+  function applyOutline(slot, selected) {
+    disposeOutline(slot);
+    if (!selected) return;
+    slot.furniture.updateWorldMatrix(true, true);
+    slot.wareAnchor.updateWorldMatrix(true, true);
+    const group = new THREE.Group();
+    group.name = 'gold-outline';
+    slot.furniture.traverse((child) => addMeshOutline(slot, child, group));
+    slot.wareAnchor.traverse((child) => addMeshOutline(slot, child, group));
+
+    outlineScratch.box.makeEmpty();
+    outlineScratch.box.expandByObject(slot.furniture);
+    if (slot.wareAnchor.children.length) outlineScratch.box.expandByObject(slot.wareAnchor);
+    if (!outlineScratch.box.isEmpty()) {
+      outlineScratch.box.getSize(outlineScratch.size);
+      outlineScratch.box.getCenter(outlineScratch.center);
+      slot.anchor.worldToLocal(outlineScratch.center);
+      const boxGeom = new THREE.BoxGeometry(
+        outlineScratch.size.x + 0.08,
+        outlineScratch.size.y + 0.08,
+        outlineScratch.size.z + 0.08,
+      );
+      const boxEdges = new THREE.EdgesGeometry(boxGeom);
+      boxGeom.dispose();
+      const boxLines = new THREE.LineSegments(boxEdges, outlineBoxMat);
+      boxLines.position.copy(outlineScratch.center);
+      boxLines.userData.outlineGeom = true;
+      boxLines.renderOrder = 10;
+      group.add(boxLines);
+    }
+    slot.anchor.add(group);
+    slot.outline = group;
+  }
+
+  function refreshSelection(force = false) {
+    const selected = displays[state.selectedDisplay];
+    const wareIds = selected
+      ? [
+        selected.furniture?.uuid ?? '',
+        selected.wareMesh?.userData.recipeId ?? '',
+        ...ARMOUR_SLOTS.map((name) => selected.slotMeshes[name]?.userData.recipeId ?? ''),
+      ].join(':')
+      : '';
+    const key = `${state.selectedDisplay}:${wareIds}`;
+    displays.forEach((d, i) => {
+      d.glow.material.opacity = i === state.selectedDisplay ? 0.88 : 0.0;
+    });
+    if (!force && key === outlineKey) return;
+    outlineKey = key;
+    displays.forEach((d, i) => applyOutline(d, i === state.selectedDisplay));
+  }
+  refreshSelection(true);
 
   function makeWareMesh(recipeId) {
     const mesh = state.wareLooks[recipeId]
@@ -341,6 +453,7 @@ export function createWorld(canvas, state) {
     slot.furniture = furniture;
     slot.wareAnchor.position.y = wareTopY(furniture);
     slot.anchor.add(slot.wareAnchor);
+    refreshSelection(true);
   }
 
   function bindWareLook(recipeId, model) {
@@ -515,6 +628,13 @@ export function createWorld(canvas, state) {
     setDoorOpen(shopDoor, doorBusy, dt);
     syncDisplays();
     refreshSelection();
+    const selected = displays[state.selectedDisplay];
+    if (selected?.outline) {
+      const pulse = 0.62 + Math.sin(now * 3.1) * 0.22;
+      outlineHaloMat.opacity = pulse * 0.7;
+      outlineEdgeMat.opacity = 0.78 + Math.sin(now * 3.1) * 0.18;
+      outlineBoxMat.opacity = 0.68 + Math.sin(now * 2.4) * 0.2;
+    }
     updateCustomers(dt, now);
     renderer.render(scene, camera);
   }

@@ -3,7 +3,6 @@ import {
   CUSTOMERS,
   MATERIALS,
   RECIPES,
-  SHOP,
   classLabel,
   costLabel,
   materialList,
@@ -31,8 +30,7 @@ export function bindHud(root, state, world) {
   const tabsEl = document.querySelector('#craft-tabs');
   const stockEl = root.querySelector('#stock');
   const logEl = root.querySelector('#log');
-  const selectedEl = root.querySelector('#selected');
-  const chestCountEl = root.querySelector('#chest-count');
+  const chestCountEl = document.querySelector('#chest-count');
   const tooltip = document.querySelector('#tooltip');
   const dismiss = tooltip.querySelector('[data-dismiss]');
   const chestModal = document.querySelector('#chest-modal');
@@ -102,12 +100,6 @@ export function bindHud(root, state, world) {
     if (restock(state, btn.dataset.restock)) render(performance.now() / 1000);
   });
 
-  root.querySelector('#next-display').addEventListener('click', () => {
-    state.selectedDisplay = (state.selectedDisplay + 1) % SHOP.displays.length;
-    world.refreshSelection();
-    render(performance.now() / 1000);
-  });
-
   stockEl.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-stock]');
     if (!btn) return;
@@ -117,8 +109,6 @@ export function bindHud(root, state, world) {
     }
   });
 
-  root.querySelector('#open-anvil').addEventListener('click', () => openCraft());
-  root.querySelector('#open-chest').addEventListener('click', () => openChest());
   chestModal.querySelector('[data-chest-close]').addEventListener('click', closeChest);
   chestModal.addEventListener('click', (event) => {
     if (event.target === chestModal) closeChest();
@@ -304,7 +294,8 @@ export function bindHud(root, state, world) {
 
   function render(now) {
     goldEl.textContent = `${state.gold}g`;
-    chestCountEl.textContent = String(chestTotal(state));
+    const chestN = chestTotal(state);
+    chestCountEl.textContent = `${chestN} piece${chestN === 1 ? '' : 's'} waiting`;
     for (const mat of materialList()) {
       const count = matsEl.querySelector(`[data-count="${mat.id}"]`);
       if (count) count.textContent = `×${state.materials[mat.id]}`;
@@ -343,7 +334,6 @@ export function bindHud(root, state, world) {
       }
       if (!chestModal.hidden) paintChest();
     }
-    selectedEl.querySelector('[data-selected-name]').textContent = `Selected: ${SHOP.displays[state.selectedDisplay].name}`;
     const logKey = state.log.join('|');
     if (logKey !== lastLogKey) {
       lastLogKey = logKey;

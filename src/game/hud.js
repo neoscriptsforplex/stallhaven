@@ -102,6 +102,12 @@ export function bindHud(root, state, world) {
     if (restock(state, btn.dataset.restock)) render(performance.now() / 1000);
   });
 
+  root.querySelector('#next-display').addEventListener('click', () => {
+    state.selectedDisplay = (state.selectedDisplay + 1) % SHOP.displays.length;
+    world.refreshSelection();
+    render(performance.now() / 1000);
+  });
+
   stockEl.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-stock]');
     if (!btn) return;
@@ -337,7 +343,7 @@ export function bindHud(root, state, world) {
       }
       if (!chestModal.hidden) paintChest();
     }
-    selectedEl.textContent = `Selected: ${SHOP.displays[state.selectedDisplay].name}`;
+    selectedEl.querySelector('[data-selected-name]').textContent = `Selected: ${SHOP.displays[state.selectedDisplay].name}`;
     const logKey = state.log.join('|');
     if (logKey !== lastLogKey) {
       lastLogKey = logKey;

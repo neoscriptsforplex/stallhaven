@@ -149,15 +149,15 @@ export function createWorld(canvas, state) {
     wareAnchor.position.y = furniture.userData.stand ? 0 : furniture.userData.wareY;
     anchor.add(wareAnchor);
     const pickSize = spot.kind === 'stand'
-      ? [0.7, 1.7, 0.55]
+      ? [1.15, 2.05, 1.05]
       : spot.kind === 'shelf'
-        ? [1.45, 1.05, 0.55]
+        ? [1.55, 1.2, 0.7]
         : [1.45, 1.15, 1.0];
     const pick = new THREE.Mesh(
       new THREE.BoxGeometry(...pickSize),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    pick.position.y = spot.kind === 'shelf' ? 1.15 : spot.kind === 'stand' ? 0.85 : 0.6;
+    pick.position.y = spot.kind === 'shelf' ? 1.15 : spot.kind === 'stand' ? 0.95 : 0.6;
     pick.userData.kind = 'display';
     pick.userData.displayIndex = index;
     anchor.add(pick);

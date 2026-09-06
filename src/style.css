@@ -250,6 +250,16 @@ button:disabled {
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 0.9rem;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#next-display {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  padding: 4px 8px;
 }
 
 .drop {

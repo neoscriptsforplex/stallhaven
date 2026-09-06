@@ -17,12 +17,8 @@
         <h1>Stallhaven</h1>
         <div class="ledger-row">
           <p id="gold" class="gold">40g</p>
-          <button type="button" id="open-anvil" class="chest-btn">Anvil</button>
-          <button type="button" id="open-chest" class="chest-btn">Chest <span id="chest-count">0</span></button>
         </div>
       </header>
-
-      <p class="hint">Click the anvil to craft. Click a traveler to sell, refuse, or buy their scrap.</p>
 
       <section class="panel" aria-label="Materials">
         <h2>Materials</h2>
@@ -30,8 +26,6 @@
       </section>
 
       <section class="panel" id="stock" hidden aria-label="Chest wares"></section>
-
-      <p id="selected" class="selected"><span data-selected-name>Selected: Left front table</span> <button type="button" id="next-display">Next display</button></p>
 
       <section class="panel drop-wrap" aria-label="Model upload">
         <div id="drop" class="drop" role="button" tabindex="0">
@@ -44,12 +38,14 @@
       <ol id="log" class="log" aria-live="polite"></ol>
     </aside>
 
+    <p id="hint" class="hint">Click the anvil to craft. Click a traveler to sell, refuse, or buy their scrap.</p>
+
     <div id="tooltip" class="modal" hidden>
       <div class="sheet">
         <h2>Keep the stall</h2>
         <p>You stand behind the counter. Click the anvil to craft a sword, bow, staff, or armour. Finished gear goes in the wooden chest.</p>
         <p>Travelers come through the front door and ask for a piece by name. Click them to sell, refuse, or buy a scrap they offer — buying sends them on their way.</p>
-        <p>Click the chest — or the Chest button — to see your inventory. Click a table, wall shelf, or armour stand, then place a ware. Armour stands wear helm, body, and legs together.</p>
+        <p>Click the wooden chest to see your inventory. Click a table, wall shelf, or armour stand — it lights gold — then place a ware. Armour stands wear helm, body, and legs together.</p>
         <p>Spend gold to restock materials. Drag a model onto the drop zone if you want a custom table or ware look — nothing uploaded leaves your browser.</p>
         <button type="button" data-dismiss>Got it</button>
       </div>
@@ -58,6 +54,7 @@
     <div id="chest-modal" class="modal" hidden>
       <div class="sheet chest-sheet">
         <h2>Stall chest</h2>
+        <p class="chest-tally" id="chest-count">0 pieces waiting</p>
         <p>Crafted gear waits here. Place a piece on the selected table, shelf, or armour stand, or sell it when an adventurer asks.</p>
         <div id="chest-items"></div>
         <button type="button" class="ghost" data-chest-close>Close</button>

@@ -21,7 +21,7 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 ## How to play
 
 1. Click the **anvil** by the counter. In the anvil panel, craft under **Arms**, **Armour**, or **Provisions**. Recipes spend materials, sometimes gold, and a short wait. Close the panel when you are done.
-2. You stand behind the counter. Finished gear goes in the wooden **chest**. Click the chest — or the Chest button — to see it. Click a table, wall shelf, or armour stand, then **Place on stall**.
+2. You stand behind the counter. Finished gear goes in the wooden **chest**. Click the chest to see it. Click a table, wall shelf, or armour stand (it outlines in gold), then **Place on stall**.
 3. Adventurers come through the **front door** and ask for a named piece (speech bubble). Mercenaries want melee gear, rangers want bows and hide, hedge mages want staves and veils.
 4. **Click the traveler** to open trade: **Sell** if you have the item, **Refuse** to send them off, or **Buy their goods** for a scrap of material. Buying also sends them back out the door.
 5. Restock materials with gold when the bins run low.

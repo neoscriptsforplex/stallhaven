@@ -155,10 +155,10 @@ export function createWorld(canvas, state) {
   chest.rotation.y = -0.45;
   scene.add(chest);
   const chestPick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.98, 0.78, 0.68),
+    new THREE.BoxGeometry(1.12, 0.95, 0.82),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  chestPick.position.set(SHOP.chest.x, 0.38, SHOP.chest.z);
+  chestPick.position.set(SHOP.chest.x, 0.42, SHOP.chest.z);
   chestPick.rotation.y = -0.45;
   chestPick.userData.kind = 'chest';
   scene.add(chestPick);
@@ -184,13 +184,13 @@ export function createWorld(canvas, state) {
     const pickSize = spot.kind === 'stand'
       ? [1.15, 2.05, 1.05]
       : spot.kind === 'shelf'
-        ? [1.55, 1.2, 0.7]
+        ? [1.28, 0.95, 0.42]
         : [1.45, 1.15, 1.0];
     const pick = new THREE.Mesh(
       new THREE.BoxGeometry(...pickSize),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    pick.position.y = spot.kind === 'shelf' ? 1.15 : spot.kind === 'stand' ? 0.95 : 0.6;
+    pick.position.y = spot.kind === 'shelf' ? 1.18 : spot.kind === 'stand' ? 0.95 : 0.6;
     pick.userData.kind = 'display';
     pick.userData.displayIndex = index;
     anchor.add(pick);

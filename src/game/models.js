@@ -710,6 +710,9 @@ export function buildChest() {
   lid.add(latch);
   root.add(lid);
   root.userData.lid = lid;
+  const label = makeNameSprite('Chest');
+  label.position.y = 1.05;
+  root.add(label);
 
   return root;
 }

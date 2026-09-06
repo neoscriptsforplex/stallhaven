@@ -21,7 +21,7 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 ## How to play
 
 1. **Click the floor** to walk. The camera follows you — scroll or `-` / `=` to zoom, arrow keys to change the angle.
-2. Click the **anvil** (back-left of the counter). In the anvil panel, craft under **Arms**, **Armour**, or **Provisions**. Recipes spend materials, sometimes gold, and a short wait. Close the panel when you are done.
+2. Click the **anvil** (left of the counter). In the anvil panel, craft under **Arms**, **Armour**, or **Provisions**. Recipes spend materials, sometimes gold, and a short wait. Close the panel when you are done.
 3. Finished gear goes in the wooden **chest**. Click the chest to see it. Click a table, wall shelf, or armour stand (it outlines in gold), then **Place on stall**.
 4. Adventurers come through the **front door** and **line up at the counter**. The traveler at the front is who you trade with. Mercenaries want melee gear, rangers want bows and hide, hedge mages want staves and veils.
 5. **Click the traveler at the front** to open trade: **Sell** if you have the item, **Refuse** to send them off, or **Buy their goods** for a scrap of material. After sell, refuse, or buy they leave and the line advances.

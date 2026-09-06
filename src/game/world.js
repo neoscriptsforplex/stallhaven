@@ -105,10 +105,11 @@ export function createWorld(canvas, state) {
   anvil.rotation.y = 0.35;
   scene.add(anvil);
   const anvilPick = new THREE.Mesh(
-    new THREE.BoxGeometry(1.35, 1.35, 1.1),
+    new THREE.BoxGeometry(0.88, 1.12, 0.58),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  anvilPick.position.set(SHOP.anvil.x, 0.62, SHOP.anvil.z);
+  anvilPick.position.set(SHOP.anvil.x, 0.58, SHOP.anvil.z);
+  anvilPick.rotation.y = 0.35;
   anvilPick.userData.kind = 'anvil';
   scene.add(anvilPick);
   const anvilGlow = new THREE.Mesh(
@@ -124,10 +125,11 @@ export function createWorld(canvas, state) {
   chest.rotation.y = -0.45;
   scene.add(chest);
   const chestPick = new THREE.Mesh(
-    new THREE.BoxGeometry(1.05, 0.85, 0.8),
+    new THREE.BoxGeometry(0.98, 0.78, 0.68),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  chestPick.position.set(SHOP.chest.x, 0.4, SHOP.chest.z);
+  chestPick.position.set(SHOP.chest.x, 0.38, SHOP.chest.z);
+  chestPick.rotation.y = -0.45;
   chestPick.userData.kind = 'chest';
   scene.add(chestPick);
   const chestGlow = new THREE.Mesh(
@@ -183,21 +185,24 @@ export function createWorld(canvas, state) {
   });
 
   const outlineEdgeMat = new THREE.LineBasicMaterial({
-    color: 0xf0d27a,
+    color: 0xffc857,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.98,
+    toneMapped: false,
   });
   const outlineBoxMat = new THREE.LineBasicMaterial({
     color: 0xe3b34a,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.9,
+    toneMapped: false,
   });
   const outlineHaloMat = new THREE.MeshBasicMaterial({
-    color: 0xe3b34a,
+    color: 0xf0c14a,
     side: THREE.BackSide,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.58,
     depthWrite: false,
+    toneMapped: false,
   });
   const outlineScratch = {
     box: new THREE.Box3(),
@@ -269,7 +274,12 @@ export function createWorld(canvas, state) {
       if (actor && actor.state === 'request') pickHandler?.({ type: 'customer', actor });
       return;
     }
-    const data = hits[0].object.userData;
+    const chestHit = hits.find((h) => h.object.userData.kind === 'chest');
+    const closest = hits[0];
+    const preferChest = chestHit
+      && closest.object.userData.kind === 'anvil'
+      && chestHit.distance - closest.distance < 0.5;
+    const data = (preferChest ? chestHit : closest).object.userData;
     if (data.kind === 'chest') {
       pickHandler?.({ type: 'chest' });
       return;
@@ -303,7 +313,7 @@ export function createWorld(canvas, state) {
 
     const halo = new THREE.Mesh(child.geometry, outlineHaloMat);
     halo.applyMatrix4(outlineScratch.local);
-    halo.scale.multiplyScalar(1.06);
+    halo.scale.multiplyScalar(1.09);
     halo.renderOrder = 8;
     group.add(halo);
 
@@ -630,10 +640,9 @@ export function createWorld(canvas, state) {
     refreshSelection();
     const selected = displays[state.selectedDisplay];
     if (selected?.outline) {
-      const pulse = 0.62 + Math.sin(now * 3.1) * 0.22;
-      outlineHaloMat.opacity = pulse * 0.7;
-      outlineEdgeMat.opacity = 0.78 + Math.sin(now * 3.1) * 0.18;
-      outlineBoxMat.opacity = 0.68 + Math.sin(now * 2.4) * 0.2;
+      outlineHaloMat.opacity = 0.48 + Math.sin(now * 3.1) * 0.16;
+      outlineEdgeMat.opacity = 0.82 + Math.sin(now * 3.1) * 0.16;
+      outlineBoxMat.opacity = 0.72 + Math.sin(now * 2.4) * 0.18;
     }
     updateCustomers(dt, now);
     renderer.render(scene, camera);

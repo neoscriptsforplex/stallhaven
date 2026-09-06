@@ -20,10 +20,10 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 
 ## How to play
 
-1. Press a craft button under **Arms**, **Armour**, or **Provisions**. Recipes spend materials, sometimes gold, and a short wait.
-2. Finished gear goes in the wooden **chest** by the counter. Click the chest — or the Chest button — to see it. Click a table, then **Place on stall** if you want it on display.
-3. Adventurers walk in and ask for a named piece (speech bubble). Mercenaries want melee gear, rangers want bows and hide, hedge mages want staves and veils.
-4. **Click the traveler** to open trade: **Sell** if you have the item, **Refuse** to send them off, or **Buy their goods** for a scrap of material.
+1. Click the **anvil** by the counter. In the anvil panel, craft under **Arms**, **Armour**, or **Provisions**. Recipes spend materials, sometimes gold, and a short wait. Close the panel when you are done.
+2. You stand behind the counter. Finished gear goes in the wooden **chest**. Click the chest — or the Chest button — to see it. Click a table, wall shelf, or armour stand, then **Place on stall**.
+3. Adventurers come through the **front door** and ask for a named piece (speech bubble). Mercenaries want melee gear, rangers want bows and hide, hedge mages want staves and veils.
+4. **Click the traveler** to open trade: **Sell** if you have the item, **Refuse** to send them off, or **Buy their goods** for a scrap of material. Buying also sends them back out the door.
 5. Restock materials with gold when the bins run low.
 6. Optional: drop a `.glb` or `.gltf` file onto the upload box. Tag it **Furniture** to replace the selected table, or **Ware** to change how a recipe looks. Models stay in this browser only.
 
@@ -56,7 +56,7 @@ Provisions from the old roadside stall still sell.
 
 ### Armour
 
-Each class has a helm and a body in two tiers (Iron / Steel, Hide / Scout, Veil / Gleam). Recipes use Platescrap, Hideleather, or Veilsilk plus the matching metal, string, or crystal.
+Each class has a helm, body, and legs in two tiers (Iron / Steel, Hide / Scout, Veil / Gleam). Recipes use Platescrap, Hideleather, or Veilsilk plus the matching metal, string, or crystal. Place armour on a stand to wear the matching set on the mannequin.
 
 ## For tinkerers
 

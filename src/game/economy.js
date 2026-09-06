@@ -1,9 +1,14 @@
 import {
+  ARMOUR_SLOTS,
   CUSTOMERS,
   MATERIALS,
   OTHER_CHANCE,
   RECIPES,
+  SHOP,
   START_GOLD,
+  displayKind,
+  emptySlots,
+  matchingArmourIds,
   recipeCost,
 } from './catalog.js';
 
@@ -18,7 +23,11 @@ export function createState() {
     crafts: {},
     chest: {},
     ready: [],
-    displays: [{ ware: null, furnitureId: null }, { ware: null, furnitureId: null }],
+    displays: SHOP.displays.map(() => ({
+      ware: null,
+      furnitureId: null,
+      slots: emptySlots(),
+    })),
     selectedDisplay: 0,
     wareLooks: {},
     log: [],
@@ -79,9 +88,14 @@ export function addToChest(state, recipeId) {
   return true;
 }
 
+function displayHolds(display, recipeId) {
+  if (display.ware?.recipeId === recipeId) return true;
+  return ARMOUR_SLOTS.some((slot) => display.slots?.[slot] === recipeId);
+}
+
 export function hasStock(state, recipeId) {
   if (chestCount(state, recipeId) > 0) return true;
-  return state.displays.some((d) => d.ware?.recipeId === recipeId);
+  return state.displays.some((d) => displayHolds(d, recipeId));
 }
 
 export function takeStock(state, recipeId) {
@@ -92,9 +106,14 @@ export function takeStock(state, recipeId) {
     if (state.ready) state.ready = chestReadyIds(state);
     return true;
   }
-  const display = state.displays.find((d) => d.ware?.recipeId === recipeId);
+  const display = state.displays.find((d) => displayHolds(d, recipeId));
   if (!display) return false;
-  display.ware = null;
+  if (display.slots) {
+    for (const slot of ARMOUR_SLOTS) {
+      if (display.slots[slot] === recipeId) display.slots[slot] = null;
+    }
+  }
+  if (display.ware?.recipeId === recipeId) display.ware = null;
   refreshShowcases(state);
   return true;
 }
@@ -112,24 +131,68 @@ export function completeCrafts(state, nowSeconds) {
   return finished;
 }
 
-export function refreshShowcases(state) {
+function shownIds(state) {
+  const shown = new Set();
   for (const display of state.displays) {
-    if (display.ware && chestCount(state, display.ware.recipeId) < 1) {
-      display.ware = null;
+    if (display.ware) shown.add(display.ware.recipeId);
+    if (display.slots) {
+      for (const slot of ARMOUR_SLOTS) {
+        if (display.slots[slot]) shown.add(display.slots[slot]);
+      }
     }
   }
-  const shown = new Set(
-    state.displays.filter((d) => d.ware).map((d) => d.ware.recipeId),
-  );
-  for (const display of state.displays) {
-    if (display.ware) continue;
-    const next = Object.keys(state.chest).find((id) => (
-      state.chest[id] > 0 && !shown.has(id)
-    ));
-    if (next) {
-      display.ware = { recipeId: next };
-      shown.add(next);
+  return shown;
+}
+
+function fillStandSet(display, recipeId, ownedIds) {
+  display.slots = matchingArmourIds(recipeId, ownedIds);
+  const filled = ARMOUR_SLOTS.map((slot) => display.slots[slot]).filter(Boolean);
+  display.ware = filled.length ? { recipeId: filled.includes(recipeId) ? recipeId : filled[0] } : null;
+}
+
+export function refreshShowcases(state) {
+  for (const [index, display] of state.displays.entries()) {
+    if (!display.slots) display.slots = emptySlots();
+    const kind = displayKind(index);
+    if (kind === 'stand') {
+      for (const slot of ARMOUR_SLOTS) {
+        const id = display.slots[slot];
+        if (id && chestCount(state, id) < 1) display.slots[slot] = null;
+      }
+      const focus = display.ware?.recipeId;
+      if (focus && chestCount(state, focus) > 0 && RECIPES[focus]?.category === 'armour') {
+        fillStandSet(display, focus, Object.keys(state.chest).filter((id) => chestCount(state, id) > 0));
+      } else {
+        const filled = ARMOUR_SLOTS.map((slot) => display.slots[slot]).filter(Boolean);
+        display.ware = filled.length ? { recipeId: filled[0] } : null;
+      }
+    } else if (display.ware && chestCount(state, display.ware.recipeId) < 1) {
+      display.ware = null;
+      display.slots = emptySlots();
     }
+  }
+
+  const shown = shownIds(state);
+  const chestIds = Object.keys(state.chest).filter((id) => state.chest[id] > 0);
+
+  for (const [index, display] of state.displays.entries()) {
+    if (displayKind(index) !== 'stand') continue;
+    if (ARMOUR_SLOTS.some((slot) => display.slots[slot])) continue;
+    const next = chestIds.find((id) => !shown.has(id) && RECIPES[id]?.category === 'armour');
+    if (!next) continue;
+    fillStandSet(display, next, chestIds);
+    for (const slot of ARMOUR_SLOTS) {
+      if (display.slots[slot]) shown.add(display.slots[slot]);
+    }
+  }
+
+  for (const [index, display] of state.displays.entries()) {
+    if (displayKind(index) === 'stand') continue;
+    if (display.ware) continue;
+    const next = chestIds.find((id) => !shown.has(id));
+    if (!next) continue;
+    display.ware = { recipeId: next };
+    shown.add(next);
   }
 }
 
@@ -141,7 +204,15 @@ export function placeFromChest(state, recipeId, displayIndex = state.selectedDis
   if (chestCount(state, recipeId) < 1) return false;
   const display = state.displays[displayIndex];
   if (!display) return false;
+  if (!display.slots) display.slots = emptySlots();
+  const recipe = RECIPES[recipeId];
+  if (displayKind(displayIndex) === 'stand' && recipe?.category === 'armour') {
+    const owned = Object.keys(state.chest).filter((id) => chestCount(state, id) > 0);
+    fillStandSet(display, recipeId, owned);
+    return true;
+  }
   display.ware = { recipeId };
+  display.slots = emptySlots();
   return true;
 }
 

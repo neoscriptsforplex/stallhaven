@@ -27,8 +27,8 @@ import {
 export function bindHud(root, state, world) {
   const goldEl = root.querySelector('#gold');
   const matsEl = root.querySelector('#materials');
-  const craftsEl = root.querySelector('#crafts');
-  const tabsEl = root.querySelector('#craft-tabs');
+  const craftsEl = document.querySelector('#crafts');
+  const tabsEl = document.querySelector('#craft-tabs');
   const stockEl = root.querySelector('#stock');
   const logEl = root.querySelector('#log');
   const selectedEl = root.querySelector('#selected');
@@ -38,6 +38,7 @@ export function bindHud(root, state, world) {
   const chestModal = document.querySelector('#chest-modal');
   const chestItems = document.querySelector('#chest-items');
   const tradeModal = document.querySelector('#trade-modal');
+  const craftModal = document.querySelector('#craft-modal');
 
   let craftTab = 'weapon';
   let tradeActor = null;
@@ -126,12 +127,27 @@ export function bindHud(root, state, world) {
   });
 
   function setModalOpen() {
-    const open = !chestModal.hidden || !tradeModal.hidden || !tooltip.hidden;
+    const open = !chestModal.hidden || !tradeModal.hidden || !tooltip.hidden || !craftModal.hidden;
     document.body.classList.toggle('modal-open', open);
+  }
+
+  function openCraft() {
+    closeChest();
+    closeTrade();
+    craftModal.hidden = false;
+    setModalOpen();
+    render(performance.now() / 1000);
+  }
+
+  function closeCraft() {
+    craftModal.hidden = true;
+    world.ignorePicks(280);
+    setModalOpen();
   }
 
   function openChest() {
     closeTrade();
+    closeCraft();
     paintChest();
     chestModal.hidden = false;
     world.setChestOpen(true);
@@ -165,6 +181,7 @@ export function bindHud(root, state, world) {
   function openTrade(actor) {
     if (!actor || actor.state === 'leave') return;
     closeChest();
+    closeCraft();
     tradeActor = actor;
     world.setTrading(actor.id);
     paintTrade();
@@ -242,7 +259,8 @@ export function bindHud(root, state, world) {
     if (buyFromCustomer(state, actor.offer.materialId, actor.offer.price)) {
       const mat = MATERIALS[actor.offer.materialId];
       pushLog(state, `Bought ${mat.name} from ${CUSTOMERS[actor.typeId].name} for ${actor.offer.price}g.`);
-      paintTrade();
+      world.buyFromActor(actor);
+      closeTrade();
       render(performance.now() / 1000);
     }
   });
@@ -252,8 +270,14 @@ export function bindHud(root, state, world) {
     if (event.target === tradeModal) closeTrade();
   });
 
+  craftModal.querySelector('[data-craft-close]').addEventListener('click', closeCraft);
+  craftModal.addEventListener('click', (event) => {
+    if (event.target === craftModal) closeCraft();
+  });
+
   world.onPick((event) => {
     if (event.type === 'chest') openChest();
+    if (event.type === 'anvil') openCraft();
     if (event.type === 'customer') openTrade(event.actor);
   });
 
@@ -325,5 +349,5 @@ export function bindHud(root, state, world) {
     }
   }
 
-  return { render, openChest, openTrade };
+  return { render, openChest, openTrade, openCraft };
 }

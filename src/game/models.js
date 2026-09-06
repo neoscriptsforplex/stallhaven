@@ -73,28 +73,30 @@ export function buildStall() {
   right.position.x = 4.1;
   root.add(right);
 
-  const frontLeft = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.7, 2.7, 0.16), plaster));
-  frontLeft.position.set(-2.75, 1.4, 3.55);
+  const doorHalf = 0.58;
+  const wallSpan = 4.1 - doorHalf;
+  const frontLeft = addShadow(new THREE.Mesh(new THREE.BoxGeometry(wallSpan, 2.7, 0.16), plaster));
+  frontLeft.position.set(-4.1 + wallSpan / 2, 1.4, 3.58);
   root.add(frontLeft);
   const frontRight = frontLeft.clone();
-  frontRight.position.x = 2.75;
+  frontRight.position.x = 4.1 - wallSpan / 2;
   root.add(frontRight);
 
-  const lintel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.55, 0.2), beam));
-  lintel.position.set(0, 2.45, 3.55);
+  const lintel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(doorHalf * 2 + 0.36, 0.38, 0.22), beam));
+  lintel.position.set(0, 2.52, 3.58);
   root.add(lintel);
-
-  const doorLeft = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.05, 0.18), beam));
-  doorLeft.position.set(-1.12, 1.1, 3.55);
-  root.add(doorLeft);
-  const doorRight = doorLeft.clone();
-  doorRight.position.x = 1.12;
-  root.add(doorRight);
-
-  const halfDoor = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.05, 0.08), wood(0x4a301c)));
-  halfDoor.position.set(-0.52, 0.62, 3.48);
-  halfDoor.rotation.y = 0.55;
-  root.add(halfDoor);
+  const postL = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.18, 0.2), beam));
+  postL.position.set(-doorHalf - 0.02, 1.14, 3.58);
+  root.add(postL);
+  const postR = postL.clone();
+  postR.position.x = doorHalf + 0.02;
+  root.add(postR);
+  const sill = addShadow(new THREE.Mesh(new THREE.BoxGeometry(doorHalf * 2 + 0.2, 0.08, 0.42), wood(0x4a301c)));
+  sill.position.set(0, 0.08, 3.62);
+  root.add(sill);
+  const stoop = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.1, 0.7), wood(0x5a3b22, 0.92)));
+  stoop.position.set(0, 0.04, 4.12);
+  root.add(stoop);
 
   const posts = [
     [-3.7, 3.45],
@@ -235,6 +237,195 @@ export function buildDefaultTable() {
   return group;
 }
 
+export function buildShopDoor() {
+  const root = new THREE.Group();
+  root.name = 'shop-door';
+  const hinge = new THREE.Group();
+  hinge.position.set(-0.56, 0, 3.58);
+  const leaf = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.05, 0.07), wood(0x4a301c, 0.72)));
+  leaf.position.set(0.55, 1.1, 0);
+  hinge.add(leaf);
+  const brace = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.08, 0.09), wood(0x2f1c10)));
+  brace.position.set(0.55, 0.42, 0.02);
+  hinge.add(brace);
+  const brace2 = brace.clone();
+  brace2.position.y = 1.72;
+  hinge.add(brace2);
+  const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.95, 0.09), metal(0xb08a3c)));
+  strap.position.set(0.12, 1.1, 0.02);
+  hinge.add(strap);
+  const strap2 = strap.clone();
+  strap2.position.x = 0.98;
+  hinge.add(strap2);
+  const window = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.32, 0.04),
+    new THREE.MeshStandardMaterial({
+      color: 0x7ec8e0,
+      roughness: 0.12,
+      metalness: 0.15,
+      transparent: true,
+      opacity: 0.55,
+    }),
+  ));
+  window.position.set(0.55, 1.55, 0.03);
+  hinge.add(window);
+  const handle = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), metal(0xc4a05a)));
+  handle.position.set(0.98, 1.02, 0.06);
+  hinge.add(handle);
+  root.add(hinge);
+  root.userData.hinge = hinge;
+  return root;
+}
+
+export function setDoorOpen(door, open, dt = 1) {
+  const hinge = door.userData.hinge;
+  if (!hinge) return;
+  const target = open ? -1.35 : 0.04;
+  hinge.rotation.y += (target - hinge.rotation.y) * Math.min(1, dt * 5);
+}
+
+export function buildShopkeeper() {
+  const group = new THREE.Group();
+  group.name = 'shopkeeper';
+  const skin = new THREE.MeshStandardMaterial({ color: 0xe2c2a0, roughness: 0.68 });
+  const shirt = new THREE.MeshStandardMaterial({ color: 0x5a3a24, roughness: 0.86 });
+  const apron = cloth(0xd8c49a, 0.9);
+  const hair = new THREE.MeshStandardMaterial({ color: 0x3a2416, roughness: 0.8 });
+
+  const legs = addShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.28, 4, 8), cloth(0x3a2a1c)));
+  legs.position.y = 0.32;
+  group.add(legs);
+  const body = addShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.36, 4, 10), shirt));
+  body.position.y = 0.78;
+  group.add(body);
+  const bib = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 0.08), apron));
+  bib.position.set(0, 0.72, 0.12);
+  group.add(bib);
+  const skirt = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.16), apron));
+  skirt.position.set(0, 0.48, 0.06);
+  group.add(skirt);
+  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), skin));
+  head.position.y = 1.18;
+  group.add(head);
+  const haircap = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.7), hair));
+  haircap.position.y = 1.22;
+  group.add(haircap);
+  const armL = addShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.28, 3, 8), shirt));
+  armL.position.set(-0.22, 0.78, 0.02);
+  armL.rotation.z = 0.18;
+  group.add(armL);
+  const armR = armL.clone();
+  armR.position.x = 0.22;
+  armR.rotation.z = -0.18;
+  group.add(armR);
+  const label = makeNameSprite('You');
+  label.position.y = 1.55;
+  group.add(label);
+  return group;
+}
+
+export function buildAnvil() {
+  const group = new THREE.Group();
+  group.name = 'anvil';
+  const iron = metal(0x4a4e54);
+  const dark = metal(0x2a2c30);
+  const stump = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.22, 10), wood(0x4a301c)));
+  stump.position.y = 0.12;
+  group.add(stump);
+  const waist = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.18), dark));
+  waist.position.y = 0.32;
+  group.add(waist);
+  const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.18, 0.26), iron));
+  body.position.y = 0.5;
+  group.add(body);
+  const horn = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.08, 0.28, 8), iron));
+  horn.rotation.z = Math.PI / 2;
+  horn.position.set(-0.36, 0.5, 0);
+  group.add(horn);
+  const heel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.22), iron));
+  heel.position.set(0.3, 0.47, 0);
+  group.add(heel);
+  const face = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.04, 0.22), metal(0x8a9098)));
+  face.position.y = 0.6;
+  group.add(face);
+  const hammer = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.38, 6), wood(0x5a3a22)));
+  hammer.position.set(0.22, 0.72, 0.16);
+  hammer.rotation.z = 0.7;
+  group.add(hammer);
+  const head = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 0.05), iron));
+  head.position.set(0.36, 0.84, 0.16);
+  group.add(head);
+  group.userData.wareY = 0.64;
+  return group;
+}
+
+export function buildWallShelf() {
+  const group = new THREE.Group();
+  group.name = 'shelf';
+  const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.07, 0.38), wood(0x7a5230)));
+  board.position.y = 1.38;
+  group.add(board);
+  const board2 = board.clone();
+  board2.position.y = 0.92;
+  group.add(board2);
+  const bracket = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.7, 0.08), wood(0x3f2716)));
+  bracket.position.set(-0.55, 1.12, -0.12);
+  group.add(bracket);
+  const bracket2 = bracket.clone();
+  bracket2.position.x = 0.55;
+  group.add(bracket2);
+  const back = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.82, 0.05), wood(0x4e301c)));
+  back.position.set(0, 1.15, -0.18);
+  group.add(back);
+  group.userData.wareY = 1.46;
+  return group;
+}
+
+export function buildArmourStand() {
+  const group = new THREE.Group();
+  group.name = 'armour-stand';
+  const pole = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1.42, 8), wood(0x3f2716)));
+  pole.position.y = 0.72;
+  group.add(pole);
+  const base = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.08, 10), wood(0x4a301c)));
+  base.position.y = 0.04;
+  group.add(base);
+  const hips = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.05, 0.1), wood(0x5a3b22)));
+  hips.position.y = 0.52;
+  group.add(hips);
+  const shoulders = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.1), wood(0x5a3b22)));
+  shoulders.position.y = 1.18;
+  group.add(shoulders);
+  const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.16, 8), wood(0x3f2716)));
+  neck.position.y = 1.3;
+  group.add(neck);
+  const knob = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), wood(0x6a4324)));
+  knob.position.y = 1.42;
+  group.add(knob);
+  group.userData.wareY = 0;
+  group.userData.stand = true;
+  group.userData.slots = {
+    helm: { x: 0, y: 1.38, z: 0 },
+    body: { x: 0, y: 0.78, z: 0 },
+    legs: { x: 0, y: 0.28, z: 0 },
+    ware: { x: 0.16, y: 0.62, z: 0.08 },
+  };
+  return group;
+}
+
+export function buildFurniture(kind) {
+  if (kind === 'shelf') return buildWallShelf();
+  if (kind === 'stand') return buildArmourStand();
+  return buildDefaultTable();
+}
+
+export function slotPose(slot) {
+  if (slot === 'helm') return { x: 0, y: 1.38, z: 0 };
+  if (slot === 'body') return { x: 0, y: 0.78, z: 0 };
+  if (slot === 'legs') return { x: 0, y: 0.28, z: 0 };
+  return { x: 0, y: 0.62, z: 0 };
+}
+
 export function buildWare(recipeId) {
   const recipe = RECIPES[recipeId];
   const group = new THREE.Group();
@@ -309,6 +500,8 @@ export function buildWare(recipeId) {
     addHelm(group, recipe.tint, recipe.combatClass);
   } else if (recipe?.slot === 'body') {
     addBody(group, recipe.tint, recipe.combatClass);
+  } else if (recipe?.slot === 'legs') {
+    addLegs(group, recipe.tint, recipe.combatClass);
   } else {
     const lump = addShadow(new THREE.Mesh(
       new THREE.BoxGeometry(0.28, 0.18, 0.22),
@@ -438,6 +631,34 @@ function addBody(group, tint, combatClass) {
   const collar = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.18), metal(0xc4a05a)));
   collar.position.y = 0.42;
   group.add(collar);
+}
+
+function addLegs(group, tint, combatClass) {
+  if (combatClass === 'magic') {
+    const wrap = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.38, 10), cloth(tint)));
+    wrap.position.y = 0.2;
+    group.add(wrap);
+    const hem = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.018, 8, 14), cloth(0xc4a05a)));
+    hem.rotation.x = Math.PI / 2;
+    hem.position.y = 0.04;
+    group.add(hem);
+    return;
+  }
+  const mat = combatClass === 'range' ? cloth(tint) : metal(tint);
+  const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.12), mat));
+  left.position.set(-0.08, 0.2, 0);
+  group.add(left);
+  const right = left.clone();
+  right.position.x = 0.08;
+  group.add(right);
+  if (combatClass === 'melee') {
+    const knee = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.06, 0.13), metal(0xc4a05a)));
+    knee.position.set(-0.08, 0.22, 0.02);
+    group.add(knee);
+    const knee2 = knee.clone();
+    knee2.position.x = 0.08;
+    group.add(knee2);
+  }
 }
 
 export function buildChest() {

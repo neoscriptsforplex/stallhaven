@@ -21,17 +21,11 @@
         </div>
       </header>
 
-      <p class="hint">Craft into the chest. Click a traveler to sell or refuse.</p>
+      <p class="hint">Click the anvil to craft. Click a traveler to sell, refuse, or buy their scrap.</p>
 
       <section class="panel" aria-label="Materials">
         <h2>Materials</h2>
         <div id="materials"></div>
-      </section>
-
-      <section class="panel" aria-label="Craft">
-        <h2>Craft</h2>
-        <div id="craft-tabs" class="tabs"></div>
-        <div id="crafts"></div>
       </section>
 
       <section class="panel" id="stock" hidden aria-label="Chest wares"></section>
@@ -52,9 +46,9 @@
     <div id="tooltip" class="modal" hidden>
       <div class="sheet">
         <h2>Keep the stall</h2>
-        <p>Craft a sword, bow, staff, or armour. Finished gear goes in the wooden chest by the counter.</p>
-        <p>Travelers walk in and ask for a piece by name. Click them to sell, refuse, or buy a scrap they offer.</p>
-        <p>Click the chest — or the Chest button — to see your inventory. Click a table to choose which stall to dress.</p>
+        <p>You stand behind the counter. Click the anvil to craft a sword, bow, staff, or armour. Finished gear goes in the wooden chest.</p>
+        <p>Travelers come through the front door and ask for a piece by name. Click them to sell, refuse, or buy a scrap they offer — buying sends them on their way.</p>
+        <p>Click the chest — or the Chest button — to see your inventory. Click a table, wall shelf, or armour stand, then place a ware. Armour stands wear helm, body, and legs together.</p>
         <p>Spend gold to restock materials. Drag a model onto the drop zone if you want a custom table or ware look — nothing uploaded leaves your browser.</p>
         <button type="button" data-dismiss>Got it</button>
       </div>
@@ -63,9 +57,19 @@
     <div id="chest-modal" class="modal" hidden>
       <div class="sheet chest-sheet">
         <h2>Stall chest</h2>
-        <p>Crafted gear waits here. Place a piece on the selected stall, or sell it when an adventurer asks.</p>
+        <p>Crafted gear waits here. Place a piece on the selected table, shelf, or armour stand, or sell it when an adventurer asks.</p>
         <div id="chest-items"></div>
         <button type="button" class="ghost" data-chest-close>Close</button>
+      </div>
+    </div>
+
+    <div id="craft-modal" class="modal" hidden>
+      <div class="sheet craft-sheet">
+        <h2>Anvil</h2>
+        <p>Work a ware here. Finished pieces land in the chest.</p>
+        <div id="craft-tabs" class="tabs"></div>
+        <div id="crafts"></div>
+        <button type="button" class="ghost" data-craft-close>Close</button>
       </div>
     </div>
 

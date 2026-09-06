@@ -4,8 +4,10 @@ import {
   CUSTOMERS,
   MATERIALS,
   RECIPES,
+  SHOP,
   START_GOLD,
   decideRequest,
+  matchingArmourIds,
   recipeCost,
   recipeList,
 } from './catalog.js';
@@ -75,7 +77,8 @@ describe('stall economy', () => {
     assert.equal(chestTotal(state), 3);
     sellFromDisplay(state, 0);
     assert.equal(chestTotal(state), 2);
-    assert.ok(state.displays[0].ware);
+    assert.equal(hasStock(state, 'emberflask'), true);
+    assert.equal(hasStock(state, 'thornpike'), true);
   });
 
   it('crafts a sword that spends gold and more than one material', () => {
@@ -99,6 +102,21 @@ describe('stall economy', () => {
     assert.equal(placeFromChest(state, 'ironedge', 1), true);
     assert.equal(state.displays[1].ware.recipeId, 'ironedge');
     assert.equal(state.chest.ironedge, 1);
+  });
+
+  it('puts a matching armour set on a stand', () => {
+    const state = createState();
+    state.materials.platescrap += 2;
+    startCraft(state, 'ironhelm', 0);
+    startCraft(state, 'ironmail', 0);
+    startCraft(state, 'ironlegs', 0);
+    completeCrafts(state, 20);
+    const standIndex = SHOP.displays.findIndex((d) => d.kind === 'stand');
+    assert.ok(standIndex >= 0);
+    assert.equal(placeFromChest(state, 'ironhelm', standIndex), true);
+    assert.equal(state.displays[standIndex].slots.helm, 'ironhelm');
+    assert.equal(state.displays[standIndex].slots.body, 'ironmail');
+    assert.equal(state.displays[standIndex].slots.legs, 'ironlegs');
   });
 });
 
@@ -185,8 +203,24 @@ describe('catalog', () => {
     for (const cls of ['melee', 'range', 'magic']) {
       const helms = recipeList().filter((r) => r.combatClass === cls && r.slot === 'helm');
       const bodies = recipeList().filter((r) => r.combatClass === cls && r.slot === 'body');
+      const legs = recipeList().filter((r) => r.combatClass === cls && r.slot === 'legs');
       assert.ok(helms.length >= 2, cls);
       assert.ok(bodies.length >= 2, cls);
+      assert.ok(legs.length >= 2, cls);
     }
+  });
+
+  it('keeps at least four display spots plus shelves and armour stands', () => {
+    assert.ok(SHOP.displays.length >= 4);
+    assert.ok(SHOP.displays.filter((d) => d.kind === 'table').length >= 4);
+    assert.ok(SHOP.displays.some((d) => d.kind === 'shelf'));
+    assert.ok(SHOP.displays.some((d) => d.kind === 'stand'));
+  });
+
+  it('groups matching helm, body, and legs for a stand', () => {
+    const slots = matchingArmourIds('ironhelm', ['ironhelm', 'ironmail', 'ironlegs', 'steelhelm']);
+    assert.equal(slots.helm, 'ironhelm');
+    assert.equal(slots.body, 'ironmail');
+    assert.equal(slots.legs, 'ironlegs');
   });
 });

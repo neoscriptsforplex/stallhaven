@@ -318,8 +318,20 @@ body.modal-open #view {
 }
 
 .chest-sheet,
-.trade-sheet {
+.trade-sheet,
+.craft-sheet {
   width: min(460px, calc(100vw - 32px));
+}
+
+.craft-sheet {
+  max-height: min(80vh, 720px);
+  overflow: auto;
+}
+
+.craft-sheet #crafts {
+  max-height: 46vh;
+  overflow: auto;
+  margin-bottom: 10px;
 }
 
 .sheet {

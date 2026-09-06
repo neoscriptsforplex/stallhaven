@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
+  ARMOUR_SLOTS,
   CUSTOMERS,
   FIRST_CUSTOMER_DELAY,
   MAX_CUSTOMERS,
@@ -10,18 +11,25 @@ import {
   SPAWN_GAP_MAX,
   SPAWN_GAP_MIN,
   decideRequest,
+  displayKind,
+  emptySlots,
 } from './catalog.js';
 import { hasStock, pushLog } from './economy.js';
 import {
   buildAdventurer,
+  buildAnvil,
   buildChest,
-  buildDefaultTable,
   buildDust,
+  buildFurniture,
+  buildShopDoor,
+  buildShopkeeper,
   buildStall,
   buildWare,
   normalizeImported,
   setChestLid,
+  setDoorOpen,
   setSpeechText,
+  slotPose,
   wareTopY,
 } from './models.js';
 
@@ -78,8 +86,34 @@ export function createWorld(canvas, state) {
   scene.add(lantern2);
 
   scene.add(buildStall());
+  const shopDoor = buildShopDoor();
+  scene.add(shopDoor);
   const dust = buildDust();
   scene.add(dust);
+
+  const shopkeeper = buildShopkeeper();
+  shopkeeper.position.set(SHOP.keeper.x, 0, SHOP.keeper.z);
+  shopkeeper.rotation.y = 0;
+  scene.add(shopkeeper);
+
+  const anvil = buildAnvil();
+  anvil.position.set(SHOP.anvil.x, 0, SHOP.anvil.z);
+  anvil.rotation.y = 0.35;
+  scene.add(anvil);
+  const anvilPick = new THREE.Mesh(
+    new THREE.BoxGeometry(0.95, 1.05, 0.8),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  anvilPick.position.set(SHOP.anvil.x, 0.5, SHOP.anvil.z);
+  anvilPick.userData.kind = 'anvil';
+  scene.add(anvilPick);
+  const anvilGlow = new THREE.Mesh(
+    new THREE.RingGeometry(0.42, 0.54, 24),
+    new THREE.MeshBasicMaterial({ color: 0xe8b45a, transparent: true, opacity: 0.32, side: THREE.DoubleSide }),
+  );
+  anvilGlow.rotation.x = -Math.PI / 2;
+  anvilGlow.position.set(SHOP.anvil.x, 0.08, SHOP.anvil.z);
+  scene.add(anvilGlow);
 
   const chest = buildChest();
   chest.position.set(SHOP.chest.x, 0, SHOP.chest.z);
@@ -104,28 +138,34 @@ export function createWorld(canvas, state) {
   const displays = SHOP.displays.map((spot, index) => {
     const anchor = new THREE.Group();
     anchor.position.set(spot.x, 0, spot.z);
+    if (spot.kind === 'shelf') anchor.rotation.y = 0;
     scene.add(anchor);
-    const furniture = buildDefaultTable();
+    const furniture = buildFurniture(spot.kind);
     anchor.add(furniture);
     const wareAnchor = new THREE.Group();
-    wareAnchor.position.y = furniture.userData.wareY;
+    wareAnchor.position.y = furniture.userData.stand ? 0 : furniture.userData.wareY;
     anchor.add(wareAnchor);
+    const pickSize = spot.kind === 'stand'
+      ? [0.7, 1.7, 0.55]
+      : spot.kind === 'shelf'
+        ? [1.45, 1.05, 0.55]
+        : [1.45, 1.15, 1.0];
     const pick = new THREE.Mesh(
-      new THREE.BoxGeometry(1.5, 1.15, 1.05),
+      new THREE.BoxGeometry(...pickSize),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    pick.position.y = 0.6;
+    pick.position.y = spot.kind === 'shelf' ? 1.15 : spot.kind === 'stand' ? 0.85 : 0.6;
     pick.userData.kind = 'display';
     pick.userData.displayIndex = index;
     anchor.add(pick);
     const glow = new THREE.Mesh(
-      new THREE.RingGeometry(0.78, 0.9, 24),
+      new THREE.RingGeometry(spot.kind === 'stand' ? 0.32 : 0.72, spot.kind === 'stand' ? 0.44 : 0.86, 24),
       new THREE.MeshBasicMaterial({ color: 0xe8b45a, transparent: true, opacity: 0.0, side: THREE.DoubleSide }),
     );
     glow.rotation.x = -Math.PI / 2;
     glow.position.y = 0.1;
     anchor.add(glow);
-    return { spot, anchor, furniture, wareAnchor, pick, glow, wareMesh: null };
+    return { spot, anchor, furniture, wareAnchor, pick, glow, wareMesh: null, slotMeshes: emptySlots() };
   });
 
   const customers = [];
@@ -151,6 +191,7 @@ export function createWorld(canvas, state) {
     return [
       ...displays.map((d) => d.pick),
       chestPick,
+      anvilPick,
       ...customers.map((c) => c.mesh.userData.pick).filter(Boolean),
     ];
   }
@@ -193,6 +234,10 @@ export function createWorld(canvas, state) {
       pickHandler?.({ type: 'chest' });
       return;
     }
+    if (data.kind === 'anvil') {
+      pickHandler?.({ type: 'anvil' });
+      return;
+    }
     if (data.kind === 'display') {
       state.selectedDisplay = data.displayIndex;
       refreshSelection();
@@ -207,23 +252,76 @@ export function createWorld(canvas, state) {
   }
   refreshSelection();
 
-  function setDisplayWare(index, recipeId) {
-    const slot = displays[index];
+  function makeWareMesh(recipeId) {
+    const mesh = state.wareLooks[recipeId]
+      ? state.wareLooks[recipeId].clone(true)
+      : buildWare(recipeId);
+    mesh.userData.recipeId = recipeId;
+    return mesh;
+  }
+
+  function clearSlotMeshes(slot) {
+    for (const name of ARMOUR_SLOTS) {
+      if (slot.slotMeshes[name]) {
+        slot.wareAnchor.remove(slot.slotMeshes[name]);
+        slot.slotMeshes[name] = null;
+      }
+    }
     if (slot.wareMesh) {
       slot.wareAnchor.remove(slot.wareMesh);
       slot.wareMesh = null;
     }
+  }
+
+  function setDisplayWare(index, recipeId) {
+    const slot = displays[index];
+    clearSlotMeshes(slot);
     if (!recipeId) return;
-    const mesh = state.wareLooks[recipeId]
-      ? state.wareLooks[recipeId].clone(true)
-      : buildWare(recipeId);
+    const mesh = makeWareMesh(recipeId);
     mesh.position.set(0, 0, 0);
     slot.wareAnchor.add(mesh);
     slot.wareMesh = mesh;
   }
 
+  function setStandWares(index, slots, fallbackId) {
+    const slot = displays[index];
+    const want = { ...emptySlots(), ...slots };
+    const hasSet = ARMOUR_SLOTS.some((name) => want[name]);
+    if (!hasSet && fallbackId && RECIPES[fallbackId]?.category !== 'armour') {
+      if (slot.wareMesh?.userData.recipeId === fallbackId) return;
+      clearSlotMeshes(slot);
+      const mesh = makeWareMesh(fallbackId);
+      const pose = slotPose('ware');
+      mesh.position.set(pose.x, pose.y, pose.z);
+      mesh.scale.setScalar(0.85);
+      slot.wareAnchor.add(mesh);
+      slot.wareMesh = mesh;
+      return;
+    }
+    let dirty = false;
+    for (const name of ARMOUR_SLOTS) {
+      const have = slot.slotMeshes[name]?.userData.recipeId ?? null;
+      if (have !== (want[name] ?? null)) dirty = true;
+    }
+    if (!dirty && !(slot.wareMesh && !hasSet)) return;
+    clearSlotMeshes(slot);
+    for (const name of ARMOUR_SLOTS) {
+      const recipeId = want[name];
+      if (!recipeId) continue;
+      const mesh = makeWareMesh(recipeId);
+      const pose = slotPose(name);
+      mesh.position.set(pose.x, pose.y, pose.z);
+      slot.wareAnchor.add(mesh);
+      slot.slotMeshes[name] = mesh;
+    }
+  }
+
   function syncDisplays() {
     state.displays.forEach((d, i) => {
+      if (displayKind(i) === 'stand') {
+        setStandWares(i, d.slots ?? emptySlots(), d.ware?.recipeId ?? null);
+        return;
+      }
       const want = d.ware?.recipeId ?? null;
       const haveId = displays[i].wareMesh?.userData.recipeId ?? null;
       if (want !== haveId) setDisplayWare(i, want);
@@ -252,15 +350,22 @@ export function createWorld(canvas, state) {
   }
 
   function takeWareMesh(recipeId) {
-    const index = state.displays.findIndex((d) => d.ware?.recipeId === recipeId);
+    const index = state.displays.findIndex((d) => (
+      d.ware?.recipeId === recipeId || ARMOUR_SLOTS.some((name) => d.slots?.[name] === recipeId)
+    ));
     if (index < 0) {
-      const mesh = state.wareLooks[recipeId]
-        ? state.wareLooks[recipeId].clone(true)
-        : buildWare(recipeId);
+      const mesh = makeWareMesh(recipeId);
       mesh.scale.setScalar(0.7);
       return mesh;
     }
     const slot = displays[index];
+    const recipe = RECIPES[recipeId];
+    if (displayKind(index) === 'stand' && recipe?.slot && slot.slotMeshes[recipe.slot]) {
+      const mesh = slot.slotMeshes[recipe.slot];
+      slot.slotMeshes[recipe.slot] = null;
+      if (mesh) slot.wareAnchor.remove(mesh);
+      return mesh;
+    }
     const mesh = slot.wareMesh;
     slot.wareMesh = null;
     if (mesh) slot.wareAnchor.remove(mesh);
@@ -275,19 +380,23 @@ export function createWorld(canvas, state) {
     const request = decideRequest(typeId);
     const mesh = buildAdventurer(typeId);
     mesh.userData.pick.userData.customerId = customerSerial;
-    mesh.position.set(SHOP.door.x, 0, SHOP.door.z + 0.4);
+    mesh.position.set(SHOP.outside.x, 0, SHOP.outside.z + 0.15);
     setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
     scene.add(mesh);
     const usedRight = customers.some((c) => c.browse?.x > 0);
     const browse = usedRight
-      ? { x: -1.25, z: 2.35 }
-      : { x: 1.25, z: 2.35 };
+      ? { x: -1.15, z: 2.28 }
+      : { x: 1.15, z: 2.28 };
     const actor = {
       id: customerSerial,
       typeId,
       mesh,
       state: 'enter',
-      path: [browse],
+      path: [
+        { x: SHOP.door.x, z: SHOP.door.z + 0.35 },
+        { x: SHOP.door.x, z: SHOP.door.z - 0.45 },
+        browse,
+      ],
       waitUntil: 0,
       requestRecipeId: request.recipeId,
       offerGold: request.gold,
@@ -324,7 +433,7 @@ export function createWorld(canvas, state) {
     if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = true;
   }
 
-  function dismissCustomer(actor, sold) {
+  function dismissCustomer(actor, sold, farewell = null) {
     if (!actor || actor.state === 'leave') return;
     if (sold && actor.pendingCarry) {
       actor.mesh.userData.hand.add(actor.pendingCarry);
@@ -333,10 +442,14 @@ export function createWorld(canvas, state) {
       actor.carried = actor.pendingCarry;
       actor.pendingCarry = null;
     }
-    setSpeechText(actor.mesh, sold ? 'Thanks!' : null);
+    setSpeechText(actor.mesh, sold ? 'Thanks!' : farewell);
     if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = false;
     actor.state = 'leave';
-    actor.path = [{ x: SHOP.door.x, z: SHOP.door.z + 0.6 }];
+    actor.path = [
+      { x: SHOP.door.x, z: SHOP.door.z - 0.4 },
+      { x: SHOP.door.x, z: SHOP.door.z + 0.45 },
+      { x: SHOP.outside.x, z: SHOP.outside.z },
+    ];
   }
 
   function updateCustomers(dt, now) {
@@ -344,8 +457,11 @@ export function createWorld(canvas, state) {
     for (let i = customers.length - 1; i >= 0; i -= 1) {
       const actor = customers[i];
       if (actor.state === 'enter') {
-        if (!actor.path.length || walkToward(actor, actor.path[0], dt)) {
+        if (!actor.path.length) {
           beginRequest(actor, now);
+        } else if (walkToward(actor, actor.path[0], dt)) {
+          actor.path.shift();
+          if (!actor.path.length) beginRequest(actor, now);
         }
       } else if (actor.state === 'request') {
         actor.mesh.rotation.y = Math.PI + Math.sin(now * 1.4 + actor.id) * 0.12;
@@ -360,12 +476,15 @@ export function createWorld(canvas, state) {
         }
       } else if (actor.state === 'leave') {
         if (!actor.path.length || walkToward(actor, actor.path[0], dt)) {
-          if (actor.carried) {
-            actor.mesh.userData.hand.remove(actor.carried);
-            actor.carried = null;
+          if (actor.path.length) actor.path.shift();
+          if (!actor.path.length) {
+            if (actor.carried) {
+              actor.mesh.userData.hand.remove(actor.carried);
+              actor.carried = null;
+            }
+            scene.remove(actor.mesh);
+            customers.splice(i, 1);
           }
-          scene.remove(actor.mesh);
-          customers.splice(i, 1);
         }
       }
     }
@@ -383,6 +502,13 @@ export function createWorld(canvas, state) {
     positions.needsUpdate = true;
     setChestLid(chest, chestOpen, dt);
     chestGlow.material.opacity = 0.28 + Math.sin(now * 2.2) * 0.08;
+    anvilGlow.material.opacity = 0.26 + Math.sin(now * 2.4) * 0.1;
+    shopkeeper.position.y = Math.abs(Math.sin(now * 1.7)) * 0.018;
+    const doorBusy = customers.some((c) => (
+      Math.abs(c.mesh.position.z - SHOP.door.z) < 1.15
+      && Math.abs(c.mesh.position.x - SHOP.door.x) < 0.85
+    ));
+    setDoorOpen(shopDoor, doorBusy, dt);
     syncDisplays();
     refreshSelection();
     updateCustomers(dt, now);
@@ -422,6 +548,10 @@ export function createWorld(canvas, state) {
     },
     refuseActor(actor) {
       dismissCustomer(actor, false);
+    },
+    buyFromActor(actor) {
+      if (!actor || actor.state === 'leave') return;
+      dismissCustomer(actor, false, 'Sold.');
     },
   };
 }

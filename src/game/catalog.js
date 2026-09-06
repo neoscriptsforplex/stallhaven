@@ -233,6 +233,19 @@ export const RECIPES = {
     buyers: ['mercenary'],
     tint: 0x6a7078,
   },
+  ironlegs: {
+    id: 'ironlegs',
+    name: 'Ironlegs',
+    category: 'armour',
+    combatClass: 'melee',
+    slot: 'legs',
+    tier: 1,
+    cost: { materials: { platescrap: 1, dulliron: 1 }, gold: 5 },
+    time: 12,
+    price: 32,
+    buyers: ['mercenary'],
+    tint: 0x636870,
+  },
   steelhelm: {
     id: 'steelhelm',
     name: 'Steelhelm',
@@ -258,6 +271,19 @@ export const RECIPES = {
     price: 56,
     buyers: ['mercenary'],
     tint: 0xb0b8c0,
+  },
+  steellegs: {
+    id: 'steellegs',
+    name: 'Steellegs',
+    category: 'armour',
+    combatClass: 'melee',
+    slot: 'legs',
+    tier: 2,
+    cost: { materials: { platescrap: 1, brightsteel: 1 }, gold: 9 },
+    time: 14,
+    price: 48,
+    buyers: ['mercenary'],
+    tint: 0xa8b0b8,
   },
 
   hidehood: {
@@ -286,6 +312,19 @@ export const RECIPES = {
     buyers: ['ranger'],
     tint: 0x8a5a32,
   },
+  hidelegs: {
+    id: 'hidelegs',
+    name: 'Hidelegs',
+    category: 'armour',
+    combatClass: 'range',
+    slot: 'legs',
+    tier: 1,
+    cost: { materials: { hideleather: 1, woolspool: 1 }, gold: 5 },
+    time: 11,
+    price: 28,
+    buyers: ['ranger'],
+    tint: 0x7a4a28,
+  },
   scoutcap: {
     id: 'scoutcap',
     name: 'Scoutcap',
@@ -311,6 +350,19 @@ export const RECIPES = {
     price: 52,
     buyers: ['ranger'],
     tint: 0x4a6a3c,
+  },
+  scoutlegs: {
+    id: 'scoutlegs',
+    name: 'Scoutlegs',
+    category: 'armour',
+    combatClass: 'range',
+    slot: 'legs',
+    tier: 2,
+    cost: { materials: { hideleather: 1, moonstring: 1 }, gold: 8 },
+    time: 13,
+    price: 42,
+    buyers: ['ranger'],
+    tint: 0x3f5a34,
   },
 
   veilcirclet: {
@@ -339,6 +391,19 @@ export const RECIPES = {
     buyers: ['hedgemage'],
     tint: 0x4a3560,
   },
+  veilwraps: {
+    id: 'veilwraps',
+    name: 'Veilwraps',
+    category: 'armour',
+    combatClass: 'magic',
+    slot: 'legs',
+    tier: 1,
+    cost: { materials: { veilsilk: 1, woolspool: 1 }, gold: 5 },
+    time: 12,
+    price: 30,
+    buyers: ['hedgemage'],
+    tint: 0x3d2a52,
+  },
   gleamcowl: {
     id: 'gleamcowl',
     name: 'Gleamcowl',
@@ -365,6 +430,19 @@ export const RECIPES = {
     buyers: ['hedgemage'],
     tint: 0x3d2f6a,
   },
+  gleamwraps: {
+    id: 'gleamwraps',
+    name: 'Gleamwraps',
+    category: 'armour',
+    combatClass: 'magic',
+    slot: 'legs',
+    tier: 2,
+    cost: { materials: { veilsilk: 1, gleamcrystal: 1 }, gold: 8 },
+    time: 14,
+    price: 46,
+    buyers: ['hedgemage'],
+    tint: 0x352860,
+  },
 };
 
 export const CUSTOMERS = {
@@ -388,9 +466,11 @@ export const CUSTOMERS = {
       'thornpike',
       'ironhelm',
       'ironmail',
+      'ironlegs',
       'steelcleaver',
       'steelhelm',
       'steelmail',
+      'steellegs',
       'starfang',
     ],
     patient: false,
@@ -407,9 +487,11 @@ export const CUSTOMERS = {
       'ashlong',
       'hidehood',
       'hidevest',
+      'hidelegs',
       'heartstring',
       'scoutcap',
       'scoutcoat',
+      'scoutlegs',
       'skysplit',
     ],
     patient: true,
@@ -427,10 +509,12 @@ export const CUSTOMERS = {
       'emberflask',
       'veilcirclet',
       'veilrobe',
+      'veilwraps',
       'waycloak',
       'gleamstave',
       'gleamcowl',
       'gleamrobe',
+      'gleamwraps',
       'veilstaff',
     ],
     patient: false,
@@ -442,17 +526,32 @@ export const CUSTOMERS = {
 };
 
 export const SHOP = {
-  door: { x: 0, z: 3.15 },
+  door: { x: 0, z: 3.58 },
+  outside: { x: 0, z: 5.55 },
   counter: { x: 0, z: -2.05 },
+  keeper: { x: 0.08, z: -2.62 },
+  anvil: { x: -1.62, z: -1.82 },
   browse: { x: 0.15, z: 2.15 },
   chest: { x: 2.28, z: -1.72 },
   displays: [
-    { id: 'left', name: 'Left stall', x: -1.72, z: 1.48 },
-    { id: 'right', name: 'Right stall', x: 1.72, z: 1.48 },
+    { id: 'left-front', name: 'Left front table', x: -2.12, z: 1.52, kind: 'table' },
+    { id: 'right-front', name: 'Right front table', x: 2.12, z: 1.52, kind: 'table' },
+    { id: 'left-mid', name: 'Left table', x: -2.52, z: -0.12, kind: 'table' },
+    { id: 'right-mid', name: 'Right table', x: 2.52, z: -0.12, kind: 'table' },
+    { id: 'shelf-left', name: 'Left wall shelf', x: -2.48, z: -3.22, kind: 'shelf' },
+    { id: 'shelf-right', name: 'Right wall shelf', x: 2.48, z: -3.22, kind: 'shelf' },
+    { id: 'stand-left', name: 'Left armour stand', x: -3.42, z: 0.78, kind: 'stand' },
+    { id: 'stand-right', name: 'Right armour stand', x: 3.42, z: 0.78, kind: 'stand' },
   ],
-  cameraStart: { x: 0, y: 1.58, z: -1.42 },
-  cameraTarget: { x: 0, y: 0.78, z: 1.12 },
+  cameraStart: { x: 0.72, y: 1.86, z: -2.88 },
+  cameraTarget: { x: 0, y: 0.86, z: 1.18 },
 };
+
+export const ARMOUR_SLOTS = ['helm', 'body', 'legs'];
+
+export function emptySlots() {
+  return { helm: null, body: null, legs: null };
+}
 
 export function recipeList() {
   return Object.values(RECIPES);
@@ -494,6 +593,29 @@ export function classLabel(combatClass) {
   if (combatClass === 'range') return 'Range';
   if (combatClass === 'magic') return 'Magic';
   return 'Road';
+}
+
+export function displayKind(index) {
+  return SHOP.displays[index]?.kind ?? 'table';
+}
+
+export function matchingArmourIds(recipeId, ownedIds) {
+  const recipe = RECIPES[recipeId];
+  const slots = emptySlots();
+  if (recipe?.category !== 'armour') return slots;
+  for (const id of ownedIds) {
+    const other = RECIPES[id];
+    if (
+      other?.category === 'armour'
+      && other.combatClass === recipe.combatClass
+      && other.tier === recipe.tier
+      && ARMOUR_SLOTS.includes(other.slot)
+    ) {
+      slots[other.slot] = id;
+    }
+  }
+  if (ARMOUR_SLOTS.includes(recipe.slot)) slots[recipe.slot] = recipeId;
+  return slots;
 }
 
 export function decideRequest(customerId, rng = Math.random) {

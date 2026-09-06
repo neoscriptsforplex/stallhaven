@@ -59,9 +59,9 @@ export function createWorld(canvas, state) {
 
   const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.08, 80);
   const cam = {
-    yaw: 0.18,
-    pitch: 0.58,
-    distance: 4.55,
+    yaw: -0.06,
+    pitch: 0.62,
+    distance: 6.85,
   };
   const camLook = new THREE.Vector3(SHOP.keeper.x, 0.95, SHOP.keeper.z);
   const camHeld = { left: false, right: false, up: false, down: false };
@@ -854,6 +854,15 @@ export function createWorld(canvas, state) {
     },
     getFrontCustomer() {
       return customers.find((actor) => actor.state === 'request') ?? null;
+    },
+    projectToClient(x, y, z) {
+      const point = new THREE.Vector3(x, y, z);
+      point.project(camera);
+      const rect = renderer.domElement.getBoundingClientRect();
+      return {
+        x: rect.left + (point.x * 0.5 + 0.5) * rect.width,
+        y: rect.top + (-point.y * 0.5 + 0.5) * rect.height,
+      };
     },
     sellToActor(actor) {
       if (!actor || actor.state === 'leave') return;

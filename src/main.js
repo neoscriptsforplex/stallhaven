@@ -25,6 +25,7 @@ if (!hasWebGL()) {
   const state = createState();
   pushLog(state, 'The Store of Geilenor is open. Craft into the chest, then trade at the counter.');
   const world = createWorld(canvas, state);
+  window.stallhaven = { world, state };
   const hud = bindHud(hudRoot, state, world);
   bindUploadUI({
     zone: document.querySelector('#drop'),

@@ -529,9 +529,9 @@ export const SHOP = {
   door: { x: 0, z: 3.58 },
   outside: { x: 0, z: 5.55 },
   counter: { x: 0, z: -2.05 },
-  keeper: { x: -1.85, z: -0.95 },
-  anvil: { x: -2.48, z: -1.68 },
-  chest: { x: 2.48, z: -1.68 },
+  keeper: { x: -0.62, z: -0.42 },
+  anvil: { x: -2.15, z: -1.58 },
+  chest: { x: 2.15, z: -1.58 },
   queue: { x: 0, z: -1.1, gap: 0.88 },
   clutter: [
     { x: 3.48, z: -2.88, w: 0.8, d: 0.65 },

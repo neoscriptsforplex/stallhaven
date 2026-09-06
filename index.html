@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Stallhaven — roadside stall</title>
-    <meta name="description" content="Keep a dusty roadside stall in Stallhaven. Craft swords, bows, and staves into a chest, then trade with travelers." />
+    <title>Store of Geilenor</title>
+    <meta name="description" content="Keep the Store of Geilenor. Craft swords, bows, and staves into a chest, then trade with travelers at the counter." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%236b4423' width='64' height='64' rx='10'/%3E%3Cpath fill='%23e8c37a' d='M12 40h40v8H12z'/%3E%3Cpath fill='%238b4336' d='M8 20h48l-6 12H14z'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
-    <canvas id="view" aria-label="Stallhaven stall"></canvas>
+    <canvas id="view" aria-label="Store of Geilenor shop floor"></canvas>
 
     <aside id="hud">
       <header class="ledger">
-        <p class="place">Roadside market town</p>
-        <h1>Stallhaven</h1>
+        <p class="place">A roadside shop</p>
+        <h1>Store of Geilenor</h1>
         <div class="ledger-row">
           <p id="gold" class="gold">40g</p>
         </div>
@@ -38,13 +38,14 @@
       <ol id="log" class="log" aria-live="polite"></ol>
     </aside>
 
-    <p id="hint" class="hint">Click the anvil to craft. Click a traveler to sell, refuse, or buy their scrap.</p>
+    <p id="hint" class="hint">Click the floor to walk. Click the anvil to craft. Click the traveler at the counter to trade.</p>
 
     <div id="tooltip" class="modal" hidden>
       <div class="sheet">
-        <h2>Keep the stall</h2>
-        <p>You stand behind the counter. Click the anvil to craft a sword, bow, staff, or armour. Finished gear goes in the wooden chest.</p>
-        <p>Travelers come through the front door and ask for a piece by name. Click them to sell, refuse, or buy a scrap they offer — buying sends them on their way.</p>
+        <h2>Keep the store</h2>
+        <p>You keep the Store of Geilenor. Click the floor to walk — the camera follows you. Scroll or −/= to zoom; arrow keys change the angle.</p>
+        <p>Click the anvil to craft a sword, bow, staff, or armour. Finished gear goes in the wooden chest.</p>
+        <p>Travelers come through the front door and line up at the counter. Click the traveler at the front to sell, refuse, or buy a scrap they offer — then they leave and the line advances.</p>
         <p>Click the wooden chest to see your inventory. Click a table, wall shelf, or armour stand — it lights gold — then place a ware. Armour stands wear helm, body, and legs together.</p>
         <p>Spend gold to restock materials. Drag a model onto the drop zone if you want a custom table or ware look — nothing uploaded leaves your browser.</p>
         <button type="button" data-dismiss>Got it</button>
@@ -53,7 +54,7 @@
 
     <div id="chest-modal" class="modal" hidden>
       <div class="sheet chest-sheet">
-        <h2>Stall chest</h2>
+        <h2>Shop chest</h2>
         <p class="chest-tally" id="chest-count">0 pieces waiting</p>
         <p>Crafted gear waits here. Place a piece on the selected table, shelf, or armour stand, or sell it when an adventurer asks.</p>
         <div id="chest-items"></div>

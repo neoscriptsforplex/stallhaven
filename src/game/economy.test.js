@@ -29,6 +29,7 @@ import {
   sellToCustomer,
   startCraft,
 } from './economy.js';
+import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 
 describe('stall economy', () => {
   it('starts with gold and a little of each material', () => {
@@ -215,6 +216,25 @@ describe('catalog', () => {
     assert.ok(SHOP.displays.filter((d) => d.kind === 'table').length >= 4);
     assert.ok(SHOP.displays.some((d) => d.kind === 'shelf'));
     assert.ok(SHOP.displays.some((d) => d.kind === 'stand'));
+  });
+
+  it('keeps a clear queue aisle in front of the counter', () => {
+    for (const spot of SHOP.displays) {
+      if (spot.kind === 'shelf') continue;
+      const hw = spot.kind === 'stand' ? 0.36 : 0.76;
+      const hd = spot.kind === 'stand' ? 0.36 : 0.52;
+      assert.equal(rectHitsAisle(spot.x, spot.z, hw, hd, QUEUE_AISLE), false, spot.name);
+    }
+    assert.equal(rectHitsAisle(SHOP.anvil.x, SHOP.anvil.z, 0.48, 0.4, QUEUE_AISLE), false);
+    assert.equal(rectHitsAisle(SHOP.chest.x, SHOP.chest.z, 0.54, 0.41, QUEUE_AISLE), false);
+  });
+
+  it('lines travelers up in front of the counter', () => {
+    const front = queueSlot(0);
+    const second = queueSlot(1);
+    assert.ok(front.z > SHOP.counter.z);
+    assert.ok(second.z > front.z);
+    assert.equal(front.x, SHOP.queue.x);
   });
 
   it('groups matching helm, body, and legs for a stand', () => {

@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "A free browser stall-keeping game set in the roadside town of Stallhaven.",
+  "description": "A free browser shop-keeping game: keep the Store of Geilenor.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

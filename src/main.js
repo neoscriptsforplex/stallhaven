@@ -23,7 +23,7 @@ if (!hasWebGL()) {
   fallback.hidden = false;
 } else {
   const state = createState();
-  pushLog(state, 'The stall is open. Craft into the chest, then click a traveler.');
+  pushLog(state, 'The Store of Geilenor is open. Craft into the chest, then trade at the counter.');
   const world = createWorld(canvas, state);
   const hud = bindHud(hudRoot, state, world);
   bindUploadUI({

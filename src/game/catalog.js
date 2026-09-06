@@ -1,12 +1,12 @@
-/** Stallhaven catalog: original roadside recipes, materials, and travelers. */
+/** Store of Geilenor catalog: original roadside recipes, materials, and travelers. */
 
 export const START_GOLD = 40;
 
 export const OTHER_CHANCE = 0.18;
-export const MAX_CUSTOMERS = 2;
-export const FIRST_CUSTOMER_DELAY = 5;
-export const SPAWN_GAP_MIN = 8;
-export const SPAWN_GAP_MAX = 14;
+export const MAX_CUSTOMERS = 3;
+export const FIRST_CUSTOMER_DELAY = 4;
+export const SPAWN_GAP_MIN = 6;
+export const SPAWN_GAP_MAX = 11;
 export const PATIENT_WAIT = 9;
 export const PATIENT_RECHECKS = 3;
 export const REQUEST_WAIT = 58;
@@ -529,22 +529,26 @@ export const SHOP = {
   door: { x: 0, z: 3.58 },
   outside: { x: 0, z: 5.55 },
   counter: { x: 0, z: -2.05 },
-  keeper: { x: -0.82, z: -2.38 },
-  anvil: { x: 1.42, z: -1.22 },
-  browse: { x: 0.15, z: 2.15 },
-  chest: { x: 2.28, z: -1.72 },
+  keeper: { x: -0.62, z: -0.42 },
+  anvil: { x: -2.15, z: -1.58 },
+  chest: { x: 2.15, z: -1.58 },
+  queue: { x: 0, z: -1.1, gap: 0.88 },
+  clutter: [
+    { x: 3.48, z: -2.88, w: 0.8, d: 0.65 },
+    { x: -3.48, z: -2.88, w: 0.7, d: 0.65 },
+  ],
   displays: [
-    { id: 'left-front', name: 'Left front table', x: -2.12, z: 1.52, kind: 'table' },
-    { id: 'right-front', name: 'Right front table', x: 2.12, z: 1.52, kind: 'table' },
-    { id: 'left-mid', name: 'Left table', x: -2.52, z: -0.12, kind: 'table' },
-    { id: 'right-mid', name: 'Right table', x: 2.52, z: -0.12, kind: 'table' },
+    { id: 'left-front', name: 'Left front table', x: -2.55, z: 1.95, kind: 'table' },
+    { id: 'right-front', name: 'Right front table', x: 2.55, z: 1.95, kind: 'table' },
+    { id: 'left-mid', name: 'Left table', x: -3.15, z: 0.25, kind: 'table' },
+    { id: 'right-mid', name: 'Right table', x: 3.15, z: 0.25, kind: 'table' },
     { id: 'shelf-left', name: 'Left wall shelf', x: -2.48, z: -3.22, kind: 'shelf' },
     { id: 'shelf-right', name: 'Right wall shelf', x: 2.48, z: -3.22, kind: 'shelf' },
-    { id: 'stand-left', name: 'Left armour stand', x: -3.15, z: 0.55, kind: 'stand' },
-    { id: 'stand-right', name: 'Right armour stand', x: 3.15, z: 0.55, kind: 'stand' },
+    { id: 'stand-left', name: 'Left armour stand', x: -3.32, z: 1.12, kind: 'stand' },
+    { id: 'stand-right', name: 'Right armour stand', x: 3.32, z: 1.12, kind: 'stand' },
   ],
-  cameraStart: { x: 0.55, y: 2.35, z: 2.45 },
-  cameraTarget: { x: -0.35, y: 0.95, z: -2.15 },
+  cameraStart: { x: -0.15, y: 3.35, z: 2.85 },
+  cameraTarget: { x: -0.85, y: 0.95, z: -1.35 },
 };
 
 export const ARMOUR_SLOTS = ['helm', 'body', 'legs'];

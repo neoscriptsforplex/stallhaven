@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   ARMOUR_SLOTS,
   CUSTOMERS,
@@ -15,6 +14,7 @@ import {
   emptySlots,
 } from './catalog.js';
 import { hasStock, pushLog } from './economy.js';
+import { planWalk, queueSlot, shopObstacles } from './nav.js';
 import {
   buildAdventurer,
   buildAnvil,
@@ -34,6 +34,14 @@ import {
 } from './models.js';
 
 const CUSTOMER_SPEED = 1.35;
+const PLAYER_SPEED = 1.85;
+const CAM_YAW_SPEED = 1.45;
+const CAM_PITCH_SPEED = 0.95;
+const CAM_ZOOM_STEP = 0.38;
+const CAM_MIN_DISTANCE = 2.05;
+const CAM_MAX_DISTANCE = 8.6;
+const CAM_MIN_PITCH = 0.28;
+const CAM_MAX_PITCH = 1.18;
 
 export function createWorld(canvas, state) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -50,18 +58,15 @@ export function createWorld(canvas, state) {
   scene.fog = new THREE.Fog(0xc9b48a, 12, 26);
 
   const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.08, 80);
+  const cam = {
+    yaw: -0.06,
+    pitch: 0.62,
+    distance: 6.85,
+  };
+  const camLook = new THREE.Vector3(SHOP.keeper.x, 0.95, SHOP.keeper.z);
+  const camHeld = { left: false, right: false, up: false, down: false };
   camera.position.set(SHOP.cameraStart.x, SHOP.cameraStart.y, SHOP.cameraStart.z);
-
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(SHOP.cameraTarget.x, SHOP.cameraTarget.y, SHOP.cameraTarget.z);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.06;
-  controls.minDistance = 2.2;
-  controls.maxDistance = 9.5;
-  controls.maxPolarAngle = Math.PI * 0.48;
-  controls.minPolarAngle = 0.22;
-  controls.enablePan = false;
-  controls.update();
+  camera.lookAt(camLook);
 
   const hemi = new THREE.HemisphereLight(0xf0e2c4, 0x6a5340, 0.9);
   scene.add(hemi);
@@ -96,19 +101,44 @@ export function createWorld(canvas, state) {
 
   const shopkeeper = buildShopkeeper();
   shopkeeper.position.set(SHOP.keeper.x, 0, SHOP.keeper.z);
-  shopkeeper.rotation.y = 0;
+  shopkeeper.rotation.y = 0.35;
   shopkeeper.scale.setScalar(1.12);
   scene.add(shopkeeper);
+  const obstacles = shopObstacles();
+  const playerPath = [];
+  const moveMarker = new THREE.Mesh(
+    new THREE.RingGeometry(0.16, 0.24, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xf0c14a,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    }),
+  );
+  moveMarker.rotation.x = -Math.PI / 2;
+  moveMarker.position.y = 0.1;
+  moveMarker.visible = false;
+  scene.add(moveMarker);
+
+  const groundPick = new THREE.Mesh(
+    new THREE.PlaneGeometry(8.05, 7.05),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  groundPick.rotation.x = -Math.PI / 2;
+  groundPick.position.set(0, 0.09, 0.1);
+  groundPick.userData.kind = 'ground';
+  scene.add(groundPick);
 
   const anvil = buildAnvil();
   anvil.position.set(SHOP.anvil.x, 0, SHOP.anvil.z);
   anvil.rotation.y = 0.35;
   scene.add(anvil);
   const anvilPick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.88, 1.12, 0.58),
+    new THREE.BoxGeometry(0.95, 1.45, 0.72),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  anvilPick.position.set(SHOP.anvil.x, 0.58, SHOP.anvil.z);
+  anvilPick.position.set(SHOP.anvil.x, 0.72, SHOP.anvil.z);
   anvilPick.rotation.y = 0.35;
   anvilPick.userData.kind = 'anvil';
   scene.add(anvilPick);
@@ -125,10 +155,10 @@ export function createWorld(canvas, state) {
   chest.rotation.y = -0.45;
   scene.add(chest);
   const chestPick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.98, 0.78, 0.68),
+    new THREE.BoxGeometry(1.28, 1.45, 1.02),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  chestPick.position.set(SHOP.chest.x, 0.38, SHOP.chest.z);
+  chestPick.position.set(SHOP.chest.x, 0.72, SHOP.chest.z);
   chestPick.rotation.y = -0.45;
   chestPick.userData.kind = 'chest';
   scene.add(chestPick);
@@ -154,13 +184,13 @@ export function createWorld(canvas, state) {
     const pickSize = spot.kind === 'stand'
       ? [1.15, 2.05, 1.05]
       : spot.kind === 'shelf'
-        ? [1.55, 1.2, 0.7]
+        ? [1.28, 0.95, 0.42]
         : [1.45, 1.15, 1.0];
     const pick = new THREE.Mesh(
       new THREE.BoxGeometry(...pickSize),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    pick.position.y = spot.kind === 'shelf' ? 1.15 : spot.kind === 'stand' ? 0.95 : 0.6;
+    pick.position.y = spot.kind === 'shelf' ? 1.18 : spot.kind === 'stand' ? 0.95 : 0.6;
     pick.userData.kind = 'display';
     pick.userData.displayIndex = index;
     anchor.add(pick);
@@ -220,6 +250,7 @@ export function createWorld(canvas, state) {
   let pickHandler = null;
   let ignorePicksUntil = 0;
   let tradingId = null;
+  let lastNow = 0;
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -237,8 +268,81 @@ export function createWorld(canvas, state) {
       ...displays.map((d) => d.pick),
       chestPick,
       anvilPick,
-      ...customers.map((c) => c.mesh.userData.pick).filter(Boolean),
+      ...customers
+        .filter((actor) => actor.state === 'request')
+        .map((actor) => actor.mesh.userData.pick)
+        .filter(Boolean),
     ];
+  }
+
+  function clampCam() {
+    cam.pitch = Math.min(CAM_MAX_PITCH, Math.max(CAM_MIN_PITCH, cam.pitch));
+    cam.distance = Math.min(CAM_MAX_DISTANCE, Math.max(CAM_MIN_DISTANCE, cam.distance));
+  }
+
+  function setMoveTarget(x, z) {
+    const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
+    const path = planWalk(from, { x, z }, obstacles);
+    playerPath.length = 0;
+    if (!path.length) {
+      moveMarker.visible = false;
+      return;
+    }
+    playerPath.push(...path);
+    const goal = path[path.length - 1];
+    moveMarker.position.set(goal.x, 0.1, goal.z);
+    moveMarker.visible = true;
+  }
+
+  function walkToward(actor, goal, dt, speed = CUSTOMER_SPEED) {
+    const pos = actor.mesh.position;
+    const dx = goal.x - pos.x;
+    const dz = goal.z - pos.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 0.08) return true;
+    const step = speed * dt;
+    const t = Math.min(1, step / dist);
+    pos.x += dx * t;
+    pos.z += dz * t;
+    actor.mesh.rotation.y = Math.atan2(dx, dz);
+    actor.mesh.position.y = Math.abs(Math.sin(performance.now() * 0.01)) * 0.03;
+    return false;
+  }
+
+  function updatePlayer(dt, now) {
+    if (playerPath.length) {
+      if (walkToward({ mesh: shopkeeper }, playerPath[0], dt, PLAYER_SPEED)) {
+        playerPath.shift();
+        if (!playerPath.length) moveMarker.visible = false;
+      }
+      return;
+    }
+    shopkeeper.position.y = Math.abs(Math.sin(now * 1.7)) * 0.018;
+    const front = customers.find((actor) => actor.state === 'request');
+    if (front) {
+      const dx = front.mesh.position.x - shopkeeper.position.x;
+      const dz = front.mesh.position.z - shopkeeper.position.z;
+      if (Math.hypot(dx, dz) > 0.05) shopkeeper.rotation.y = Math.atan2(dx, dz);
+    }
+  }
+
+  function updateFollowCamera(dt) {
+    if (camHeld.left) cam.yaw += CAM_YAW_SPEED * dt;
+    if (camHeld.right) cam.yaw -= CAM_YAW_SPEED * dt;
+    if (camHeld.up) cam.pitch += CAM_PITCH_SPEED * dt;
+    if (camHeld.down) cam.pitch -= CAM_PITCH_SPEED * dt;
+    clampCam();
+    const look = new THREE.Vector3(shopkeeper.position.x, 0.95, shopkeeper.position.z);
+    const flat = Math.cos(cam.pitch) * cam.distance;
+    const desired = new THREE.Vector3(
+      look.x + Math.sin(cam.yaw) * flat,
+      look.y + Math.sin(cam.pitch) * cam.distance,
+      look.z + Math.cos(cam.yaw) * flat,
+    );
+    const k = 1 - Math.exp(-dt * 6.2);
+    camera.position.lerp(desired, k);
+    camLook.lerp(look, k);
+    camera.lookAt(camLook);
   }
 
   function setPointer(event) {
@@ -266,7 +370,7 @@ export function createWorld(canvas, state) {
     if (moved > 8) return;
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(allPicks(), false);
+    const hits = raycaster.intersectObjects([...allPicks(), groundPick], false);
     if (!hits.length) return;
     const customerHit = hits.find((h) => h.object.userData.kind === 'customer');
     if (customerHit) {
@@ -275,24 +379,79 @@ export function createWorld(canvas, state) {
       return;
     }
     const chestHit = hits.find((h) => h.object.userData.kind === 'chest');
-    const closest = hits[0];
+    const interactHits = hits.filter((h) => h.object.userData.kind !== 'ground' && h.object.userData.kind !== 'customer');
+    const closest = interactHits[0];
     const preferChest = chestHit
-      && closest.object.userData.kind === 'anvil'
+      && closest?.object.userData.kind === 'anvil'
       && chestHit.distance - closest.distance < 0.5;
-    const data = (preferChest ? chestHit : closest).object.userData;
-    if (data.kind === 'chest') {
-      pickHandler?.({ type: 'chest' });
-      return;
+    const picked = preferChest ? chestHit : closest;
+    if (picked) {
+      const data = picked.object.userData;
+      if (data.kind === 'chest') {
+        pickHandler?.({ type: 'chest' });
+        return;
+      }
+      if (data.kind === 'anvil') {
+        pickHandler?.({ type: 'anvil' });
+        return;
+      }
+      if (data.kind === 'display') {
+        state.selectedDisplay = data.displayIndex;
+        refreshSelection();
+        pickHandler?.({ type: 'display', index: data.displayIndex });
+        return;
+      }
     }
-    if (data.kind === 'anvil') {
-      pickHandler?.({ type: 'anvil' });
-      return;
+    const groundHit = hits.find((h) => h.object.userData.kind === 'ground');
+    if (groundHit) {
+      const point = groundHit.point;
+      if (Math.hypot(point.x - SHOP.chest.x, point.z - SHOP.chest.z) < 0.72) {
+        pickHandler?.({ type: 'chest' });
+        return;
+      }
+      if (Math.hypot(point.x - SHOP.anvil.x, point.z - SHOP.anvil.z) < 0.62) {
+        pickHandler?.({ type: 'anvil' });
+        return;
+      }
+      setMoveTarget(point.x, point.z);
     }
-    if (data.kind === 'display') {
-      state.selectedDisplay = data.displayIndex;
-      refreshSelection();
-      pickHandler?.({ type: 'display', index: data.displayIndex });
+  });
+
+  renderer.domElement.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    cam.distance += Math.sign(event.deltaY) * CAM_ZOOM_STEP;
+    clampCam();
+  }, { passive: false });
+
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      camHeld.left = true;
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      camHeld.right = true;
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      camHeld.up = true;
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      camHeld.down = true;
+    } else if (event.key === '-' || event.key === '_') {
+      event.preventDefault();
+      cam.distance += CAM_ZOOM_STEP;
+      clampCam();
+    } else if (event.key === '=' || event.key === '+') {
+      event.preventDefault();
+      cam.distance -= CAM_ZOOM_STEP;
+      clampCam();
     }
+  });
+
+  window.addEventListener('keyup', (event) => {
+    if (event.key === 'ArrowLeft') camHeld.left = false;
+    if (event.key === 'ArrowRight') camHeld.right = false;
+    if (event.key === 'ArrowUp') camHeld.up = false;
+    if (event.key === 'ArrowDown') camHeld.down = false;
   });
 
   function disposeOutline(slot) {
@@ -499,8 +658,14 @@ export function createWorld(canvas, state) {
     return mesh;
   }
 
+  function waitingLine() {
+    return customers
+      .filter((actor) => actor.state !== 'leave')
+      .sort((a, b) => a.queueIndex - b.queueIndex);
+  }
+
   function spawnCustomer(now) {
-    if (customers.length >= MAX_CUSTOMERS) return;
+    if (waitingLine().length >= MAX_CUSTOMERS) return;
     const types = Object.keys(CUSTOMERS);
     const typeId = firstSpawn ? 'pilgrim' : types[Math.floor(Math.random() * types.length)];
     firstSpawn = false;
@@ -510,10 +675,8 @@ export function createWorld(canvas, state) {
     mesh.position.set(SHOP.outside.x, 0, SHOP.outside.z + 0.15);
     setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
     scene.add(mesh);
-    const usedRight = customers.some((c) => c.browse?.x > 0);
-    const browse = usedRight
-      ? { x: -1.15, z: 2.28 }
-      : { x: 1.15, z: 2.28 };
+    const queueIndex = waitingLine().length;
+    const slot = queueSlot(queueIndex);
     const actor = {
       id: customerSerial,
       typeId,
@@ -522,34 +685,19 @@ export function createWorld(canvas, state) {
       path: [
         { x: SHOP.door.x, z: SHOP.door.z + 0.35 },
         { x: SHOP.door.x, z: SHOP.door.z - 0.45 },
-        browse,
+        slot,
       ],
       waitUntil: 0,
       requestRecipeId: request.recipeId,
       offerGold: request.gold,
       offer: request.offer,
       carried: null,
-      browse,
+      queueIndex,
     };
     customerSerial += 1;
     customers.push(actor);
     nextSpawnAt = now + SPAWN_GAP_MIN + Math.random() * (SPAWN_GAP_MAX - SPAWN_GAP_MIN);
-    pushLog(state, `${CUSTOMERS[typeId].name} asks for ${RECIPES[request.recipeId].name}.`);
-  }
-
-  function walkToward(actor, goal, dt) {
-    const pos = actor.mesh.position;
-    const dx = goal.x - pos.x;
-    const dz = goal.z - pos.z;
-    const dist = Math.hypot(dx, dz);
-    if (dist < 0.08) return true;
-    const step = CUSTOMER_SPEED * dt;
-    const t = Math.min(1, step / dist);
-    pos.x += dx * t;
-    pos.z += dz * t;
-    actor.mesh.rotation.y = Math.atan2(dx, dz);
-    actor.mesh.position.y = Math.abs(Math.sin(performance.now() * 0.01)) * 0.03;
-    return false;
+    pushLog(state, `${CUSTOMERS[typeId].name} joins the line for ${RECIPES[request.recipeId].name}.`);
   }
 
   function beginRequest(actor, now) {
@@ -558,6 +706,32 @@ export function createWorld(canvas, state) {
     actor.path = [];
     actor.mesh.rotation.y = Math.PI;
     if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = true;
+  }
+
+  function settleInLine(actor, now) {
+    actor.path = [];
+    actor.mesh.rotation.y = Math.PI;
+    if (actor.queueIndex === 0) {
+      beginRequest(actor, now);
+      return;
+    }
+    actor.state = 'queue';
+    if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = false;
+  }
+
+  function advanceQueue(now) {
+    waitingLine().forEach((actor, index) => {
+      actor.queueIndex = index;
+      const slot = queueSlot(index);
+      const dist = Math.hypot(slot.x - actor.mesh.position.x, slot.z - actor.mesh.position.z);
+      if (dist > 0.12) {
+        actor.state = 'enter';
+        actor.path = [slot];
+        if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = false;
+        return;
+      }
+      settleInLine(actor, now);
+    });
   }
 
   function dismissCustomer(actor, sold, farewell = null) {
@@ -577,6 +751,7 @@ export function createWorld(canvas, state) {
       { x: SHOP.door.x, z: SHOP.door.z + 0.45 },
       { x: SHOP.outside.x, z: SHOP.outside.z },
     ];
+    advanceQueue(lastNow || performance.now() / 1000);
   }
 
   function updateCustomers(dt, now) {
@@ -585,11 +760,14 @@ export function createWorld(canvas, state) {
       const actor = customers[i];
       if (actor.state === 'enter') {
         if (!actor.path.length) {
-          beginRequest(actor, now);
+          settleInLine(actor, now);
         } else if (walkToward(actor, actor.path[0], dt)) {
           actor.path.shift();
-          if (!actor.path.length) beginRequest(actor, now);
+          if (!actor.path.length) settleInLine(actor, now);
         }
+      } else if (actor.state === 'queue') {
+        actor.mesh.rotation.y = Math.PI + Math.sin(now * 1.1 + actor.id) * 0.06;
+        actor.mesh.position.y = Math.abs(Math.sin(now * 1.6 + actor.id)) * 0.012;
       } else if (actor.state === 'request') {
         actor.mesh.rotation.y = Math.PI + Math.sin(now * 1.4 + actor.id) * 0.12;
         const have = hasStock(state, actor.requestRecipeId);
@@ -618,7 +796,9 @@ export function createWorld(canvas, state) {
   }
 
   function tick(dt, now) {
-    controls.update();
+    lastNow = now;
+    updatePlayer(dt, now);
+    updateFollowCamera(dt);
     dust.rotation.y += dt * 0.03;
     const positions = dust.geometry.attributes.position;
     for (let i = 0; i < positions.count; i += 1) {
@@ -630,7 +810,6 @@ export function createWorld(canvas, state) {
     setChestLid(chest, chestOpen, dt);
     chestGlow.material.opacity = 0.28 + Math.sin(now * 2.2) * 0.08;
     anvilGlow.material.opacity = 0.26 + Math.sin(now * 2.4) * 0.1;
-    shopkeeper.position.y = Math.abs(Math.sin(now * 1.7)) * 0.018;
     const doorBusy = customers.some((c) => (
       Math.abs(c.mesh.position.z - SHOP.door.z) < 1.15
       && Math.abs(c.mesh.position.x - SHOP.door.x) < 0.85
@@ -671,7 +850,19 @@ export function createWorld(canvas, state) {
       return customers.find((c) => c.id === id) ?? null;
     },
     listCustomers() {
-      return customers.filter((c) => c.state !== 'leave');
+      return waitingLine();
+    },
+    getFrontCustomer() {
+      return customers.find((actor) => actor.state === 'request') ?? null;
+    },
+    projectToClient(x, y, z) {
+      const point = new THREE.Vector3(x, y, z);
+      point.project(camera);
+      const rect = renderer.domElement.getBoundingClientRect();
+      return {
+        x: rect.left + (point.x * 0.5 + 0.5) * rect.width,
+        y: rect.top + (-point.y * 0.5 + 0.5) * rect.height,
+      };
     },
     sellToActor(actor) {
       if (!actor || actor.state === 'leave') return;

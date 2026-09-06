@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CUSTOMERS, RECIPES } from './catalog.js';
+import { CUSTOMERS, RECIPES, SHOP } from './catalog.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({
@@ -150,16 +150,16 @@ export function buildStall() {
   root.add(sign);
 
   const counter = buildCounter();
-  counter.position.set(0, 0, -2.05);
+  counter.position.set(SHOP.counter.x, 0, SHOP.counter.z);
   root.add(counter);
 
   const crate = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.45, 0.55), wood(0x5a3b22)));
-  crate.position.set(3.35, 0.32, -2.3);
+  crate.position.set(SHOP.clutter[0].x, 0.32, SHOP.clutter[0].z);
   root.add(crate);
 
   const sack = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), cloth(0xbfa06c)));
   sack.scale.set(1, 0.75, 1.1);
-  sack.position.set(-3.4, 0.28, -2.15);
+  sack.position.set(SHOP.clutter[1].x, 0.28, SHOP.clutter[1].z);
   root.add(sack);
 
   return root;
@@ -167,25 +167,25 @@ export function buildStall() {
 
 function makeSign() {
   const group = new THREE.Group();
-  const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.55, 0.08), wood(0x4e331f)));
+  const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.85, 0.55, 0.08), wood(0x4e331f)));
   group.add(board);
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
+  canvas.width = 640;
   canvas.height = 128;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#4e331f';
-  ctx.fillRect(0, 0, 512, 128);
+  ctx.fillRect(0, 0, 640, 128);
   ctx.fillStyle = '#f0d9a8';
-  ctx.font = '700 56px Georgia, serif';
+  ctx.font = '700 42px Georgia, serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('STALLHAVEN', 256, 52);
+  ctx.fillText('STORE OF GEILENOR', 320, 52);
   ctx.font = '22px Georgia, serif';
   ctx.fillStyle = '#d7b27a';
-  ctx.fillText('wares for the dusty road', 256, 98);
+  ctx.fillText('wares for the dusty road', 320, 98);
   const tex = new THREE.CanvasTexture(canvas);
   const label = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.25, 0.46),
+    new THREE.PlaneGeometry(2.7, 0.46),
     new THREE.MeshBasicMaterial({ map: tex, transparent: true }),
   );
   label.position.z = 0.05;
@@ -710,6 +710,9 @@ export function buildChest() {
   lid.add(latch);
   root.add(lid);
   root.userData.lid = lid;
+  const label = makeNameSprite('Chest');
+  label.position.y = 1.05;
+  root.add(label);
 
   return root;
 }

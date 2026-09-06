@@ -275,7 +275,7 @@ export function bindHud(root, state, world) {
   world.onPick((event) => {
     if (event.type === 'chest') openChest();
     if (event.type === 'anvil') openCraft();
-    if (event.type === 'customer') openTrade(event.actor);
+    if (event.type === 'customer' && event.actor?.state === 'request') openTrade(event.actor);
   });
 
   if (!localStorage.getItem('stallhaven-tip')) {

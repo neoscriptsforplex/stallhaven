@@ -530,7 +530,7 @@ export const SHOP = {
   outside: { x: 0, z: 5.55 },
   counter: { x: 0, z: -2.05 },
   keeper: { x: 0.08, z: -2.62 },
-  anvil: { x: -1.62, z: -1.82 },
+  anvil: { x: 1.42, z: -1.22 },
   browse: { x: 0.15, z: 2.15 },
   chest: { x: 2.28, z: -1.72 },
   displays: [
@@ -540,11 +540,11 @@ export const SHOP = {
     { id: 'right-mid', name: 'Right table', x: 2.52, z: -0.12, kind: 'table' },
     { id: 'shelf-left', name: 'Left wall shelf', x: -2.48, z: -3.22, kind: 'shelf' },
     { id: 'shelf-right', name: 'Right wall shelf', x: 2.48, z: -3.22, kind: 'shelf' },
-    { id: 'stand-left', name: 'Left armour stand', x: -3.42, z: 0.78, kind: 'stand' },
-    { id: 'stand-right', name: 'Right armour stand', x: 3.42, z: 0.78, kind: 'stand' },
+    { id: 'stand-left', name: 'Left armour stand', x: -3.15, z: 0.55, kind: 'stand' },
+    { id: 'stand-right', name: 'Right armour stand', x: 3.15, z: 0.55, kind: 'stand' },
   ],
-  cameraStart: { x: 0.72, y: 1.86, z: -2.88 },
-  cameraTarget: { x: 0, y: 0.86, z: 1.18 },
+  cameraStart: { x: 0.95, y: 2.02, z: -2.55 },
+  cameraTarget: { x: 0, y: 0.88, z: 1.25 },
 };
 
 export const ARMOUR_SLOTS = ['helm', 'body', 'legs'];

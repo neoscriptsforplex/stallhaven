@@ -84,6 +84,9 @@ export function createWorld(canvas, state) {
   const lantern2 = lantern.clone();
   lantern2.position.x = 1.35;
   scene.add(lantern2);
+  const doorLight = new THREE.PointLight(0xffe1b0, 2.4, 6, 2);
+  doorLight.position.set(0, 2.15, 3.9);
+  scene.add(doorLight);
 
   scene.add(buildStall());
   const shopDoor = buildShopDoor();
@@ -101,14 +104,14 @@ export function createWorld(canvas, state) {
   anvil.rotation.y = 0.35;
   scene.add(anvil);
   const anvilPick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.95, 1.05, 0.8),
+    new THREE.BoxGeometry(1.35, 1.35, 1.1),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  anvilPick.position.set(SHOP.anvil.x, 0.5, SHOP.anvil.z);
+  anvilPick.position.set(SHOP.anvil.x, 0.62, SHOP.anvil.z);
   anvilPick.userData.kind = 'anvil';
   scene.add(anvilPick);
   const anvilGlow = new THREE.Mesh(
-    new THREE.RingGeometry(0.42, 0.54, 24),
+    new THREE.RingGeometry(0.52, 0.68, 24),
     new THREE.MeshBasicMaterial({ color: 0xe8b45a, transparent: true, opacity: 0.32, side: THREE.DoubleSide }),
   );
   anvilGlow.rotation.x = -Math.PI / 2;

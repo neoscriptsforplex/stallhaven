@@ -111,6 +111,7 @@ export function bindHud(root, state, world) {
     }
   });
 
+  root.querySelector('#open-anvil').addEventListener('click', () => openCraft());
   root.querySelector('#open-chest').addEventListener('click', () => openChest());
   chestModal.querySelector('[data-chest-close]').addEventListener('click', closeChest);
   chestModal.addEventListener('click', (event) => {

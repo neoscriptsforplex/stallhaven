@@ -107,6 +107,14 @@ h1 {
   margin-left: auto;
 }
 
+#open-anvil {
+  margin-left: auto;
+}
+
+#open-chest {
+  margin-left: 0;
+}
+
 .hint {
   margin: 0;
   padding: 8px 12px;

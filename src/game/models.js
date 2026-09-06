@@ -241,36 +241,39 @@ export function buildShopDoor() {
   const root = new THREE.Group();
   root.name = 'shop-door';
   const hinge = new THREE.Group();
-  hinge.position.set(-0.56, 0, 3.58);
-  const leaf = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.05, 0.07), wood(0x4a301c, 0.72)));
-  leaf.position.set(0.55, 1.1, 0);
+  hinge.position.set(-0.56, 0, 3.5);
+  const leaf = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.08), wood(0x6a4324, 0.7)));
+  leaf.position.set(0.56, 1.12, 0);
   hinge.add(leaf);
-  const brace = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.08, 0.09), wood(0x2f1c10)));
-  brace.position.set(0.55, 0.42, 0.02);
-  hinge.add(brace);
-  const brace2 = brace.clone();
-  brace2.position.y = 1.72;
-  hinge.add(brace2);
-  const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.95, 0.09), metal(0xb08a3c)));
-  strap.position.set(0.12, 1.1, 0.02);
+  const panel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.72, 0.04), wood(0x8a5a32, 0.78)));
+  panel.position.set(0.56, 0.62, 0.03);
+  hinge.add(panel);
+  const panel2 = panel.clone();
+  panel2.position.y = 1.48;
+  hinge.add(panel2);
+  const mid = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.1, 0.1), wood(0x3f2716)));
+  mid.position.set(0.56, 1.06, 0.03);
+  hinge.add(mid);
+  const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 2.0, 0.1), metal(0xc4a05a)));
+  strap.position.set(0.12, 1.12, 0.03);
   hinge.add(strap);
   const strap2 = strap.clone();
-  strap2.position.x = 0.98;
+  strap2.position.x = 1.0;
   hinge.add(strap2);
   const window = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(0.28, 0.32, 0.04),
+    new THREE.BoxGeometry(0.32, 0.28, 0.05),
     new THREE.MeshStandardMaterial({
-      color: 0x7ec8e0,
-      roughness: 0.12,
-      metalness: 0.15,
+      color: 0xcfe8f2,
+      roughness: 0.08,
+      metalness: 0.2,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.7,
     }),
   ));
-  window.position.set(0.55, 1.55, 0.03);
+  window.position.set(0.56, 1.62, 0.04);
   hinge.add(window);
-  const handle = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), metal(0xc4a05a)));
-  handle.position.set(0.98, 1.02, 0.06);
+  const handle = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), metal(0xe3b34a)));
+  handle.position.set(1.0, 1.02, 0.08);
   hinge.add(handle);
   root.add(hinge);
   root.userData.hinge = hinge;
@@ -327,35 +330,38 @@ export function buildShopkeeper() {
 export function buildAnvil() {
   const group = new THREE.Group();
   group.name = 'anvil';
-  const iron = metal(0x4a4e54);
+  const iron = metal(0x5a6068);
   const dark = metal(0x2a2c30);
-  const stump = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.22, 10), wood(0x4a301c)));
-  stump.position.y = 0.12;
+  const stump = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.26, 10), wood(0x4a301c)));
+  stump.position.y = 0.14;
   group.add(stump);
-  const waist = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.18), dark));
-  waist.position.y = 0.32;
+  const waist = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.24, 0.22), dark));
+  waist.position.y = 0.38;
   group.add(waist);
-  const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.18, 0.26), iron));
-  body.position.y = 0.5;
+  const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.22, 0.32), iron));
+  body.position.y = 0.58;
   group.add(body);
-  const horn = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.08, 0.28, 8), iron));
+  const horn = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.1, 0.36, 8), iron));
   horn.rotation.z = Math.PI / 2;
-  horn.position.set(-0.36, 0.5, 0);
+  horn.position.set(-0.46, 0.58, 0);
   group.add(horn);
-  const heel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.22), iron));
-  heel.position.set(0.3, 0.47, 0);
+  const heel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.26), iron));
+  heel.position.set(0.4, 0.55, 0);
   group.add(heel);
-  const face = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.04, 0.22), metal(0x8a9098)));
-  face.position.y = 0.6;
+  const face = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.05, 0.28), metal(0xb0b8c0)));
+  face.position.y = 0.7;
   group.add(face);
-  const hammer = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.38, 6), wood(0x5a3a22)));
-  hammer.position.set(0.22, 0.72, 0.16);
+  const hammer = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.42, 6), wood(0x5a3a22)));
+  hammer.position.set(0.26, 0.86, 0.18);
   hammer.rotation.z = 0.7;
   group.add(hammer);
-  const head = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 0.05), iron));
-  head.position.set(0.36, 0.84, 0.16);
+  const head = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, 0.06), iron));
+  head.position.set(0.42, 1.0, 0.18);
   group.add(head);
-  group.userData.wareY = 0.64;
+  const label = makeNameSprite('Anvil');
+  label.position.y = 1.22;
+  group.add(label);
+  group.userData.wareY = 0.74;
   return group;
 }
 
@@ -402,6 +408,9 @@ export function buildArmourStand() {
   const knob = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), wood(0x6a4324)));
   knob.position.y = 1.42;
   group.add(knob);
+  const dummy = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.34, 0.1), wood(0x7a5230, 0.9)));
+  dummy.position.y = 0.96;
+  group.add(dummy);
   group.userData.wareY = 0;
   group.userData.stand = true;
   group.userData.slots = {

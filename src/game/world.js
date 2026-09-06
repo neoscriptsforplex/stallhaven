@@ -135,10 +135,10 @@ export function createWorld(canvas, state) {
   anvil.rotation.y = 0.35;
   scene.add(anvil);
   const anvilPick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.88, 1.12, 0.58),
+    new THREE.BoxGeometry(0.95, 1.45, 0.72),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  anvilPick.position.set(SHOP.anvil.x, 0.58, SHOP.anvil.z);
+  anvilPick.position.set(SHOP.anvil.x, 0.72, SHOP.anvil.z);
   anvilPick.rotation.y = 0.35;
   anvilPick.userData.kind = 'anvil';
   scene.add(anvilPick);
@@ -155,10 +155,10 @@ export function createWorld(canvas, state) {
   chest.rotation.y = -0.45;
   scene.add(chest);
   const chestPick = new THREE.Mesh(
-    new THREE.BoxGeometry(1.12, 0.95, 0.82),
+    new THREE.BoxGeometry(1.28, 1.45, 1.02),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  chestPick.position.set(SHOP.chest.x, 0.42, SHOP.chest.z);
+  chestPick.position.set(SHOP.chest.x, 0.72, SHOP.chest.z);
   chestPick.rotation.y = -0.45;
   chestPick.userData.kind = 'chest';
   scene.add(chestPick);
@@ -403,7 +403,18 @@ export function createWorld(canvas, state) {
       }
     }
     const groundHit = hits.find((h) => h.object.userData.kind === 'ground');
-    if (groundHit) setMoveTarget(groundHit.point.x, groundHit.point.z);
+    if (groundHit) {
+      const point = groundHit.point;
+      if (Math.hypot(point.x - SHOP.chest.x, point.z - SHOP.chest.z) < 0.72) {
+        pickHandler?.({ type: 'chest' });
+        return;
+      }
+      if (Math.hypot(point.x - SHOP.anvil.x, point.z - SHOP.anvil.z) < 0.62) {
+        pickHandler?.({ type: 'anvil' });
+        return;
+      }
+      setMoveTarget(point.x, point.z);
+    }
   });
 
   renderer.domElement.addEventListener('wheel', (event) => {

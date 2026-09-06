@@ -529,7 +529,7 @@ export const SHOP = {
   door: { x: 0, z: 3.58 },
   outside: { x: 0, z: 5.55 },
   counter: { x: 0, z: -2.05 },
-  keeper: { x: -0.15, z: -2.52 },
+  keeper: { x: -0.82, z: -2.38 },
   anvil: { x: 1.42, z: -1.22 },
   browse: { x: 0.15, z: 2.15 },
   chest: { x: 2.28, z: -1.72 },
@@ -543,8 +543,8 @@ export const SHOP = {
     { id: 'stand-left', name: 'Left armour stand', x: -3.15, z: 0.55, kind: 'stand' },
     { id: 'stand-right', name: 'Right armour stand', x: 3.15, z: 0.55, kind: 'stand' },
   ],
-  cameraStart: { x: 1.05, y: 2.08, z: -3.18 },
-  cameraTarget: { x: 0.1, y: 0.9, z: 1.2 },
+  cameraStart: { x: 2.55, y: 3.15, z: -2.35 },
+  cameraTarget: { x: 0.05, y: 0.72, z: 0.85 },
 };
 
 export const ARMOUR_SLOTS = ['helm', 'body', 'legs'];

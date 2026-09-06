@@ -283,7 +283,7 @@ export function buildShopDoor() {
 export function setDoorOpen(door, open, dt = 1) {
   const hinge = door.userData.hinge;
   if (!hinge) return;
-  const target = open ? -1.35 : 0.04;
+  const target = open ? -1.45 : -0.38;
   hinge.rotation.y += (target - hinge.rotation.y) * Math.min(1, dt * 5);
 }
 
@@ -313,6 +313,9 @@ export function buildShopkeeper() {
   const haircap = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.7), hair));
   haircap.position.y = 1.22;
   group.add(haircap);
+  const hat = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.1, 10), cloth(0x6b4336)));
+  hat.position.y = 1.32;
+  group.add(hat);
   const armL = addShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.28, 3, 8), shirt));
   armL.position.set(-0.22, 0.78, 0.02);
   armL.rotation.z = 0.18;

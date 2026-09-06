@@ -56,10 +56,10 @@ export function createWorld(canvas, state) {
   controls.target.set(SHOP.cameraTarget.x, SHOP.cameraTarget.y, SHOP.cameraTarget.z);
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
-  controls.minDistance = 1.4;
-  controls.maxDistance = 7.5;
-  controls.maxPolarAngle = Math.PI * 0.46;
-  controls.minPolarAngle = 0.18;
+  controls.minDistance = 2.2;
+  controls.maxDistance = 9.5;
+  controls.maxPolarAngle = Math.PI * 0.48;
+  controls.minPolarAngle = 0.22;
   controls.enablePan = false;
   controls.update();
 

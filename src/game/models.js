@@ -373,30 +373,31 @@ export function buildDefaultTable() {
 export function buildShopDoor() {
   const root = new THREE.Group();
   root.name = 'shop-door';
-  const hingeX = -0.6;
-  const hingeZ = 3.5;
+  const hingeX = -0.58;
+  const hingeZ = 3.4;
   for (const y of [0.38, 1.12, 1.86]) {
-    const knuckle = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.14, 8), metal(0xc4a05a)));
+    const knuckle = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.16, 8), metal(0xe3b34a)));
     knuckle.rotation.x = Math.PI / 2;
     knuckle.position.set(hingeX, y, hingeZ);
     root.add(knuckle);
   }
   const hinge = new THREE.Group();
   hinge.position.set(hingeX, 0, hingeZ);
-  const leaf = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.08), wood(0x6a4324, 0.7)));
+  const oak = wood(0x8a5230, 0.68);
+  const leaf = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.1), oak));
   leaf.position.set(0.56, 1.12, 0);
   hinge.add(leaf);
-  const panel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.72, 0.04), wood(0x8a5a32, 0.78)));
-  panel.position.set(0.56, 0.62, 0.03);
+  const panel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.72, 0.05), wood(0xb06a38, 0.74)));
+  panel.position.set(0.56, 0.62, 0.05);
   hinge.add(panel);
   const panel2 = panel.clone();
   panel2.position.y = 1.48;
   hinge.add(panel2);
-  const mid = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.1, 0.1), wood(0x3f2716)));
-  mid.position.set(0.56, 1.06, 0.03);
+  const mid = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.1, 0.12), wood(0x3f2716)));
+  mid.position.set(0.56, 1.06, 0.04);
   hinge.add(mid);
-  const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 2.0, 0.1), metal(0xc4a05a)));
-  strap.position.set(0.12, 1.12, 0.03);
+  const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.0, 0.12), metal(0xe3b34a)));
+  strap.position.set(0.12, 1.12, 0.04);
   hinge.add(strap);
   const strap2 = strap.clone();
   strap2.position.x = 1.0;
@@ -411,10 +412,10 @@ export function buildShopDoor() {
       opacity: 0.7,
     }),
   ));
-  window.position.set(0.56, 1.62, 0.04);
+  window.position.set(0.56, 1.62, 0.06);
   hinge.add(window);
-  const handle = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), metal(0xe3b34a)));
-  handle.position.set(1.0, 1.02, 0.08);
+  const handle = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), metal(0xe8c56a)));
+  handle.position.set(1.0, 1.02, 0.1);
   hinge.add(handle);
   hinge.rotation.y = OPEN_DOOR_ANGLE;
   root.add(hinge);
@@ -422,7 +423,7 @@ export function buildShopDoor() {
   return root;
 }
 
-const OPEN_DOOR_ANGLE = 2.15;
+const OPEN_DOOR_ANGLE = 1.72;
 
 export function setDoorOpen(door, _open, dt = 1) {
   const hinge = door.userData.hinge;

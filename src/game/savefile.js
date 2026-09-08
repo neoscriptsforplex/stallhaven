@@ -1,7 +1,7 @@
 import { applyState, serializeState } from './economy.js';
 
 const SAVE_TYPE = {
-  description: 'Store of Geilenor save',
+  description: 'Rune Craft save',
   accept: { 'application/json': ['.json'] },
 };
 
@@ -11,7 +11,7 @@ function toJson(state) {
 
 async function writeWithPicker(text) {
   const handle = await window.showSaveFilePicker({
-    suggestedName: 'geilenor-save.json',
+    suggestedName: 'runecraft-save.json',
     types: [SAVE_TYPE],
   });
   const writable = await handle.createWritable();
@@ -24,7 +24,7 @@ function downloadFallback(text) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'geilenor-save.json';
+  link.download = 'runecraft-save.json';
   document.body.appendChild(link);
   link.click();
   link.remove();

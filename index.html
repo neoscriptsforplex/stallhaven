@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Store of Geilenor</title>
-    <meta name="description" content="Keep the Store of Geilenor. Craft gear into a chest, then trade with travelers at the counter." />
+    <title>Rune Craft</title>
+    <meta name="description" content="Keep Rune Craft. Craft gear into a chest, then trade with travelers at the counter." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%236b4423' width='64' height='64' rx='10'/%3E%3Cpath fill='%23e8c37a' d='M12 40h40v8H12z'/%3E%3Cpath fill='%238b4336' d='M8 20h48l-6 12H14z'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
-    <canvas id="view" aria-label="Store of Geilenor shop floor"></canvas>
+    <canvas id="view" aria-label="Rune Craft shop floor"></canvas>
 
     <aside id="save-bar" aria-label="Save and load">
       <button type="button" id="save-btn">Save</button>
@@ -20,16 +20,15 @@
     <aside id="hud">
       <header class="ledger">
         <p class="place">A roadside shop</p>
-        <h1>Store of Geilenor</h1>
+        <h1>Rune Craft</h1>
         <div class="ledger-row">
           <p id="gold" class="gold">40g</p>
         </div>
+        <div id="active-craft" class="active-craft" hidden>
+          <p data-active-craft-name>Crafting</p>
+          <span class="craft-bar"><i data-active-craft-bar></i></span>
+        </div>
       </header>
-
-      <section class="panel" aria-label="Materials">
-        <h2>Materials</h2>
-        <div id="materials"></div>
-      </section>
 
       <section class="panel" id="stock" hidden aria-label="Chest wares"></section>
 
@@ -46,11 +45,15 @@
 
     <p id="hint" class="hint">Click the floor to walk — including behind the counter. Click the anvil to craft. Click the traveler at the front of the line to trade.</p>
 
+    <aside id="mat-strip" aria-label="Materials">
+      <div id="materials"></div>
+    </aside>
+
     <div id="tooltip" class="modal" hidden>
       <div class="sheet">
-        <h2>Keep the store</h2>
-        <p>You keep the Store of Geilenor. Click the floor to walk — the camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle.</p>
-        <p>Click the anvil to craft. Bronze gear, a Staff, Blue d'hide, and Bread start unlocked. Craft enough of a piece to open the next tier in that line.</p>
+        <h2>Keep Rune Craft</h2>
+        <p>You keep Rune Craft. Click the floor to walk — the camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle.</p>
+        <p>Click the anvil to craft under Melee, Magic, Ranged, Food, or Potions. Bronze gear, a Staff, Blue d'hide, and Bread start unlocked. Craft enough of a piece to open the next tier in that line.</p>
         <p>Travelers come through the front door and line up on the customer side of the counter. Click the traveler at the front to sell, refuse, or buy a scrap they offer — then they leave and the line advances.</p>
         <p>Click the wooden chest to see your inventory. Click a table, wall shelf, or armour stand — it lights gold — then place a ware. Food sits on the wall shelves.</p>
         <p>Save and Load in the top right write a JSON file on your computer. Spend gold to restock materials. Drag a model onto the drop zone if you want a custom table or ware look — nothing uploaded leaves your browser.</p>

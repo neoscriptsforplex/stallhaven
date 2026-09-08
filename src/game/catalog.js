@@ -1,4 +1,4 @@
-/** Store of Geilenor catalog: melee, magic, range, and food lines. */
+/** Rune Craft catalog: melee, magic, range, and food lines. */
 
 export const START_GOLD = 40;
 
@@ -16,9 +16,11 @@ export const UNLOCK_START = 20;
 export const UNLOCK_STEP = 10;
 
 export const CRAFT_TABS = [
-  { id: 'weapon', label: 'Arms' },
-  { id: 'armour', label: 'Armour' },
+  { id: 'melee', label: 'Melee' },
+  { id: 'magic', label: 'Magic' },
+  { id: 'ranged', label: 'Ranged' },
   { id: 'food', label: 'Food' },
+  { id: 'potion', label: 'Potions' },
 ];
 
 export const METALS = [
@@ -355,19 +357,15 @@ export const SHOP = {
   anvil: { x: -2.98, z: -2.42 },
   chest: { x: 2.98, z: -2.42 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
-  clutter: [
-    { x: 3.48, z: -2.96, w: 0.7, d: 0.55 },
-    { x: -3.48, z: -2.96, w: 0.62, d: 0.55 },
-  ],
   displays: [
-    { id: 'left-front', name: 'Left front table', x: -2.55, z: 1.95, kind: 'table' },
-    { id: 'right-front', name: 'Right front table', x: 2.55, z: 1.95, kind: 'table' },
-    { id: 'left-mid', name: 'Left table', x: -3.15, z: 0.25, kind: 'table' },
-    { id: 'right-mid', name: 'Right table', x: 3.15, z: 0.25, kind: 'table' },
+    { id: 'left-front', name: 'Left front table', x: -2.95, z: 1.85, kind: 'table' },
+    { id: 'right-front', name: 'Right front table', x: 2.95, z: 1.85, kind: 'table' },
+    { id: 'left-mid', name: 'Left table', x: -2.95, z: 0.35, kind: 'table' },
+    { id: 'right-mid', name: 'Right table', x: 2.95, z: 0.35, kind: 'table' },
     { id: 'shelf-left', name: 'Left wall shelf', x: -2.48, z: -3.22, kind: 'shelf' },
     { id: 'shelf-right', name: 'Right wall shelf', x: 2.48, z: -3.22, kind: 'shelf' },
-    { id: 'stand-left', name: 'Left armour stand', x: -3.32, z: 1.12, kind: 'stand' },
-    { id: 'stand-right', name: 'Right armour stand', x: 3.32, z: 1.12, kind: 'stand' },
+    { id: 'stand-left', name: 'Left armour stand', x: -1.58, z: 2.68, kind: 'stand', rot: 0.42 },
+    { id: 'stand-right', name: 'Right armour stand', x: 1.58, z: 2.68, kind: 'stand', rot: -0.42 },
   ],
   cameraStart: { x: -0.15, y: 3.35, z: 2.85 },
   cameraTarget: { x: -0.85, y: 0.95, z: -1.35 },
@@ -400,7 +398,10 @@ export function recipeCost(recipe) {
 }
 
 export function recipesForTab(tabId) {
-  return recipeList().filter((recipe) => recipe.category === tabId);
+  if (tabId === 'potion') return [];
+  if (tabId === 'food') return recipeList().filter((recipe) => recipe.category === 'food');
+  if (tabId === 'ranged') return recipeList().filter((recipe) => recipe.combatClass === 'range');
+  return recipeList().filter((recipe) => recipe.combatClass === tabId);
 }
 
 export function recipesInLine(lineId) {
@@ -420,7 +421,7 @@ export function costLabel(recipe) {
 
 export function classLabel(combatClass) {
   if (combatClass === 'melee') return 'Melee';
-  if (combatClass === 'range') return 'Range';
+  if (combatClass === 'range') return 'Ranged';
   if (combatClass === 'magic') return 'Magic';
   return 'Food';
 }

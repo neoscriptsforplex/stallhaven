@@ -175,9 +175,9 @@ export function createWorld(canvas, state) {
   const displays = SHOP.displays.map((spot, index) => {
     const anchor = new THREE.Group();
     anchor.position.set(spot.x, 0, spot.z);
-    if (spot.kind === 'shelf') anchor.rotation.y = 0;
-    scene.add(anchor);
     const furniture = buildFurniture(spot.kind);
+    if (spot.rot) anchor.rotation.y = spot.rot;
+    scene.add(anchor);
     anchor.add(furniture);
     const wareAnchor = new THREE.Group();
     wareAnchor.position.y = furniture.userData.stand ? 0 : furniture.userData.wareY;
@@ -818,11 +818,7 @@ export function createWorld(canvas, state) {
     setChestLid(chest, chestOpen, dt);
     chestGlow.material.opacity = 0.28 + Math.sin(now * 2.2) * 0.08;
     anvilGlow.material.opacity = 0.26 + Math.sin(now * 2.4) * 0.1;
-    const doorBusy = customers.some((c) => (
-      Math.abs(c.mesh.position.z - SHOP.door.z) < 1.15
-      && Math.abs(c.mesh.position.x - SHOP.door.x) < 0.85
-    ));
-    setDoorOpen(shopDoor, doorBusy, dt);
+    setDoorOpen(shopDoor, true, dt);
     syncDisplays();
     refreshSelection();
     const selected = displays[state.selectedDisplay];

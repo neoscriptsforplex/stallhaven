@@ -29,7 +29,7 @@ import { loadStateFromFile, saveStateToFile } from './savefile.js';
 
 export function bindHud(root, state, world) {
   const goldEl = root.querySelector('#gold');
-  const matsEl = root.querySelector('#materials');
+  const matsEl = document.querySelector('#materials');
   const craftsEl = document.querySelector('#crafts');
   const tabsEl = document.querySelector('#craft-tabs');
   const stockEl = root.querySelector('#stock');
@@ -41,8 +41,10 @@ export function bindHud(root, state, world) {
   const chestItems = document.querySelector('#chest-items');
   const tradeModal = document.querySelector('#trade-modal');
   const craftModal = document.querySelector('#craft-modal');
+  const activeCraft = root.querySelector('#active-craft');
+  const activeCraftName = activeCraft?.querySelector('[data-active-craft-name]');
 
-  let craftTab = 'weapon';
+  let craftTab = 'melee';
   let tradeActor = null;
 
   tabsEl.innerHTML = CRAFT_TABS.map((tab) => (
@@ -50,18 +52,26 @@ export function bindHud(root, state, world) {
   )).join('');
 
   function paintCrafts() {
+    for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
+      btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
+    }
+    if (craftTab === 'potion') {
+      craftsEl.innerHTML = '<p class="empty">Potion recipes are coming later.</p>';
+      return;
+    }
     const recipes = recipesForTab(craftTab);
     const groups = new Map();
     for (const recipe of recipes) {
-      const classKey = recipe.combatClass || 'food';
-      if (!groups.has(classKey)) groups.set(classKey, new Map());
-      const lines = groups.get(classKey);
+      const groupKey = recipe.category === 'armour' ? 'armour' : recipe.category === 'food' ? 'food' : 'weapon';
+      if (!groups.has(groupKey)) groups.set(groupKey, new Map());
+      const lines = groups.get(groupKey);
       const lineId = recipe.lineId || recipe.id;
       if (!lines.has(lineId)) lines.set(lineId, []);
       lines.get(lineId).push(recipe);
     }
+    const groupTitle = { weapon: 'Weapons', armour: 'Armour', food: 'Kitchen' };
     craftsEl.innerHTML = [...groups.entries()].map(([key, lines]) => {
-      const heading = `<h3 class="group">${classLabel(key)}</h3>`;
+      const heading = groups.size > 1 ? `<h3 class="group">${groupTitle[key] ?? classLabel(key)}</h3>` : '';
       const blocks = [...lines.entries()].map(([, list]) => {
         list.sort((a, b) => a.lineIndex - b.lineIndex);
         const lineTitle = list[0]?.lineName ? `<h4 class="line">${list[0].lineName}</h4>` : '';
@@ -77,15 +87,13 @@ export function bindHud(root, state, world) {
               <strong>${recipe.name}</strong>
               <span class="meta">${lockText}</span>
               <span class="timer" data-timer="${recipe.id}"></span>
+              <span class="craft-bar" aria-hidden="true"><i data-bar="${recipe.id}"></i></span>
             </button>
           `;
         }).join('');
       }).join('');
       return heading + blocks;
     }).join('');
-    for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
-      btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
-    }
   }
   paintCrafts();
 
@@ -380,6 +388,18 @@ export function bindHud(root, state, world) {
         btn.classList.remove('is-busy');
         timer.textContent = '';
         btn.style.setProperty('--t', '0');
+      }
+    }
+    const busyId = Object.keys(state.crafts ?? {})[0];
+    if (activeCraft) {
+      if (busyId) {
+        const progress = craftProgress(state, busyId, now);
+        activeCraft.hidden = false;
+        if (activeCraftName) activeCraftName.textContent = `Crafting ${RECIPES[busyId].name}`;
+        activeCraft.style.setProperty('--t', String(progress?.t ?? 0));
+      } else {
+        activeCraft.hidden = true;
+        activeCraft.style.setProperty('--t', '0');
       }
     }
     const stockKey = chestList(state).map((item) => `${item.recipeId}:${item.count}`).join('|');

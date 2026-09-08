@@ -10,7 +10,9 @@ import {
   matchingArmourIds,
   recipeCost,
   recipeList,
+  recipesForTab,
   unlockNeed,
+  CRAFT_TABS,
 } from './catalog.js';
 import {
   applyState,
@@ -293,6 +295,40 @@ describe('catalog', () => {
     assert.ok(front.z > SHOP.counter.z);
     assert.ok(second.z > front.z);
     assert.equal(front.x, SHOP.queue.x);
+  });
+
+  it('lines tables up in two columns and keeps armour stands out of the corners', () => {
+    const tables = SHOP.displays.filter((d) => d.kind === 'table');
+    const leftX = tables.filter((d) => d.x < 0).map((d) => d.x);
+    const rightX = tables.filter((d) => d.x > 0).map((d) => d.x);
+    assert.ok(leftX.length >= 2);
+    assert.ok(rightX.length >= 2);
+    assert.ok(leftX.every((x) => x === leftX[0]));
+    assert.ok(rightX.every((x) => x === rightX[0]));
+    for (const stand of SHOP.displays.filter((d) => d.kind === 'stand')) {
+      assert.ok(Math.abs(stand.x) < 2.2, stand.name);
+      assert.ok(stand.z > 2, stand.name);
+    }
+    assert.equal(SHOP.clutter?.length ?? 0, 0);
+  });
+
+  it('groups anvil recipes by melee, magic, ranged, food, and an empty potions tab', () => {
+    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged', 'Food', 'Potions']);
+    const melee = recipesForTab('melee');
+    const magic = recipesForTab('magic');
+    const ranged = recipesForTab('ranged');
+    const food = recipesForTab('food');
+    assert.ok(melee.length > 0);
+    assert.ok(melee.every((r) => r.combatClass === 'melee'));
+    assert.ok(magic.every((r) => r.combatClass === 'magic'));
+    assert.ok(ranged.every((r) => r.combatClass === 'range'));
+    assert.ok(food.every((r) => r.category === 'food'));
+    assert.equal(recipesForTab('potion').length, 0);
+    assert.ok(melee.some((r) => r.id === 'bronze_sword'));
+    assert.ok(!melee.some((r) => r.id === 'staff'));
+    assert.ok(magic.some((r) => r.id === 'staff'));
+    assert.ok(ranged.some((r) => r.id === 'bronze_shortbow'));
+    assert.ok(food.some((r) => r.id === 'bread'));
   });
 
   it('groups matching helm, body, and legs for a stand', () => {

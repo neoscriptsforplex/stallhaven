@@ -51,4 +51,14 @@ describe('shop navigation', () => {
       assert.ok(slot.z > SHOP.counter.z);
     }
   });
+
+  it('leaves the back corners behind the anvil and chest unblocked', () => {
+    assert.equal((SHOP.clutter ?? []).length, 0);
+    const behindAnvil = nearestWalkable(-3.4, -2.95, obstacles);
+    const behindChest = nearestWalkable(3.4, -2.95, obstacles);
+    assert.ok(behindAnvil);
+    assert.ok(behindChest);
+    assert.equal(isWalkable(behindAnvil.x, behindAnvil.z, obstacles), true);
+    assert.equal(isWalkable(behindChest.x, behindChest.z, obstacles), true);
+  });
 });

@@ -24,14 +24,148 @@ export function addShadow(mesh) {
   return mesh;
 }
 
+function cobbleMap() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#5a564e';
+  ctx.fillRect(0, 0, 256, 256);
+  let seed = 7919;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+  const cols = 8;
+  const rows = 8;
+  const cw = 256 / cols;
+  const ch = 256 / rows;
+  for (let row = 0; row < rows; row += 1) {
+    const stagger = (row % 2) * 0.5;
+    for (let col = -1; col <= cols; col += 1) {
+      const x = (col + stagger) * cw + 2;
+      const y = row * ch + 2;
+      const bw = cw - 5 + rand() * 2;
+      const bh = ch - 5 + rand() * 2;
+      const shade = 108 + Math.floor(rand() * 42);
+      const r = shade + 6;
+      const g = shade;
+      const b = shade - 12;
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      const rx = 5 + rand() * 3;
+      roundRect(ctx, x, y, bw, bh, rx);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(40, 36, 32, ${0.28 + rand() * 0.2})`;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.05 + rand() * 0.07})`;
+      roundRect(ctx, x + 3, y + 2, bw * 0.42, bh * 0.28, 3);
+      ctx.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function cobbleMat(repeatX, repeatY) {
+  const map = cobbleMap();
+  map.repeat.set(repeatX, repeatY);
+  return new THREE.MeshStandardMaterial({
+    map,
+    roughness: 0.94,
+    metalness: 0.03,
+    color: 0xd8d2c6,
+  });
+}
+
+function addWallSlab(root, mat, x, y, z, sx, sy, sz) {
+  if (sx < 0.03 || sy < 0.03 || sz < 0.03) return;
+  const mesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat));
+  mesh.position.set(x, y, z);
+  root.add(mesh);
+}
+
+function addWallWithWindow(root, mat, {
+  x, y, z, w, h, t, axis, winAlong, winY, winW, winH,
+}) {
+  const along0 = axis === 'x' ? x : z;
+  const left = along0 - w / 2;
+  const right = along0 + w / 2;
+  const bottom = y - h / 2;
+  const top = y + h / 2;
+  const winL = winAlong - winW / 2;
+  const winR = winAlong + winW / 2;
+  const winB = winY - winH / 2;
+  const winT = winY + winH / 2;
+  const place = (along, cy, sw, sh) => {
+    addWallSlab(
+      root,
+      mat,
+      axis === 'x' ? along : x,
+      cy,
+      axis === 'x' ? z : along,
+      axis === 'x' ? sw : t,
+      sh,
+      axis === 'x' ? t : sw,
+    );
+  };
+  place(left + (winL - left) / 2, y, winL - left, h);
+  place(winR + (right - winR) / 2, y, right - winR, h);
+  place(winAlong, bottom + (winB - bottom) / 2, winW, winB - bottom);
+  place(winAlong, winT + (top - winT) / 2, winW, top - winT);
+}
+
+function addShopWindow(root, { x, y, z, rotY = 0, w = 0.78, h = 0.9 }) {
+  const group = new THREE.Group();
+  group.position.set(x, y, z);
+  group.rotation.y = rotY;
+  const frame = wood(0x3a2414, 0.82);
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0xb7d7e6,
+    roughness: 0.08,
+    metalness: 0.18,
+    transparent: true,
+    opacity: 0.42,
+    emissive: 0x7eb8d0,
+    emissiveIntensity: 0.16,
+  });
+  const pane = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w - 0.08, h - 0.08, 0.03), glass));
+  group.add(pane);
+  const top = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w, 0.07, 0.09), frame));
+  top.position.y = h / 2 - 0.02;
+  group.add(top);
+  const bot = top.clone();
+  bot.position.y = -h / 2 + 0.02;
+  group.add(bot);
+  const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, h, 0.09), frame));
+  left.position.x = -w / 2 + 0.02;
+  group.add(left);
+  const right = left.clone();
+  right.position.x = w / 2 - 0.02;
+  group.add(right);
+  const mullionV = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.045, h - 0.08, 0.05), frame));
+  group.add(mullionV);
+  const mullionH = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w - 0.08, 0.045, 0.05), frame));
+  group.add(mullionH);
+  const sill = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, 0.06, 0.16), wood(0x4a301c)));
+  sill.position.set(0, -h / 2 - 0.02, 0.02);
+  group.add(sill);
+  root.add(group);
+  return group;
+}
+
 export function buildStall() {
   const root = new THREE.Group();
   root.name = 'stall';
 
-  const plaster = new THREE.MeshStandardMaterial({
-    color: 0xc6b496,
-    roughness: 0.94,
-  });
+  const stoneFront = cobbleMat(4.2, 2.6);
+  const stoneSide = cobbleMat(7.2, 2.6);
+  const stoneBack = cobbleMat(8.2, 2.6);
   const beam = wood(0x3c2616, 0.78);
   const floorMat = wood(0x6a4a2e, 0.9);
   const dustGround = new THREE.MeshStandardMaterial({
@@ -61,26 +195,33 @@ export function buildStall() {
     root.add(plank);
   }
 
-  const back = addShadow(new THREE.Mesh(new THREE.BoxGeometry(8.2, 2.7, 0.16), plaster));
+  const back = addShadow(new THREE.Mesh(new THREE.BoxGeometry(8.2, 2.7, 0.16), stoneBack));
   back.position.set(0, 1.4, -3.45);
   root.add(back);
 
-  const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.7, 7.2), plaster));
-  left.position.set(-4.1, 1.4, 0.1);
-  root.add(left);
-
-  const right = left.clone();
-  right.position.x = 4.1;
-  root.add(right);
+  addWallWithWindow(root, stoneSide, {
+    x: -4.1, y: 1.4, z: 0.1, w: 7.2, h: 2.7, t: 0.16, axis: 'z',
+    winAlong: 0.15, winY: 1.42, winW: 0.86, winH: 0.95,
+  });
+  addWallWithWindow(root, stoneSide, {
+    x: 4.1, y: 1.4, z: 0.1, w: 7.2, h: 2.7, t: 0.16, axis: 'z',
+    winAlong: 0.15, winY: 1.42, winW: 0.86, winH: 0.95,
+  });
+  addShopWindow(root, { x: -4.08, y: 1.42, z: 0.15, rotY: Math.PI / 2 });
+  addShopWindow(root, { x: 4.08, y: 1.42, z: 0.15, rotY: -Math.PI / 2 });
 
   const doorHalf = 0.58;
   const wallSpan = 4.1 - doorHalf;
-  const frontLeft = addShadow(new THREE.Mesh(new THREE.BoxGeometry(wallSpan, 2.7, 0.16), plaster));
-  frontLeft.position.set(-4.1 + wallSpan / 2, 1.4, 3.58);
-  root.add(frontLeft);
-  const frontRight = frontLeft.clone();
-  frontRight.position.x = 4.1 - wallSpan / 2;
-  root.add(frontRight);
+  addWallWithWindow(root, stoneFront, {
+    x: -4.1 + wallSpan / 2, y: 1.4, z: 3.58, w: wallSpan, h: 2.7, t: 0.16, axis: 'x',
+    winAlong: -1.48, winY: 1.42, winW: 0.82, winH: 0.95,
+  });
+  addWallWithWindow(root, stoneFront, {
+    x: 4.1 - wallSpan / 2, y: 1.4, z: 3.58, w: wallSpan, h: 2.7, t: 0.16, axis: 'x',
+    winAlong: 1.48, winY: 1.42, winW: 0.82, winH: 0.95,
+  });
+  addShopWindow(root, { x: -1.48, y: 1.42, z: 3.58 });
+  addShopWindow(root, { x: 1.48, y: 1.42, z: 3.58 });
 
   const lintel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(doorHalf * 2 + 0.36, 0.38, 0.22), beam));
   lintel.position.set(0, 2.52, 3.58);
@@ -153,15 +294,6 @@ export function buildStall() {
   counter.position.set(SHOP.counter.x, 0, SHOP.counter.z);
   root.add(counter);
 
-  const crate = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.45, 0.55), wood(0x5a3b22)));
-  crate.position.set(SHOP.clutter[0].x, 0.32, SHOP.clutter[0].z);
-  root.add(crate);
-
-  const sack = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), cloth(0xbfa06c)));
-  sack.scale.set(1, 0.75, 1.1);
-  sack.position.set(SHOP.clutter[1].x, 0.28, SHOP.clutter[1].z);
-  root.add(sack);
-
   return root;
 }
 
@@ -179,10 +311,10 @@ function makeSign() {
   ctx.font = '700 42px Georgia, serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('STORE OF GEILENOR', 320, 52);
+  ctx.fillText('RUNE CRAFT', 320, 52);
   ctx.font = '22px Georgia, serif';
   ctx.fillStyle = '#d7b27a';
-  ctx.fillText('wares for the dusty road', 320, 98);
+  ctx.fillText('forge, bake, and trade', 320, 98);
   const tex = new THREE.CanvasTexture(canvas);
   const label = new THREE.Mesh(
     new THREE.PlaneGeometry(2.7, 0.46),
@@ -241,7 +373,7 @@ export function buildShopDoor() {
   const root = new THREE.Group();
   root.name = 'shop-door';
   const hinge = new THREE.Group();
-  hinge.position.set(-0.56, 0, 3.5);
+  hinge.position.set(-0.58, 0, 3.5);
   const leaf = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.08), wood(0x6a4324, 0.7)));
   leaf.position.set(0.56, 1.12, 0);
   hinge.add(leaf);
@@ -275,15 +407,16 @@ export function buildShopDoor() {
   const handle = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), metal(0xe3b34a)));
   handle.position.set(1.0, 1.02, 0.08);
   hinge.add(handle);
+  hinge.rotation.y = -1.62;
   root.add(hinge);
   root.userData.hinge = hinge;
   return root;
 }
 
-export function setDoorOpen(door, open, dt = 1) {
+export function setDoorOpen(door, _open, dt = 1) {
   const hinge = door.userData.hinge;
   if (!hinge) return;
-  const target = open ? -1.45 : -0.38;
+  const target = -1.62;
   hinge.rotation.y += (target - hinge.rotation.y) * Math.min(1, dt * 5);
 }
 
@@ -393,34 +526,40 @@ export function buildWallShelf() {
 export function buildArmourStand() {
   const group = new THREE.Group();
   group.name = 'armour-stand';
-  const pole = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1.42, 8), wood(0x3f2716)));
-  pole.position.y = 0.72;
+  const pole = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 1.48, 8), wood(0x3f2716)));
+  pole.position.y = 0.76;
   group.add(pole);
-  const base = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.08, 10), wood(0x4a301c)));
+  const base = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.08, 12), wood(0x4a301c)));
   base.position.y = 0.04;
   group.add(base);
-  const hips = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.05, 0.1), wood(0x5a3b22)));
-  hips.position.y = 0.52;
+  const hips = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.14), wood(0x5a3b22)));
+  hips.position.y = 0.5;
   group.add(hips);
-  const shoulders = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.1), wood(0x5a3b22)));
-  shoulders.position.y = 1.18;
+  const torso = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 0.14), wood(0x7a5230, 0.9)));
+  torso.position.y = 0.92;
+  group.add(torso);
+  const shoulders = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.12), wood(0x5a3b22)));
+  shoulders.position.y = 1.16;
   group.add(shoulders);
-  const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.16, 8), wood(0x3f2716)));
-  neck.position.y = 1.3;
+  const armL = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.38, 8), wood(0x3f2716)));
+  armL.position.set(-0.24, 0.92, 0);
+  group.add(armL);
+  const armR = armL.clone();
+  armR.position.x = 0.24;
+  group.add(armR);
+  const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), wood(0x3f2716)));
+  neck.position.y = 1.28;
   group.add(neck);
-  const knob = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), wood(0x6a4324)));
-  knob.position.y = 1.42;
+  const knob = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), wood(0x6a4324)));
+  knob.position.y = 1.4;
   group.add(knob);
-  const dummy = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.34, 0.1), wood(0x7a5230, 0.9)));
-  dummy.position.y = 0.96;
-  group.add(dummy);
   group.userData.wareY = 0;
   group.userData.stand = true;
   group.userData.slots = {
-    helm: { x: 0, y: 1.38, z: 0 },
-    body: { x: 0, y: 0.78, z: 0 },
-    legs: { x: 0, y: 0.28, z: 0 },
-    ware: { x: 0.16, y: 0.62, z: 0.08 },
+    helm: { x: 0, y: 1.4, z: 0 },
+    body: { x: 0, y: 0.82, z: 0 },
+    legs: { x: 0, y: 0.3, z: 0 },
+    ware: { x: 0.18, y: 0.62, z: 0.1 },
   };
   return group;
 }
@@ -432,11 +571,11 @@ export function buildFurniture(kind) {
 }
 
 export function slotPose(slot) {
-  if (slot === 'helm') return { x: 0, y: 1.38, z: 0 };
-  if (slot === 'body') return { x: 0, y: 0.78, z: 0 };
+  if (slot === 'helm') return { x: 0, y: 1.4, z: 0 };
+  if (slot === 'body') return { x: 0, y: 0.82, z: 0 };
   if (slot === 'legs') return { x: 0, y: 0.32, z: 0 };
   if (slot === 'boots') return { x: 0, y: 0.08, z: 0.02 };
-  if (slot === 'gloves') return { x: 0.22, y: 0.72, z: 0.04 };
+  if (slot === 'gloves') return { x: 0.24, y: 0.74, z: 0.04 };
   return { x: 0, y: 0.62, z: 0 };
 }
 

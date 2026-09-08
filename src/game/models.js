@@ -422,7 +422,7 @@ export function buildShopDoor() {
   return root;
 }
 
-const OPEN_DOOR_ANGLE = 1.48;
+const OPEN_DOOR_ANGLE = 2.15;
 
 export function setDoorOpen(door, _open, dt = 1) {
   const hinge = door.userData.hinge;

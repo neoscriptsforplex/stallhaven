@@ -8,6 +8,7 @@ import {
   materialList,
   recipesForTab,
 } from './catalog.js';
+import { playClick } from './audio.js';
 import {
   buyFromCustomer,
   canCraft,
@@ -16,12 +17,15 @@ import {
   chestTotal,
   craftProgress,
   hasStock,
+  isUnlocked,
   placeFromChest,
   pushLog,
   restock,
   sellToCustomer,
   startCraft,
+  unlockRemaining,
 } from './economy.js';
+import { loadStateFromFile, saveStateToFile } from './savefile.js';
 
 export function bindHud(root, state, world) {
   const goldEl = root.querySelector('#gold');
@@ -49,19 +53,35 @@ export function bindHud(root, state, world) {
     const recipes = recipesForTab(craftTab);
     const groups = new Map();
     for (const recipe of recipes) {
-      const key = recipe.combatClass || 'road';
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(recipe);
+      const classKey = recipe.combatClass || 'food';
+      if (!groups.has(classKey)) groups.set(classKey, new Map());
+      const lines = groups.get(classKey);
+      const lineId = recipe.lineId || recipe.id;
+      if (!lines.has(lineId)) lines.set(lineId, []);
+      lines.get(lineId).push(recipe);
     }
-    craftsEl.innerHTML = [...groups.entries()].map(([key, list]) => {
-      const heading = craftTab === 'provision' ? '' : `<h3 class="group">${classLabel(key)}</h3>`;
-      return heading + list.map((recipe) => `
-        <button type="button" class="craft" data-craft="${recipe.id}">
-          <strong>${recipe.name}</strong>
-          <span class="meta">${costLabel(recipe)}</span>
-          <span class="timer" data-timer="${recipe.id}"></span>
-        </button>
-      `).join('');
+    craftsEl.innerHTML = [...groups.entries()].map(([key, lines]) => {
+      const heading = `<h3 class="group">${classLabel(key)}</h3>`;
+      const blocks = [...lines.entries()].map(([, list]) => {
+        list.sort((a, b) => a.lineIndex - b.lineIndex);
+        const lineTitle = list[0]?.lineName ? `<h4 class="line">${list[0].lineName}</h4>` : '';
+        return lineTitle + list.map((recipe) => {
+          const locked = !isUnlocked(state, recipe.id);
+          const prev = recipe.previousId ? RECIPES[recipe.previousId] : null;
+          const remain = unlockRemaining(state, recipe.id);
+          const lockText = locked
+            ? `Locked · ${remain} more ${prev?.name ?? 'crafts'}`
+            : costLabel(recipe);
+          return `
+            <button type="button" class="craft${locked ? ' is-locked' : ''}" data-craft="${recipe.id}">
+              <strong>${recipe.name}</strong>
+              <span class="meta">${lockText}</span>
+              <span class="timer" data-timer="${recipe.id}"></span>
+            </button>
+          `;
+        }).join('');
+      }).join('');
+      return heading + blocks;
     }).join('');
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
       btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
@@ -89,6 +109,7 @@ export function bindHud(root, state, world) {
     const btn = event.target.closest('[data-craft]');
     if (!btn) return;
     if (startCraft(state, btn.dataset.craft, performance.now() / 1000)) {
+      playClick('craft');
       pushLog(state, `Crafting ${RECIPES[btn.dataset.craft].name}…`);
       render(performance.now() / 1000);
     }
@@ -233,6 +254,7 @@ export function bindHud(root, state, world) {
       paintTrade();
       return;
     }
+    playClick('trade');
     pushLog(state, `Sold ${RECIPES[recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${paid}g.`);
     world.sellToActor(actor);
     world.syncDisplays();
@@ -254,6 +276,7 @@ export function bindHud(root, state, world) {
     const actor = tradeActor && world.getCustomer(tradeActor.id);
     if (!actor?.offer) return;
     if (buyFromCustomer(state, actor.offer.materialId, actor.offer.price)) {
+      playClick('trade');
       const mat = MATERIALS[actor.offer.materialId];
       pushLog(state, `Bought ${mat.name} from ${CUSTOMERS[actor.typeId].name} for ${actor.offer.price}g.`);
       world.buyFromActor(actor);
@@ -289,8 +312,41 @@ export function bindHud(root, state, world) {
   });
   setModalOpen();
 
+  const saveBtn = document.querySelector('#save-btn');
+  const loadBtn = document.querySelector('#load-btn');
+  saveBtn?.addEventListener('click', async () => {
+    try {
+      if (await saveStateToFile(state)) pushLog(state, 'Shop saved to a file.');
+    } catch {
+      pushLog(state, 'Could not save that file.');
+    }
+    render(performance.now() / 1000);
+  });
+  loadBtn?.addEventListener('click', async () => {
+    try {
+      if (await loadStateFromFile(state)) {
+        world.syncDisplays();
+        world.refreshSelection(true);
+        paintCrafts();
+        lastStockKey = null;
+        pushLog(state, 'Shop loaded from a file.');
+      }
+    } catch {
+      pushLog(state, 'Could not read that save file.');
+    }
+    render(performance.now() / 1000);
+  });
+
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.craft || btn.hasAttribute('data-trade-sell') || btn.hasAttribute('data-trade-buy-btn')) return;
+    playClick('ui');
+  });
+
   let lastStockKey = null;
   let lastLogKey = null;
+  let lastUnlockKey = null;
 
   function render(now) {
     goldEl.textContent = `${state.gold}g`;
@@ -298,15 +354,22 @@ export function bindHud(root, state, world) {
     chestCountEl.textContent = `${chestN} piece${chestN === 1 ? '' : 's'} waiting`;
     for (const mat of materialList()) {
       const count = matsEl.querySelector(`[data-count="${mat.id}"]`);
-      if (count) count.textContent = `×${state.materials[mat.id]}`;
+      if (count) count.textContent = `×${state.materials[mat.id] ?? 0}`;
       const btn = matsEl.querySelector(`[data-restock="${mat.id}"]`);
       if (btn) btn.disabled = !canRestock(state, mat.id);
+    }
+    const unlockKey = Object.entries(state.craftCounts ?? {}).map(([id, n]) => `${id}:${n}`).join('|');
+    if (unlockKey !== lastUnlockKey) {
+      lastUnlockKey = unlockKey;
+      paintCrafts();
     }
     for (const recipe of recipesForTab(craftTab)) {
       const btn = craftsEl.querySelector(`[data-craft="${recipe.id}"]`);
       const timer = craftsEl.querySelector(`[data-timer="${recipe.id}"]`);
       if (!btn || !timer) continue;
       const progress = craftProgress(state, recipe.id, now);
+      const locked = !isUnlocked(state, recipe.id);
+      btn.classList.toggle('is-locked', locked);
       if (progress) {
         btn.disabled = true;
         btn.classList.add('is-busy');

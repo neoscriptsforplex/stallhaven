@@ -13,8 +13,9 @@ import {
 describe('shop navigation', () => {
   const obstacles = shopObstacles();
 
-  it('lets the shopkeeper stand in the open space beside the counter', () => {
+  it('lets the shopkeeper stand behind the counter', () => {
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, obstacles), true);
+    assert.equal(isWalkable(0, SHOP.counter.z - 0.82, obstacles), true);
   });
 
   it('blocks the counter, walls, and the road outside', () => {
@@ -24,16 +25,15 @@ describe('shop navigation', () => {
   });
 
   it('walks around the counter instead of through it', () => {
-    const from = { x: SHOP.keeper.x, z: SHOP.keeper.z };
-    const to = { x: 1.85, z: -1.35 };
+    const from = { x: 0, z: 1.2 };
+    const to = { x: 0, z: SHOP.counter.z - 0.82 };
     const path = planWalk(from, to, obstacles);
     assert.ok(path.length >= 1);
     for (const point of path) {
       assert.equal(isWalkable(point.x, point.z, obstacles), true);
     }
-    const midZ = SHOP.counter.z;
     const through = path.some((point) => (
-      Math.abs(point.z - midZ) < 0.2 && Math.abs(point.x) < 0.9
+      Math.abs(point.z - SHOP.counter.z) < 0.18 && Math.abs(point.x) < 0.7
     ));
     assert.equal(through, false);
   });

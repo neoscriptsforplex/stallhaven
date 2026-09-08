@@ -133,6 +133,7 @@ function addShopWindow(root, { x, y, z, rotY = 0, w = 0.78, h = 0.9 }) {
     opacity: 0.42,
     emissive: 0x7eb8d0,
     emissiveIntensity: 0.16,
+    side: THREE.DoubleSide,
   });
   const pane = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w - 0.08, h - 0.08, 0.03), glass));
   group.add(pane);
@@ -220,8 +221,8 @@ export function buildStall() {
     x: 4.1 - wallSpan / 2, y: 1.4, z: 3.58, w: wallSpan, h: 2.7, t: 0.16, axis: 'x',
     winAlong: 1.48, winY: 1.42, winW: 0.82, winH: 0.95,
   });
-  addShopWindow(root, { x: -1.48, y: 1.42, z: 3.58 });
-  addShopWindow(root, { x: 1.48, y: 1.42, z: 3.58 });
+  addShopWindow(root, { x: -1.48, y: 1.42, z: 3.5 });
+  addShopWindow(root, { x: 1.48, y: 1.42, z: 3.5 });
 
   const lintel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(doorHalf * 2 + 0.36, 0.38, 0.22), beam));
   lintel.position.set(0, 2.52, 3.58);
@@ -372,8 +373,16 @@ export function buildDefaultTable() {
 export function buildShopDoor() {
   const root = new THREE.Group();
   root.name = 'shop-door';
+  const hingeX = -0.6;
+  const hingeZ = 3.5;
+  for (const y of [0.38, 1.12, 1.86]) {
+    const knuckle = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.14, 8), metal(0xc4a05a)));
+    knuckle.rotation.x = Math.PI / 2;
+    knuckle.position.set(hingeX, y, hingeZ);
+    root.add(knuckle);
+  }
   const hinge = new THREE.Group();
-  hinge.position.set(-0.58, 0, 3.5);
+  hinge.position.set(hingeX, 0, hingeZ);
   const leaf = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.08), wood(0x6a4324, 0.7)));
   leaf.position.set(0.56, 1.12, 0);
   hinge.add(leaf);
@@ -407,17 +416,18 @@ export function buildShopDoor() {
   const handle = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), metal(0xe3b34a)));
   handle.position.set(1.0, 1.02, 0.08);
   hinge.add(handle);
-  hinge.rotation.y = -1.62;
+  hinge.rotation.y = OPEN_DOOR_ANGLE;
   root.add(hinge);
   root.userData.hinge = hinge;
   return root;
 }
 
+const OPEN_DOOR_ANGLE = 1.48;
+
 export function setDoorOpen(door, _open, dt = 1) {
   const hinge = door.userData.hinge;
   if (!hinge) return;
-  const target = -1.62;
-  hinge.rotation.y += (target - hinge.rotation.y) * Math.min(1, dt * 5);
+  hinge.rotation.y += (OPEN_DOOR_ANGLE - hinge.rotation.y) * Math.min(1, dt * 5);
 }
 
 export function buildShopkeeper() {

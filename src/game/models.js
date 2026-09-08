@@ -434,7 +434,9 @@ export function buildFurniture(kind) {
 export function slotPose(slot) {
   if (slot === 'helm') return { x: 0, y: 1.38, z: 0 };
   if (slot === 'body') return { x: 0, y: 0.78, z: 0 };
-  if (slot === 'legs') return { x: 0, y: 0.28, z: 0 };
+  if (slot === 'legs') return { x: 0, y: 0.32, z: 0 };
+  if (slot === 'boots') return { x: 0, y: 0.08, z: 0.02 };
+  if (slot === 'gloves') return { x: 0.22, y: 0.72, z: 0.04 };
   return { x: 0, y: 0.62, z: 0 };
 }
 
@@ -442,87 +444,59 @@ export function buildWare(recipeId) {
   const recipe = RECIPES[recipeId];
   const group = new THREE.Group();
   group.name = recipeId;
-
-  if (recipeId === 'trailbread') {
-    const loaf = addShadow(
-      new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), new THREE.MeshStandardMaterial({
-        color: recipe.tint,
-        roughness: 0.9,
-      })),
-    );
-    loaf.scale.set(1.35, 0.55, 0.9);
-    loaf.position.y = 0.08;
-    group.add(loaf);
-    const loaf2 = loaf.clone();
-    loaf2.position.set(0.12, 0.12, 0.05);
-    loaf2.rotation.z = 0.2;
-    group.add(loaf2);
-  } else if (recipeId === 'emberflask') {
-    const glass = new THREE.MeshStandardMaterial({
-      color: 0x6a220e,
-      emissive: 0xc13a10,
-      emissiveIntensity: 0.55,
-      roughness: 0.25,
-      metalness: 0.1,
-    });
-    const body = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), glass));
-    body.position.y = 0.14;
-    group.add(body);
-    const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.16, 8), glass));
-    neck.position.y = 0.3;
-    group.add(neck);
-    const cork = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 8), wood(0x6b4423)));
-    cork.position.y = 0.39;
-    group.add(cork);
-  } else if (recipeId === 'thornpike') {
-    const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.95, 8), wood(0x5a3a22)));
-    shaft.rotation.z = 0.55;
-    shaft.rotation.x = -0.2;
-    shaft.position.set(-0.05, 0.28, 0);
-    group.add(shaft);
-    const head = addShadow(
-      new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 6), new THREE.MeshStandardMaterial({
-        color: 0x8ea86a,
-        roughness: 0.45,
-        metalness: 0.25,
-      })),
-    );
-    head.rotation.z = 0.55;
-    head.rotation.x = -0.2;
-    head.position.set(0.28, 0.58, -0.08);
-    group.add(head);
-  } else if (recipeId === 'waycloak') {
-    const stand = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.55, 8), wood(0x3a2a1c)));
-    stand.position.y = 0.28;
-    group.add(stand);
-    const cape = addShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.22, 4, 8), cloth(recipe.tint)));
-    cape.position.y = 0.34;
-    cape.scale.set(1.2, 1, 0.45);
-    group.add(cape);
-    const hood = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), cloth(0x3c4c56)));
-    hood.position.set(0, 0.52, 0.02);
-    group.add(hood);
-  } else if (recipe?.slot === 'sword') {
-    addSword(group, recipe.tint);
-  } else if (recipe?.slot === 'bow') {
-    addBow(group, recipe.tint);
-  } else if (recipe?.slot === 'staff') {
-    addStaff(group, recipe.tint);
-  } else if (recipe?.slot === 'helm') {
-    addHelm(group, recipe.tint, recipe.combatClass);
-  } else if (recipe?.slot === 'body') {
-    addBody(group, recipe.tint, recipe.combatClass);
-  } else if (recipe?.slot === 'legs') {
-    addLegs(group, recipe.tint, recipe.combatClass);
-  } else {
+  const shape = recipe?.shape;
+  const tint = recipe?.tint ?? 0x888888;
+  const builders = {
+    scimitar: () => addScimitar(group, tint),
+    dagger: () => addDagger(group, tint),
+    sword: () => addSword(group, tint, 1),
+    mace: () => addMace(group, tint),
+    spear: () => addSpear(group, tint),
+    '2h': () => addSword(group, tint, 1.38),
+    defender: () => addDefender(group, tint),
+    full_helm: () => addFullHelm(group, tint),
+    med_helm: () => addMedHelm(group, tint),
+    platebody: () => addPlatebody(group, tint),
+    platelegs: () => addPlatelegs(group, tint),
+    boots: () => addBoots(group, tint, true),
+    gloves: () => addGloves(group, tint, true),
+    chainbody: () => addChainbody(group, tint),
+    plateskirt: () => addPlateskirt(group, tint),
+    staff_plain: () => addMagicStaff(group, tint, 'plain'),
+    staff_mystic: () => addMagicStaff(group, tint, 'mystic'),
+    staff_battle: () => addMagicStaff(group, tint, 'battle'),
+    staff_lunar: () => addMagicStaff(group, tint, 'lunar'),
+    staff_ancient: () => addMagicStaff(group, tint, 'ancient'),
+    wizard_hat: () => addWizardHat(group, tint, recipe?.accent),
+    robe_top: () => addRobeTop(group, tint, recipe?.accent),
+    robe_bottom: () => addRobeBottom(group, tint, recipe?.accent),
+    magic_boots: () => addBoots(group, tint, false),
+    magic_gloves: () => addGloves(group, tint, false),
+    shortbow: () => addBow(group, tint, 0.78),
+    longbow: () => addBow(group, tint, 1.18),
+    crossbow: () => addCrossbow(group, tint),
+    knives: () => addKnives(group, tint),
+    thrownaxe: () => addThrownaxe(group, tint),
+    dhide_body: () => addDhideBody(group, tint),
+    dhide_chaps: () => addChaps(group, tint),
+    dhide_vambraces: () => addVambraces(group, tint),
+    dhide_boots: () => addBoots(group, tint, false),
+    bread: () => addBread(group, tint),
+    pizza: () => addPizza(group, tint),
+    cake: () => addCake(group, tint),
+    pie: () => addPie(group, tint, 0xb45a4a),
+    fish_pie: () => addPie(group, tint, 0x7a9aaa),
+  };
+  if (builders[shape]) builders[shape]();
+  else {
     const lump = addShadow(new THREE.Mesh(
       new THREE.BoxGeometry(0.28, 0.18, 0.22),
-      new THREE.MeshStandardMaterial({ color: recipe?.tint ?? 0x888888, roughness: 0.6 }),
+      new THREE.MeshStandardMaterial({ color: tint, roughness: 0.6 }),
     ));
     lump.position.y = 0.1;
     group.add(lump);
   }
-
+  if (recipe?.category === 'food') group.scale.setScalar(0.55);
   group.userData.recipeId = recipeId;
   return group;
 }
@@ -535,109 +509,121 @@ function metal(color) {
   });
 }
 
-function addSword(group, tint) {
-  const blade = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.62, 0.016), metal(tint)));
-  blade.position.set(0.08, 0.42, 0);
-  blade.rotation.z = -0.45;
-  group.add(blade);
-  const tip = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 6), metal(tint)));
-  tip.position.set(0.22, 0.7, 0);
-  tip.rotation.z = -0.45;
-  group.add(tip);
-  const guard = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.05), metal(0xc4a05a)));
-  guard.position.set(-0.02, 0.18, 0);
-  guard.rotation.z = -0.45;
+function glow(color) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 0.4,
+    roughness: 0.28,
+    metalness: 0.15,
+  });
+}
+
+function addHilt(group, x, y, rot, wide = 0.22) {
+  const guard = addShadow(new THREE.Mesh(new THREE.BoxGeometry(wide, 0.035, 0.05), metal(0xc4a05a)));
+  guard.position.set(x, y, 0);
+  guard.rotation.z = rot;
   group.add(guard);
   const grip = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.022, 0.16, 8), wood(0x4a301c)));
-  grip.position.set(-0.08, 0.08, 0);
-  grip.rotation.z = -0.45;
+  grip.position.set(x - 0.06, y - 0.1, 0);
+  grip.rotation.z = rot;
   group.add(grip);
 }
 
-function addBow(group, tint) {
-  const limb = addShadow(new THREE.Mesh(
-    new THREE.TorusGeometry(0.28, 0.018, 8, 16, Math.PI),
-    wood(tint),
-  ));
-  limb.rotation.y = Math.PI / 2;
-  limb.rotation.z = Math.PI / 2;
-  limb.position.set(0, 0.32, 0);
-  group.add(limb);
-  const string = addShadow(new THREE.Mesh(
-    new THREE.CylinderGeometry(0.006, 0.006, 0.54, 6),
-    new THREE.MeshStandardMaterial({ color: 0xead3ae, roughness: 0.5 }),
-  ));
-  string.position.set(0.18, 0.32, 0);
-  group.add(string);
+function addSword(group, tint, scale = 1) {
+  const blade = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.055 * scale, 0.62 * scale, 0.016), metal(tint)));
+  blade.position.set(0.08, 0.34 + 0.08 * scale, 0);
+  blade.rotation.z = -0.45;
+  group.add(blade);
+  const tip = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.038 * scale, 0.12 * scale, 6), metal(tint)));
+  tip.position.set(0.08 + 0.14 * scale, 0.34 + 0.36 * scale, 0);
+  tip.rotation.z = -0.45;
+  group.add(tip);
+  addHilt(group, -0.02, 0.18, -0.45, 0.2 * scale);
 }
 
-function addStaff(group, tint) {
-  const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.82, 8), wood(0x3a2a1c)));
-  shaft.position.set(0, 0.4, 0);
-  shaft.rotation.z = 0.28;
+function addScimitar(group, tint) {
+  const blade = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.028, 8, 18, Math.PI * 0.72), metal(tint)));
+  blade.rotation.y = Math.PI / 2;
+  blade.rotation.z = 0.55;
+  blade.position.set(0.08, 0.42, 0);
+  group.add(blade);
+  addHilt(group, -0.06, 0.16, -0.35, 0.18);
+}
+
+function addDagger(group, tint) {
+  const blade = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.32, 0.014), metal(tint)));
+  blade.position.set(0.04, 0.28, 0);
+  blade.rotation.z = -0.4;
+  group.add(blade);
+  const tip = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.1, 6), metal(tint)));
+  tip.position.set(0.1, 0.44, 0);
+  tip.rotation.z = -0.4;
+  group.add(tip);
+  addHilt(group, -0.04, 0.14, -0.4, 0.16);
+}
+
+function addMace(group, tint) {
+  const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.48, 8), wood(0x4a301c)));
+  shaft.position.set(0, 0.28, 0);
+  shaft.rotation.z = 0.35;
   group.add(shaft);
-  const orb = addShadow(new THREE.Mesh(
-    new THREE.SphereGeometry(0.09, 12, 10),
-    new THREE.MeshStandardMaterial({
-      color: tint,
-      emissive: tint,
-      emissiveIntensity: 0.45,
-      roughness: 0.25,
-    }),
-  ));
-  orb.position.set(0.12, 0.82, 0);
-  group.add(orb);
+  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), metal(tint)));
+  head.position.set(0.1, 0.52, 0);
+  group.add(head);
+  for (const [x, y, z] of [[0.16, 0.56, 0], [0.04, 0.58, 0.06], [0.04, 0.58, -0.06]]) {
+    const spike = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.08, 5), metal(tint)));
+    spike.position.set(x, y, z);
+    group.add(spike);
+  }
 }
 
-function addHelm(group, tint, combatClass) {
-  if (combatClass === 'magic') {
-    const band = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.02, 8, 16), metal(tint)));
-    band.rotation.x = Math.PI / 2;
-    band.position.y = 0.16;
-    group.add(band);
-    const gem = addShadow(new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.05),
-      new THREE.MeshStandardMaterial({ color: tint, emissive: tint, emissiveIntensity: 0.35 }),
-    ));
-    gem.position.y = 0.22;
-    group.add(gem);
-    return;
-  }
-  if (combatClass === 'range') {
-    const cap = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), cloth(tint)));
-    cap.position.y = 0.12;
-    group.add(cap);
-    const brim = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.02, 12), cloth(0x3a2a1c)));
-    brim.position.y = 0.12;
-    group.add(brim);
-    return;
-  }
-  const dome = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.7), metal(tint)));
+function addSpear(group, tint) {
+  const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.92, 8), wood(0x5a3a22)));
+  shaft.position.set(0, 0.4, 0);
+  shaft.rotation.z = 0.42;
+  group.add(shaft);
+  const head = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 6), metal(tint)));
+  head.position.set(0.2, 0.82, 0);
+  head.rotation.z = 0.42;
+  group.add(head);
+}
+
+function addDefender(group, tint) {
+  const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.42, 0.05), metal(tint)));
+  board.position.y = 0.24;
+  group.add(board);
+  const boss = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), metal(0xc4a05a)));
+  boss.position.set(0, 0.24, 0.04);
+  group.add(boss);
+  const rim = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.04, 0.06), metal(0xc4a05a)));
+  rim.position.y = 0.44;
+  group.add(rim);
+}
+
+function addFullHelm(group, tint) {
+  const dome = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.5), metal(tint)));
+  dome.position.y = 0.14;
+  group.add(dome);
+  const face = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.16), metal(tint)));
+  face.position.set(0, 0.1, 0.02);
+  group.add(face);
+  const slit = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.04), metal(0x1a1a1a)));
+  slit.position.set(0, 0.14, 0.1);
+  group.add(slit);
+}
+
+function addMedHelm(group, tint) {
+  const dome = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.85), metal(tint)));
   dome.position.y = 0.12;
   group.add(dome);
-  const visor = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.08), metal(0x2a2a2a)));
-  visor.position.set(0, 0.12, 0.1);
-  group.add(visor);
+  const nasal = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.1, 0.04), metal(tint)));
+  nasal.position.set(0, 0.08, 0.12);
+  group.add(nasal);
 }
 
-function addBody(group, tint, combatClass) {
-  if (combatClass === 'magic') {
-    const robe = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.48, 10), cloth(tint)));
-    robe.position.y = 0.24;
-    group.add(robe);
-    return;
-  }
-  if (combatClass === 'range') {
-    const vest = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.34, 0.14), cloth(tint)));
-    vest.position.y = 0.22;
-    group.add(vest);
-    const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.36, 0.16), cloth(0x3a2a1c)));
-    strap.position.set(0.08, 0.22, 0);
-    strap.rotation.z = -0.3;
-    group.add(strap);
-    return;
-  }
-  const plate = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.36, 0.16), metal(tint)));
+function addPlatebody(group, tint) {
+  const plate = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.38, 0.16), metal(tint)));
   plate.position.y = 0.22;
   group.add(plate);
   const collar = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.18), metal(0xc4a05a)));
@@ -645,32 +631,272 @@ function addBody(group, tint, combatClass) {
   group.add(collar);
 }
 
-function addLegs(group, tint, combatClass) {
-  if (combatClass === 'magic') {
-    const wrap = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.38, 10), cloth(tint)));
-    wrap.position.y = 0.2;
-    group.add(wrap);
-    const hem = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.018, 8, 14), cloth(0xc4a05a)));
-    hem.rotation.x = Math.PI / 2;
-    hem.position.y = 0.04;
-    group.add(hem);
-    return;
+function addChainbody(group, tint) {
+  const vest = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.14), metal(tint)));
+  vest.position.y = 0.22;
+  group.add(vest);
+  for (let i = 0; i < 4; i += 1) {
+    const ring = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 10), metal(tint)));
+    ring.position.set(-0.1 + (i % 2) * 0.2, 0.14 + Math.floor(i / 2) * 0.14, 0.08);
+    group.add(ring);
   }
-  const mat = combatClass === 'range' ? cloth(tint) : metal(tint);
-  const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.12), mat));
+}
+
+function addPlatelegs(group, tint) {
+  const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.12), metal(tint)));
   left.position.set(-0.08, 0.2, 0);
   group.add(left);
   const right = left.clone();
   right.position.x = 0.08;
   group.add(right);
-  if (combatClass === 'melee') {
-    const knee = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.06, 0.13), metal(0xc4a05a)));
-    knee.position.set(-0.08, 0.22, 0.02);
-    group.add(knee);
-    const knee2 = knee.clone();
-    knee2.position.x = 0.08;
-    group.add(knee2);
+  const knee = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.06, 0.13), metal(0xc4a05a)));
+  knee.position.set(-0.08, 0.22, 0.02);
+  group.add(knee);
+  const knee2 = knee.clone();
+  knee2.position.x = 0.08;
+  group.add(knee2);
+}
+
+function addPlateskirt(group, tint) {
+  const skirt = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.28, 10), metal(tint)));
+  skirt.position.y = 0.16;
+  group.add(skirt);
+  const belt = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.02, 8, 14), metal(0xc4a05a)));
+  belt.rotation.x = Math.PI / 2;
+  belt.position.y = 0.28;
+  group.add(belt);
+}
+
+function addBoots(group, tint, plated) {
+  const mat = plated ? metal(tint) : cloth(tint);
+  const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.16), mat));
+  left.position.set(-0.07, 0.06, 0.02);
+  group.add(left);
+  const right = left.clone();
+  right.position.x = 0.07;
+  group.add(right);
+}
+
+function addGloves(group, tint, plated) {
+  const mat = plated ? metal(tint) : cloth(tint);
+  const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.1), mat));
+  left.position.set(-0.08, 0.06, 0);
+  group.add(left);
+  const right = left.clone();
+  right.position.x = 0.08;
+  group.add(right);
+}
+
+function addMagicStaff(group, tint, kind) {
+  const fancy = kind === 'battle';
+  const shaft = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(fancy ? 0.024 : 0.018, fancy ? 0.032 : 0.024, 0.82, fancy ? 10 : 8),
+    wood(fancy ? 0x2a1a10 : 0x3a2a1c),
+  ));
+  shaft.position.set(0, 0.4, 0);
+  shaft.rotation.z = 0.22;
+  group.add(shaft);
+  if (fancy) {
+    const wrap = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.01, 6, 10), metal(0xc4a05a)));
+    wrap.position.set(0.04, 0.55, 0);
+    wrap.rotation.z = 0.22;
+    group.add(wrap);
+    const wrap2 = wrap.clone();
+    wrap2.position.set(0.08, 0.7, 0);
+    group.add(wrap2);
   }
+  const top = new THREE.Vector3(0.1, 0.82, 0);
+  if (kind === 'plain') {
+    const cap = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.02, 0.06, 8), wood(0x4a301c)));
+    cap.position.copy(top);
+    group.add(cap);
+    return;
+  }
+  if (kind === 'lunar') {
+    const moon = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.022, 8, 18, Math.PI * 1.35), glow(tint)));
+    moon.position.copy(top);
+    moon.rotation.z = 0.6;
+    group.add(moon);
+    return;
+  }
+  if (kind === 'ancient') {
+    const arch = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), glow(tint)));
+    arch.position.copy(top);
+    arch.scale.set(0.85, 1.15, 0.45);
+    group.add(arch);
+    for (const [dx, dy] of [[-0.04, 0.04], [0.04, 0.04], [-0.04, -0.04], [0.04, -0.04]]) {
+      const cut = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.055, 0.08), cloth(0x1a1210)));
+      cut.position.set(top.x + dx, top.y + dy, top.z + 0.04);
+      group.add(cut);
+    }
+    return;
+  }
+  const orb = addShadow(new THREE.Mesh(new THREE.SphereGeometry(fancy ? 0.1 : 0.09, 12, 10), glow(tint)));
+  orb.position.copy(top);
+  group.add(orb);
+}
+
+function addWizardHat(group, tint, accent = 0xc4a05a) {
+  const brim = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 12), cloth(tint)));
+  brim.position.y = 0.08;
+  group.add(brim);
+  const cone = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.32, 10), cloth(tint)));
+  cone.position.y = 0.24;
+  group.add(cone);
+  const band = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.125, 0.03, 10), cloth(accent)));
+  band.position.y = 0.12;
+  group.add(band);
+}
+
+function addRobeTop(group, tint, accent = 0xc4a05a) {
+  const robe = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.42, 10), cloth(tint)));
+  robe.position.y = 0.22;
+  group.add(robe);
+  const trim = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.16), cloth(accent)));
+  trim.position.y = 0.38;
+  group.add(trim);
+}
+
+function addRobeBottom(group, tint, accent = 0xc4a05a) {
+  const wrap = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.36, 10), cloth(tint)));
+  wrap.position.y = 0.18;
+  group.add(wrap);
+  const hem = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.016, 8, 14), cloth(accent)));
+  hem.rotation.x = Math.PI / 2;
+  hem.position.y = 0.04;
+  group.add(hem);
+}
+
+function addBow(group, tint, scale = 1) {
+  const limb = addShadow(new THREE.Mesh(
+    new THREE.TorusGeometry(0.28 * scale, 0.016, 8, 16, Math.PI),
+    wood(tint),
+  ));
+  limb.rotation.y = Math.PI / 2;
+  limb.rotation.z = Math.PI / 2;
+  limb.position.set(0, 0.28 * scale, 0);
+  group.add(limb);
+  const string = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.005, 0.005, 0.54 * scale, 6),
+    new THREE.MeshStandardMaterial({ color: 0xead3ae, roughness: 0.5 }),
+  ));
+  string.position.set(0.18 * scale, 0.28 * scale, 0);
+  group.add(string);
+}
+
+function addCrossbow(group, tint) {
+  const stock = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.42), wood(0x5a3a22)));
+  stock.position.y = 0.12;
+  group.add(stock);
+  const prod = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.05), metal(tint)));
+  prod.position.set(0, 0.16, 0.12);
+  group.add(prod);
+  const bow = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.014, 6, 12, Math.PI), wood(tint)));
+  bow.rotation.x = Math.PI / 2;
+  bow.position.set(0, 0.16, 0.14);
+  group.add(bow);
+}
+
+function addKnives(group, tint) {
+  for (const [x, rot] of [[-0.08, -0.5], [0.02, -0.2], [0.1, 0.15]]) {
+    const blade = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.22, 0.01), metal(tint)));
+    blade.position.set(x, 0.16, 0);
+    blade.rotation.z = rot;
+    group.add(blade);
+  }
+}
+
+function addThrownaxe(group, tint) {
+  const haft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.36, 8), wood(0x4a301c)));
+  haft.position.y = 0.2;
+  haft.rotation.z = 0.4;
+  group.add(haft);
+  const blade = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8, 0, Math.PI), metal(tint)));
+  blade.rotation.y = Math.PI / 2;
+  blade.position.set(0.08, 0.34, 0);
+  group.add(blade);
+}
+
+function addDhideBody(group, tint) {
+  const vest = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.34, 0.14), cloth(tint)));
+  vest.position.y = 0.22;
+  group.add(vest);
+  const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.36, 0.16), cloth(0x3a2a1c)));
+  strap.position.set(0.08, 0.22, 0);
+  strap.rotation.z = -0.3;
+  group.add(strap);
+}
+
+function addChaps(group, tint) {
+  const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.12), cloth(tint)));
+  left.position.set(-0.08, 0.2, 0);
+  group.add(left);
+  const right = left.clone();
+  right.position.x = 0.08;
+  group.add(right);
+}
+
+function addVambraces(group, tint) {
+  const left = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.16, 8), cloth(tint)));
+  left.position.set(-0.1, 0.1, 0);
+  left.rotation.z = 0.4;
+  group.add(left);
+  const right = left.clone();
+  right.position.x = 0.1;
+  right.rotation.z = -0.4;
+  group.add(right);
+}
+
+function addBread(group, tint) {
+  const loaf = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), new THREE.MeshStandardMaterial({
+    color: tint,
+    roughness: 0.92,
+  })));
+  loaf.scale.set(1.4, 0.5, 0.85);
+  loaf.position.y = 0.06;
+  group.add(loaf);
+}
+
+function addPizza(group, tint) {
+  const base = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.03, 12), new THREE.MeshStandardMaterial({
+    color: tint,
+    roughness: 0.88,
+  })));
+  base.position.y = 0.03;
+  group.add(base);
+  const topping = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.02, 10), new THREE.MeshStandardMaterial({
+    color: 0xd45a32,
+    roughness: 0.7,
+  })));
+  topping.position.y = 0.05;
+  group.add(topping);
+}
+
+function addCake(group, tint) {
+  const cake = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.1, 12), new THREE.MeshStandardMaterial({
+    color: tint,
+    roughness: 0.86,
+  })));
+  cake.position.y = 0.06;
+  group.add(cake);
+  const icing = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.12, 0.03, 12), cloth(0xf4e8d0)));
+  icing.position.y = 0.12;
+  group.add(icing);
+}
+
+function addPie(group, tint, filling) {
+  const dish = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.06, 12), new THREE.MeshStandardMaterial({
+    color: tint,
+    roughness: 0.85,
+  })));
+  dish.position.y = 0.04;
+  group.add(dish);
+  const top = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2.4), new THREE.MeshStandardMaterial({
+    color: filling,
+    roughness: 0.7,
+  })));
+  top.position.y = 0.06;
+  group.add(top);
 }
 
 export function buildChest() {

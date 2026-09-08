@@ -3,7 +3,7 @@ import { SHOP } from './catalog.js';
 export const FLOOR = { minX: -3.72, maxX: 3.72, minZ: -3.18, maxZ: 3.28 };
 export const PLAYER_RADIUS = 0.28;
 export const CELL = 0.2;
-export const QUEUE_AISLE = { minX: -0.85, maxX: 0.85, minZ: -1.55, maxZ: 1.55 };
+export const QUEUE_AISLE = { minX: -0.85, maxX: 0.85, minZ: -1.28, maxZ: 1.55 };
 
 const NEIGHBORS = [
   [1, 0, 1],
@@ -27,9 +27,10 @@ export function rectFromCenter(x, z, w, d) {
 
 export function shopObstacles(shop = SHOP) {
   const blocks = [
-    rectFromCenter(shop.counter.x, shop.counter.z, 2.72, 1.02),
-    rectFromCenter(shop.anvil.x, shop.anvil.z, 0.95, 0.78),
-    rectFromCenter(shop.chest.x, shop.chest.z, 1.08, 0.82),
+    // Counter blocks the customer-facing mass only, leaving a walkway behind it.
+    rectFromCenter(shop.counter.x, shop.counter.z, 2.18, 0.52),
+    rectFromCenter(shop.anvil.x, shop.anvil.z, 0.88, 0.7),
+    rectFromCenter(shop.chest.x, shop.chest.z, 0.98, 0.72),
   ];
   for (const spot of shop.displays) {
     if (spot.kind === 'shelf') blocks.push(rectFromCenter(spot.x, spot.z, 1.5, 0.5));

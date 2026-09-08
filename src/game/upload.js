@@ -124,6 +124,10 @@ export function bindUploadUI({ zone, modal, state, world, onChange }) {
       fileInput.click();
     }
   });
+  zone.addEventListener('click', (event) => {
+    if (event.target === fileInput) return;
+    fileInput.click();
+  });
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
     if (file) receiveFile(file);

@@ -15,6 +15,7 @@ import {
 } from './catalog.js';
 import { hasStock, pushLog } from './economy.js';
 import { planWalk, queueSlot, shopObstacles } from './nav.js';
+import { playClick } from './audio.js';
 import {
   buildAdventurer,
   buildAnvil,
@@ -375,7 +376,10 @@ export function createWorld(canvas, state) {
     const customerHit = hits.find((h) => h.object.userData.kind === 'customer');
     if (customerHit) {
       const actor = customers.find((c) => c.mesh.userData.pick === customerHit.object);
-      if (actor && actor.state === 'request') pickHandler?.({ type: 'customer', actor });
+      if (actor && actor.state === 'request') {
+        playClick('ui');
+        pickHandler?.({ type: 'customer', actor });
+      }
       return;
     }
     const chestHit = hits.find((h) => h.object.userData.kind === 'chest');
@@ -388,14 +392,17 @@ export function createWorld(canvas, state) {
     if (picked) {
       const data = picked.object.userData;
       if (data.kind === 'chest') {
+        playClick('ui');
         pickHandler?.({ type: 'chest' });
         return;
       }
       if (data.kind === 'anvil') {
+        playClick('ui');
         pickHandler?.({ type: 'anvil' });
         return;
       }
       if (data.kind === 'display') {
+        playClick('ui');
         state.selectedDisplay = data.displayIndex;
         refreshSelection();
         pickHandler?.({ type: 'display', index: data.displayIndex });
@@ -414,6 +421,7 @@ export function createWorld(canvas, state) {
         return;
       }
       setMoveTarget(point.x, point.z);
+      playClick('move');
     }
   });
 

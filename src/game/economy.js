@@ -12,6 +12,8 @@ import {
   recipeCost,
 } from './catalog.js';
 
+export const SAVE_VERSION = 1;
+
 export function createState() {
   const materials = {};
   for (const mat of Object.values(MATERIALS)) {
@@ -21,6 +23,7 @@ export function createState() {
     gold: START_GOLD,
     materials,
     crafts: {},
+    craftCounts: {},
     chest: {},
     ready: [],
     displays: SHOP.displays.map(() => ({
@@ -34,9 +37,27 @@ export function createState() {
   };
 }
 
+export function craftCount(state, recipeId) {
+  return state.craftCounts?.[recipeId] ?? 0;
+}
+
+export function isUnlocked(state, recipeId) {
+  const recipe = RECIPES[recipeId];
+  if (!recipe) return false;
+  if (!recipe.previousId) return true;
+  return craftCount(state, recipe.previousId) >= (recipe.unlockNeed ?? 0);
+}
+
+export function unlockRemaining(state, recipeId) {
+  const recipe = RECIPES[recipeId];
+  if (!recipe?.previousId) return 0;
+  return Math.max(0, (recipe.unlockNeed ?? 0) - craftCount(state, recipe.previousId));
+}
+
 export function canCraft(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return false;
+  if (!isUnlocked(state, recipeId)) return false;
   if (state.crafts[recipeId]) return false;
   const cost = recipeCost(recipe);
   if ((cost.gold || 0) > state.gold) return false;
@@ -124,6 +145,8 @@ export function completeCrafts(state, nowSeconds) {
     if (nowSeconds - craft.startedAt >= craft.duration) {
       delete state.crafts[recipeId];
       addToChest(state, recipeId);
+      if (!state.craftCounts) state.craftCounts = {};
+      state.craftCounts[recipeId] = craftCount(state, recipeId) + 1;
       finished.push(recipeId);
     }
   }
@@ -187,13 +210,99 @@ export function refreshShowcases(state) {
   }
 
   for (const [index, display] of state.displays.entries()) {
-    if (displayKind(index) === 'stand') continue;
-    if (display.ware) continue;
-    const next = chestIds.find((id) => !shown.has(id));
+    if (displayKind(index) !== 'shelf' || display.ware) continue;
+    const next = chestIds.find((id) => !shown.has(id) && (RECIPES[id]?.shelfItem || RECIPES[id]?.category === 'food'));
     if (!next) continue;
     display.ware = { recipeId: next };
     shown.add(next);
   }
+
+  for (const [index, display] of state.displays.entries()) {
+    if (displayKind(index) === 'stand') continue;
+    if (display.ware) continue;
+    const next = chestIds.find((id) => !shown.has(id) && RECIPES[id]?.category !== 'food')
+      ?? chestIds.find((id) => !shown.has(id));
+    if (!next) continue;
+    display.ware = { recipeId: next };
+    shown.add(next);
+  }
+}
+
+export function serializeState(state) {
+  return {
+    version: SAVE_VERSION,
+    gold: state.gold,
+    materials: { ...state.materials },
+    chest: { ...state.chest },
+    craftCounts: { ...state.craftCounts },
+    selectedDisplay: state.selectedDisplay,
+    displays: state.displays.map((display) => ({
+      ware: display.ware ? { recipeId: display.ware.recipeId } : null,
+      furnitureId: display.furnitureId ?? null,
+      slots: { ...emptySlots(), ...(display.slots ?? {}) },
+    })),
+  };
+}
+
+export function applyState(state, data) {
+  if (!data || typeof data !== 'object') return false;
+  const next = createState();
+  if (typeof data.gold === 'number' && Number.isFinite(data.gold)) {
+    next.gold = Math.max(0, Math.round(data.gold));
+  }
+  if (data.materials && typeof data.materials === 'object') {
+    for (const id of Object.keys(next.materials)) {
+      const value = data.materials[id];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        next.materials[id] = Math.max(0, Math.round(value));
+      }
+    }
+  }
+  if (data.chest && typeof data.chest === 'object') {
+    for (const [id, count] of Object.entries(data.chest)) {
+      if (!RECIPES[id] || typeof count !== 'number' || !Number.isFinite(count)) continue;
+      const n = Math.max(0, Math.round(count));
+      if (n) next.chest[id] = n;
+    }
+  }
+  if (data.craftCounts && typeof data.craftCounts === 'object') {
+    for (const [id, count] of Object.entries(data.craftCounts)) {
+      if (!RECIPES[id] || typeof count !== 'number' || !Number.isFinite(count)) continue;
+      next.craftCounts[id] = Math.max(0, Math.round(count));
+    }
+  }
+  if (Array.isArray(data.displays)) {
+    next.displays = next.displays.map((display, index) => {
+      const saved = data.displays[index];
+      if (!saved || typeof saved !== 'object') return display;
+      const wareId = saved.ware?.recipeId;
+      const slots = emptySlots();
+      if (saved.slots && typeof saved.slots === 'object') {
+        for (const slot of ARMOUR_SLOTS) {
+          const id = saved.slots[slot];
+          slots[slot] = RECIPES[id] ? id : null;
+        }
+      }
+      return {
+        ware: RECIPES[wareId] ? { recipeId: wareId } : null,
+        furnitureId: saved.furnitureId ?? null,
+        slots,
+      };
+    });
+  }
+  if (typeof data.selectedDisplay === 'number' && SHOP.displays[data.selectedDisplay]) {
+    next.selectedDisplay = data.selectedDisplay;
+  }
+  state.gold = next.gold;
+  state.materials = next.materials;
+  state.chest = next.chest;
+  state.craftCounts = next.craftCounts;
+  state.crafts = {};
+  state.displays = next.displays;
+  state.selectedDisplay = next.selectedDisplay;
+  state.ready = [];
+  refreshShowcases(state);
+  return true;
 }
 
 export function autoStock(state) {

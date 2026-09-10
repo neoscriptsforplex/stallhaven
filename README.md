@@ -20,13 +20,13 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 
 ## How to play
 
-1. **Click the floor** to walk, including **behind the counter**. The camera follows you — scroll or `-` / `=` to zoom, arrow keys to change the angle. Customers still line up on the customer side of the counter.
-2. Click the **anvil** (left, behind the counter). Craft under **Melee**, **Magic**, **Ranged**, **Food**, or **Potions**. Higher tiers stay locked until you craft enough of the previous item in that same line (20, then 30, then +10 each step). A progress bar fills while a piece is working.
-3. Finished gear goes in the wooden **chest**. Click the chest to see it. Click a table, wall shelf, or armour stand (it outlines in gold), then **Place on stall**. Food is small and sits on the wall shelves.
+1. **Click the floor** to walk, including **behind the counter**. The camera follows you — scroll or `-` / `=` to zoom (zoom far out to see the **roof** and garden), arrow keys to change the angle. Customers still line up on the customer side of the counter.
+2. Click the **anvil** (left, behind the counter). Craft under **Melee**, **Magic**, **Ranged**, or **Potions**. Click the compact **cooking range** for **Food**. Higher tiers stay locked until you craft enough of the previous item in that same line (20, then 30, then +10 each step). A progress bar fills while a piece is working.
+3. Finished gear goes in the wooden **chest** (100 slots to start). Click the chest to see it. **Right-click** the chest to upgrade (+100 slots per level, 500g then ×3, max level 10 / 1000 slots). Click a table, wall shelf, or armour stand (it outlines in gold), then **Place on stall**. Food is small and sits on the wall shelves. Click furniture for **Move** / **Rotate 15°**.
 4. Adventurers come through the **front door** and **line up at the counter**. The traveler at the front is who you trade with.
-5. **Click the traveler at the front** to open trade: **Sell** if you have the item, **Refuse** to send them off, or **Buy their goods** for a scrap of material.
-6. Restock materials with gold when the bins run low — they sit along the bottom of the screen. Clicks make a short sound.
-7. **Save** and **Load** in the top right write or read a JSON file on your computer (gold, materials, chest, unlock progress, craft counts, placed displays).
+5. **Click the traveler at the front** to open trade: **Sell** if you have the item, **Swap** a different stocked item they will take at a reduced price, **Refuse** to send them off, or **Buy their goods** for a scrap of material.
+6. Restock materials with gold when the bins run low — they sit along the bottom of the screen. Basic materials also refill slowly on their own up to 250; higher-tier metals refill slower. Clicks make a short sound.
+7. **Save** and **Load** in the top right write or read a JSON file on your computer. The expand-arrow button buys extra rooms (500g, then ×5): click a pad, then Confirm.
 8. Optional: drop a `.glb` or `.gltf` file onto the upload box. Tag it **Furniture** to replace the selected table, or **Ware** to change how a recipe looks. Models stay in this browser only.
 
 You start with 40 gold. Bronze gear, a Staff, Blue d'hide, and Bread are unlocked.
@@ -61,11 +61,17 @@ Dragonhide armour in Blue, Green, Red, Black: body, chaps, vambraces, boots.
 
 ### Food
 
-Bread → Pizza → Cake → Pie → Fish pie, using flour, pineapple, egg, raspberry, and fish. Food displays on wall shelves.
+Bread → Pizza → Cake → Pie → Fish pie, using flour, pineapple, egg, raspberry, and fish. Cook these on the **range**, not the anvil. Food displays on wall shelves.
 
 ### Potions
 
 Coming later. The anvil tab is ready; recipes are not in yet.
+
+## Shop upgrades
+
+- **Chest:** 100 slots at level 1, +100 per level, max level 10 (1000). First upgrade 500g, then ×3.
+- **Rooms:** five pads around the starting shop (three behind, one either side). First room 500g, then ×5.
+- **Furniture:** move (snaps to the floor) and rotate in 15° steps. Wares sit on the piece and travel with it.
 
 ## For tinkerers
 

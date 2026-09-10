@@ -1,5 +1,5 @@
 import { RECIPES } from './game/catalog.js';
-import { completeCrafts, createState, pushLog } from './game/economy.js';
+import { completeCrafts, createState, pushLog, tickMaterials } from './game/economy.js';
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
 import { bindUploadUI, parseModelBuffer } from './game/upload.js';
@@ -59,6 +59,7 @@ if (!hasWebGL()) {
     const now = nowMs / 1000;
     const dt = Math.min(0.05, (nowMs - last) / 1000);
     last = nowMs;
+    tickMaterials(state, dt);
     const finished = completeCrafts(state, now);
     for (const id of finished) {
       pushLog(state, `Finished ${RECIPES[id].name}. Into the chest.`);

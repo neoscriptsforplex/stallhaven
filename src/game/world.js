@@ -14,17 +14,23 @@ import {
   emptySlots,
 } from './catalog.js';
 import { hasStock, pushLog } from './economy.js';
-import { planWalk, queueSlot, shopObstacles } from './nav.js';
+import {
+  FURNITURE_ROT_STEP,
+  cloneFurniture,
+  snapToFloor,
+  walkFloors,
+} from './layout.js';
+import { PLAYER_RADIUS, floorsForState, liveObstacles, planWalk, queueSlot } from './nav.js';
 import { playClick } from './audio.js';
 import {
   buildAdventurer,
   buildAnvil,
   buildChest,
+  buildCounter,
   buildDust,
   buildFurniture,
   buildShopDoor,
   buildShopkeeper,
-  buildStall,
   buildWare,
   normalizeImported,
   setChestLid,
@@ -33,16 +39,19 @@ import {
   slotPose,
   wareTopY,
 } from './models.js';
+import { buildRange, buildShop } from './shopbuild.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
-const CAM_YAW_SPEED = 1.45;
-const CAM_PITCH_SPEED = 0.95;
+const CAM_YAW_SPEED = 2.175;
+const CAM_PITCH_SPEED = 1.425;
 const CAM_ZOOM_STEP = 0.38;
 const CAM_MIN_DISTANCE = 2.05;
-const CAM_MAX_DISTANCE = 8.6;
+const CAM_MAX_DISTANCE = 25.8;
 const CAM_MIN_PITCH = 0.28;
 const CAM_MAX_PITCH = 1.18;
+const ROOF_FADE_START = 13.7;
+const ROOF_FADE_FULL = 20.5;
 
 export function createWorld(canvas, state) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -58,7 +67,7 @@ export function createWorld(canvas, state) {
   scene.background = new THREE.Color(0xc9b48a);
   scene.fog = new THREE.Fog(0xc9b48a, 12, 26);
 
-  const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.08, 80);
+  const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.08, 180);
   const cam = {
     yaw: -0.06,
     pitch: 0.62,
@@ -72,29 +81,66 @@ export function createWorld(canvas, state) {
   const hemi = new THREE.HemisphereLight(0xf0e2c4, 0x6a5340, 0.9);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffe1b0, 1.15);
-  sun.position.set(-4.5, 8.5, 6.5);
+  sun.position.set(-4.5, 12, 6.5);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 22;
-  sun.shadow.camera.left = -8;
-  sun.shadow.camera.right = 8;
-  sun.shadow.camera.top = 8;
-  sun.shadow.camera.bottom = -8;
+  sun.shadow.camera.far = 48;
+  sun.shadow.camera.left = -22;
+  sun.shadow.camera.right = 22;
+  sun.shadow.camera.top = 22;
+  sun.shadow.camera.bottom = -22;
   scene.add(sun);
 
-  const lantern = new THREE.PointLight(0xffb15a, 3.2, 7, 2);
-  lantern.position.set(-1.35, 2.05, -2.9);
-  lantern.castShadow = false;
-  scene.add(lantern);
-  const lantern2 = lantern.clone();
-  lantern2.position.x = 1.35;
-  scene.add(lantern2);
   const doorLight = new THREE.PointLight(0xffe1b0, 2.4, 6, 2);
   doorLight.position.set(0, 2.15, 3.9);
   scene.add(doorLight);
 
-  scene.add(buildStall());
+  if (!state.furniture) state.furniture = cloneFurniture();
+  let architecture = null;
+  let roofGroup = null;
+  let groundGroup = null;
+  let padGroup = null;
+  let floors = walkFloors(state.expansions ?? []);
+  const obstacles = liveObstacles(state);
+  let expandMode = false;
+  let selectedPad = null;
+  let moveTarget = null;
+
+  function disposeGroup(group) {
+    if (!group) return;
+    scene.remove(group);
+    group.traverse((child) => {
+      if (child.geometry) child.geometry.dispose();
+    });
+  }
+
+  function rebuildArchitecture() {
+    disposeGroup(architecture);
+    disposeGroup(roofGroup);
+    disposeGroup(groundGroup);
+    disposeGroup(padGroup);
+    const built = buildShop(state.expansions ?? []);
+    architecture = built.root;
+    roofGroup = built.roofs;
+    groundGroup = built.grounds;
+    padGroup = built.pads;
+    padGroup.visible = expandMode;
+    scene.add(architecture);
+    scene.add(roofGroup);
+    scene.add(groundGroup);
+    scene.add(padGroup);
+    floors = floorsForState(state);
+    rebuildNav();
+  }
+
+  function rebuildNav() {
+    const next = liveObstacles(state);
+    obstacles.length = 0;
+    obstacles.push(...next);
+  }
+
+  rebuildArchitecture();
   const shopDoor = buildShopDoor();
   scene.add(shopDoor);
   const dust = buildDust();
@@ -105,7 +151,6 @@ export function createWorld(canvas, state) {
   shopkeeper.rotation.y = 0.35;
   shopkeeper.scale.setScalar(1.12);
   scene.add(shopkeeper);
-  const obstacles = shopObstacles();
   const playerPath = [];
   const moveMarker = new THREE.Mesh(
     new THREE.RingGeometry(0.16, 0.24, 24),
@@ -122,61 +167,73 @@ export function createWorld(canvas, state) {
   moveMarker.visible = false;
   scene.add(moveMarker);
 
-  const groundPick = new THREE.Mesh(
-    new THREE.PlaneGeometry(8.05, 7.05),
-    new THREE.MeshBasicMaterial({ visible: false }),
-  );
-  groundPick.rotation.x = -Math.PI / 2;
-  groundPick.position.set(0, 0.09, 0.1);
-  groundPick.userData.kind = 'ground';
-  scene.add(groundPick);
+  function makeGlow(inner, outer) {
+    const glow = new THREE.Mesh(
+      new THREE.RingGeometry(inner, outer, 24),
+      new THREE.MeshBasicMaterial({ color: 0xe8b45a, transparent: true, opacity: 0.32, side: THREE.DoubleSide }),
+    );
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.y = 0.08;
+    scene.add(glow);
+    return glow;
+  }
+
+  function makePick(w, h, d, kind) {
+    const pick = new THREE.Mesh(
+      new THREE.BoxGeometry(w, h, d),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    pick.userData.kind = kind;
+    scene.add(pick);
+    return pick;
+  }
+
+  const counterMesh = buildCounter();
+  scene.add(counterMesh);
+  const counterPick = makePick(2.7, 1.2, 0.95, 'counter');
+  counterPick.position.y = 0.55;
+  const counterGlow = makeGlow(0.9, 1.12);
 
   const anvil = buildAnvil();
-  anvil.position.set(SHOP.anvil.x, 0, SHOP.anvil.z);
-  anvil.rotation.y = 0.35;
   scene.add(anvil);
-  const anvilPick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.95, 1.45, 0.72),
-    new THREE.MeshBasicMaterial({ visible: false }),
-  );
-  anvilPick.position.set(SHOP.anvil.x, 0.72, SHOP.anvil.z);
-  anvilPick.rotation.y = 0.35;
-  anvilPick.userData.kind = 'anvil';
-  scene.add(anvilPick);
-  const anvilGlow = new THREE.Mesh(
-    new THREE.RingGeometry(0.52, 0.68, 24),
-    new THREE.MeshBasicMaterial({ color: 0xe8b45a, transparent: true, opacity: 0.32, side: THREE.DoubleSide }),
-  );
-  anvilGlow.rotation.x = -Math.PI / 2;
-  anvilGlow.position.set(SHOP.anvil.x, 0.08, SHOP.anvil.z);
-  scene.add(anvilGlow);
+  const anvilPick = makePick(0.95, 1.45, 0.72, 'anvil');
+  const anvilGlow = makeGlow(0.52, 0.68);
 
   const chest = buildChest();
-  chest.position.set(SHOP.chest.x, 0, SHOP.chest.z);
-  chest.rotation.y = -0.45;
   scene.add(chest);
-  const chestPick = new THREE.Mesh(
-    new THREE.BoxGeometry(1.28, 1.45, 1.02),
-    new THREE.MeshBasicMaterial({ visible: false }),
-  );
-  chestPick.position.set(SHOP.chest.x, 0.72, SHOP.chest.z);
-  chestPick.rotation.y = -0.45;
-  chestPick.userData.kind = 'chest';
-  scene.add(chestPick);
-  const chestGlow = new THREE.Mesh(
-    new THREE.RingGeometry(0.62, 0.74, 24),
-    new THREE.MeshBasicMaterial({ color: 0xe8b45a, transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
-  );
-  chestGlow.rotation.x = -Math.PI / 2;
-  chestGlow.position.set(SHOP.chest.x, 0.08, SHOP.chest.z);
-  scene.add(chestGlow);
+  const chestPick = makePick(1.28, 1.45, 1.02, 'chest');
+  const chestGlow = makeGlow(0.62, 0.74);
   let chestOpen = false;
 
+  const rangeMesh = buildRange();
+  scene.add(rangeMesh);
+  const rangePick = makePick(0.78, 1.35, 0.62, 'range');
+  const rangeGlow = makeGlow(0.4, 0.54);
+
+  const fixtureMeshes = {
+    counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
+    anvil: { mesh: anvil, pick: anvilPick, glow: anvilGlow, pickY: 0.72 },
+    chest: { mesh: chest, pick: chestPick, glow: chestGlow, pickY: 0.72 },
+    range: { mesh: rangeMesh, pick: rangePick, glow: rangeGlow, pickY: 0.68 },
+  };
+
+  function applyFixturePose(id) {
+    const pose = state.furniture[id];
+    const slot = fixtureMeshes[id];
+    if (!pose || !slot) return;
+    slot.mesh.position.set(pose.x, 0, pose.z);
+    slot.mesh.rotation.y = pose.rot ?? 0;
+    slot.pick.position.set(pose.x, slot.pickY, pose.z);
+    slot.pick.rotation.y = pose.rot ?? 0;
+    slot.glow.position.set(pose.x, 0.08, pose.z);
+  }
+
   const displays = SHOP.displays.map((spot, index) => {
+    const pose = state.furniture.displays[index] ?? { x: spot.x, z: spot.z, rot: spot.rot ?? 0 };
     const anchor = new THREE.Group();
-    anchor.position.set(spot.x, 0, spot.z);
+    anchor.position.set(pose.x, 0, pose.z);
     const furniture = buildFurniture(spot.kind);
-    if (spot.rot) anchor.rotation.y = spot.rot;
+    anchor.rotation.y = pose.rot ?? 0;
     scene.add(anchor);
     anchor.add(furniture);
     const wareAnchor = new THREE.Group();
@@ -214,6 +271,21 @@ export function createWorld(canvas, state) {
       slotMeshes: emptySlots(),
     };
   });
+
+  function applyDisplayPose(index) {
+    const slot = displays[index];
+    const pose = state.furniture.displays[index];
+    if (!slot || !pose) return;
+    slot.anchor.position.set(pose.x, 0, pose.z);
+    slot.anchor.rotation.y = pose.rot ?? 0;
+  }
+
+  function applyAllPoses() {
+    for (const id of Object.keys(fixtureMeshes)) applyFixturePose(id);
+    displays.forEach((_, index) => applyDisplayPose(index));
+    rebuildNav();
+  }
+  applyAllPoses();
 
   const outlineEdgeMat = new THREE.LineBasicMaterial({
     color: 0xffc857,
@@ -265,15 +337,29 @@ export function createWorld(canvas, state) {
   window.addEventListener('resize', resize);
 
   function allPicks() {
+    const extra = expandMode && padGroup
+      ? padGroup.children.filter((child) => child.userData.kind === 'expand-pad')
+      : [];
     return [
       ...displays.map((d) => d.pick),
       chestPick,
       anvilPick,
+      rangePick,
+      counterPick,
+      ...extra,
       ...customers
         .filter((actor) => actor.state === 'request')
         .map((actor) => actor.mesh.userData.pick)
         .filter(Boolean),
     ];
+  }
+
+  function groundMeshes() {
+    return groundGroup ? groundGroup.children : [];
+  }
+
+  function counterPose() {
+    return state.furniture.counter;
   }
 
   function clampCam() {
@@ -283,7 +369,7 @@ export function createWorld(canvas, state) {
 
   function setMoveTarget(x, z) {
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
-    const path = planWalk(from, { x, z }, obstacles);
+    const path = planWalk(from, { x, z }, obstacles, PLAYER_RADIUS, floors);
     playerPath.length = 0;
     if (!path.length) {
       moveMarker.visible = false;
@@ -344,6 +430,28 @@ export function createWorld(canvas, state) {
     camera.position.lerp(desired, k);
     camLook.lerp(look, k);
     camera.lookAt(camLook);
+    if (scene.fog) {
+      scene.fog.near = 18 + cam.distance * 0.4;
+      scene.fog.far = 40 + cam.distance * 1.1;
+    }
+    updateRoofFade();
+  }
+
+  function updateRoofFade() {
+    if (!roofGroup) return;
+    const t = Math.min(1, Math.max(0, (cam.distance - ROOF_FADE_START) / (ROOF_FADE_FULL - ROOF_FADE_START)));
+    roofGroup.visible = t > 0.02;
+    roofGroup.traverse((child) => {
+      const mat = child.material;
+      if (!mat || mat.opacity == null) return;
+      if (!mat.userData.isRoof) {
+        if (mat.transparent) mat.userData.isRoof = true;
+        else return;
+      }
+      mat.transparent = true;
+      mat.opacity = t;
+      mat.depthWrite = t > 0.75;
+    });
   }
 
   function setPointer(event) {
@@ -363,16 +471,98 @@ export function createWorld(canvas, state) {
     return Boolean(document.querySelector('.modal:not([hidden])'));
   }
 
+  function furnitureIdFromKind(kind, displayIndex) {
+    if (kind === 'display') return { id: 'display', index: displayIndex };
+    if (kind === 'chest' || kind === 'anvil' || kind === 'range' || kind === 'counter') {
+      return { id: kind };
+    }
+    return null;
+  }
+
+  function placeMovingFurniture(x, z) {
+    if (!moveTarget) return false;
+    const snapped = snapToFloor(x, z, floors);
+    if (moveTarget.id === 'display') {
+      const pose = state.furniture.displays[moveTarget.index];
+      pose.x = snapped.x;
+      pose.z = snapped.z;
+      applyDisplayPose(moveTarget.index);
+    } else {
+      const pose = state.furniture[moveTarget.id];
+      pose.x = snapped.x;
+      pose.z = snapped.z;
+      applyFixturePose(moveTarget.id);
+    }
+    rebuildNav();
+    moveTarget = null;
+    moveMarker.visible = false;
+    return true;
+  }
+
+  function rotateFurniturePose(target) {
+    const pose = target.id === 'display'
+      ? state.furniture.displays[target.index]
+      : state.furniture[target.id];
+    if (!pose) return false;
+    pose.rot = (pose.rot ?? 0) + FURNITURE_ROT_STEP;
+    if (target.id === 'display') applyDisplayPose(target.index);
+    else applyFixturePose(target.id);
+    rebuildNav();
+    return true;
+  }
+
+  function hitFurniture(hits) {
+    const chestHit = hits.find((h) => h.object.userData.kind === 'chest');
+    const interactHits = hits.filter((h) => (
+      h.object.userData.kind !== 'ground'
+      && h.object.userData.kind !== 'customer'
+      && h.object.userData.kind !== 'expand-pad'
+    ));
+    const closest = interactHits[0];
+    const preferChest = chestHit
+      && closest?.object.userData.kind === 'anvil'
+      && chestHit.distance - closest.distance < 0.5;
+    return preferChest ? chestHit : closest;
+  }
+
   renderer.domElement.addEventListener('pointerup', (event) => {
     if (event.button !== 0) return;
     if (performance.now() < ignorePicksUntil) return;
-    if (modalBlocksWorld()) return;
+    if (modalBlocksWorld() && !moveTarget && !expandMode) return;
+    const held = performance.now() - pointerDown.t;
     const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
     if (moved > 8) return;
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects([...allPicks(), groundPick], false);
+    const hits = raycaster.intersectObjects([...allPicks(), ...groundMeshes()], false);
     if (!hits.length) return;
+
+    if (expandMode) {
+      const padHit = hits.find((h) => h.object.userData.kind === 'expand-pad');
+      if (padHit?.object.userData.connects) {
+        selectedPad = padHit.object.userData.padId;
+        padGroup.children.forEach((child) => {
+          if (child.userData.kind === 'expand-pad') {
+            child.material.opacity = child.userData.padId === selectedPad ? 0.55 : 0.22;
+            child.material.color.setHex(child.userData.padId === selectedPad ? 0xf0d27a : 0xe3b34a);
+          }
+        });
+        playClick('ui');
+        pickHandler?.({ type: 'expand-pad', padId: selectedPad });
+      }
+      return;
+    }
+
+    if (moveTarget) {
+      const groundHit = hits.find((h) => h.object.userData.kind === 'ground');
+      if (groundHit) {
+        placeMovingFurniture(groundHit.point.x, groundHit.point.z);
+        playClick('ui');
+        pickHandler?.({ type: 'furniture-moved' });
+      }
+      return;
+    }
+
     const customerHit = hits.find((h) => h.object.userData.kind === 'customer');
     if (customerHit) {
       const actor = customers.find((c) => c.mesh.userData.pick === customerHit.object);
@@ -382,47 +572,87 @@ export function createWorld(canvas, state) {
       }
       return;
     }
-    const chestHit = hits.find((h) => h.object.userData.kind === 'chest');
-    const interactHits = hits.filter((h) => h.object.userData.kind !== 'ground' && h.object.userData.kind !== 'customer');
-    const closest = interactHits[0];
-    const preferChest = chestHit
-      && closest?.object.userData.kind === 'anvil'
-      && chestHit.distance - closest.distance < 0.5;
-    const picked = preferChest ? chestHit : closest;
+
+    const picked = hitFurniture(hits);
     if (picked) {
       const data = picked.object.userData;
+      if (data.kind === 'chest' && held >= 500) {
+        playClick('ui');
+        pickHandler?.({ type: 'chest-upgrade' });
+        return;
+      }
       if (data.kind === 'chest') {
         playClick('ui');
-        pickHandler?.({ type: 'chest' });
+        pickHandler?.({ type: 'chest', furniture: { id: 'chest' } });
         return;
       }
       if (data.kind === 'anvil') {
         playClick('ui');
-        pickHandler?.({ type: 'anvil' });
+        pickHandler?.({ type: 'anvil', furniture: { id: 'anvil' } });
+        return;
+      }
+      if (data.kind === 'range') {
+        playClick('ui');
+        pickHandler?.({ type: 'range', furniture: { id: 'range' } });
+        return;
+      }
+      if (data.kind === 'counter') {
+        playClick('ui');
+        pickHandler?.({ type: 'counter', furniture: { id: 'counter' }, clientX: event.clientX, clientY: event.clientY });
         return;
       }
       if (data.kind === 'display') {
         playClick('ui');
         state.selectedDisplay = data.displayIndex;
         refreshSelection();
-        pickHandler?.({ type: 'display', index: data.displayIndex });
+        pickHandler?.({ type: 'display', index: data.displayIndex, furniture: { id: 'display', index: data.displayIndex }, clientX: event.clientX, clientY: event.clientY });
         return;
       }
     }
     const groundHit = hits.find((h) => h.object.userData.kind === 'ground');
     if (groundHit) {
       const point = groundHit.point;
-      if (Math.hypot(point.x - SHOP.chest.x, point.z - SHOP.chest.z) < 0.72) {
-        pickHandler?.({ type: 'chest' });
+      const chestPos = state.furniture.chest;
+      const anvilPos = state.furniture.anvil;
+      const rangePos = state.furniture.range;
+      if (Math.hypot(point.x - chestPos.x, point.z - chestPos.z) < 0.72) {
+        pickHandler?.({ type: 'chest', furniture: { id: 'chest' } });
         return;
       }
-      if (Math.hypot(point.x - SHOP.anvil.x, point.z - SHOP.anvil.z) < 0.62) {
-        pickHandler?.({ type: 'anvil' });
+      if (Math.hypot(point.x - anvilPos.x, point.z - anvilPos.z) < 0.62) {
+        pickHandler?.({ type: 'anvil', furniture: { id: 'anvil' } });
+        return;
+      }
+      if (Math.hypot(point.x - rangePos.x, point.z - rangePos.z) < 0.5) {
+        pickHandler?.({ type: 'range', furniture: { id: 'range' } });
         return;
       }
       setMoveTarget(point.x, point.z);
       playClick('move');
     }
+  });
+
+  renderer.domElement.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    if (modalBlocksWorld() && !moveTarget) return;
+    setPointer(event);
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects([...allPicks(), ...groundMeshes()], false);
+    if (moveTarget) {
+      moveTarget = null;
+      pickHandler?.({ type: 'furniture-cancel' });
+      return;
+    }
+    const picked = hitFurniture(hits);
+    if (!picked) return;
+    const data = picked.object.userData;
+    playClick('ui');
+    if (data.kind === 'chest') {
+      pickHandler?.({ type: 'chest-upgrade' });
+      return;
+    }
+    const furn = furnitureIdFromKind(data.kind, data.displayIndex);
+    if (furn) pickHandler?.({ type: 'furn-menu', furniture: furn, clientX: event.clientX, clientY: event.clientY });
   });
 
   renderer.domElement.addEventListener('wheel', (event) => {
@@ -444,6 +674,11 @@ export function createWorld(canvas, state) {
     } else if (event.key === 'ArrowDown') {
       event.preventDefault();
       camHeld.down = true;
+    } else if (event.key === 'Escape') {
+      if (moveTarget) {
+        moveTarget = null;
+        pickHandler?.({ type: 'furniture-cancel' });
+      }
     } else if (event.key === '-' || event.key === '_') {
       event.preventDefault();
       cam.distance += CAM_ZOOM_STEP;
@@ -684,7 +919,7 @@ export function createWorld(canvas, state) {
     setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
     scene.add(mesh);
     const queueIndex = waitingLine().length;
-    const slot = queueSlot(queueIndex);
+    const slot = queueSlot(queueIndex, SHOP, counterPose());
     const actor = {
       id: customerSerial,
       typeId,
@@ -730,7 +965,7 @@ export function createWorld(canvas, state) {
   function advanceQueue(now) {
     waitingLine().forEach((actor, index) => {
       actor.queueIndex = index;
-      const slot = queueSlot(index);
+      const slot = queueSlot(index, SHOP, counterPose());
       const dist = Math.hypot(slot.x - actor.mesh.position.x, slot.z - actor.mesh.position.z);
       if (dist > 0.12) {
         actor.state = 'enter';
@@ -818,6 +1053,8 @@ export function createWorld(canvas, state) {
     setChestLid(chest, chestOpen, dt);
     chestGlow.material.opacity = 0.28 + Math.sin(now * 2.2) * 0.08;
     anvilGlow.material.opacity = 0.26 + Math.sin(now * 2.4) * 0.1;
+    rangeGlow.material.opacity = 0.24 + Math.sin(now * 2.1) * 0.1;
+    counterGlow.material.opacity = moveTarget?.id === 'counter' ? 0.7 : 0.0;
     setDoorOpen(shopDoor, true, dt);
     syncDisplays();
     refreshSelection();
@@ -838,6 +1075,11 @@ export function createWorld(canvas, state) {
     replaceFurniture,
     bindWareLook,
     getSelectedName: () => SHOP.displays[state.selectedDisplay].name,
+    applyLayout() {
+      applyAllPoses();
+      rebuildArchitecture();
+      applyAllPoses();
+    },
     setChestOpen(open) {
       chestOpen = Boolean(open);
     },
@@ -880,6 +1122,42 @@ export function createWorld(canvas, state) {
     buyFromActor(actor) {
       if (!actor || actor.state === 'leave') return;
       dismissCustomer(actor, false, 'Sold.');
+    },
+    beginMoveFurniture(target) {
+      moveTarget = target;
+      expandMode = false;
+      if (padGroup) padGroup.visible = false;
+      pickHandler?.({ type: 'furniture-move-start', furniture: target });
+    },
+    rotateFurniture(target) {
+      return rotateFurniturePose(target);
+    },
+    isMovingFurniture() {
+      return Boolean(moveTarget);
+    },
+    cancelMoveFurniture() {
+      moveTarget = null;
+    },
+    setExpandMode(on) {
+      expandMode = Boolean(on);
+      selectedPad = null;
+      if (padGroup) {
+        padGroup.visible = expandMode;
+        padGroup.children.forEach((child) => {
+          if (child.userData.kind === 'expand-pad') {
+            child.material.opacity = child.userData.connects ? 0.28 : 0.08;
+            child.visible = true;
+            if (!child.userData.connects) child.material.color.setHex(0x6a5a40);
+          }
+        });
+      }
+    },
+    getSelectedPad() {
+      return selectedPad;
+    },
+    rebuildAfterExpansion() {
+      rebuildArchitecture();
+      applyAllPoses();
     },
   };
 }

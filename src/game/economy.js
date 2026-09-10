@@ -10,9 +10,23 @@ import {
   emptySlots,
   matchingArmourIds,
   recipeCost,
+  recipeList,
 } from './catalog.js';
+import {
+  CHEST_MAX_LEVEL,
+  MATERIAL_CAP,
+  SWAP_PRICE_RATIO,
+  chestSlots,
+  chestUpgradeCost,
+  cloneFurniture,
+  defaultFurniture,
+  emptyMaterialAcc,
+  expansionCost,
+  padById,
+  padConnects,
+} from './layout.js';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export function createState() {
   const materials = {};
@@ -22,15 +36,19 @@ export function createState() {
   return {
     gold: START_GOLD,
     materials,
+    materialAcc: emptyMaterialAcc(materials),
     crafts: {},
     craftCounts: {},
     chest: {},
+    chestLevel: 1,
     ready: [],
     displays: SHOP.displays.map(() => ({
       ware: null,
       furnitureId: null,
       slots: emptySlots(),
     })),
+    furniture: defaultFurniture(),
+    expansions: [],
     selectedDisplay: 0,
     wareLooks: {},
     log: [],
@@ -54,11 +72,20 @@ export function unlockRemaining(state, recipeId) {
   return Math.max(0, (recipe.unlockNeed ?? 0) - craftCount(state, recipe.previousId));
 }
 
+export function chestCapacity(state) {
+  return chestSlots(state.chestLevel ?? 1);
+}
+
+export function chestHasSpace(state, extra = 1) {
+  return chestTotal(state) + extra <= chestCapacity(state);
+}
+
 export function canCraft(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return false;
   if (!isUnlocked(state, recipeId)) return false;
   if (state.crafts[recipeId]) return false;
+  if (!chestHasSpace(state)) return false;
   const cost = recipeCost(recipe);
   if ((cost.gold || 0) > state.gold) return false;
   for (const [materialId, need] of Object.entries(cost.materials)) {
@@ -107,6 +134,79 @@ export function addToChest(state, recipeId) {
   state.chest[recipeId] = chestCount(state, recipeId) + 1;
   if (state.ready) state.ready = chestReadyIds(state);
   return true;
+}
+
+export function canUpgradeChest(state) {
+  const level = state.chestLevel ?? 1;
+  if (level >= CHEST_MAX_LEVEL) return false;
+  return state.gold >= chestUpgradeCost(level);
+}
+
+export function upgradeChest(state) {
+  if (!canUpgradeChest(state)) return false;
+  const level = state.chestLevel ?? 1;
+  const cost = chestUpgradeCost(level);
+  state.gold -= cost;
+  state.chestLevel = level + 1;
+  return true;
+}
+
+export function canBuyExpansion(state, padId) {
+  const pad = padById(padId);
+  if (!pad) return false;
+  if ((state.expansions ?? []).includes(padId)) return false;
+  if (!padConnects(pad, state.expansions ?? [])) return false;
+  return state.gold >= expansionCost((state.expansions ?? []).length);
+}
+
+export function buyExpansion(state, padId) {
+  if (!canBuyExpansion(state, padId)) return false;
+  const cost = expansionCost((state.expansions ?? []).length);
+  state.gold -= cost;
+  state.expansions = [...(state.expansions ?? []), padId];
+  return true;
+}
+
+export function swapOffer(state, customerId, requestRecipeId) {
+  const customer = CUSTOMERS[customerId];
+  if (!customer) return null;
+  const owned = recipeList().filter((recipe) => (
+    recipe.id !== requestRecipeId && hasStock(state, recipe.id)
+  ));
+  const preferred = owned.filter((recipe) => customer.prefers.includes(recipe.id));
+  const sameClass = owned.filter((recipe) => (
+    customer.combatClass && recipe.combatClass === customer.combatClass
+  ));
+  const pool = preferred.length ? preferred : sameClass;
+  if (!pool.length) return null;
+  const want = RECIPES[requestRecipeId];
+  pool.sort((a, b) => {
+    const da = Math.abs((a.price ?? 0) - (want?.price ?? 0));
+    const db = Math.abs((b.price ?? 0) - (want?.price ?? 0));
+    return da - db;
+  });
+  const recipe = pool[0];
+  const gold = Math.max(1, Math.round(recipe.price * SWAP_PRICE_RATIO));
+  return { recipeId: recipe.id, gold, listPrice: recipe.price };
+}
+
+export function tickMaterials(state, dt) {
+  // Quests will later change how better materials are earned.
+  if (!state.materialAcc) state.materialAcc = emptyMaterialAcc(state.materials);
+  for (const mat of Object.values(MATERIALS)) {
+    const every = mat.regenEvery;
+    if (!every || every <= 0) continue;
+    const cur = state.materials[mat.id] ?? 0;
+    if (cur >= MATERIAL_CAP) {
+      state.materialAcc[mat.id] = 0;
+      continue;
+    }
+    state.materialAcc[mat.id] = (state.materialAcc[mat.id] ?? 0) + dt / every;
+    const add = Math.floor(state.materialAcc[mat.id]);
+    if (add <= 0) continue;
+    state.materialAcc[mat.id] -= add;
+    state.materials[mat.id] = Math.min(MATERIAL_CAP, cur + add);
+  }
 }
 
 function displayHolds(display, recipeId) {
@@ -229,13 +329,18 @@ export function refreshShowcases(state) {
 }
 
 export function serializeState(state) {
+  const furniture = cloneFurniture(state.furniture ?? defaultFurniture());
   return {
     version: SAVE_VERSION,
     gold: state.gold,
     materials: { ...state.materials },
+    materialAcc: { ...(state.materialAcc ?? {}) },
     chest: { ...state.chest },
+    chestLevel: state.chestLevel ?? 1,
     craftCounts: { ...state.craftCounts },
     selectedDisplay: state.selectedDisplay,
+    expansions: [...(state.expansions ?? [])],
+    furniture,
     displays: state.displays.map((display) => ({
       ware: display.ware ? { recipeId: display.ware.recipeId } : null,
       furnitureId: display.furnitureId ?? null,
@@ -293,12 +398,47 @@ export function applyState(state, data) {
   if (typeof data.selectedDisplay === 'number' && SHOP.displays[data.selectedDisplay]) {
     next.selectedDisplay = data.selectedDisplay;
   }
+  if (typeof data.chestLevel === 'number' && Number.isFinite(data.chestLevel)) {
+    next.chestLevel = Math.min(CHEST_MAX_LEVEL, Math.max(1, Math.round(data.chestLevel)));
+  }
+  if (Array.isArray(data.expansions)) {
+    next.expansions = data.expansions.filter((id) => padById(id));
+  }
+  if (data.materialAcc && typeof data.materialAcc === 'object') {
+    for (const id of Object.keys(next.materialAcc)) {
+      const value = data.materialAcc[id];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        next.materialAcc[id] = Math.max(0, value);
+      }
+    }
+  }
+  if (data.furniture && typeof data.furniture === 'object') {
+    const defaults = defaultFurniture();
+    const readPose = (saved, fallback) => {
+      if (!saved || typeof saved !== 'object') return { ...fallback };
+      const x = typeof saved.x === 'number' && Number.isFinite(saved.x) ? saved.x : fallback.x;
+      const z = typeof saved.z === 'number' && Number.isFinite(saved.z) ? saved.z : fallback.z;
+      const rot = typeof saved.rot === 'number' && Number.isFinite(saved.rot) ? saved.rot : fallback.rot;
+      return { x, z, rot };
+    };
+    next.furniture = {
+      counter: readPose(data.furniture.counter, defaults.counter),
+      anvil: readPose(data.furniture.anvil, defaults.anvil),
+      chest: readPose(data.furniture.chest, defaults.chest),
+      range: readPose(data.furniture.range, defaults.range),
+      displays: defaults.displays.map((pose, index) => readPose(data.furniture.displays?.[index], pose)),
+    };
+  }
   state.gold = next.gold;
   state.materials = next.materials;
+  state.materialAcc = next.materialAcc;
   state.chest = next.chest;
+  state.chestLevel = next.chestLevel;
   state.craftCounts = next.craftCounts;
   state.crafts = {};
   state.displays = next.displays;
+  state.furniture = next.furniture;
+  state.expansions = next.expansions;
   state.selectedDisplay = next.selectedDisplay;
   state.ready = [];
   refreshShowcases(state);

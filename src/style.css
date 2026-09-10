@@ -182,6 +182,10 @@ h1 {
   margin-bottom: 8px;
 }
 
+.tabs[hidden] {
+  display: none;
+}
+
 .tab {
   flex: none;
   width: 100%;

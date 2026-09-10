@@ -12,6 +12,9 @@
     <canvas id="view" aria-label="Rune Craft shop floor"></canvas>
 
     <aside id="save-bar" aria-label="Save and load">
+      <button type="button" id="expand-btn" title="Expand the shop" aria-label="Expand the shop">
+        <span class="expand-icon" aria-hidden="true">⤢</span>
+      </button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
@@ -43,7 +46,7 @@
       <ol id="log" class="log" aria-live="polite"></ol>
     </aside>
 
-    <p id="hint" class="hint">Click the floor to walk — including behind the counter. Click the anvil to craft. Click the traveler at the front of the line to trade.</p>
+    <p id="hint" class="hint">Click the floor to walk. Click the anvil to smith, the range to cook. Right-click the chest to upgrade it. Scroll to zoom out for the roof and garden.</p>
 
     <aside id="mat-strip" aria-label="Materials">
       <div id="materials"></div>
@@ -52,11 +55,11 @@
     <div id="tooltip" class="modal" hidden>
       <div class="sheet">
         <h2>Keep Rune Craft</h2>
-        <p>You keep Rune Craft. Click the floor to walk — the camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle.</p>
-        <p>Click the anvil to craft under Melee, Magic, Ranged, Food, or Potions. Bronze gear, a Staff, Blue d'hide, and Bread start unlocked. Craft enough of a piece to open the next tier in that line.</p>
-        <p>Travelers come through the front door and line up on the customer side of the counter. Click the traveler at the front to sell, refuse, or buy a scrap they offer — then they leave and the line advances.</p>
-        <p>Click the wooden chest to see your inventory. Click a table, wall shelf, or armour stand — it lights gold — then place a ware. Food sits on the wall shelves.</p>
-        <p>Save and Load in the top right write a JSON file on your computer. Spend gold to restock materials. Drag a model onto the drop zone if you want a custom table or ware look — nothing uploaded leaves your browser.</p>
+        <p>You keep Rune Craft. Click the floor to walk — the camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden.</p>
+        <p>Click the anvil to smith Melee, Magic, Ranged, or Potions. Click the compact cooking range for Food. Bronze gear, a Staff, Blue d'hide, and Bread start unlocked. Craft enough of a piece to open the next tier in that line.</p>
+        <p>Travelers line up at the counter. Click the traveler at the front to sell, swap a different stocked item at a reduced price, refuse, or buy a scrap they offer.</p>
+        <p>Click the wooden chest to see your inventory. Right-click the chest to upgrade its space. Click a table, shelf, or armour stand, then place a ware. Food sits on the wall shelves.</p>
+        <p>The expand button beside Save buys extra rooms. Click furniture and use Move or Rotate — wares sit tight while the piece moves. Save and Load write a JSON file on your computer.</p>
         <button type="button" data-dismiss>Got it</button>
       </div>
     </div>
@@ -65,18 +68,28 @@
       <div class="sheet chest-sheet">
         <h2>Shop chest</h2>
         <p class="chest-tally" id="chest-count">0 pieces waiting</p>
+        <p id="chest-cap" class="meta">Level 1 · 100 slots</p>
         <p>Crafted gear waits here. Place a piece on the selected table, shelf, or armour stand, or sell it when an adventurer asks.</p>
         <div id="chest-items"></div>
+        <div class="row furn-row">
+          <button type="button" data-chest-move>Move furniture</button>
+          <button type="button" data-chest-rotate>Rotate 15°</button>
+          <button type="button" data-chest-upgrade>Upgrade</button>
+        </div>
         <button type="button" class="ghost" data-chest-close>Close</button>
       </div>
     </div>
 
     <div id="craft-modal" class="modal" hidden>
       <div class="sheet craft-sheet">
-        <h2>Anvil</h2>
-        <p>Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
+        <h2 data-craft-title>Anvil</h2>
+        <p data-craft-blurb>Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
         <div id="craft-tabs" class="tabs"></div>
         <div id="crafts"></div>
+        <div class="row furn-row">
+          <button type="button" data-craft-move>Move furniture</button>
+          <button type="button" data-craft-rotate>Rotate 15°</button>
+        </div>
         <button type="button" class="ghost" data-craft-close>Close</button>
       </div>
     </div>
@@ -88,8 +101,10 @@
         <p data-trade-offer></p>
         <p data-trade-have></p>
         <p data-trade-buy hidden></p>
+        <p data-trade-swap hidden></p>
         <div class="row">
           <button type="button" data-trade-sell>Sell</button>
+          <button type="button" data-trade-swap-btn>Swap</button>
           <button type="button" data-trade-buy-btn>Buy their goods</button>
           <button type="button" data-trade-refuse>Refuse</button>
         </div>
@@ -110,6 +125,40 @@
         <button type="button" class="ghost" data-cancel>Cancel</button>
       </div>
     </div>
+
+    <div id="chest-upgrade-modal" class="modal" hidden>
+      <div class="sheet">
+        <h2>Upgrade chest</h2>
+        <p data-upgrade-now></p>
+        <p data-upgrade-next></p>
+        <p data-upgrade-cost></p>
+        <div class="row">
+          <button type="button" data-upgrade-buy>Upgrade</button>
+        </div>
+        <button type="button" class="ghost" data-upgrade-close>Close</button>
+      </div>
+    </div>
+
+    <aside id="expand-dock" class="expand-dock" hidden>
+      <h2>Expand the shop</h2>
+      <p>Click a gold pad (three behind, one either side). Confirm before gold is spent. New rooms match the original size.</p>
+      <p data-expand-cost></p>
+      <p data-expand-pick class="meta">No pad selected yet.</p>
+      <div class="row furn-row">
+        <button type="button" data-expand-confirm disabled>Confirm</button>
+        <button type="button" class="ghost" data-expand-close>Cancel</button>
+      </div>
+    </aside>
+
+    <div id="furn-menu" class="furn-menu" hidden>
+      <p data-furn-name>Furniture</p>
+      <button type="button" data-furn-use hidden>Use</button>
+      <button type="button" data-furn-move>Move furniture</button>
+      <button type="button" data-furn-rotate>Rotate 15°</button>
+      <button type="button" class="ghost" data-furn-close>Close</button>
+    </div>
+
+    <div id="shop-fade" hidden></div>
 
     <p id="nowebgl" hidden>This stall needs WebGL. Try another browser, then open the same page again.</p>
 

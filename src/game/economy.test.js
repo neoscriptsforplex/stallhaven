@@ -16,8 +16,10 @@ import {
 } from './catalog.js';
 import {
   applyState,
+  buyExpansion,
   buyFromCustomer,
   canCraft,
+  chestCapacity,
   chestCount,
   chestTotal,
   completeCrafts,
@@ -31,7 +33,10 @@ import {
   sellToCustomer,
   serializeState,
   startCraft,
+  swapOffer,
+  tickMaterials,
   unlockRemaining,
+  upgradeChest,
 } from './economy.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 
@@ -163,17 +168,25 @@ describe('unlock lines', () => {
 });
 
 describe('save and load', () => {
-  it('round-trips gold, materials, chest, craft counts, and displays', () => {
+  it('round-trips gold, materials, chest, craft counts, chest level, expansions, and furniture', () => {
     const state = createState();
     finishCraft(state, 'bronze_scimitar');
     state.gold = 77;
     state.selectedDisplay = 2;
+    state.chestLevel = 3;
+    state.expansions = ['left'];
+    state.furniture.anvil.x = -2.4;
+    state.materialAcc.bronze = 0.4;
     const saved = serializeState(state);
     const other = createState();
     assert.equal(applyState(other, saved), true);
     assert.equal(other.gold, 77);
     assert.equal(other.chest.bronze_scimitar, 1);
     assert.equal(other.craftCounts.bronze_scimitar, 1);
+    assert.equal(other.chestLevel, 3);
+    assert.deepEqual(other.expansions, ['left']);
+    assert.equal(other.furniture.anvil.x, -2.4);
+    assert.equal(other.materialAcc.bronze, 0.4);
     assert.equal(other.displays[2].ware?.recipeId ?? other.displays.find((d) => d.ware?.recipeId === 'bronze_scimitar')?.ware.recipeId, 'bronze_scimitar');
   });
 });
@@ -209,6 +222,17 @@ describe('customer trade', () => {
     assert.equal(RECIPES[range.recipeId].combatClass, 'range');
     const mage = decideRequest('hedgemage', () => 0);
     assert.equal(RECIPES[mage.recipeId].combatClass, 'magic');
+  });
+
+  it('offers a swap of another stocked preferred item at a reduced price', () => {
+    const state = createState();
+    finishCraft(state, 'bread');
+    finishCraft(state, 'bronze_sword');
+    const swap = swapOffer(state, 'mercenary', 'bronze_scimitar');
+    assert.ok(swap);
+    assert.equal(swap.recipeId, 'bronze_sword');
+    assert.ok(swap.gold < RECIPES.bronze_sword.price);
+    assert.equal(swap.gold, Math.round(RECIPES.bronze_sword.price * 0.65));
   });
 });
 
@@ -287,6 +311,7 @@ describe('catalog', () => {
     }
     assert.equal(rectHitsAisle(SHOP.anvil.x, SHOP.anvil.z, 0.48, 0.4, QUEUE_AISLE), false);
     assert.equal(rectHitsAisle(SHOP.chest.x, SHOP.chest.z, 0.54, 0.41, QUEUE_AISLE), false);
+    assert.equal(rectHitsAisle(SHOP.range.x, SHOP.range.z, 0.34, 0.28, QUEUE_AISLE), false);
   });
 
   it('lines travelers up in front of the counter', () => {
@@ -312,8 +337,8 @@ describe('catalog', () => {
     assert.equal(SHOP.clutter?.length ?? 0, 0);
   });
 
-  it('groups anvil recipes by melee, magic, ranged, food, and an empty potions tab', () => {
-    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged', 'Food', 'Potions']);
+  it('groups anvil recipes by melee, magic, ranged, and an empty potions tab', () => {
+    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged', 'Potions']);
     const melee = recipesForTab('melee');
     const magic = recipesForTab('magic');
     const ranged = recipesForTab('ranged');
@@ -329,6 +354,7 @@ describe('catalog', () => {
     assert.ok(magic.some((r) => r.id === 'staff'));
     assert.ok(ranged.some((r) => r.id === 'bronze_shortbow'));
     assert.ok(food.some((r) => r.id === 'bread'));
+    assert.ok(!melee.some((r) => r.category === 'food'));
   });
 
   it('groups matching helm, body, and legs for a stand', () => {
@@ -341,5 +367,74 @@ describe('catalog', () => {
     assert.equal(slots.helm, 'bronze_full_helm');
     assert.equal(slots.body, 'bronze_platebody');
     assert.equal(slots.legs, 'bronze_platelegs');
+  });
+});
+
+describe('chest upgrades', () => {
+  it('starts at 100 slots and climbs 100 per level to 1000 at level 10', () => {
+    const state = createState();
+    assert.equal(state.chestLevel, 1);
+    assert.equal(chestCapacity(state), 100);
+    state.gold = 500;
+    assert.equal(upgradeChest(state), true);
+    assert.equal(state.chestLevel, 2);
+    assert.equal(chestCapacity(state), 200);
+    assert.equal(state.gold, 0);
+    state.gold = 1500;
+    assert.equal(upgradeChest(state), true);
+    assert.equal(state.chestLevel, 3);
+    assert.equal(chestCapacity(state), 300);
+  });
+
+  it('costs 500g then triples each upgrade', () => {
+    const state = createState();
+    state.gold = 499;
+    assert.equal(upgradeChest(state), false);
+    state.gold = 500;
+    upgradeChest(state);
+    state.gold = 1499;
+    assert.equal(upgradeChest(state), false);
+    state.gold = 1500;
+    assert.equal(upgradeChest(state), true);
+  });
+});
+
+describe('material regen', () => {
+  it('fills basic materials faster than high-tier metals, capped at 250', () => {
+    const state = createState();
+    state.materials.bronze = 0;
+    state.materials.dragon = 0;
+    tickMaterials(state, 8);
+    assert.equal(state.materials.bronze, 1);
+    tickMaterials(state, 8);
+    assert.ok(state.materials.dragon < state.materials.bronze);
+    state.materials.bronze = 249;
+    state.materialAcc.bronze = 0;
+    tickMaterials(state, 16);
+    assert.equal(state.materials.bronze, 250);
+    tickMaterials(state, 80);
+    assert.equal(state.materials.bronze, 250);
+  });
+});
+
+describe('shop expansions', () => {
+  it('sells the first extra room for 500g and the next for five times that', () => {
+    const state = createState();
+    state.gold = 500;
+    assert.equal(buyExpansion(state, 'left'), true);
+    assert.deepEqual(state.expansions, ['left']);
+    assert.equal(state.gold, 0);
+    state.gold = 2500;
+    assert.equal(buyExpansion(state, 'back-left'), true);
+    assert.equal(state.gold, 0);
+    assert.ok(state.expansions.includes('back-left'));
+  });
+
+  it('will not sell a corner pad until it touches an owned room', () => {
+    const state = createState();
+    state.gold = 5000;
+    assert.equal(buyExpansion(state, 'back-left'), false);
+    assert.equal(buyExpansion(state, 'back'), true);
+    assert.equal(buyExpansion(state, 'back-left'), true);
   });
 });

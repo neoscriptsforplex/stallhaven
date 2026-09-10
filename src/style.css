@@ -176,15 +176,17 @@ h1 {
 }
 
 .tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 8px;
 }
 
 .tab {
-  flex: 1 1 4.4rem;
-  padding: 5px 6px;
+  flex: none;
+  width: 100%;
+  min-height: 2.15rem;
+  padding: 5px 4px;
   font-size: 0.78rem;
 }
 
@@ -386,7 +388,8 @@ body.modal-open #view {
 
 .modal[hidden],
 #nowebgl[hidden],
-#stock[hidden] {
+#stock[hidden],
+#shop-fade[hidden] {
   display: none;
 }
 
@@ -425,12 +428,126 @@ body.modal-open #view {
   width: min(520px, calc(100vw - 32px));
   max-height: min(80vh, 720px);
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #e3b34a #3e2616;
+}
+
+.craft-sheet::-webkit-scrollbar,
+.craft-sheet #crafts::-webkit-scrollbar,
+[data-recipes]::-webkit-scrollbar {
+  width: 10px;
+}
+
+.craft-sheet::-webkit-scrollbar-track,
+.craft-sheet #crafts::-webkit-scrollbar-track,
+[data-recipes]::-webkit-scrollbar-track {
+  background: #3e2616;
+  border-radius: 8px;
+  border: 1px solid #8a6238;
+}
+
+.craft-sheet::-webkit-scrollbar-thumb,
+.craft-sheet #crafts::-webkit-scrollbar-thumb,
+[data-recipes]::-webkit-scrollbar-thumb {
+  background: linear-gradient(#e3b34a, #8a6238);
+  border-radius: 8px;
+  border: 1px solid #4a301c;
 }
 
 .craft-sheet #crafts {
   max-height: 50vh;
   overflow: auto;
   margin-bottom: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #e3b34a #3e2616;
+}
+
+.furn-row {
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+}
+
+.expand-icon {
+  display: inline-block;
+  font-size: 1.15rem;
+  line-height: 1;
+  transform: scale(1.15);
+}
+
+#expand-btn {
+  min-width: 2.6rem;
+  font-weight: 700;
+}
+
+.expand-dock {
+  position: absolute;
+  top: 58px;
+  right: 16px;
+  z-index: 18;
+  width: min(280px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--gold);
+  pointer-events: auto;
+}
+
+.expand-dock[hidden] {
+  display: none;
+}
+
+.expand-dock h2 {
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: #f3e2c0;
+}
+
+.expand-dock p {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  color: #e6d3b2;
+}
+
+.furn-menu {
+  position: absolute;
+  z-index: 22;
+  width: min(220px, calc(100vw - 24px));
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--gold);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  display: grid;
+  gap: 6px;
+}
+
+.furn-menu[hidden] {
+  display: none;
+}
+
+.furn-menu p {
+  margin: 0 0 4px;
+  color: #f0d9a8;
+  font-weight: 700;
+}
+
+#shop-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: #100a06;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+
+#shop-fade.is-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#shop-fade[hidden] {
+  display: none;
 }
 
 .sheet {

@@ -15,13 +15,15 @@ export const REQUEST_WAIT = 58;
 export const UNLOCK_START = 20;
 export const UNLOCK_STEP = 10;
 
-export const CRAFT_TABS = [
+export const ANVIL_TABS = [
   { id: 'melee', label: 'Melee' },
   { id: 'magic', label: 'Magic' },
   { id: 'ranged', label: 'Ranged' },
-  { id: 'food', label: 'Food' },
   { id: 'potion', label: 'Potions' },
 ];
+
+/** @deprecated Food moved to the cooking range; anvil uses ANVIL_TABS. */
+export const CRAFT_TABS = ANVIL_TABS;
 
 export const METALS = [
   { id: 'bronze', name: 'Bronze', tint: 0x8a5a32, restock: 3, start: 12 },
@@ -56,23 +58,28 @@ export const MAGIC_STAVES = [
   { id: 'ancient_staff', name: 'Ancient Staff', shape: 'staff_ancient' },
 ];
 
+/** Seconds per +1 toward the 250 cap. Higher tier = slower. */
+function regenEvery(tier) {
+  return 8 * tier;
+}
+
 export const MATERIALS = {
-  bronze: { id: 'bronze', name: 'Bronze', restock: 3, start: 12 },
-  iron: { id: 'iron', name: 'Iron', restock: 5, start: 2 },
-  steel: { id: 'steel', name: 'Steel', restock: 7, start: 1 },
-  mithril: { id: 'mithril', name: 'Mithril', restock: 10, start: 1 },
-  adamant: { id: 'adamant', name: 'Adamant', restock: 13, start: 0 },
-  runite: { id: 'runite', name: 'Runite', restock: 16, start: 0 },
-  dragon: { id: 'dragon', name: 'Dragon', restock: 22, start: 0 },
-  logs: { id: 'logs', name: 'Logs', restock: 4, start: 8 },
-  string: { id: 'string', name: 'String', restock: 4, start: 6 },
-  cloth: { id: 'cloth', name: 'Cloth', restock: 5, start: 8 },
-  hide: { id: 'hide', name: 'Hide', restock: 5, start: 8 },
-  egg: { id: 'egg', name: 'Egg', restock: 4, start: 4 },
-  flour: { id: 'flour', name: 'Flour', restock: 3, start: 10 },
-  pineapple: { id: 'pineapple', name: 'Pineapple', restock: 6, start: 3 },
-  raspberry: { id: 'raspberry', name: 'Raspberry', restock: 6, start: 3 },
-  fish: { id: 'fish', name: 'Fish', restock: 6, start: 3 },
+  bronze: { id: 'bronze', name: 'Bronze', restock: 3, start: 12, tier: 1, regenEvery: regenEvery(1) },
+  iron: { id: 'iron', name: 'Iron', restock: 5, start: 2, tier: 2, regenEvery: regenEvery(2) },
+  steel: { id: 'steel', name: 'Steel', restock: 7, start: 1, tier: 3, regenEvery: regenEvery(3) },
+  mithril: { id: 'mithril', name: 'Mithril', restock: 10, start: 1, tier: 4, regenEvery: regenEvery(4) },
+  adamant: { id: 'adamant', name: 'Adamant', restock: 13, start: 0, tier: 5, regenEvery: regenEvery(5) },
+  runite: { id: 'runite', name: 'Runite', restock: 16, start: 0, tier: 6, regenEvery: regenEvery(6) },
+  dragon: { id: 'dragon', name: 'Dragon', restock: 22, start: 0, tier: 7, regenEvery: regenEvery(7) },
+  logs: { id: 'logs', name: 'Logs', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  string: { id: 'string', name: 'String', restock: 4, start: 6, tier: 1, regenEvery: regenEvery(1) },
+  cloth: { id: 'cloth', name: 'Cloth', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  hide: { id: 'hide', name: 'Hide', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  egg: { id: 'egg', name: 'Egg', restock: 4, start: 4, tier: 1, regenEvery: regenEvery(1) },
+  flour: { id: 'flour', name: 'Flour', restock: 3, start: 10, tier: 1, regenEvery: regenEvery(1) },
+  pineapple: { id: 'pineapple', name: 'Pineapple', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
+  raspberry: { id: 'raspberry', name: 'Raspberry', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
+  fish: { id: 'fish', name: 'Fish', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
 };
 
 export const ARMOUR_SLOTS = ['helm', 'body', 'legs', 'boots', 'gloves'];
@@ -355,6 +362,7 @@ export const SHOP = {
   counter: { x: 0, z: -1.72 },
   keeper: { x: -0.48, z: -2.52 },
   anvil: { x: -2.98, z: -2.42 },
+  range: { x: 1.18, z: -2.52 },
   chest: { x: 2.98, z: -2.42 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [

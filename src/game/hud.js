@@ -1,5 +1,5 @@
 import {
-  CRAFT_TABS,
+  ANVIL_TABS,
   CUSTOMERS,
   MATERIALS,
   RECIPES,
@@ -10,9 +10,13 @@ import {
 } from './catalog.js';
 import { playClick } from './audio.js';
 import {
+  buyExpansion,
   buyFromCustomer,
+  canBuyExpansion,
   canCraft,
   canRestock,
+  canUpgradeChest,
+  chestCapacity,
   chestList,
   chestTotal,
   craftProgress,
@@ -23,8 +27,17 @@ import {
   restock,
   sellToCustomer,
   startCraft,
+  swapOffer,
   unlockRemaining,
+  upgradeChest,
 } from './economy.js';
+import {
+  CHEST_MAX_LEVEL,
+  chestSlots,
+  chestUpgradeCost,
+  expansionCost,
+  padById,
+} from './layout.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 
 export function bindHud(root, state, world) {
@@ -41,25 +54,47 @@ export function bindHud(root, state, world) {
   const chestItems = document.querySelector('#chest-items');
   const tradeModal = document.querySelector('#trade-modal');
   const craftModal = document.querySelector('#craft-modal');
+  const upgradeModal = document.querySelector('#chest-upgrade-modal');
+  const expandModal = document.querySelector('#expand-dock');
+  const furnMenu = document.querySelector('#furn-menu');
+  const shopFade = document.querySelector('#shop-fade');
   const activeCraft = root.querySelector('#active-craft');
   const activeCraftName = activeCraft?.querySelector('[data-active-craft-name]');
+  const chestCapEl = document.querySelector('#chest-cap');
 
   let craftTab = 'melee';
+  let craftStation = 'anvil';
   let tradeActor = null;
+  let furnTarget = null;
 
-  tabsEl.innerHTML = CRAFT_TABS.map((tab) => (
+  tabsEl.innerHTML = ANVIL_TABS.map((tab) => (
     `<button type="button" class="tab" data-tab="${tab.id}">${tab.label}</button>`
   )).join('');
 
+  function currentRecipes() {
+    if (craftStation === 'range') return recipesForTab('food');
+    return recipesForTab(craftTab);
+  }
+
   function paintCrafts() {
+    const rangeMode = craftStation === 'range';
+    tabsEl.hidden = rangeMode;
+    const title = craftModal.querySelector('[data-craft-title]');
+    const blurb = craftModal.querySelector('[data-craft-blurb]');
+    if (title) title.textContent = rangeMode ? 'Cooking range' : 'Anvil';
+    if (blurb) {
+      blurb.textContent = rangeMode
+        ? 'Bake food here. Finished plates land in the chest or on a wall shelf.'
+        : 'Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.';
+    }
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
       btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
     }
-    if (craftTab === 'potion') {
+    if (!rangeMode && craftTab === 'potion') {
       craftsEl.innerHTML = '<p class="empty">Potion recipes are coming later.</p>';
       return;
     }
-    const recipes = recipesForTab(craftTab);
+    const recipes = currentRecipes();
     const groups = new Map();
     for (const recipe of recipes) {
       const groupKey = recipe.category === 'armour' ? 'armour' : recipe.category === 'food' ? 'food' : 'weapon';
@@ -153,13 +188,25 @@ export function bindHud(root, state, world) {
   });
 
   function setModalOpen() {
-    const open = !chestModal.hidden || !tradeModal.hidden || !tooltip.hidden || !craftModal.hidden;
+    const open = !chestModal.hidden || !tradeModal.hidden || !tooltip.hidden || !craftModal.hidden
+      || !upgradeModal.hidden;
     document.body.classList.toggle('modal-open', open);
   }
 
-  function openCraft() {
+  function hideFurnMenu() {
+    furnMenu.hidden = true;
+    furnTarget = null;
+  }
+
+  function openCraft(station = 'anvil') {
     closeChest();
     closeTrade();
+    closeUpgrade();
+    hideFurnMenu();
+    craftStation = station;
+    if (station === 'range') craftTab = 'food';
+    else if (craftTab === 'food') craftTab = 'melee';
+    paintCrafts();
     craftModal.hidden = false;
     setModalOpen();
     render(performance.now() / 1000);
@@ -168,6 +215,41 @@ export function bindHud(root, state, world) {
   function closeCraft() {
     craftModal.hidden = true;
     world.ignorePicks(280);
+    setModalOpen();
+  }
+
+  function closeUpgrade() {
+    upgradeModal.hidden = true;
+    world.ignorePicks(280);
+    setModalOpen();
+  }
+
+  function paintUpgrade() {
+    const level = state.chestLevel ?? 1;
+    const cap = chestSlots(level);
+    upgradeModal.querySelector('[data-upgrade-now]').textContent = `Level ${level} · ${cap} slots · ${chestTotal(state)} stored.`;
+    const nextEl = upgradeModal.querySelector('[data-upgrade-next]');
+    const costEl = upgradeModal.querySelector('[data-upgrade-cost]');
+    const buyBtn = upgradeModal.querySelector('[data-upgrade-buy]');
+    if (level >= CHEST_MAX_LEVEL) {
+      nextEl.textContent = 'The chest is at max level (1000 slots).';
+      costEl.textContent = '';
+      buyBtn.disabled = true;
+      return;
+    }
+    const cost = chestUpgradeCost(level);
+    nextEl.textContent = `Level ${level + 1} adds 100 slots (${chestSlots(level + 1)} total).`;
+    costEl.textContent = `Cost: ${cost}g.`;
+    buyBtn.disabled = !canUpgradeChest(state);
+  }
+
+  function openUpgrade() {
+    closeChest();
+    closeCraft();
+    closeTrade();
+    hideFurnMenu();
+    paintUpgrade();
+    upgradeModal.hidden = false;
     setModalOpen();
   }
 
@@ -188,6 +270,10 @@ export function bindHud(root, state, world) {
   }
 
   function paintChest() {
+    const level = state.chestLevel ?? 1;
+    const cap = chestCapacity(state);
+    const n = chestTotal(state);
+    if (chestCapEl) chestCapEl.textContent = `Level ${level} · ${n} / ${cap} slots`;
     const items = chestList(state);
     if (!items.length) {
       chestItems.innerHTML = '<p class="empty">The chest is empty. Craft a ware and it will land here.</p>';
@@ -246,6 +332,20 @@ export function bindHud(root, state, world) {
     } else {
       buyLine.hidden = true;
     }
+    const swap = swapOffer(state, actor.typeId, actor.requestRecipeId);
+    actor.swap = swap;
+    const swapLine = tradeModal.querySelector('[data-trade-swap]');
+    const swapBtn = tradeModal.querySelector('[data-trade-swap-btn]');
+    if (swap) {
+      const alt = RECIPES[swap.recipeId];
+      swapLine.hidden = false;
+      swapLine.textContent = `Swap: they will take ${alt.name} for ${swap.gold}g (reduced from ${swap.listPrice}g).`;
+      swapBtn.disabled = false;
+    } else {
+      swapLine.hidden = false;
+      swapLine.textContent = 'Swap: no other stocked item they will take.';
+      swapBtn.disabled = true;
+    }
     tradeModal.querySelector('[data-trade-sell]').disabled = !have;
     tradeModal.querySelector('[data-trade-buy-btn]').disabled = !offer || state.gold < offer.price;
   }
@@ -293,6 +393,31 @@ export function bindHud(root, state, world) {
     }
   });
 
+  tradeModal.querySelector('[data-trade-swap-btn]').addEventListener('click', () => {
+    const actor = tradeActor && world.getCustomer(tradeActor.id);
+    if (!actor) {
+      closeTrade();
+      return;
+    }
+    const swap = swapOffer(state, actor.typeId, actor.requestRecipeId);
+    if (!swap) {
+      paintTrade();
+      return;
+    }
+    const paid = sellToCustomer(state, swap.recipeId, swap.gold);
+    if (!paid) {
+      paintTrade();
+      return;
+    }
+    playClick('trade');
+    pushLog(state, `Swapped ${RECIPES[swap.recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${paid}g (reduced).`);
+    actor.requestRecipeId = swap.recipeId;
+    world.sellToActor(actor);
+    world.syncDisplays();
+    closeTrade();
+    render(performance.now() / 1000);
+  });
+
   tradeModal.querySelector('[data-trade-close]').addEventListener('click', closeTrade);
   tradeModal.addEventListener('click', (event) => {
     if (event.target === tradeModal) closeTrade();
@@ -303,9 +428,167 @@ export function bindHud(root, state, world) {
     if (event.target === craftModal) closeCraft();
   });
 
+  function startMove(target) {
+    if (!target) return;
+    closeChest();
+    closeCraft();
+    closeTrade();
+    closeUpgrade();
+    hideFurnMenu();
+    world.beginMoveFurniture(target);
+    pushLog(state, 'Click the floor to place that furniture. Right-click cancels.');
+    render(performance.now() / 1000);
+  }
+
+  function doRotate(target) {
+    if (!target) return;
+    world.rotateFurniture(target);
+    render(performance.now() / 1000);
+  }
+
+  function showFurnMenu(target, clientX, clientY) {
+    furnTarget = target;
+    furnMenu.querySelector('[data-furn-name]').textContent = (
+      target.id === 'chest' ? 'Chest'
+        : target.id === 'anvil' ? 'Anvil'
+          : target.id === 'range' ? 'Cooking range'
+            : target.id === 'counter' ? 'Counter'
+              : 'Display'
+    );
+    const useBtn = furnMenu.querySelector('[data-furn-use]');
+    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range') {
+      useBtn.hidden = false;
+      useBtn.textContent = target.id === 'chest' ? 'Open chest' : target.id === 'range' ? 'Cook' : 'Craft';
+    } else {
+      useBtn.hidden = true;
+    }
+    furnMenu.hidden = false;
+    const x = Math.min(window.innerWidth - 230, Math.max(8, clientX ?? 24));
+    const y = Math.min(window.innerHeight - 180, Math.max(8, clientY ?? 80));
+    furnMenu.style.left = `${x}px`;
+    furnMenu.style.top = `${y}px`;
+  }
+
+  chestModal.querySelector('[data-chest-move]')?.addEventListener('click', () => startMove({ id: 'chest' }));
+  chestModal.querySelector('[data-chest-rotate]')?.addEventListener('click', () => doRotate({ id: 'chest' }));
+  chestModal.querySelector('[data-chest-upgrade]')?.addEventListener('click', openUpgrade);
+  craftModal.querySelector('[data-craft-move]')?.addEventListener('click', () => {
+    startMove({ id: craftStation === 'range' ? 'range' : 'anvil' });
+  });
+  craftModal.querySelector('[data-craft-rotate]')?.addEventListener('click', () => {
+    doRotate({ id: craftStation === 'range' ? 'range' : 'anvil' });
+  });
+
+  upgradeModal.querySelector('[data-upgrade-close]').addEventListener('click', closeUpgrade);
+  upgradeModal.addEventListener('click', (event) => {
+    if (event.target === upgradeModal) closeUpgrade();
+  });
+  upgradeModal.querySelector('[data-upgrade-buy]').addEventListener('click', () => {
+    const level = state.chestLevel ?? 1;
+    const cost = chestUpgradeCost(level);
+    if (upgradeChest(state)) {
+      pushLog(state, `Chest upgraded to level ${state.chestLevel} (${chestSlots(state.chestLevel)} slots) for ${cost}g.`);
+      paintUpgrade();
+      paintChest();
+      render(performance.now() / 1000);
+    }
+  });
+
+  function paintExpand() {
+    const cost = expansionCost((state.expansions ?? []).length);
+    expandModal.querySelector('[data-expand-cost]').textContent = `Next room costs ${cost}g.`;
+    const padId = world.getSelectedPad();
+    const pickEl = expandModal.querySelector('[data-expand-pick]');
+    const confirm = expandModal.querySelector('[data-expand-confirm]');
+    if (!padId) {
+      pickEl.textContent = 'Click a gold pad on the ground, then confirm.';
+      confirm.disabled = true;
+      return;
+    }
+    const pad = padById(padId);
+    pickEl.textContent = `Selected: ${pad?.label ?? padId}.`;
+    confirm.disabled = !canBuyExpansion(state, padId);
+  }
+
+  function closeExpand() {
+    expandModal.hidden = true;
+    world.setExpandMode(false);
+    world.ignorePicks(280);
+  }
+
+  function openExpand() {
+    closeChest();
+    closeCraft();
+    closeTrade();
+    closeUpgrade();
+    hideFurnMenu();
+    if ((state.expansions ?? []).length >= 5) {
+      pushLog(state, 'The shop already uses every expansion pad.');
+      render(performance.now() / 1000);
+      return;
+    }
+    world.setExpandMode(true);
+    paintExpand();
+    expandModal.hidden = false;
+  }
+
+  function fadeShop(then) {
+    shopFade.hidden = false;
+    requestAnimationFrame(() => shopFade.classList.add('is-on'));
+    window.setTimeout(() => {
+      then?.();
+      shopFade.classList.remove('is-on');
+      window.setTimeout(() => {
+        shopFade.hidden = true;
+      }, 450);
+    }, 480);
+  }
+
+  document.querySelector('#expand-btn')?.addEventListener('click', openExpand);
+  expandModal.querySelector('[data-expand-close]').addEventListener('click', closeExpand);
+  expandModal.querySelector('[data-expand-confirm]').addEventListener('click', () => {
+    const padId = world.getSelectedPad();
+    if (!padId || !canBuyExpansion(state, padId)) {
+      paintExpand();
+      return;
+    }
+    const cost = expansionCost((state.expansions ?? []).length);
+    fadeShop(() => {
+      if (buyExpansion(state, padId)) {
+        world.rebuildAfterExpansion();
+        world.setExpandMode(false);
+        pushLog(state, `Opened a new room (${padById(padId)?.label ?? padId}) for ${cost}g.`);
+      }
+      closeExpand();
+      render(performance.now() / 1000);
+    });
+  });
+
+  furnMenu.querySelector('[data-furn-close]').addEventListener('click', hideFurnMenu);
+  furnMenu.querySelector('[data-furn-move]').addEventListener('click', () => startMove(furnTarget));
+  furnMenu.querySelector('[data-furn-rotate]').addEventListener('click', () => doRotate(furnTarget));
+  furnMenu.querySelector('[data-furn-use]').addEventListener('click', () => {
+    const target = furnTarget;
+    hideFurnMenu();
+    if (target?.id === 'chest') openChest();
+    if (target?.id === 'anvil') openCraft('anvil');
+    if (target?.id === 'range') openCraft('range');
+  });
+
   world.onPick((event) => {
+    if (event.type !== 'furn-menu' && event.type !== 'display' && event.type !== 'counter' && event.type !== 'expand-pad') {
+      hideFurnMenu();
+    }
     if (event.type === 'chest') openChest();
-    if (event.type === 'anvil') openCraft();
+    if (event.type === 'anvil') openCraft('anvil');
+    if (event.type === 'range') openCraft('range');
+    if (event.type === 'counter') showFurnMenu(event.furniture, event.clientX, event.clientY);
+    if (event.type === 'display') showFurnMenu(event.furniture, event.clientX, event.clientY);
+    if (event.type === 'chest-upgrade') openUpgrade();
+    if (event.type === 'furn-menu') showFurnMenu(event.furniture, event.clientX, event.clientY);
+    if (event.type === 'expand-pad') paintExpand();
+    if (event.type === 'furniture-moved') pushLog(state, 'Furniture placed.');
+    if (event.type === 'furniture-cancel') pushLog(state, 'Move cancelled.');
     if (event.type === 'customer' && event.actor?.state === 'request') openTrade(event.actor);
   });
 
@@ -333,6 +616,7 @@ export function bindHud(root, state, world) {
   loadBtn?.addEventListener('click', async () => {
     try {
       if (await loadStateFromFile(state)) {
+        world.applyLayout();
         world.syncDisplays();
         world.refreshSelection(true);
         paintCrafts();
@@ -348,7 +632,7 @@ export function bindHud(root, state, world) {
   document.addEventListener('click', (event) => {
     const btn = event.target.closest('button');
     if (!btn) return;
-    if (btn.dataset.craft || btn.hasAttribute('data-trade-sell') || btn.hasAttribute('data-trade-buy-btn')) return;
+    if (btn.dataset.craft || btn.hasAttribute('data-trade-sell') || btn.hasAttribute('data-trade-buy-btn') || btn.hasAttribute('data-trade-swap-btn')) return;
     playClick('ui');
   });
 
@@ -371,7 +655,7 @@ export function bindHud(root, state, world) {
       lastUnlockKey = unlockKey;
       paintCrafts();
     }
-    for (const recipe of recipesForTab(craftTab)) {
+    for (const recipe of currentRecipes()) {
       const btn = craftsEl.querySelector(`[data-craft="${recipe.id}"]`);
       const timer = craftsEl.querySelector(`[data-timer="${recipe.id}"]`);
       if (!btn || !timer) continue;

@@ -274,19 +274,6 @@ export function buildStall() {
   sideBeam2.position.x = 4;
   root.add(sideBeam2);
 
-  const lanternGlow = new THREE.MeshStandardMaterial({
-    color: 0xffc56a,
-    emissive: 0xff9a3a,
-    emissiveIntensity: 1.4,
-    roughness: 0.4,
-  });
-  const lantern = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), lanternGlow));
-  lantern.position.set(-1.35, 2.08, -3.2);
-  root.add(lantern);
-  const lantern2 = lantern.clone();
-  lantern2.position.x = 1.35;
-  root.add(lantern2);
-
   const sign = makeSign();
   sign.position.set(0, 2.05, -3.32);
   root.add(sign);
@@ -312,10 +299,7 @@ function makeSign() {
   ctx.font = '700 42px Georgia, serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('RUNE CRAFT', 320, 52);
-  ctx.font = '22px Georgia, serif';
-  ctx.fillStyle = '#d7b27a';
-  ctx.fillText('forge, bake, and trade', 320, 98);
+  ctx.fillText('RUNE CRAFT', 320, 64);
   const tex = new THREE.CanvasTexture(canvas);
   const label = new THREE.Mesh(
     new THREE.PlaneGeometry(2.7, 0.46),

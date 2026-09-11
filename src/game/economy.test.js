@@ -28,6 +28,7 @@ import {
   decidePurchase,
   hasStock,
   isUnlocked,
+  offerChoices,
   placeFromChest,
   restock,
   sellToCustomer,
@@ -222,6 +223,22 @@ describe('customer trade', () => {
     assert.equal(RECIPES[range.recipeId].combatClass, 'range');
     const mage = decideRequest('hedgemage', () => 0);
     assert.equal(RECIPES[mage.recipeId].combatClass, 'magic');
+  });
+
+  it('lists chest items as offer choices at a reduced sale price', () => {
+    const state = createState();
+    finishCraft(state, 'bread');
+    finishCraft(state, 'bronze_sword');
+    const choices = offerChoices(state, 'bronze_scimitar');
+    assert.equal(choices.length, 2);
+    const sword = choices.find((choice) => choice.recipeId === 'bronze_sword');
+    const bread = choices.find((choice) => choice.recipeId === 'bread');
+    assert.ok(sword);
+    assert.ok(bread);
+    assert.ok(sword.gold < RECIPES.bronze_sword.price);
+    assert.equal(sword.gold, Math.round(RECIPES.bronze_sword.price * 0.65));
+    assert.equal(sword.listPrice, RECIPES.bronze_sword.price);
+    assert.equal(offerChoices(state, 'bronze_sword').some((choice) => choice.recipeId === 'bronze_sword'), false);
   });
 
   it('offers a swap of another stocked preferred item at a reduced price', () => {

@@ -167,6 +167,22 @@ export function buyExpansion(state, padId) {
   return true;
 }
 
+export function reducedSalePrice(listPrice) {
+  return Math.max(1, Math.round((listPrice ?? 0) * SWAP_PRICE_RATIO));
+}
+
+export function offerChoices(state, requestRecipeId) {
+  return chestList(state)
+    .filter((item) => item.recipe && item.recipeId !== requestRecipeId)
+    .map(({ recipe, recipeId, count }) => ({
+      recipeId,
+      name: recipe.name,
+      count,
+      gold: reducedSalePrice(recipe.price),
+      listPrice: recipe.price,
+    }));
+}
+
 export function swapOffer(state, customerId, requestRecipeId) {
   const customer = CUSTOMERS[customerId];
   if (!customer) return null;
@@ -186,8 +202,11 @@ export function swapOffer(state, customerId, requestRecipeId) {
     return da - db;
   });
   const recipe = pool[0];
-  const gold = Math.max(1, Math.round(recipe.price * SWAP_PRICE_RATIO));
-  return { recipeId: recipe.id, gold, listPrice: recipe.price };
+  return {
+    recipeId: recipe.id,
+    gold: reducedSalePrice(recipe.price),
+    listPrice: recipe.price,
+  };
 }
 
 export function tickMaterials(state, dt) {

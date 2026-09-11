@@ -30,6 +30,14 @@ export const FURNITURE_ROT_STEP = Math.PI / 12;
 export const FURNITURE_FORWARD = 0;
 export const SWAP_PRICE_RATIO = 0.65;
 export const CAULDRON_COST = 10000;
+/** Mid-tier station: between the spinning wheel (500) and the cauldron (10,000). */
+export const FURNACE_COST = 3000;
+export const WHEEL_COST = 500;
+export const STATION_UNLOCKS = [
+  { id: 'wheel', label: 'Spinning Wheel', cost: WHEEL_COST },
+  { id: 'furnace', label: 'Furnace', cost: FURNACE_COST },
+  { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
+];
 export const FURNITURE_BUY_BASE = 500;
 export const FURNITURE_BUY_MULT = 3;
 export const FURNITURE_SHOP = [
@@ -155,8 +163,19 @@ export function playerWalkFloors(expansionIds = []) {
   return [...walkFloors(expansionIds), ...outdoorWalkFloors(expansionIds)];
 }
 
+export function stationUnlock(id) {
+  return STATION_UNLOCKS.find((item) => item.id === id) ?? null;
+}
+
+export function stationLabel(id) {
+  return stationUnlock(id)?.label
+    ?? (id === 'wheel' ? 'Spinning Wheel' : id === 'furnace' ? 'Furnace' : id === 'cauldron' ? 'Cauldron' : furnitureLabelForType(id));
+}
+
 export function furnitureHalfSize(kind) {
   if (kind === 'cauldron') return { hw: 0.32, hd: 0.32 };
+  if (kind === 'furnace') return { hw: 0.4, hd: 0.36 };
+  if (kind === 'wheel') return { hw: 0.36, hd: 0.32 };
   if (kind === 'anvil') return { hw: 0.44, hd: 0.35 };
   if (kind === 'chest') return { hw: 0.49, hd: 0.36 };
   if (kind === 'range') return { hw: 0.34, hd: 0.28 };
@@ -194,6 +213,8 @@ export function defaultFurniture() {
     chest: { x: SHOP.chest.x, z: SHOP.chest.z, rot: FURNITURE_FORWARD },
     range: { x: SHOP.range.x, z: SHOP.range.z, rot: FURNITURE_FORWARD },
     cauldron: null,
+    furnace: null,
+    wheel: null,
     displays: SHOP.displays.map((spot) => ({
       x: spot.x,
       z: spot.z,
@@ -214,6 +235,8 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     chest: { ...furniture.chest },
     range: { ...furniture.range },
     cauldron: clonePose(furniture.cauldron),
+    furnace: clonePose(furniture.furnace),
+    wheel: clonePose(furniture.wheel),
     displays: (furniture.displays ?? defaults.displays).map((pose) => ({ ...pose })),
   };
 }

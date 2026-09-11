@@ -17,6 +17,7 @@ import {
   roomCenter,
   wallVineMounts,
 } from './layout.js';
+import { initRatWander } from './rats.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.04 });
@@ -814,6 +815,75 @@ export function buildCauldron() {
   return group;
 }
 
+export function buildFurnace() {
+  const group = new THREE.Group();
+  group.name = 'furnace';
+  const stone = new THREE.MeshStandardMaterial({ color: 0x6a6258, roughness: 0.92, metalness: 0.08 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x3a342e, roughness: 0.88, metalness: 0.12 });
+  const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.78, 0.62), stone));
+  body.position.y = 0.39;
+  group.add(body);
+  const hearth = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.32, 0.12), dark));
+  hearth.position.set(0, 0.28, 0.27);
+  group.add(hearth);
+  const glow = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.2, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0xff6a18, emissive: 0xff4a00, emissiveIntensity: 1.1, roughness: 0.4 }),
+  );
+  glow.position.set(0, 0.28, 0.32);
+  group.add(glow);
+  const chimney = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.22), stone));
+  chimney.position.set(-0.16, 0.98, -0.08);
+  group.add(chimney);
+  const lip = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.28), dark));
+  lip.position.set(-0.16, 1.26, -0.08);
+  group.add(lip);
+  const fire = new THREE.PointLight(0xff7a28, 0.55, 2.6, 2);
+  fire.position.set(0, 0.32, 0.2);
+  group.add(fire);
+  group.userData.wareY = 0.8;
+  const label = makeNameSprite('Furnace');
+  label.position.y = 1.42;
+  group.add(label);
+  return group;
+}
+
+export function buildSpinningWheel() {
+  const group = new THREE.Group();
+  group.name = 'wheel';
+  const oak = wood(0x6b4423);
+  const dark = wood(0x3e2616);
+  const base = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.06, 0.28), oak));
+  base.position.y = 0.03;
+  group.add(base);
+  const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.06), oak));
+  post.position.set(-0.08, 0.32, 0);
+  group.add(post);
+  const bench = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.2), oak));
+  bench.position.set(0.14, 0.22, 0);
+  group.add(bench);
+  const spinner = new THREE.Group();
+  spinner.name = 'spin-wheel';
+  const rim = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.016, 8, 22), dark));
+  spinner.add(rim);
+  for (let i = 0; i < 8; i += 1) {
+    const spoke = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.012, 0.012), oak));
+    spoke.rotation.z = (i * Math.PI) / 8;
+    spinner.add(spoke);
+  }
+  const hub = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.04, 8), dark));
+  hub.rotation.x = Math.PI / 2;
+  spinner.add(hub);
+  spinner.position.set(-0.08, 0.52, 0);
+  group.add(spinner);
+  group.userData.spinWheel = spinner;
+  group.userData.wareY = 0.7;
+  const label = makeNameSprite('Spinning Wheel');
+  label.position.y = 1.12;
+  group.add(label);
+  return group;
+}
+
 function makeNameSprite(text) {
   const canvas = document.createElement('canvas');
   canvas.width = 320;
@@ -1312,6 +1382,7 @@ export function buildDungeon() {
   for (let i = 0; i < 4; i += 1) {
     const rat = buildRat();
     rat.position.set(-2 + i * 1.1, 0.06, 1.2 - i * 0.6);
+    initRatWander(rat, i);
     root.add(rat);
     rats.push(rat);
   }

@@ -58,6 +58,8 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     blockFromPose(poses.range, 0.34, 0.28),
   ];
   if (poses.cauldron) blocks.push(blockFromPose(poses.cauldron, 0.32, 0.32));
+  if (poses.furnace) blocks.push(blockFromPose(poses.furnace, 0.4, 0.36));
+  if (poses.wheel) blocks.push(blockFromPose(poses.wheel, 0.36, 0.32));
   const displayPoses = poses.displays ?? [];
   const kinds = furniture?.displayKinds;
   const removed = furniture?.displayRemoved;
@@ -89,6 +91,8 @@ export function liveObstacles(state, shop = SHOP, skip = null) {
   ));
   furniture.displayRemoved = (state?.displays ?? []).map((display) => Boolean(display?.removed));
   if (skip?.id === 'cauldron') furniture.cauldron = null;
+  if (skip?.id === 'furnace') furniture.furnace = null;
+  if (skip?.id === 'wheel') furniture.wheel = null;
   if (skip?.id === 'anvil') furniture.anvil = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'chest') furniture.chest = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'range') furniture.range = { x: 999, z: 999, rot: 0 };

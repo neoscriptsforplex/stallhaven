@@ -3,8 +3,11 @@ import {
   CUSTOMERS,
   DEFAULT_SKYBOX,
   MATERIALS,
+  METALS,
   OTHER_CHANCE,
   RECIPES,
+  isCraftedMaterial,
+  isMaterialCraft,
   SHOP,
   SHELF_SLOT_COUNT,
   SHOP_MAX_LEVEL,
@@ -27,6 +30,9 @@ import {
 } from './catalog.js';
 import {
   CAULDRON_COST,
+  FURNACE_COST,
+  WHEEL_COST,
+  STATION_UNLOCKS,
   CHEST_MAX_LEVEL,
   FURNITURE_FORWARD,
   MATERIAL_CAP,
@@ -47,6 +53,9 @@ import {
 
 export {
   CAULDRON_COST,
+  FURNACE_COST,
+  WHEEL_COST,
+  STATION_UNLOCKS,
   furnitureBuyCost,
   masteryNeed,
   MASTERY_SPEED,
@@ -56,12 +65,28 @@ export {
   SKYBOXES,
 };
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
 function emptyBoughtFurniture() {
   return { table: 0, mannequin: 0 };
+}
+
+/** Old saves used ores for smithing. Copy ore counts onto bars so progress is not bricked. */
+function migrateLegacyMetalBars(next, data) {
+  const version = data.version ?? 0;
+  if (version >= SAVE_VERSION) return;
+  for (const metal of METALS) {
+    const barId = `${metal.id}_bar`;
+    const savedBar = data.materials?.[barId];
+    if (typeof savedBar === 'number' && Number.isFinite(savedBar)) {
+      next.materials[barId] = Math.max(0, Math.round(savedBar));
+      continue;
+    }
+    next.materials[barId] = next.materials[metal.id] ?? 0;
+  }
+  next.materials.bow_string = 0;
 }
 
 export function skyboxId(id) {
@@ -256,6 +281,8 @@ export function isUnlocked(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return false;
   if (recipe.category === 'potion' && !ownsCauldron(state)) return false;
+  if (recipe.category === 'smelt' && !ownsFurnace(state)) return false;
+  if (recipe.category === 'spin' && !ownsWheel(state)) return false;
   if (!recipe.previousId) return true;
   return craftCount(state, recipe.previousId) >= (recipe.unlockNeed ?? 0);
 }
@@ -266,13 +293,19 @@ export function craftBlockReason(state, recipeId) {
   if (recipe.category === 'potion' && !ownsCauldron(state)) {
     return 'Place a cauldron from Upgrade to brew potions.';
   }
+  if (recipe.category === 'smelt' && !ownsFurnace(state)) {
+    return 'Place a furnace from Upgrade to smelt ores into bars.';
+  }
+  if (recipe.category === 'spin' && !ownsWheel(state)) {
+    return 'Place a spinning wheel from Upgrade to spin flax into bow string.';
+  }
   if (!isUnlocked(state, recipeId)) {
     const remain = unlockRemaining(state, recipeId);
     const prev = recipe.previousId ? RECIPES[recipe.previousId] : null;
     return `Locked. Craft ${remain} more ${prev?.name ?? 'item'} first.`;
   }
   if (state.crafts[recipeId]) return `${recipe.name} is already in progress.`;
-  if (!chestHasSpace(state)) return 'The chest is full.';
+  if (!isMaterialCraft(recipe) && !chestHasSpace(state)) return 'The chest is full.';
   const cost = recipeCost(recipe);
   if ((cost.gold || 0) > state.gold) return `Need ${formatGold(cost.gold)}g more.`;
   for (const [materialId, need] of Object.entries(cost.materials)) {
@@ -419,23 +452,65 @@ export function buyExpansion(state, padId) {
   return true;
 }
 
-export function ownsCauldron(state) {
-  return Boolean(state.furniture?.cauldron);
+export function stationCost(id) {
+  return STATION_UNLOCKS.find((item) => item.id === id)?.cost ?? 0;
 }
 
-export function canBuyCauldron(state) {
-  return !ownsCauldron(state) && state.gold >= CAULDRON_COST;
+export function ownsStation(state, id) {
+  return Boolean(state.furniture?.[id]);
 }
 
-export function buyCauldron(state, pose) {
-  if (state.gold < CAULDRON_COST || !pose) return false;
-  state.gold -= CAULDRON_COST;
-  state.furniture.cauldron = {
+export function canBuyStation(state, id) {
+  const cost = stationCost(id);
+  return cost > 0 && !ownsStation(state, id) && state.gold >= cost;
+}
+
+export function buyStation(state, id, pose) {
+  const cost = stationCost(id);
+  if (cost <= 0 || state.gold < cost || !pose || ownsStation(state, id)) return false;
+  state.gold -= cost;
+  state.furniture[id] = {
     x: pose.x,
     z: pose.z,
     rot: pose.rot ?? FURNITURE_FORWARD,
   };
   return true;
+}
+
+export function ownsCauldron(state) {
+  return ownsStation(state, 'cauldron');
+}
+
+export function canBuyCauldron(state) {
+  return canBuyStation(state, 'cauldron');
+}
+
+export function buyCauldron(state, pose) {
+  return buyStation(state, 'cauldron', pose);
+}
+
+export function ownsFurnace(state) {
+  return ownsStation(state, 'furnace');
+}
+
+export function canBuyFurnace(state) {
+  return canBuyStation(state, 'furnace');
+}
+
+export function buyFurnace(state, pose) {
+  return buyStation(state, 'furnace', pose);
+}
+
+export function ownsWheel(state) {
+  return ownsStation(state, 'wheel');
+}
+
+export function canBuyWheel(state) {
+  return canBuyStation(state, 'wheel');
+}
+
+export function buyWheel(state, pose) {
+  return buyStation(state, 'wheel', pose);
 }
 
 export function boughtFurnitureCount(state, type) {
@@ -534,7 +609,7 @@ export function tickMaterials(state, dt) {
   if (!state.materialAcc) state.materialAcc = emptyMaterialAcc(state.materials);
   for (const mat of Object.values(MATERIALS)) {
     const every = mat.regenEvery;
-    if (!every || every <= 0) continue;
+    if (mat.crafted || !every || every <= 0) continue;
     const cur = state.materials[mat.id] ?? 0;
     if (cur >= MATERIAL_CAP) {
       state.materialAcc[mat.id] = 0;
@@ -591,7 +666,13 @@ export function completeCrafts(state, nowSeconds) {
   for (const [recipeId, craft] of Object.entries(state.crafts)) {
     if (nowSeconds - craft.startedAt >= craft.duration) {
       delete state.crafts[recipeId];
-      addToChest(state, recipeId);
+      const recipe = RECIPES[recipeId];
+      if (isMaterialCraft(recipe) && MATERIALS[recipe.outputMaterial]) {
+        const n = recipe.outputCount ?? 1;
+        state.materials[recipe.outputMaterial] = (state.materials[recipe.outputMaterial] ?? 0) + n;
+      } else {
+        addToChest(state, recipeId);
+      }
       if (!state.craftCounts) state.craftCounts = {};
       state.craftCounts[recipeId] = craftCount(state, recipeId) + 1;
       grantShopXp(state, recipeId);
@@ -780,11 +861,13 @@ export function applyState(state, data) {
   }
   if (data.materials && typeof data.materials === 'object') {
     for (const id of Object.keys(next.materials)) {
+      if (id === 'string') continue;
       const value = data.materials[id];
       if (typeof value === 'number' && Number.isFinite(value)) {
         next.materials[id] = Math.max(0, Math.round(value));
       }
     }
+    migrateLegacyMetalBars(next, data);
   }
   if (data.chest && typeof data.chest === 'object') {
     for (const [id, count] of Object.entries(data.chest)) {
@@ -902,6 +985,12 @@ export function applyState(state, data) {
       cauldron: data.furniture.cauldron
         ? readPose(data.furniture.cauldron, SHOP.cauldron)
         : null,
+      furnace: data.furniture.furnace
+        ? readPose(data.furniture.furnace, SHOP.furnace)
+        : null,
+      wheel: data.furniture.wheel
+        ? readPose(data.furniture.wheel, SHOP.wheel)
+        : null,
       displays: next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {
           x: 0,
@@ -1004,7 +1093,8 @@ function chestReadyIds(state) {
 
 export function canRestock(state, materialId) {
   const mat = MATERIALS[materialId];
-  return Boolean(mat) && state.gold >= mat.restock;
+  if (!mat || isCraftedMaterial(materialId) || !mat.restock || mat.restock <= 0) return false;
+  return state.gold >= mat.restock;
 }
 
 export function restock(state, materialId) {
@@ -1044,7 +1134,7 @@ export function sellToCustomer(state, recipeId, gold = RECIPES[recipeId]?.price 
 
 export function buyFromCustomer(state, materialId, price) {
   const mat = MATERIALS[materialId];
-  if (!mat || price < 0 || state.gold < price) return false;
+  if (!mat || isCraftedMaterial(materialId) || price < 0 || state.gold < price) return false;
   state.gold -= price;
   state.materials[materialId] += 1;
   return true;

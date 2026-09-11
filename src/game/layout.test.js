@@ -2,6 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CAULDRON_COST,
+  FURNACE_COST,
+  WHEEL_COST,
   CHEST_MAX_LEVEL,
   EXPANSION_PADS,
   FURNITURE_FORWARD,
@@ -85,6 +87,8 @@ describe('layout numbers', () => {
     const turned = rotatePose(furniture.range, 1);
     assert.ok(Math.abs(turned.rot - FURNITURE_ROT_STEP) < 1e-9);
     assert.equal(furniture.cauldron, null);
+    assert.equal(furniture.furnace, null);
+    assert.equal(furniture.wheel, null);
   });
 
   it('puts the cooking range on the floor right of the counter, between counter and chest', () => {
@@ -120,6 +124,8 @@ describe('layout numbers', () => {
     const right = gardenTreeSpots(['right']);
     assert.equal(right.some((spot) => spot.side === 'right' || spot.side === 'front-right'), false);
     assert.ok(right.some((spot) => spot.side === 'left'));
+    assert.equal(WHEEL_COST, 500);
+    assert.equal(FURNACE_COST, 3000);
     assert.equal(CAULDRON_COST, 10000);
   });
 

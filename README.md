@@ -21,12 +21,12 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 ## How to play
 
 1. **Click the floor** to walk, including **behind the counter**. The camera follows you — scroll or `-` / `=` to zoom (zoom far out to see the **roof** and garden), arrow keys to change the angle. Customers still line up on the customer side of the counter.
-2. Click the **anvil** (left, behind the counter). Craft under **Melee**, **Magic**, or **Ranged**, then **Weapons** or **Armour**. Click the compact **cooking range** for **Food**. Click a placed **cauldron** for **Potions**. Higher tiers stay locked until you craft enough of the previous item in that same line. A progress bar fills while a piece is working. Restock materials from inside the craft window.
+2. Click the **anvil** (left, behind the counter). Craft under **Melee**, **Magic**, or **Ranged**, then **Weapons** or **Armour**. Weapons and armour use **metal bars**, not raw ore. Click a placed **furnace** to smelt ores into bars. Click a **spinning wheel** to turn **Flax** into **Bow String** (required for every bow and crossbow). Click the compact **cooking range** for **Food**. Click a placed **cauldron** for **Potions**. Higher tiers stay locked until you craft enough of the previous item in that same line. A progress bar fills while a piece is working. Restock materials from inside the craft window.
 3. Finished gear goes in the wooden **chest** (100 slots to start). Click the chest to see it. **Right-click** the chest for **Upgrade**, **Move**, or **Rotate**. **Right-click a table or wall shelf** and choose **Display item…** to place a chest ware. On a **shelf**, pick the item, then **Top Left**, **Top Right**, **Bottom Left**, or **Bottom Right**. If that slot is full, the old ware returns to the chest. Food and potions are small shelf items.
 4. Adventurers come through the **front door** and **line up at the counter**. The traveler at the front is who you trade with.
-5. **Click the traveler at the front** to open trade: **Sell** if you have the item, **Offer** a different chest item at a reduced price (click the item, then Confirm), **Craft** what they asked for on the anvil, range, or cauldron, **Refuse** to send them off, or **Buy their goods** for a scrap of material.
-6. Basic materials refill slowly on their own up to 250; higher-tier metals refill slower. Restock with gold from a craft window (anvil, range, or cauldron). Clicks make a short sound.
-7. **Save** and **Load** in the top right write or read a JSON file on your computer. The fullscreen button fills the window. **Upgrade** unlocks extra rooms (10,000g, then ×3, up to 5: click a pad, then Confirm), extra **tables** and **mannequins** (500g, then ×3 per type; starting pieces do not count), and a **cauldron** for 10,000 gp. Side rooms clear the trees on that side of the shop. The music-note button (right of Load) plays uploaded MP3, WAV, or OGG tracks as a playlist.
+5. **Click the traveler at the front** to open trade: **Sell** if you have the item, **Offer** a different chest item at a reduced price (click the item, then Confirm), **Craft** what they asked for on the anvil, range, furnace, spinning wheel, or cauldron, **Refuse** to send them off, or **Buy their goods** for a scrap of material.
+6. Basic materials refill slowly on their own up to 250; higher-tier ores refill slower. Restock with gold from a craft window. **Metal bars** and **Bow String** do not refill or restock — smelt bars at the furnace, and spin bow string from flax at the wheel. Clicks make a short sound.
+7. **Save** and **Load** in the top right write or read a JSON file on your computer. The fullscreen button fills the window. **Upgrade** unlocks extra rooms (10,000g, then ×3, up to 5: click a pad, then Confirm), extra **tables** and **mannequins** (500g, then ×3 per type; starting pieces do not count), a **spinning wheel** for 500 gp, a **furnace** for 3,000 gp, and a **cauldron** for 10,000 gp. Side rooms clear the trees on that side of the shop. The music-note button (right of Load) plays uploaded MP3, WAV, or OGG tracks as a playlist.
 8. Optional: tap **Upload** beside Coins to add a `.glb` or `.gltf`. Tag it **Furniture** (selected table), **Ware** (a recipe look), **Player** (your character mesh), or **Customer** (shared NPC body; types keep colours and labels). Models stay in this browser. A custom player mesh still walks; hair/colour customizer may not apply to it.
 
 You start with 40 gold. Bronze gear, a Staff, Blue D'hide, and Bread are unlocked.
@@ -61,6 +61,8 @@ Robes: Magic, Mystic, Battlemage, Lunar, Ancient. Each set has Hat, Robe Top, Ro
 
 Same seven metals for Shortbow, Longbow, Crossbow, Knives, Thrown Axe.
 
+Bows and crossbows also need **Bow String** (spun from Flax) plus logs.
+
 Dragonhide armour in Blue, Green, Red, Black: Body, Chaps, Vambraces, Boots.
 
 ### Food
@@ -75,6 +77,8 @@ Brew on a placed **cauldron** from **Herbs** and **Water**: Strength (yellow), P
 
 - **Chest:** 100 slots at level 1, +100 per level, max level 10 (1000). First upgrade 500g, then ×3. Right-click the chest to upgrade, move, or rotate.
 - **Rooms:** from **Upgrade**. Five pads around the starting shop (three behind, one either side). First room 10,000g, then ×3, up to 5 extra spaces. Side expansions clear the exterior trees on that side so they do not clip through the new room.
+- **Upgrade / Spinning Wheel:** 500 gp. Place with the floor snap grid, then Confirm. Click it to spin Flax into Bow String. The wheel mesh turns while a craft is running.
+- **Upgrade / Furnace:** 3,000 gp (between the spinning wheel and the cauldron). Place with the floor snap grid, then Confirm. Click it to smelt ores into bars.
 - **Upgrade / Cauldron:** 10,000 gp. Place with the floor snap grid, then Confirm. Click the cauldron to brew potions. Right-click to move or rotate.
 - **Upgrade / Table and Mannequin:** first extra of each type is 500g, then ×3 (1500, 4500, …). Starting shop tables and mannequins do not count. Place on the floor snap grid, then Confirm. Right-click to move, rotate, or (tables) Display item….
 - **Furniture:** Move and Rotate only from a **right-click** context menu (not craft windows). The counter ignores left-click. Wares sit on the piece and travel with it.

@@ -65,7 +65,8 @@ import {
   wareTopY,
   wrapImportedCharacter,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildRange, buildShop } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel } from './shopbuild.js';
+import { stepRatWander } from './rats.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
@@ -300,12 +301,24 @@ export function createWorld(canvas, state) {
   scene.add(cauldronMesh);
   const cauldronPick = makePick(0.72, 1.15, 0.72, 'cauldron');
 
+  const furnaceMesh = buildFurnace();
+  scene.add(furnaceMesh);
+  const furnacePick = makePick(0.82, 1.35, 0.72, 'furnace');
+
+  const wheelMesh = buildSpinningWheel();
+  scene.add(wheelMesh);
+  const wheelPick = makePick(0.72, 1.2, 0.62, 'wheel');
+
+  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'wheel'];
+
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
     anvil: { mesh: anvil, pick: anvilPick, glow: null, pickY: 0.72 },
     chest: { mesh: chest, pick: chestPick, glow: null, pickY: 0.72 },
     range: { mesh: rangeMesh, pick: rangePick, glow: null, pickY: 0.68 },
     cauldron: { mesh: cauldronMesh, pick: cauldronPick, glow: null, pickY: 0.58 },
+    furnace: { mesh: furnaceMesh, pick: furnacePick, glow: null, pickY: 0.68 },
+    wheel: { mesh: wheelMesh, pick: wheelPick, glow: null, pickY: 0.58 },
   };
 
   function applyFixturePose(id) {
@@ -671,7 +684,7 @@ export function createWorld(canvas, state) {
       chestPick,
       anvilPick,
       rangePick,
-      ...(state.furniture.cauldron ? [cauldronPick] : []),
+      ...UNLOCK_STATIONS.filter((id) => state.furniture[id]).map((id) => fixtureMeshes[id].pick),
       counterPick,
       ...extra,
       ...trapdoorPicks(),
@@ -861,7 +874,7 @@ export function createWorld(canvas, state) {
 
   function furnitureIdFromKind(kind, displayIndex) {
     if (kind === 'display') return { id: 'display', index: displayIndex };
-    if (kind === 'chest' || kind === 'anvil' || kind === 'range' || kind === 'counter' || kind === 'cauldron') {
+    if (kind === 'chest' || kind === 'anvil' || kind === 'range' || kind === 'counter' || UNLOCK_STATIONS.includes(kind)) {
       return { id: kind };
     }
     return null;
@@ -1033,8 +1046,8 @@ export function createWorld(canvas, state) {
         queueUse('range', state.furniture.range);
         return;
       }
-      if (data.kind === 'cauldron') {
-        if (state.furniture.cauldron) queueUse('cauldron', state.furniture.cauldron);
+      if (UNLOCK_STATIONS.includes(data.kind)) {
+        if (state.furniture[data.kind]) queueUse(data.kind, state.furniture[data.kind]);
         return;
       }
       if (data.kind === 'counter') {
@@ -1054,7 +1067,6 @@ export function createWorld(canvas, state) {
       const chestPos = state.furniture.chest;
       const anvilPos = state.furniture.anvil;
       const rangePos = state.furniture.range;
-      const cauldronPos = state.furniture.cauldron;
       if (Math.hypot(point.x - chestPos.x, point.z - chestPos.z) < 0.72) {
         queueUse('chest', chestPos);
         return;
@@ -1067,9 +1079,12 @@ export function createWorld(canvas, state) {
         queueUse('range', rangePos);
         return;
       }
-      if (cauldronPos && Math.hypot(point.x - cauldronPos.x, point.z - cauldronPos.z) < 0.5) {
-        queueUse('cauldron', cauldronPos);
-        return;
+      for (const id of UNLOCK_STATIONS) {
+        const pos = state.furniture[id];
+        if (pos && Math.hypot(point.x - pos.x, point.z - pos.z) < 0.52) {
+          queueUse(id, pos);
+          return;
+        }
       }
       const hatch = gardenTrapdoorSpot(state.expansions ?? []);
       if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 1.7) {
@@ -1707,11 +1722,12 @@ export function createWorld(canvas, state) {
       updateCustomers(dt, now);
       updateGoblins(dt, now);
     } else if (dungeon?.rats) {
-      dungeon.rats.forEach((rat, i) => {
-        rat.rotation.y += dt * (1.2 + i * 0.35);
-        rat.position.x += Math.sin(now * 1.4 + i) * dt * 0.12;
-        rat.position.x = Math.max(-4.6, Math.min(4.6, rat.position.x));
-      });
+      dungeon.rats.forEach((rat) => stepRatWander(rat, dt, now));
+    }
+    const wheel = fixtureMeshes.wheel?.mesh?.userData.spinWheel;
+    if (wheel) {
+      const spinning = Object.keys(state.crafts ?? {}).some((id) => RECIPES[id]?.category === 'spin');
+      if (spinning) wheel.rotation.z += dt * 9.5;
     }
     renderer.render(scene, camera);
   }
@@ -1906,7 +1922,8 @@ export function createWorld(canvas, state) {
       pickHandler?.({ type: 'furniture-move-start', furniture: target });
     },
     beginPlaceUnlock(id) {
-      const start = snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, floors);
+      const home = SHOP[id] ?? SHOP.cauldron;
+      const start = snapToFloor(home.x, home.z, floors);
       placeDraft = { id, x: start.x, z: start.z, rot: FURNITURE_FORWARD };
       moveTarget = { id };
       placeNeedsConfirm = true;

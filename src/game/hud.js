@@ -415,6 +415,7 @@ export function bindHud(root, state, world) {
     }
     selectedOfferId = null;
     paintOfferPicker();
+    tradeModal.hidden = true;
     offerModal.hidden = false;
     setModalOpen();
   }
@@ -811,7 +812,8 @@ export function bindHud(root, state, world) {
     }
     if (tradeActor) {
       const live = world.getCustomer(tradeActor.id);
-      if (!live || live.state === 'leave') closeTrade();
+      if (live) tradeActor = live;
+      if (tradeActor.state === 'leave') closeTrade();
       else {
         if (!tradeModal.hidden) paintTrade();
         if (!offerModal.hidden) paintOfferPicker();

@@ -753,7 +753,7 @@ export function createWorld(canvas, state) {
 
   function queueUse(type, pose) {
     if (!pose) return;
-    const arrive = type === 'trapdoor' || type === 'ladder' ? 0.95 : 1.15;
+    const arrive = type === 'trapdoor' || type === 'ladder' ? 1.25 : 1.15;
     if (isNearPose(pose, arrive)) {
       pendingUse = null;
       pickHandler?.({ type });
@@ -1072,7 +1072,7 @@ export function createWorld(canvas, state) {
         return;
       }
       const hatch = gardenTrapdoorSpot(state.expansions ?? []);
-      if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 0.9) {
+      if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 1.7) {
         queueUse('trapdoor', hatch);
         return;
       }

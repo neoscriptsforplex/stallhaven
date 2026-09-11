@@ -1056,28 +1056,32 @@ function buildBoulder(scale = 1) {
   return group;
 }
 
+function markTrapdoorMesh(mesh) {
+  mesh.userData.kind = 'trapdoor';
+  return mesh;
+}
+
 function buildTrapdoor() {
   const group = new THREE.Group();
   group.name = 'trapdoor';
   const frame = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.95), wood(0x3f2716)));
   frame.position.y = 0.04;
-  group.add(frame);
+  group.add(markTrapdoorMesh(frame));
   const door = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.04, 0.72), wood(0x6a4324)));
   door.position.set(0, 0.08, 0.08);
   door.rotation.x = -0.28;
-  group.add(door);
+  group.add(markTrapdoorMesh(door));
   const hinge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.03, 0.06), metal(0xb08a3c)));
   hinge.position.set(0, 0.09, -0.34);
   group.add(hinge);
   const ring = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 10), metal(0xb08a3c)));
   ring.position.set(0, 0.12, 0.22);
   group.add(ring);
-  const pick = new THREE.Mesh(
-    new THREE.BoxGeometry(1.25, 0.85, 1.25),
+  const pick = markTrapdoorMesh(new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 1.2, 2.2),
     pickMat(),
-  );
-  pick.position.y = 0.4;
-  pick.userData.kind = 'trapdoor';
+  ));
+  pick.position.y = 0.55;
   group.add(pick);
   return group;
 }
@@ -1341,22 +1345,25 @@ function buildDungeonLadder() {
   const group = new THREE.Group();
   group.name = 'ladder';
   const rail = wood(0x5a3a22);
+  const mark = (mesh) => {
+    mesh.userData.kind = 'ladder';
+    return mesh;
+  };
   for (const x of [-0.18, 0.18]) {
     const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.05), rail));
     post.position.set(x, 1.3, 0);
-    group.add(post);
+    group.add(mark(post));
   }
   for (let i = 0; i < 8; i += 1) {
     const rung = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.04, 0.05), rail));
     rung.position.set(0, 0.28 + i * 0.3, 0.02);
-    group.add(rung);
+    group.add(mark(rung));
   }
-  const pick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 2.6, 0.4),
+  const pick = mark(new THREE.Mesh(
+    new THREE.BoxGeometry(1.1, 2.8, 0.7),
     pickMat(),
-  );
-  pick.position.set(0, 1.3, 0.1);
-  pick.userData.kind = 'ladder';
+  ));
+  pick.position.set(0, 1.3, 0.12);
   group.add(pick);
   return group;
 }

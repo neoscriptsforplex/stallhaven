@@ -1136,14 +1136,18 @@ export function bindHud(root, state, world) {
 
   function fadeShop(then) {
     shopFade.hidden = false;
-    requestAnimationFrame(() => shopFade.classList.add('is-on'));
+    shopFade.classList.remove('is-on');
+    void shopFade.offsetWidth;
+    requestAnimationFrame(() => {
+      shopFade.classList.add('is-on');
+    });
     window.setTimeout(() => {
       then?.();
-      shopFade.classList.remove('is-on');
+      requestAnimationFrame(() => shopFade.classList.remove('is-on'));
       window.setTimeout(() => {
         shopFade.hidden = true;
-      }, 450);
-    }, 480);
+      }, 560);
+    }, 720);
   }
 
   async function toggleFullscreen() {

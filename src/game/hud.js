@@ -298,7 +298,6 @@ export function bindHud(root, state, world) {
 
   function closeOfferPicker() {
     offerModal.hidden = true;
-    offerModal.style.pointerEvents = '';
     selectedOfferId = null;
     if (tradeActor) tradeModal.hidden = false;
     setModalOpen();
@@ -354,11 +353,11 @@ export function bindHud(root, state, world) {
     const offerBtn = tradeModal.querySelector('[data-trade-offer-btn]');
     if (choices.length) {
       offerLine.hidden = false;
-      offerLine.textContent = `Offer: choose a chest item to sell at a reduced price (${choices.length} available).`;
+      offerLine.textContent = `You can choose a chest item to sell at a reduced price (${choices.length} available).`;
       offerBtn.disabled = false;
     } else {
       offerLine.hidden = false;
-      offerLine.textContent = 'Offer: no other chest item to trade.';
+      offerLine.textContent = 'No other chest item to trade at a reduced price.';
       offerBtn.disabled = true;
     }
     tradeModal.querySelector('[data-trade-sell]').disabled = !have;
@@ -409,20 +408,15 @@ export function bindHud(root, state, world) {
   }
 
   function openOfferPicker() {
-    const actor = tradeActor && world.getCustomer(tradeActor.id);
-    if (!actor) {
+    const actor = tradeActor;
+    if (!actor || actor.state === 'leave') {
       closeTrade();
       return;
     }
     selectedOfferId = null;
     paintOfferPicker();
-    tradeModal.hidden = true;
     offerModal.hidden = false;
-    offerModal.style.pointerEvents = 'none';
     setModalOpen();
-    window.setTimeout(() => {
-      if (!offerModal.hidden) offerModal.style.pointerEvents = '';
-    }, 280);
   }
 
   tradeModal.querySelector('[data-trade-sell]').addEventListener('click', () => {
@@ -468,11 +462,11 @@ export function bindHud(root, state, world) {
     }
   });
 
-  tradeModal.querySelector('[data-trade-offer-btn]').addEventListener('click', (event) => {
+  function onOfferClick(event) {
     event.preventDefault();
     event.stopPropagation();
-    const actor = tradeActor && world.getCustomer(tradeActor.id);
-    if (!actor) {
+    const actor = tradeActor;
+    if (!actor || actor.state === 'leave') {
       closeTrade();
       return;
     }
@@ -482,7 +476,8 @@ export function bindHud(root, state, world) {
       return;
     }
     openOfferPicker();
-  });
+  }
+  tradeModal.querySelector('[data-trade-offer-btn]').addEventListener('click', onOfferClick);
 
   offerItems.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-offer-item]');
@@ -495,12 +490,9 @@ export function bindHud(root, state, world) {
     closeOfferPicker();
     world.ignorePicks(280);
   });
-  offerModal.addEventListener('click', (event) => {
-    if (event.target === offerModal) closeOfferPicker();
-  });
   offerModal.querySelector('[data-offer-confirm]').addEventListener('click', () => {
-    const actor = tradeActor && world.getCustomer(tradeActor.id);
-    if (!actor) {
+    const actor = tradeActor;
+    if (!actor || actor.state === 'leave') {
       closeTrade();
       return;
     }
@@ -525,9 +517,6 @@ export function bindHud(root, state, world) {
   });
 
   tradeModal.querySelector('[data-trade-close]').addEventListener('click', closeTrade);
-  tradeModal.addEventListener('click', (event) => {
-    if (event.target === tradeModal) closeTrade();
-  });
 
   craftModal.querySelector('[data-craft-close]').addEventListener('click', closeCraft);
   craftModal.addEventListener('click', (event) => {
@@ -830,5 +819,5 @@ export function bindHud(root, state, world) {
     }
   }
 
-  return { render, openChest, openTrade, openCraft };
+  return { render, openChest, openTrade, openCraft, openOfferPicker };
 }

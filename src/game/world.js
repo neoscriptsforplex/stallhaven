@@ -800,6 +800,10 @@ export function createWorld(canvas, state) {
       }
       setMoveTarget(point.x, point.z);
       playClick('move');
+      if (state.selectedDisplay !== -1) {
+        state.selectedDisplay = -1;
+        refreshSelection(true);
+      }
     }
   });
 
@@ -954,7 +958,8 @@ export function createWorld(canvas, state) {
   }
 
   function refreshSelection(force = false) {
-    const selected = displays[state.selectedDisplay];
+    const selectedIndex = state.selectedDisplay;
+    const selected = selectedIndex >= 0 ? displays[selectedIndex] : null;
     const wareIds = selected
       ? [
         selected.furniture?.uuid ?? '',
@@ -965,11 +970,11 @@ export function createWorld(canvas, state) {
       : '';
     const key = `${state.selectedDisplay}:${wareIds}`;
     displays.forEach((d, i) => {
-      d.glow.material.opacity = i === state.selectedDisplay ? 0.88 : 0.0;
+      d.glow.material.opacity = i === selectedIndex ? 0.88 : 0.0;
     });
     if (!force && key === outlineKey) return;
     outlineKey = key;
-    displays.forEach((d, i) => applyOutline(d, i === state.selectedDisplay));
+    displays.forEach((d, i) => applyOutline(d, i === selectedIndex && selectedIndex >= 0));
   }
   refreshSelection(true);
 
@@ -1176,12 +1181,29 @@ export function createWorld(canvas, state) {
 
   function waitingLine() {
     return customers
-      .filter((actor) => actor.state !== 'leave')
+      .filter((actor) => actor.state !== 'leave' && actor.queueIndex >= 0)
       .sort((a, b) => a.queueIndex - b.queueIndex);
   }
 
+  const BROWSE_SPOTS = [
+    { x: -1.55, z: 1.15 },
+    { x: 1.55, z: 1.15 },
+    { x: -1.35, z: 0.25 },
+    { x: 1.35, z: 0.25 },
+    { x: 0, z: 1.85 },
+  ];
+
+  function browseStops() {
+    const first = BROWSE_SPOTS[Math.floor(Math.random() * BROWSE_SPOTS.length)];
+    const rest = BROWSE_SPOTS.filter((spot) => spot !== first);
+    const second = rest[Math.floor(Math.random() * rest.length)];
+    const count = Math.random() < 0.45 ? 1 : 2;
+    return count === 1 ? [first] : [first, second];
+  }
+
   function spawnCustomer(now) {
-    if (waitingLine().length >= MAX_CUSTOMERS) return;
+    const inShop = customers.filter((actor) => actor.state !== 'leave').length;
+    if (inShop >= MAX_CUSTOMERS) return;
     const types = Object.keys(CUSTOMERS);
     const typeId = firstSpawn ? 'pilgrim' : types[Math.floor(Math.random() * types.length)];
     firstSpawn = false;
@@ -1191,8 +1213,6 @@ export function createWorld(canvas, state) {
     mesh.position.set(SHOP.outside.x, 0, SHOP.outside.z + 0.15);
     setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
     scene.add(mesh);
-    const queueIndex = waitingLine().length;
-    const slot = queueSlot(queueIndex, SHOP, counterPose());
     const actor = {
       id: customerSerial,
       typeId,
@@ -1201,19 +1221,29 @@ export function createWorld(canvas, state) {
       path: [
         { x: SHOP.door.x, z: SHOP.door.z + 0.35 },
         { x: SHOP.door.x, z: SHOP.door.z - 0.45 },
-        slot,
+        ...browseStops(),
       ],
       waitUntil: 0,
       requestRecipeId: request.recipeId,
       offerGold: request.gold,
       offer: request.offer,
       carried: null,
-      queueIndex,
+      queueIndex: -1,
+      browsing: true,
     };
     customerSerial += 1;
     customers.push(actor);
     nextSpawnAt = now + SPAWN_GAP_MIN + Math.random() * (SPAWN_GAP_MAX - SPAWN_GAP_MIN);
-    pushLog(state, `${CUSTOMERS[typeId].name} joins the line for ${RECIPES[request.recipeId].name}.`);
+    pushLog(state, `${CUSTOMERS[typeId].name} looks around for ${RECIPES[request.recipeId].name}.`);
+  }
+
+  function joinQueue(actor, now) {
+    actor.browsing = false;
+    actor.queueIndex = waitingLine().length;
+    const slot = queueSlot(actor.queueIndex, SHOP, counterPose());
+    actor.state = 'enter';
+    actor.path = [slot];
+    actor.waitUntil = now;
   }
 
   function beginRequest(actor, now) {
@@ -1225,6 +1255,13 @@ export function createWorld(canvas, state) {
   }
 
   function settleInLine(actor, now) {
+    if (actor.browsing) {
+      actor.state = 'browse';
+      actor.path = [];
+      actor.waitUntil = now + 1.1 + Math.random() * 1.6;
+      actor.mesh.rotation.y = Math.random() * Math.PI * 2;
+      return;
+    }
     actor.path = [];
     actor.mesh.rotation.y = Math.PI;
     if (actor.queueIndex === 0) {
@@ -1281,6 +1318,10 @@ export function createWorld(canvas, state) {
           actor.path.shift();
           if (!actor.path.length) settleInLine(actor, now);
         }
+      } else if (actor.state === 'browse') {
+        actor.mesh.rotation.y += dt * 0.35;
+        actor.mesh.position.y = Math.abs(Math.sin(now * 1.4 + actor.id)) * 0.012;
+        if (now >= actor.waitUntil) joinQueue(actor, now);
       } else if (actor.state === 'queue') {
         actor.mesh.rotation.y = Math.PI + Math.sin(now * 1.1 + actor.id) * 0.06;
         actor.mesh.position.y = Math.abs(Math.sin(now * 1.6 + actor.id)) * 0.012;

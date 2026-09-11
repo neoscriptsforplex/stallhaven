@@ -16,6 +16,7 @@ import {
   ANVIL_SUBTABS,
   nearestShelfSlot,
   SHELF_SLOT_COUNT,
+  offerClassOf,
 } from './catalog.js';
 import {
   applyState,
@@ -318,15 +319,33 @@ describe('customer trade', () => {
     finishCraft(state, 'bread');
     finishCraft(state, 'bronze_sword');
     const choices = offerChoices(state, 'bronze_scimitar');
-    assert.equal(choices.length, 2);
+    assert.equal(choices.length, 1);
     const sword = choices.find((choice) => choice.recipeId === 'bronze_sword');
     const bread = choices.find((choice) => choice.recipeId === 'bread');
     assert.ok(sword);
-    assert.ok(bread);
+    assert.equal(bread, undefined);
     assert.ok(sword.gold < RECIPES.bronze_sword.price);
     assert.equal(sword.gold, Math.round(RECIPES.bronze_sword.price * 0.65));
     assert.equal(sword.listPrice, RECIPES.bronze_sword.price);
     assert.equal(offerChoices(state, 'bronze_sword').some((choice) => choice.recipeId === 'bronze_sword'), false);
+  });
+
+  it('only lists same-class chest items in the offer picker', () => {
+    const state = createState();
+    finishCraft(state, 'bread');
+    finishCraft(state, 'bronze_sword');
+    finishCraft(state, 'staff');
+    finishCraft(state, 'bronze_shortbow');
+    const melee = offerChoices(state, 'bronze_scimitar').map((choice) => choice.recipeId);
+    assert.deepEqual(melee, ['bronze_sword']);
+    const food = offerChoices(state, 'pizza').map((choice) => choice.recipeId);
+    assert.deepEqual(food, ['bread']);
+    const magic = offerChoices(state, 'mystic_staff').map((choice) => choice.recipeId);
+    assert.deepEqual(magic, ['staff']);
+    const ranged = offerChoices(state, 'bronze_longbow').map((choice) => choice.recipeId);
+    assert.deepEqual(ranged, ['bronze_shortbow']);
+    assert.equal(offerClassOf(RECIPES.staff), 'magic');
+    assert.equal(offerChoices(state, 'bread').length, 0);
   });
 
   it('offers a swap of another stocked preferred item at a reduced price', () => {
@@ -546,13 +565,13 @@ describe('material regen', () => {
 });
 
 describe('shop expansions', () => {
-  it('sells the first extra room for 500g and the next for five times that', () => {
+  it('sells the first extra room for 10000g and the next for three times that', () => {
     const state = createState();
-    state.gold = 500;
+    state.gold = 10000;
     assert.equal(buyExpansion(state, 'left'), true);
     assert.deepEqual(state.expansions, ['left']);
     assert.equal(state.gold, 0);
-    state.gold = 2500;
+    state.gold = 30000;
     assert.equal(buyExpansion(state, 'back-left'), true);
     assert.equal(state.gold, 0);
     assert.ok(state.expansions.includes('back-left'));
@@ -560,7 +579,7 @@ describe('shop expansions', () => {
 
   it('will not sell a corner pad until it touches an owned room', () => {
     const state = createState();
-    state.gold = 5000;
+    state.gold = 50000;
     assert.equal(buyExpansion(state, 'back-left'), false);
     assert.equal(buyExpansion(state, 'back'), true);
     assert.equal(buyExpansion(state, 'back-left'), true);
@@ -568,7 +587,7 @@ describe('shop expansions', () => {
 });
 
 describe('cauldron unlock', () => {
-  it('sells one cauldron for 20000 gp and keeps the pose in a save', () => {
+  it('sells one cauldron for 10000 gp and keeps the pose in a save', () => {
     const state = createState();
     assert.equal(ownsCauldron(state), false);
     assert.equal(canBuyCauldron(state), false);
@@ -596,6 +615,7 @@ describe('cauldron unlock', () => {
   it('brews potions only after a cauldron is placed, using herbs and water', () => {
     const state = createState();
     assert.match(craftBlockReason(state, 'strength_potion'), /cauldron/i);
+    assert.match(craftBlockReason(state, 'strength_potion'), /Upgrade/);
     assert.equal(canCraft(state, 'strength_potion'), false);
     assert.equal(isUnlocked(state, 'prayer_potion'), false);
     state.gold = CAULDRON_COST;

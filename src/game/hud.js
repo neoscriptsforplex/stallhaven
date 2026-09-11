@@ -10,20 +10,29 @@ import {
   costLabel,
   displayKind,
   materialList,
+  offerClassLabel,
+  offerClassOf,
+  recipeMatsLabel,
   recipesForTab,
   SHELF_SLOT_LABELS,
   stationForRecipe,
 } from './catalog.js';
 import {
+  addMusicFiles,
   getMusicTrackName,
   getMusicVolume,
-  loadMusicFile,
+  getPlaylist,
+  isMusicPlaying,
+  movePlaylistTrack,
   playClick,
   playMusic,
+  playTrackAt,
+  removePlaylistTrack,
   setMusicVolume,
   stopMusic,
 } from './audio.js';
 import {
+  assignStandPiece,
   buyCauldron,
   buyExpansion,
   buyFromCustomer,
@@ -39,10 +48,13 @@ import {
   chestList,
   chestTotal,
   craftBlockReason,
+  craftDuration,
   craftProgress,
   DEFAULT_MUSIC_VOLUME,
+  fillStandFromRecipe,
   furnitureNeedGold,
   hasStock,
+  isMastered,
   isUnlocked,
   nextFurnitureCost,
   ownsCauldron,
@@ -101,6 +113,11 @@ export function bindHud(root, state, world) {
   const expandBtn = document.querySelector('#expand-btn');
   const musicBtn = document.querySelector('#music-btn');
   const musicFile = document.querySelector('#music-file');
+  const fillModal = document.querySelector('#fill-modal');
+  const fillItems = document.querySelector('#fill-items');
+  let fillClass = 'melee';
+  let selectedFillId = null;
+  let fillTarget = null;
 
   let craftTab = 'melee';
   let craftSubtab = 'weapon';
@@ -148,16 +165,21 @@ export function bindHud(root, state, world) {
       const lineTitle = list[0]?.lineName ? `<h4 class="line">${list[0].lineName}</h4>` : '';
       return lineTitle + list.map((recipe) => {
         const locked = !isUnlocked(state, recipe.id);
+        const mastered = isMastered(state, recipe.id);
         const prev = recipe.previousId ? RECIPES[recipe.previousId] : null;
         const remain = unlockRemaining(state, recipe.id);
+        const duration = craftDuration(state, recipe.id);
         const lockText = locked
           ? `Locked · ${remain} more ${prev?.name ?? 'crafts'}`
-          : costLabel(recipe);
+          : costLabel(recipe, duration);
+        const mats = recipeMatsLabel(recipe);
         const focus = recipe.id === craftFocusId ? ' is-focus' : '';
+        const star = mastered ? '<span class="mastery-star" title="Mastered">★</span>' : '';
         return `
-          <button type="button" class="craft${locked ? ' is-locked' : ''}${focus}" data-craft="${recipe.id}">
-            <strong>${recipe.name}</strong>
+          <button type="button" class="craft${locked ? ' is-locked' : ''}${mastered ? ' is-mastered' : ''}${focus}" data-craft="${recipe.id}">
+            <strong>${star}${recipe.name}</strong>
             <span class="meta">${lockText}</span>
+            ${mats ? `<span class="craft-mats-line">${mats}</span>` : ''}
             <span class="timer" data-timer="${recipe.id}"></span>
             <span class="craft-bar" aria-hidden="true"><i data-bar="${recipe.id}"></i></span>
           </button>
@@ -292,6 +314,7 @@ export function bindHud(root, state, world) {
     const open = !chestModal.hidden || !tradeModal.hidden || !helpModal.hidden || !craftModal.hidden
       || !upgradeModal.hidden || !offerModal.hidden || !potionModal.hidden
       || (displayModal && !displayModal.hidden)
+      || (fillModal && !fillModal.hidden)
       || (importModal && !importModal.hidden);
     document.body.classList.toggle('modal-open', open);
   }
@@ -604,11 +627,11 @@ export function bindHud(root, state, world) {
     const offerBtn = tradeModal.querySelector('[data-trade-offer-btn]');
     if (choices.length) {
       offerLine.hidden = false;
-      offerLine.textContent = `You can choose a chest item to sell at a reduced price (${choices.length} available).`;
+      offerLine.textContent = `You can offer a matching ${offerClassLabel(offerClassOf(recipe))} chest item at a reduced price (${choices.length} available).`;
       offerBtn.disabled = false;
     } else {
       offerLine.hidden = false;
-      offerLine.textContent = 'No other chest item to trade at a reduced price.';
+      offerLine.textContent = `No matching ${offerClassLabel(offerClassOf(recipe))} items to offer at a reduced price.`;
       offerBtn.disabled = true;
     }
     tradeModal.querySelector('[data-trade-sell]').disabled = !have;
@@ -629,11 +652,12 @@ export function bindHud(root, state, world) {
       return;
     }
     const choices = offerChoices(state, actor.requestRecipeId);
+    const clsLabel = offerClassLabel(offerClassOf(RECIPES[actor.requestRecipeId]));
     if (!choices.length) {
       lastOfferListKey = 'empty';
       selectedOfferId = null;
-      offerItems.innerHTML = '<p class="empty">The chest has no other item to offer at a reduced price.</p>';
-      pickEl.textContent = 'No eligible chest item to offer.';
+      offerItems.innerHTML = `<p class="empty">No matching ${clsLabel} items.</p>`;
+      pickEl.textContent = `No eligible ${clsLabel} chest item to offer.`;
       confirm.disabled = true;
       return;
     }
@@ -747,7 +771,7 @@ export function bindHud(root, state, world) {
     const recipe = RECIPES[actor.requestRecipeId];
     const craftNote = tradeModal.querySelector('[data-trade-craft-note]');
     if (recipe?.category === 'potion' && !ownsCauldron(state)) {
-      const msg = 'Place a cauldron from Build to brew potions.';
+      const msg = 'Place a cauldron from Upgrade to brew potions.';
       if (craftNote) {
         craftNote.hidden = false;
         craftNote.textContent = msg;
@@ -810,6 +834,12 @@ export function bindHud(root, state, world) {
     }
     const choice = offerChoices(state, actor.requestRecipeId).find((item) => item.recipeId === selectedOfferId);
     if (!choice) {
+      paintOfferPicker();
+      return;
+    }
+    const wantClass = offerClassOf(RECIPES[actor.requestRecipeId]);
+    if (offerClassOf(RECIPES[choice.recipeId]) !== wantClass) {
+      selectedOfferId = null;
       paintOfferPicker();
       return;
     }
@@ -919,8 +949,11 @@ export function bindHud(root, state, world) {
       useBtn.hidden = true;
     }
     const displayBtn = furnMenu.querySelector('[data-furn-display]');
+    const fillBtn = furnMenu.querySelector('[data-furn-fill]');
     const canDisplay = target.id === 'display' && displayKind(target.index, state) !== 'stand';
+    const canFill = target.id === 'display' && displayKind(target.index, state) === 'stand';
     if (displayBtn) displayBtn.hidden = !canDisplay;
+    if (fillBtn) fillBtn.hidden = !canFill;
     if (upgradeBtn) upgradeBtn.hidden = target.id !== 'chest';
     furnMenu.hidden = false;
     const x = Math.min(window.innerWidth - 230, Math.max(8, clientX ?? 24));
@@ -1267,6 +1300,11 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     if (target?.id === 'display') openDisplayPicker(target);
   });
+  furnMenu.querySelector('[data-furn-fill]')?.addEventListener('click', () => {
+    const target = furnTarget;
+    hideFurnMenu();
+    if (target?.id === 'display') openFillPicker(target);
+  });
   furnMenu.querySelector('[data-furn-use]').addEventListener('click', () => {
     const target = furnTarget;
     hideFurnMenu();
@@ -1276,19 +1314,166 @@ export function bindHud(root, state, world) {
     if (target?.id === 'cauldron') openPotion();
   });
 
+  function closeFillPicker() {
+    if (!fillModal) return;
+    const wasOpen = !fillModal.hidden;
+    fillModal.hidden = true;
+    selectedFillId = null;
+    fillTarget = null;
+    if (wasOpen) world.ignorePicks(280);
+    setModalOpen();
+  }
+
+  function paintFillPicker() {
+    if (!fillModal || !fillItems) return;
+    const pickEl = fillModal.querySelector('[data-fill-pick]');
+    const assignBtn = fillModal.querySelector('[data-fill-assign]');
+    const setBtn = fillModal.querySelector('[data-fill-set]');
+    for (const btn of fillModal.querySelectorAll('[data-fill-class]')) {
+      btn.classList.toggle('is-on', btn.dataset.fillClass === fillClass);
+    }
+    const combat = fillClass === 'ranged' ? 'range' : fillClass;
+    const items = chestList(state).filter((item) => (
+      item.recipe?.category === 'armour' && item.recipe.combatClass === combat
+    ));
+    if (!items.length) {
+      selectedFillId = null;
+      fillItems.innerHTML = `<p class="empty">No matching ${offerClassLabel(fillClass)} armour in the chest.</p>`;
+    } else {
+      if (selectedFillId && !items.some((item) => item.recipeId === selectedFillId)) selectedFillId = null;
+      fillItems.innerHTML = items.map((item) => `
+        <button type="button" class="offer-row${item.recipeId === selectedFillId ? ' is-on' : ''}" data-fill-item="${item.recipeId}">
+          <span>
+            <strong>${item.recipe.name}</strong>
+            <span class="meta">×${item.count} · ${item.recipe.slot}</span>
+          </span>
+        </button>
+      `).join('');
+    }
+    const selected = items.find((item) => item.recipeId === selectedFillId);
+    if (pickEl) {
+      pickEl.textContent = selected
+        ? `Selected: ${selected.recipe.name}. Assign that slot, or fill the matching set.`
+        : 'No piece selected yet.';
+    }
+    if (assignBtn) assignBtn.disabled = !selected;
+    if (setBtn) setBtn.disabled = !selected;
+  }
+
+  function openFillPicker(target) {
+    closeChest();
+    closeCraft();
+    closeTrade();
+    closeDisplayPicker();
+    hideFurnMenu();
+    fillTarget = target;
+    selectedFillId = null;
+    fillClass = 'melee';
+    state.selectedDisplay = target?.index ?? state.selectedDisplay;
+    paintFillPicker();
+    if (fillModal) fillModal.hidden = false;
+    setModalOpen();
+  }
+
+  fillModal?.querySelectorAll('[data-fill-class]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      fillClass = btn.dataset.fillClass;
+      selectedFillId = null;
+      paintFillPicker();
+    });
+  });
+  fillItems?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-fill-item]');
+    if (!btn) return;
+    selectedFillId = btn.dataset.fillItem;
+    paintFillPicker();
+  });
+  fillModal?.querySelector('[data-fill-cancel]')?.addEventListener('click', closeFillPicker);
+  fillModal?.addEventListener('click', (event) => {
+    if (event.target === fillModal) closeFillPicker();
+  });
+  fillModal?.querySelector('[data-fill-assign]')?.addEventListener('click', () => {
+    const index = fillTarget?.index ?? state.selectedDisplay;
+    if (!selectedFillId || !assignStandPiece(state, index, selectedFillId)) {
+      paintFillPicker();
+      return;
+    }
+    playClick('ui');
+    pushLog(state, `Placed ${RECIPES[selectedFillId].name} on the mannequin.`);
+    world.syncDisplays();
+    world.refreshSelection(true);
+    closeFillPicker();
+    render(performance.now() / 1000);
+  });
+  fillModal?.querySelector('[data-fill-set]')?.addEventListener('click', () => {
+    const index = fillTarget?.index ?? state.selectedDisplay;
+    if (!selectedFillId || !fillStandFromRecipe(state, index, selectedFillId)) {
+      paintFillPicker();
+      return;
+    }
+    playClick('ui');
+    pushLog(state, `Filled the mannequin with a matching ${RECIPES[selectedFillId].name} set.`);
+    world.syncDisplays();
+    world.refreshSelection(true);
+    closeFillPicker();
+    render(performance.now() / 1000);
+  });
+
   function paintMusic() {
     if (!musicDock) return;
     const nameEl = musicDock.querySelector('[data-music-name]');
     const vol = musicDock.querySelector('[data-music-volume]');
+    const note = musicDock.querySelector('[data-music-note]');
+    const list = musicDock.querySelector('[data-playlist]');
+    const tracks = getPlaylist();
     const track = getMusicTrackName();
-    if (nameEl) nameEl.textContent = track ? `Playing: ${track}` : 'No track loaded.';
+    if (nameEl) {
+      nameEl.textContent = track
+        ? `${isMusicPlaying() ? 'Playing' : 'Paused'}: ${track}`
+        : 'No track loaded. Upload MP3, WAV, or OGG files.';
+    }
     if (vol) vol.value = String(Math.round((state.music?.volume ?? getMusicVolume()) * 100));
+    if (list) {
+      if (!tracks.length) {
+        list.innerHTML = '<p class="empty">Playlist is empty.</p>';
+      } else {
+        list.innerHTML = tracks.map((item) => `
+          <div class="playlist-row${item.current ? ' is-on' : ''}">
+            <button type="button" class="ghost playlist-name" data-play-track="${item.index}">${item.name}</button>
+            <button type="button" data-move-up="${item.index}" ${item.index === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" data-move-down="${item.index}" ${item.index === tracks.length - 1 ? 'disabled' : ''}>↓</button>
+            <button type="button" data-remove-track="${item.index}">✕</button>
+          </div>
+        `).join('');
+      }
+    }
+    if (note && note.dataset.sticky !== '1') note.hidden = true;
+  }
+
+  function showMusicNote(text) {
+    const note = musicDock?.querySelector('[data-music-note]');
+    if (!note) return;
+    note.hidden = !text;
+    note.textContent = text || '';
+    note.dataset.sticky = text ? '1' : '';
+  }
+
+  function setMusicTab(tab) {
+    musicDock?.querySelectorAll('[data-music-tab]').forEach((btn) => {
+      btn.classList.toggle('is-on', btn.dataset.musicTab === tab);
+    });
+    const playPane = musicDock?.querySelector('[data-music-pane="play"]');
+    const listPane = musicDock?.querySelector('[data-music-pane="playlist"]');
+    if (playPane) playPane.hidden = tab !== 'play';
+    if (listPane) listPane.hidden = tab !== 'playlist';
   }
 
   function openMusic() {
     closeBuild();
     closeExpand();
     hideFurnMenu();
+    showMusicNote('');
+    setMusicTab('play');
     paintMusic();
     if (musicDock) musicDock.hidden = false;
   }
@@ -1298,22 +1483,40 @@ export function bindHud(root, state, world) {
     else openMusic();
   });
   musicDock?.querySelector('[data-music-close]')?.addEventListener('click', closeMusicDock);
+  musicDock?.querySelectorAll('[data-music-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setMusicTab(btn.dataset.musicTab);
+      paintMusic();
+    });
+  });
   musicDock?.querySelector('[data-music-upload]')?.addEventListener('click', () => musicFile?.click());
   musicFile?.addEventListener('change', async () => {
-    const file = musicFile.files?.[0];
+    const files = [...(musicFile.files ?? [])];
     musicFile.value = '';
-    if (!file) return;
+    if (!files.length) return;
     try {
-      await loadMusicFile(file);
-      pushLog(state, `Playing ${file.name} on a loop.`);
+      const { added, rejected } = await addMusicFiles(files);
+      if (added.length) {
+        pushLog(state, added.length === 1
+          ? `Added ${added[0]} to the playlist.`
+          : `Added ${added.length} tracks to the playlist.`);
+        showMusicNote('');
+      }
+      if (rejected.length) {
+        const msg = rejected[0];
+        showMusicNote(msg);
+        pushLog(state, msg);
+      }
     } catch {
-      pushLog(state, 'Could not play that audio file.');
+      const msg = 'Could not play that audio file.';
+      showMusicNote(msg);
+      pushLog(state, msg);
     }
     paintMusic();
     render(performance.now() / 1000);
   });
   musicDock?.querySelector('[data-music-play]')?.addEventListener('click', async () => {
-    if (!getMusicTrackName()) {
+    if (!getPlaylist().length) {
       musicFile?.click();
       return;
     }
@@ -1329,6 +1532,17 @@ export function bindHud(root, state, world) {
     setMusicVolume(volume);
     if (!state.music) state.music = { volume: DEFAULT_MUSIC_VOLUME };
     state.music.volume = volume;
+  });
+  musicDock?.querySelector('[data-playlist]')?.addEventListener('click', async (event) => {
+    const playBtn = event.target.closest('[data-play-track]');
+    const up = event.target.closest('[data-move-up]');
+    const down = event.target.closest('[data-move-down]');
+    const remove = event.target.closest('[data-remove-track]');
+    if (playBtn) await playTrackAt(Number(playBtn.dataset.playTrack));
+    if (up) movePlaylistTrack(Number(up.dataset.moveUp), Number(up.dataset.moveUp) - 1);
+    if (down) movePlaylistTrack(Number(down.dataset.moveDown), Number(down.dataset.moveDown) + 1);
+    if (remove) removePlaylistTrack(Number(remove.dataset.removeTrack));
+    paintMusic();
   });
   setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
 

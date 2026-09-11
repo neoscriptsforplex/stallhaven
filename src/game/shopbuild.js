@@ -34,7 +34,10 @@ function addShadow(mesh) {
   return mesh;
 }
 
+let cachedCobble = null;
+
 function cobbleMap() {
+  if (cachedCobble) return cachedCobble.clone();
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
@@ -75,12 +78,17 @@ function cobbleMap() {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   tex.needsUpdate = true;
-  return tex;
+  cachedCobble = tex;
+  return tex.clone();
 }
 
-function cobbleMat(repeatX, repeatY) {
+const COBBLE_U = 4.2 / ROOM_W;
+const COBBLE_V = 2.6 / 2.7;
+
+function cobbleMat(repeatX, repeatY, offsetX = 0, offsetY = 0) {
   const map = cobbleMap();
   map.repeat.set(repeatX, repeatY);
+  map.offset.set(offsetX, offsetY);
   return new THREE.MeshStandardMaterial({
     map,
     roughness: 0.94,
@@ -89,9 +97,21 @@ function cobbleMat(repeatX, repeatY) {
   });
 }
 
-function addWallSlab(root, mat, x, y, z, sx, sy, sz) {
+function cobbleSlabMat(alongSize, height, along0, y0) {
+  return cobbleMat(
+    Math.max(0.08, alongSize * COBBLE_U),
+    Math.max(0.08, height * COBBLE_V),
+    along0 * COBBLE_U,
+    y0 * COBBLE_V,
+  );
+}
+
+function addWallSlab(root, mat, x, y, z, sx, sy, sz, uvAlong = null, uvY = null) {
   if (sx < 0.03 || sy < 0.03 || sz < 0.03) return;
-  const mesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat));
+  const slabMat = uvAlong == null
+    ? mat
+    : cobbleSlabMat(uvAlong.size, sy, uvAlong.origin - uvAlong.size / 2, (uvY ?? y) - sy / 2);
+  const mesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), slabMat));
   mesh.position.set(x, y, z);
   root.add(mesh);
 }
@@ -118,6 +138,8 @@ function addWallWithWindow(root, mat, {
       axis === 'x' ? sw : t,
       sh,
       axis === 'x' ? t : sw,
+      { origin: along, size: sw },
+      cy,
     );
   };
   place(left + (winL - left) / 2, y, winL - left, h);
@@ -145,6 +167,8 @@ function addWallWithDoor(root, mat, {
       axis === 'x' ? sw : t,
       sh,
       axis === 'x' ? t : sw,
+      { origin: along, size: sw },
+      cy,
     );
   };
   place(left + (doorL - left) / 2, y, doorL - left, h);
@@ -236,6 +260,34 @@ function addWallTorch(root, x, y, z, rotY = 0) {
   return torch;
 }
 
+function makePlaque(text) {
+  const group = new THREE.Group();
+  const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.42, 0.08), wood(0x4e331f)));
+  group.add(board);
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#4e331f';
+  ctx.fillRect(0, 0, 640, 128);
+  ctx.fillStyle = '#f0d9a8';
+  ctx.font = '700 52px Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 320, 64);
+  const tex = new THREE.CanvasTexture(canvas);
+  const label = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.2, 0.34),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true }),
+  );
+  label.position.z = 0.05;
+  group.add(label);
+  const rail = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.05, 0.1), wood(0x3c2616)));
+  rail.position.y = 0.24;
+  group.add(rail);
+  return group;
+}
+
 function makeSign() {
   const group = new THREE.Group();
   const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.52, 0.08), wood(0x4e331f)));
@@ -297,7 +349,7 @@ function addBeams(root, center) {
   root.add(sideBeam2);
 }
 
-function addRoofForRoom(roofs, center) {
+function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
   const group = new THREE.Group();
   group.position.copy(new THREE.Vector3(center.x, 0, center.z));
   const thatch = new THREE.MeshStandardMaterial({
@@ -308,29 +360,41 @@ function addRoofForRoom(roofs, center) {
     opacity: 1,
     depthWrite: true,
   });
-  const under = new THREE.MeshStandardMaterial({
-    color: 0x3a2416,
-    roughness: 0.88,
-    transparent: true,
-    opacity: 1,
-  });
-  const slope = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W + 0.55, 0.1, ROOM_D / 2 + 0.45), thatch));
-  slope.position.set(0, 3.55, -ROOM_D / 4);
-  slope.rotation.x = 0.42;
+  const tilt = 0.42;
+  const roofDepth = ROOM_D / 2 + 0.45;
+  const rise = (roofDepth / 2) * Math.sin(tilt);
+  const eaveY = 2.82;
+  const ridgeY = eaveY + rise * 2;
+  const slope = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W + 0.55, 0.1, roofDepth), thatch));
+  slope.position.set(0, eaveY + rise, -ROOM_D / 4);
+  slope.rotation.x = -tilt;
   group.add(slope);
   const slope2 = slope.clone();
   slope2.position.z = ROOM_D / 4;
-  slope2.rotation.x = -0.42;
+  slope2.rotation.x = tilt;
   group.add(slope2);
-  const ridge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W + 0.4, 0.12, 0.22), wood(0x3c2616)));
-  ridge.position.set(0, 4.18, 0);
+  const ridge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W + 0.4, 0.14, 0.22), wood(0x3c2616)));
+  ridge.position.set(0, ridgeY, 0);
   group.add(ridge);
-  const gable = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.35, ROOM_D + 0.2), under));
-  gable.position.set(-ROOM_W / 2 - 0.08, 3.35, 0);
-  group.add(gable);
-  const gable2 = gable.clone();
-  gable2.position.x = ROOM_W / 2 + 0.08;
-  group.add(gable2);
+  const rafter = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, ROOM_D - 0.2), wood(0x3c2616)));
+  rafter.position.set(0, 2.55, 0);
+  group.add(rafter);
+  if (!neigh.front) {
+    const high = addShadow(new THREE.Mesh(
+      new THREE.BoxGeometry(ROOM_W, ridgeY - 2.7, 0.14),
+      cobbleSlabMat(ROOM_W, ridgeY - 2.7, 0, 2.7),
+    ));
+    high.position.set(0, 2.7 + (ridgeY - 2.7) / 2, ROOM_D / 2);
+    group.add(high);
+  }
+  if (!neigh.back) {
+    const high = addShadow(new THREE.Mesh(
+      new THREE.BoxGeometry(ROOM_W, ridgeY - 2.7, 0.14),
+      cobbleSlabMat(ROOM_W, ridgeY - 2.7, 0, 2.7),
+    ));
+    high.position.set(0, 2.7 + (ridgeY - 2.7) / 2, -ROOM_D / 2);
+    group.add(high);
+  }
   roofs.add(group);
   return group;
 }
@@ -376,6 +440,10 @@ function addOriginFront(root, center) {
   const stripe2 = stripe.clone();
   stripe2.position.z = center.z + ROOM_D / 2 + 0.62;
   root.add(stripe2);
+
+  const plaque = makePlaque('General Store');
+  plaque.position.set(center.x, 2.58, center.z + ROOM_D / 2 + 0.18);
+  root.add(plaque);
 }
 
 function addOriginDecor(root, center) {
@@ -714,6 +782,60 @@ function buildTree(scale = 1) {
   return group;
 }
 
+function addFountain(root, x, z) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  const stone = cobbleMat(1.1, 0.7);
+  const basin = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.7, 0.28, 14), stone));
+  basin.position.y = 0.16;
+  group.add(basin);
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(0.5, 16),
+    new THREE.MeshStandardMaterial({
+      color: 0x6aa8c8,
+      roughness: 0.12,
+      metalness: 0.25,
+      transparent: true,
+      opacity: 0.82,
+    }),
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.31;
+  group.add(water);
+  const stem = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.55, 10), stone));
+  stem.position.y = 0.48;
+  group.add(stem);
+  const bowl = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.16, 0.1, 12), stone));
+  bowl.position.y = 0.78;
+  group.add(bowl);
+  const spout = new THREE.Mesh(
+    new THREE.SphereGeometry(0.07, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0x9fd0e8, roughness: 0.18, transparent: true, opacity: 0.7 }),
+  );
+  spout.position.y = 0.9;
+  group.add(spout);
+  root.add(group);
+  return group;
+}
+
+function addGardenBed(root, x, z, rand) {
+  const soil = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.62, 0.12, 10),
+    new THREE.MeshStandardMaterial({ color: 0x4a331c, roughness: 1 }),
+  ));
+  soil.position.set(x, 0.04, z);
+  root.add(soil);
+  const flowers = buildFlowerCluster(rand);
+  flowers.position.set(x, 0.08, z);
+  root.add(flowers);
+  const bush = addShadow(new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0x2f6a32, roughness: 0.9 }),
+  ));
+  bush.position.set(x + 0.45, 0.28, z + 0.15);
+  root.add(bush);
+}
+
 function buildFlowerCluster(rand) {
   const group = new THREE.Group();
   const colors = [0xc45a32, 0xe3b34a, 0xd7c09a, 0x8a3a6a, 0xf0e2c4];
@@ -760,12 +882,17 @@ function addGarden(root, cells, expansionIds = []) {
   grass.position.set((box.minX + box.maxX) / 2, -0.02, (box.minZ + box.maxZ) / 2);
   root.add(grass);
 
-  const road = addShadow(
-    new THREE.Mesh(new THREE.PlaneGeometry(4.4, 14), new THREE.MeshStandardMaterial({ color: 0x9d8664, roughness: 1 })),
-  );
+  const road = addShadow(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.55, 12.5),
+    cobbleMat(1.55 * COBBLE_U, 12.5 * COBBLE_U),
+  ));
   road.rotation.x = -Math.PI / 2;
-  road.position.set(0, -0.01, 8);
+  road.position.set(0, -0.008, 9.2);
   root.add(road);
+
+  addFountain(root, -2.55, 6.35);
+  addGardenBed(root, 2.45, 6.2, randAt(2201));
+  addGardenBed(root, -2.7, 7.6, randAt(3311));
 
   const rand = randAt(1337 + cells.length * 17);
   const hasLeft = expansionIds.includes('left');
@@ -820,7 +947,7 @@ export function buildShop(expansionIds = []) {
     addFloor(root, c);
     addBeams(root, c);
     addRoomWalls(root, cell, neigh, isOrigin);
-    addRoofForRoom(roofs, c);
+    addRoofForRoom(roofs, c, neigh, isOrigin);
     if (isOrigin) addOriginDecor(root, c);
 
     const ground = new THREE.Mesh(

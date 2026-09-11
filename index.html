@@ -15,13 +15,13 @@
       <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
         <span class="expand-icon" aria-hidden="true">⛶</span>
       </button>
-      <button type="button" id="build-btn" title="Build" aria-label="Build">Build</button>
+      <button type="button" id="build-btn" title="Upgrade" aria-label="Upgrade">Upgrade</button>
       <button type="button" id="help-btn" title="Help" aria-label="Help">?</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
       <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
-      <input id="music-file" type="file" accept="audio/*" hidden />
+      <input id="music-file" type="file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav" multiple hidden />
     </aside>
 
     <aside id="hud">
@@ -46,7 +46,7 @@
         <p>Click the anvil to smith Melee, Magic, or Ranged (Weapons and Armour). Click the cooking range for Food. Click a placed cauldron for Potions. Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
         <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware on it (four slots per shelf). Food and potions sit on wall shelves. Right-click furniture for Move or Rotate — wares travel with the piece. The counter only moves from a right-click.</p>
-        <p>Build unlocks extra rooms, tables, mannequins, and a cauldron. Extra tables and mannequins start at 500g, then ×3 for each further purchase of that type. The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a looping track you upload.</p>
+        <p>Upgrade unlocks extra rooms, tables, mannequins, and a cauldron. Extra tables and mannequins start at 500g, then ×3 for each further purchase of that type. The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a looping track you upload.</p>
         <button type="button" data-dismiss>Close</button>
       </div>
     </div>
@@ -154,12 +154,12 @@
     </aside>
 
     <aside id="build-dock" class="expand-dock" hidden>
-      <h2>Build</h2>
+      <h2>Upgrade</h2>
       <p>Unlockables for the shop. Rooms use the same gold pads as before. Potion brewing needs a cauldron. Extra tables and mannequins sit on the floor snap grid.</p>
       <article class="build-item">
         <h3>Shop Room</h3>
         <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
-        <p data-expand-status class="meta">Next room costs 500g.</p>
+        <p data-expand-status class="meta">Next room costs 10,000g.</p>
         <button type="button" data-expand-buy>Place Room</button>
       </article>
       <article class="build-item">
@@ -177,8 +177,8 @@
       <article class="build-item">
         <h3>Cauldron</h3>
         <p>Unlocks potion crafting. Place it on the floor snap grid, then confirm. Click it afterward to brew.</p>
-        <p data-cauldron-status class="meta">Costs 20,000 gp.</p>
-        <button type="button" data-cauldron-buy>Buy · 20,000 gp</button>
+        <p data-cauldron-status class="meta">Costs 10,000 gp.</p>
+        <button type="button" data-cauldron-buy>Buy · 10,000 gp</button>
       </article>
       <button type="button" class="ghost" data-build-close>Close</button>
     </aside>
@@ -186,7 +186,7 @@
     <aside id="place-dock" class="expand-dock" hidden>
       <h2 data-place-title>Place Cauldron</h2>
       <p data-place-blurb>Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement.</p>
-      <p data-place-cost class="meta">Cost: 20,000 gp.</p>
+      <p data-place-cost class="meta">Cost: 10,000 gp.</p>
       <p data-place-note class="craft-note" hidden></p>
       <div class="row furn-row">
         <button type="button" data-place-confirm>Confirm Placement</button>
@@ -207,16 +207,27 @@
 
     <aside id="music-dock" class="expand-dock" hidden>
       <h2>Music</h2>
-      <p>Upload an audio file to play as looping background music.</p>
-      <p data-music-name class="meta">No track loaded.</p>
-      <label class="music-vol">
-        Volume
-        <input type="range" data-music-volume min="0" max="100" value="45" />
-      </label>
-      <div class="row furn-row">
-        <button type="button" data-music-upload>Upload</button>
-        <button type="button" data-music-play>Play</button>
-        <button type="button" data-music-stop>Stop</button>
+      <div class="tabs">
+        <button type="button" class="tab is-on" data-music-tab="play">Play</button>
+        <button type="button" class="tab" data-music-tab="playlist">Playlist</button>
+      </div>
+      <div data-music-pane="play">
+        <p>Upload MP3, WAV, or OGG files. Several tracks can sit in the playlist.</p>
+        <p data-music-name class="meta">No track loaded. Upload MP3, WAV, or OGG files.</p>
+        <p data-music-note class="craft-note" hidden></p>
+        <label class="music-vol">
+          Volume
+          <input type="range" data-music-volume min="0" max="100" value="75" />
+        </label>
+        <div class="row furn-row">
+          <button type="button" data-music-upload>Upload</button>
+          <button type="button" data-music-play>Play</button>
+          <button type="button" data-music-stop>Stop</button>
+        </div>
+      </div>
+      <div data-music-pane="playlist" hidden>
+        <p>Drag order with the arrows. Click a name to play it.</p>
+        <div data-playlist class="playlist"></div>
       </div>
       <button type="button" class="ghost" data-music-close>Close</button>
     </aside>
@@ -233,11 +244,31 @@
         </div>
       </div>
     </div>
+
+    <div id="fill-modal" class="modal" hidden>
+      <div class="sheet offer-sheet">
+        <h2>Fill Mannequin</h2>
+        <p>Assign armour from the chest. Melee, Magic, and Ranged sets each have their own pieces.</p>
+        <div class="tabs">
+          <button type="button" class="tab is-on" data-fill-class="melee">Melee</button>
+          <button type="button" class="tab" data-fill-class="magic">Magic</button>
+          <button type="button" class="tab" data-fill-class="ranged">Ranged</button>
+        </div>
+        <p data-fill-pick class="meta">No piece selected yet.</p>
+        <div id="fill-items" class="offer-list"></div>
+        <div class="row furn-row">
+          <button type="button" data-fill-assign disabled>Assign Piece</button>
+          <button type="button" data-fill-set disabled>Fill Matching Set</button>
+          <button type="button" class="ghost" data-fill-cancel>Cancel</button>
+        </div>
+      </div>
+    </div>
     <div id="furn-menu" class="furn-menu" hidden>
       <p data-furn-name>Furniture</p>
       <button type="button" data-furn-use hidden>Use</button>
       <button type="button" data-furn-upgrade hidden>Upgrade Chest</button>
       <button type="button" data-furn-display hidden>Display item…</button>
+      <button type="button" data-furn-fill hidden>Fill</button>
       <button type="button" data-furn-move>Move Furniture</button>
       <button type="button" data-furn-rotate>Rotate 15°</button>
       <button type="button" class="ghost" data-furn-close>Close</button>

@@ -316,6 +316,12 @@ export function buildCounter() {
   const top = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 0.85), wood(0x7a5230)));
   top.position.y = 0.92;
   group.add(top);
+  const clothMesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.03, 0.92), cloth(0x7a3d32)));
+  clothMesh.position.y = 0.98;
+  group.add(clothMesh);
+  const drape = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.38, 0.16, 0.04), cloth(0x6a332a)));
+  drape.position.set(0, 0.89, 0.46);
+  group.add(drape);
   const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.82, 0.7), wood(0x4e301c)));
   body.position.y = 0.46;
   group.add(body);
@@ -326,7 +332,7 @@ export function buildCounter() {
       roughness: 0.35,
     })),
   );
-  dish.position.set(0.7, 0.99, 0.1);
+  dish.position.set(0.7, 1.03, 0.1);
   group.add(dish);
   return group;
 }
@@ -415,6 +421,147 @@ export function setDoorOpen(door, _open, dt = 1) {
   hinge.rotation.y += (OPEN_DOOR_ANGLE - hinge.rotation.y) * Math.min(1, dt * 5);
 }
 
+function addHumanoid(group, {
+  skin,
+  shirt,
+  pants,
+  boots,
+  sleeves,
+}) {
+  const bootMat = boots ?? pants;
+  const sleeveMat = sleeves ?? shirt;
+  const hipX = 0.074;
+
+  for (const side of [-1, 1]) {
+    const foot = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.046, 8, 6), bootMat));
+    foot.scale.set(1.12, 0.52, 1.9);
+    foot.position.set(side * hipX, 0.03, 0.03);
+    group.add(foot);
+
+    const shin = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.03, 0.28, 7), pants));
+    shin.position.set(side * (hipX + 0.006), 0.20, 0);
+    shin.rotation.z = side * 0.07;
+    group.add(shin);
+
+    const knee = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.038, 7, 6), pants));
+    knee.position.set(side * (hipX + 0.014), 0.35, 0);
+    group.add(knee);
+
+    const thigh = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.038, 0.26, 7), pants));
+    thigh.position.set(side * (hipX * 0.72), 0.49, 0);
+    thigh.rotation.z = side * -0.09;
+    group.add(thigh);
+  }
+
+  const hips = addShadow(new THREE.Mesh(new THREE.LatheGeometry([
+    new THREE.Vector2(0.088, 0),
+    new THREE.Vector2(0.122, 0.032),
+    new THREE.Vector2(0.116, 0.09),
+    new THREE.Vector2(0.098, 0.13),
+  ], 10), pants));
+  hips.position.y = 0.58;
+  hips.scale.z = 0.76;
+  group.add(hips);
+
+  const torso = addShadow(new THREE.Mesh(new THREE.LatheGeometry([
+    new THREE.Vector2(0.098, 0),
+    new THREE.Vector2(0.11, 0.05),
+    new THREE.Vector2(0.12, 0.14),
+    new THREE.Vector2(0.14, 0.26),
+    new THREE.Vector2(0.126, 0.33),
+    new THREE.Vector2(0.048, 0.38),
+  ], 10), shirt));
+  torso.position.y = 0.68;
+  torso.scale.z = 0.7;
+  group.add(torso);
+
+  const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.044, 0.07, 8), skin));
+  neck.position.y = 1.08;
+  group.add(neck);
+
+  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.118, 12, 10), skin));
+  head.scale.set(0.92, 1.06, 0.88);
+  head.position.set(0, 1.22, 0.012);
+  group.add(head);
+
+  for (const side of [-1, 1]) {
+    const ear = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.026, 6, 5), skin));
+    ear.scale.set(0.5, 1.05, 0.75);
+    ear.position.set(side * 0.108, 1.22, 0);
+    group.add(ear);
+  }
+
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.42 });
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.015, 6, 5), eyeMat);
+    eye.position.set(side * 0.036, 1.235, 0.09);
+    group.add(eye);
+  }
+
+  const nose = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.015, 0.036, 5), skin));
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, 1.208, 0.102);
+  group.add(nose);
+
+  const shoulderY = 1.0;
+  const shoulderX = 0.152;
+  for (const side of [-1, 1]) {
+    const cap = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.046, 8, 6), sleeveMat));
+    cap.scale.set(1.08, 0.82, 0.9);
+    cap.position.set(side * shoulderX, shoulderY, 0);
+    group.add(cap);
+
+    const upper = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.032, 0.22, 7), sleeveMat));
+    upper.position.set(side * (shoulderX + 0.022), 0.87, 0.016);
+    upper.rotation.z = side * 0.16;
+    group.add(upper);
+
+    const elbow = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), sleeveMat));
+    elbow.position.set(side * (shoulderX + 0.042), 0.75, 0.03);
+    group.add(elbow);
+
+    const forearm = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.024, 0.2, 7), sleeveMat));
+    forearm.position.set(side * (shoulderX + 0.056), 0.63, 0.046);
+    forearm.rotation.z = side * 0.12;
+    group.add(forearm);
+
+    const palm = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.027, 6, 5), skin));
+    palm.scale.set(0.9, 0.68, 1.12);
+    palm.position.set(side * (shoulderX + 0.07), 0.515, 0.06);
+    group.add(palm);
+  }
+
+  return {
+    headY: 1.22,
+    headTop: 1.345,
+    shoulderY,
+    shoulderX,
+    handR: { x: shoulderX + 0.07, y: 0.515, z: 0.06 },
+    handL: { x: -(shoulderX + 0.07), y: 0.515, z: 0.06 },
+  };
+}
+
+function addHeldPole(group, { x, y, z, length, woodColor, orb }) {
+  const stave = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.016, 0.02, length, 6),
+    wood(woodColor),
+  ));
+  stave.position.set(x, y, z);
+  group.add(stave);
+  if (!orb) return;
+  const tipY = y + length / 2;
+  const ball = new THREE.Mesh(
+    new THREE.SphereGeometry(orb.radius, 8, 8),
+    new THREE.MeshStandardMaterial({
+      color: orb.color,
+      emissive: orb.emissive,
+      emissiveIntensity: 1.2,
+    }),
+  );
+  ball.position.set(x, tipY + orb.radius * 0.7, z);
+  group.add(ball);
+}
+
 export function buildShopkeeper() {
   const group = new THREE.Group();
   group.name = 'shopkeeper';
@@ -422,38 +569,35 @@ export function buildShopkeeper() {
   const shirt = new THREE.MeshStandardMaterial({ color: 0x5a3a24, roughness: 0.86 });
   const apron = cloth(0xd8c49a, 0.9);
   const hair = new THREE.MeshStandardMaterial({ color: 0x3a2416, roughness: 0.8 });
+  const pose = addHumanoid(group, {
+    skin,
+    shirt,
+    pants: cloth(0x3a2a1c),
+    boots: cloth(0x2a1c12),
+    sleeves: shirt,
+  });
 
-  const legs = addShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.28, 4, 8), cloth(0x3a2a1c)));
-  legs.position.y = 0.32;
-  group.add(legs);
-  const body = addShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.36, 4, 10), shirt));
-  body.position.y = 0.78;
-  group.add(body);
-  const bib = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 0.08), apron));
-  bib.position.set(0, 0.72, 0.12);
+  const bib = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.1, 0.3, 8), apron));
+  bib.scale.z = 0.22;
+  bib.position.set(0, 0.88, 0.08);
   group.add(bib);
-  const skirt = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.16), apron));
-  skirt.position.set(0, 0.48, 0.06);
+  const skirt = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.155, 0.22, 10), apron));
+  skirt.scale.z = 0.72;
+  skirt.position.set(0, 0.58, 0.02);
   group.add(skirt);
-  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), skin));
-  head.position.y = 1.18;
-  group.add(head);
-  const haircap = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.7), hair));
-  haircap.position.y = 1.22;
+
+  const haircap = addShadow(new THREE.Mesh(
+    new THREE.SphereGeometry(0.125, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.7),
+    hair,
+  ));
+  haircap.position.set(0, pose.headY + 0.04, 0.01);
   group.add(haircap);
-  const hat = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.1, 10), cloth(0x6b4336)));
-  hat.position.y = 1.32;
+  const hat = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.11, 0.09, 10), cloth(0x6b4336)));
+  hat.position.y = pose.headTop + 0.02;
   group.add(hat);
-  const armL = addShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.28, 3, 8), shirt));
-  armL.position.set(-0.22, 0.78, 0.02);
-  armL.rotation.z = 0.18;
-  group.add(armL);
-  const armR = armL.clone();
-  armR.position.x = 0.22;
-  armR.rotation.z = -0.18;
-  group.add(armR);
+
   const label = makeNameSprite('You');
-  label.position.y = 1.55;
+  label.position.y = pose.headTop + 0.28;
   group.add(label);
   return group;
 }
@@ -679,12 +823,71 @@ function addSword(group, tint, scale = 1) {
 }
 
 function addScimitar(group, tint) {
-  const blade = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.028, 8, 18, Math.PI * 0.72), metal(tint)));
-  blade.rotation.y = Math.PI / 2;
-  blade.rotation.z = 0.55;
-  blade.position.set(0.08, 0.42, 0);
+  const curve = new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(-0.02, 0.2, 0),
+    new THREE.Vector3(0.18, 0.42, 0),
+    new THREE.Vector3(0.08, 0.78, 0),
+  );
+  const blade = addShadow(new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 14, 0.028, 6, false),
+    metal(tint),
+  ));
   group.add(blade);
-  addHilt(group, -0.06, 0.16, -0.35, 0.18);
+  for (let i = 1; i < 8; i += 1) {
+    const t = i / 8;
+    const p = curve.getPoint(t);
+    const belly = 0.034 + Math.sin(t * Math.PI) * 0.028;
+    const seg = addShadow(new THREE.Mesh(new THREE.BoxGeometry(belly, 0.07, 0.016), metal(tint)));
+    seg.position.copy(p);
+    seg.rotation.z = -0.55 + t * 1.15;
+    group.add(seg);
+  }
+  const tip = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 6), metal(tint)));
+  tip.position.set(0.06, 0.84, 0);
+  tip.rotation.z = 0.55;
+  group.add(tip);
+  addHilt(group, -0.05, 0.16, -0.28, 0.2);
+}
+
+function shaftTip(posY, rotZ, halfLen) {
+  return {
+    x: -halfLen * Math.sin(rotZ),
+    y: posY + halfLen * Math.cos(rotZ),
+    z: 0,
+  };
+}
+
+function addMace(group, tint) {
+  const rotZ = 0.35;
+  const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.48, 8), wood(0x4a301c)));
+  shaft.position.set(0, 0.28, 0);
+  shaft.rotation.z = rotZ;
+  group.add(shaft);
+  const tip = shaftTip(0.28, rotZ, 0.24);
+  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), metal(tint)));
+  head.position.set(tip.x, tip.y + 0.02, 0);
+  group.add(head);
+  const dirX = -Math.sin(rotZ);
+  const dirY = Math.cos(rotZ);
+  for (const [ox, oy, oz] of [[0.08, 0.04, 0], [-0.02, 0.09, 0.05], [-0.02, 0.09, -0.05]]) {
+    const spike = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.08, 5), metal(tint)));
+    spike.position.set(head.position.x + ox * dirX, head.position.y + oy * dirY, oz);
+    spike.rotation.z = rotZ;
+    group.add(spike);
+  }
+}
+
+function addSpear(group, tint) {
+  const rotZ = 0.42;
+  const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.92, 8), wood(0x5a3a22)));
+  shaft.position.set(0, 0.4, 0);
+  shaft.rotation.z = rotZ;
+  group.add(shaft);
+  const tip = shaftTip(0.4, rotZ, 0.46);
+  const head = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 6), metal(tint)));
+  head.position.set(tip.x, tip.y + 0.02, 0);
+  head.rotation.z = rotZ;
+  group.add(head);
 }
 
 function addDagger(group, tint) {
@@ -697,32 +900,6 @@ function addDagger(group, tint) {
   tip.rotation.z = -0.4;
   group.add(tip);
   addHilt(group, -0.04, 0.14, -0.4, 0.16);
-}
-
-function addMace(group, tint) {
-  const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.48, 8), wood(0x4a301c)));
-  shaft.position.set(0, 0.28, 0);
-  shaft.rotation.z = 0.35;
-  group.add(shaft);
-  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), metal(tint)));
-  head.position.set(0.1, 0.52, 0);
-  group.add(head);
-  for (const [x, y, z] of [[0.16, 0.56, 0], [0.04, 0.58, 0.06], [0.04, 0.58, -0.06]]) {
-    const spike = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.08, 5), metal(tint)));
-    spike.position.set(x, y, z);
-    group.add(spike);
-  }
-}
-
-function addSpear(group, tint) {
-  const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.92, 8), wood(0x5a3a22)));
-  shaft.position.set(0, 0.4, 0);
-  shaft.rotation.z = 0.42;
-  group.add(shaft);
-  const head = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 6), metal(tint)));
-  head.position.set(0.2, 0.82, 0);
-  head.rotation.z = 0.42;
-  group.add(head);
 }
 
 function addDefender(group, tint) {
@@ -825,50 +1002,68 @@ function addGloves(group, tint, plated) {
 
 function addMagicStaff(group, tint, kind) {
   const fancy = kind === 'battle';
+  const rotZ = 0.22;
+  const posY = 0.4;
+  const halfLen = 0.41;
   const shaft = addShadow(new THREE.Mesh(
-    new THREE.CylinderGeometry(fancy ? 0.024 : 0.018, fancy ? 0.032 : 0.024, 0.82, fancy ? 10 : 8),
+    new THREE.CylinderGeometry(fancy ? 0.024 : 0.018, fancy ? 0.032 : 0.024, halfLen * 2, fancy ? 10 : 8),
     wood(fancy ? 0x2a1a10 : 0x3a2a1c),
   ));
-  shaft.position.set(0, 0.4, 0);
-  shaft.rotation.z = 0.22;
+  shaft.position.set(0, posY, 0);
+  shaft.rotation.z = rotZ;
   group.add(shaft);
+  const dirX = -Math.sin(rotZ);
+  const dirY = Math.cos(rotZ);
+  const tip = shaftTip(posY, rotZ, halfLen);
+  const onTip = (along) => ({
+    x: tip.x + dirX * along,
+    y: tip.y + dirY * along,
+    z: 0,
+  });
   if (fancy) {
-    const wrap = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.01, 6, 10), metal(0xc4a05a)));
-    wrap.position.set(0.04, 0.55, 0);
-    wrap.rotation.z = 0.22;
-    group.add(wrap);
-    const wrap2 = wrap.clone();
-    wrap2.position.set(0.08, 0.7, 0);
-    group.add(wrap2);
+    for (const dist of [0.08, 0.22]) {
+      const wrap = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.01, 6, 10), metal(0xc4a05a)));
+      wrap.position.set(-dist * Math.sin(rotZ), posY + dist * Math.cos(rotZ), 0);
+      wrap.rotation.x = Math.PI / 2;
+      wrap.rotation.z = rotZ;
+      group.add(wrap);
+    }
   }
-  const top = new THREE.Vector3(0.1, 0.82, 0);
   if (kind === 'plain') {
-    const cap = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.02, 0.06, 8), wood(0x4a301c)));
-    cap.position.copy(top);
+    const capH = 0.06;
+    const cap = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.02, capH, 8), wood(0x4a301c)));
+    const p = onTip(capH * 0.32);
+    cap.position.set(p.x, p.y, 0);
+    cap.rotation.z = rotZ;
     group.add(cap);
     return;
   }
   if (kind === 'lunar') {
     const moon = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.022, 8, 18, Math.PI * 1.35), glow(tint)));
-    moon.position.copy(top);
-    moon.rotation.z = 0.6;
+    const p = onTip(0.02);
+    moon.position.set(p.x, p.y, 0);
+    moon.rotation.z = rotZ + 0.38;
     group.add(moon);
     return;
   }
   if (kind === 'ancient') {
     const arch = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), glow(tint)));
-    arch.position.copy(top);
+    const p = onTip(0.11 * 0.72);
+    arch.position.set(p.x, p.y, 0);
     arch.scale.set(0.85, 1.15, 0.45);
+    arch.rotation.z = rotZ;
     group.add(arch);
     for (const [dx, dy] of [[-0.04, 0.04], [0.04, 0.04], [-0.04, -0.04], [0.04, -0.04]]) {
       const cut = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.055, 0.08), cloth(0x1a1210)));
-      cut.position.set(top.x + dx, top.y + dy, top.z + 0.04);
+      cut.position.set(p.x + dx, p.y + dy, 0.04);
       group.add(cut);
     }
     return;
   }
-  const orb = addShadow(new THREE.Mesh(new THREE.SphereGeometry(fancy ? 0.1 : 0.09, 12, 10), glow(tint)));
-  orb.position.copy(top);
+  const radius = fancy ? 0.1 : 0.09;
+  const orb = addShadow(new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 10), glow(tint)));
+  const p = onTip(radius * 0.72);
+  orb.position.set(p.x, p.y, 0);
   group.add(orb);
 }
 
@@ -1132,68 +1327,118 @@ export function buildAdventurer(typeId) {
   const robe = new THREE.MeshStandardMaterial({ color: type.robe, roughness: 0.88 });
   const skin = new THREE.MeshStandardMaterial({ color: 0xe2c2a0, roughness: 0.7 });
   const accent = new THREE.MeshStandardMaterial({ color: type.accent, roughness: 0.7 });
+  const pants = typeId === 'mercenary' || typeId === 'ranger'
+    ? new THREE.MeshStandardMaterial({ color: type.robe, roughness: 0.86 })
+    : robe;
+  const pose = addHumanoid(group, {
+    skin,
+    shirt: robe,
+    pants,
+    boots: typeId === 'mercenary' ? metal(0x4a463f) : cloth(0x2a1c12),
+    sleeves: robe,
+  });
 
-  const body = addShadow(new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.42, 4, 10), robe));
-  body.position.y = 0.62;
-  group.add(body);
-  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), skin));
-  head.position.y = 1.05;
-  group.add(head);
-
+  let labelY = pose.headTop + 0.24;
   if (typeId === 'pilgrim') {
-    const hood = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), robe));
-    hood.position.y = 1.1;
+    const tunic = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 0.46, 10), robe));
+    tunic.scale.z = 0.78;
+    tunic.position.y = 0.44;
+    group.add(tunic);
+    const cord = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.012, 6, 12), cloth(type.accent)));
+    cord.rotation.x = Math.PI / 2;
+    cord.position.y = 0.64;
+    group.add(cord);
+    const hood = addShadow(new THREE.Mesh(
+      new THREE.SphereGeometry(0.145, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.85),
+      robe,
+    ));
+    hood.position.set(0, pose.headY + 0.04, 0.01);
     group.add(hood);
-    const staff = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 1.15, 6), wood(0x5b3c22)));
-    staff.position.set(0.22, 0.58, 0.05);
-    group.add(staff);
+    addHeldPole(group, {
+      x: pose.handR.x,
+      y: 0.62,
+      z: pose.handR.z,
+      length: 1.18,
+      woodColor: 0x5b3c22,
+    });
   } else if (typeId === 'mercenary') {
-    const helm = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.145, 10, 8), accent));
-    helm.position.y = 1.1;
+    const plate = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.28, 10), accent));
+    plate.scale.z = 0.52;
+    plate.position.set(0, 0.9, 0.04);
+    group.add(plate);
+    for (const side of [-1, 1]) {
+      const pauldron = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), accent));
+      pauldron.scale.set(1.15, 0.7, 0.95);
+      pauldron.position.set(side * pose.shoulderX, pose.shoulderY + 0.02, 0.01);
+      group.add(pauldron);
+    }
+    const helm = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), accent));
+    helm.scale.set(0.98, 0.88, 0.95);
+    helm.position.set(0, pose.headY + 0.03, 0.01);
     group.add(helm);
-    const pauldron = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.12, 0.22), accent));
-    pauldron.position.y = 0.86;
-    group.add(pauldron);
+    const visor = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.045, 10), metal(0x6a5a3a)));
+    visor.scale.z = 0.55;
+    visor.position.set(0, pose.headY + 0.02, 0.06);
+    group.add(visor);
+    labelY = pose.headTop + 0.2;
   } else if (typeId === 'ranger') {
-    const hood = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.8), robe));
-    hood.position.y = 1.1;
+    const vest = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.108, 0.26, 10), cloth(0x2f3a26)));
+    vest.scale.z = 0.62;
+    vest.position.set(0, 0.9, 0.02);
+    group.add(vest);
+    const hood = addShadow(new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.7),
+      robe,
+    ));
+    hood.position.set(0, pose.headY + 0.05, 0.01);
     group.add(hood);
+    const quiver = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.034, 0.32, 8), wood(0x5a3a22)));
+    quiver.position.set(-0.08, 0.92, -0.12);
+    quiver.rotation.z = 0.35;
+    group.add(quiver);
     const bow = addShadow(new THREE.Mesh(
-      new THREE.TorusGeometry(0.22, 0.014, 6, 14, Math.PI),
+      new THREE.TorusGeometry(0.2, 0.014, 6, 14, Math.PI),
       wood(0x7a5a32),
     ));
     bow.rotation.y = Math.PI / 2;
-    bow.position.set(-0.2, 0.7, -0.08);
+    bow.position.set(pose.handL.x, pose.handL.y + 0.16, pose.handL.z - 0.04);
     group.add(bow);
   } else {
-    const hat = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.28, 8), accent));
-    hat.position.y = 1.28;
+    const robeSkirt = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 0.5, 10), robe));
+    robeSkirt.scale.z = 0.78;
+    robeSkirt.position.y = 0.42;
+    group.add(robeSkirt);
+    const brim = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.03, 10), accent));
+    brim.position.y = pose.headTop - 0.02;
+    group.add(brim);
+    const hat = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 8), accent));
+    hat.position.y = pose.headTop + 0.14;
     group.add(hat);
-    const orb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.05, 8, 8),
-      new THREE.MeshStandardMaterial({ color: 0x9b6cff, emissive: 0x6a3cff, emissiveIntensity: 1.2 }),
-    );
-    orb.position.set(0.22, 0.7, 0.08);
-    group.add(orb);
-    const stave = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.9, 6), wood(0x2f4a3a)));
-    stave.position.set(0.22, 0.45, 0.08);
-    group.add(stave);
+    addHeldPole(group, {
+      x: pose.handR.x,
+      y: 0.55,
+      z: pose.handR.z,
+      length: 0.95,
+      woodColor: 0x2f4a3a,
+      orb: { radius: 0.05, color: 0x9b6cff, emissive: 0x6a3cff },
+    });
+    labelY = pose.headTop + 0.42;
   }
 
   const label = makeNameSprite(type.name);
-  label.position.y = 1.48;
+  label.position.y = labelY;
   group.add(label);
 
   const speech = makeSpeechSprite('…');
-  speech.position.y = 1.78;
+  speech.position.y = labelY + 0.3;
   speech.visible = false;
   group.add(speech);
 
   const pick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 1.7, 0.62),
+    new THREE.BoxGeometry(0.72, 1.78, 0.58),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
-  pick.position.y = 0.85;
+  pick.position.y = 0.9;
   pick.userData.kind = 'customer';
   group.add(pick);
 
@@ -1208,7 +1453,7 @@ export function buildAdventurer(typeId) {
 
   const hand = new THREE.Group();
   hand.name = 'hand';
-  hand.position.set(0.18, 0.72, 0.12);
+  hand.position.set(pose.handR.x, pose.handR.y, pose.handR.z);
   group.add(hand);
 
   group.userData.hand = hand;

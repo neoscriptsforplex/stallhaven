@@ -5,10 +5,12 @@ import {
   MATERIALS,
   RECIPES,
   SHOP,
+  SKYBOXES,
   START_GOLD,
   decideRequest,
   formatGold,
   matchingArmourIds,
+  mostExpensiveChestId,
   recipeCost,
   recipeList,
   recipesForTab,
@@ -40,6 +42,7 @@ import {
   createState,
   decideAfterWait,
   decidePurchase,
+  discardFromChest,
   hasStock,
   isUnlocked,
   offerChoices,
@@ -420,8 +423,12 @@ describe('catalog', () => {
     assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'armour').length, 56);
     assert.equal(recipes.filter((r) => r.shape?.startsWith('staff')).length, 5);
     assert.equal(recipes.filter((r) => r.combatClass === 'magic' && r.category === 'armour').length, 25);
-    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 35);
-    assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 16);
+    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 42);
+    assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 20);
+    assert.equal(RECIPES.blue_dhide_coif.name, "Blue D'hide Coif");
+    assert.equal(RECIPES.black_dhide_coif.slot, 'helm');
+    assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
+    assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
     assert.equal(recipes.filter((r) => r.category === 'food').length, 5);
     assert.equal(recipes.filter((r) => r.category === 'potion').length, 8);
     assert.equal(RECIPES.bronze_scimitar.name, 'Bronze Scimitar');
@@ -515,6 +522,8 @@ describe('catalog', () => {
     assert.ok(!melee.some((r) => r.id === 'staff'));
     assert.ok(magic.some((r) => r.id === 'staff'));
     assert.ok(ranged.some((r) => r.id === 'bronze_shortbow'));
+    assert.ok(ranged.some((r) => r.id === 'bronze_arrows'));
+    assert.ok(ranged.some((r) => r.id === 'blue_dhide_coif'));
     assert.ok(food.some((r) => r.id === 'bread'));
     assert.ok(!melee.some((r) => r.category === 'food'));
     assert.equal(RECIPES.strength_potion.name, 'Strength Potion');
@@ -753,6 +762,16 @@ describe('cheat codes', () => {
     assert.equal(state.chefHat, false);
     assert.equal(state.shopXp, 0);
   });
+
+  it('subtracts gold for -motherlode and clamps at zero', () => {
+    const state = createState();
+    state.gold = 500;
+    assert.equal(applyCheat(state, '-Motherlode'), '-motherlode');
+    assert.equal(state.gold, 0);
+    state.gold = 25000;
+    assert.equal(applyCheat(state, '-motherlode'), '-motherlode');
+    assert.equal(state.gold, 15000);
+  });
 });
 
 describe('center wall shelf save migration', () => {
@@ -796,3 +815,63 @@ describe('default display order', () => {
     assert.equal(SHOP.displays[8].kind, 'shelf');
   });
 });
+
+describe('ores, appearance, king, and chest bin', () => {
+  it('names metal materials as ore', () => {
+    assert.equal(MATERIALS.bronze.name, 'Bronze Ore');
+    assert.equal(MATERIALS.runite.name, 'Runite Ore');
+    assert.equal(MATERIALS.dragon.name, 'Dragon Ore');
+  });
+
+  it('lists peach among skyboxes', () => {
+    assert.ok(SKYBOXES.some((item) => item.id === 'peach'));
+    assert.equal(SKYBOXES.find((item) => item.id === 'blue').id, 'blue');
+  });
+
+  it('saves and loads player appearance and play time', () => {
+    const state = createState();
+    state.appearance = { hair: 'bun', shirt: 'red', legs: 'navy', boots: 'tan', faceHair: 'beard' };
+    state.playTime = 120;
+    const data = serializeState(state);
+    assert.equal(data.appearance.hair, 'bun');
+    assert.equal(data.appearance.shirt, 'red');
+    const next = createState();
+    assert.equal(applyState(next, data), true);
+    assert.equal(next.appearance.hair, 'bun');
+    assert.equal(next.appearance.faceHair, 'beard');
+    assert.equal(next.playTime, 120);
+  });
+
+  it('lets King Roald ask for the most expensive chest ware', () => {
+    const state = createState();
+    state.chest.bread = 8;
+    state.chest.dragon_2h_sword = 1;
+    assert.equal(mostExpensiveChestId(state), 'dragon_2h_sword');
+    const req = decideRequest('kingroald', Math.random, state);
+    assert.equal(req.recipeId, 'dragon_2h_sword');
+    assert.equal(req.royal, true);
+    assert.equal(CUSTOMERS.kingroald.name, 'King Roald');
+  });
+
+  it('discards a chest ware', () => {
+    const state = createState();
+    finishCraft(state, 'bread');
+    finishCraft(state, 'bread');
+    assert.equal(discardFromChest(state, 'bread', 1), 1);
+    assert.equal(chestCount(state, 'bread'), 1);
+  });
+
+  it('clears the middle back-wall shelf when expanding behind the shop', () => {
+    const state = createState();
+    const center = SHOP.displays.findIndex((d) => d.id === 'shelf-center');
+    finishCraft(state, 'bread');
+    finishCraft(state, 'bread');
+    state.displays[center].shelfSlots = ['bread', 'bread', null, null];
+    state.chest.bread = 0;
+    state.gold = 10000;
+    assert.equal(buyExpansion(state, 'back'), true);
+    assert.equal(state.displays[center].removed, true);
+    assert.equal(chestCount(state, 'bread'), 2);
+  });
+});
+

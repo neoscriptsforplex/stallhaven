@@ -1,5 +1,16 @@
 import { SHOP } from './catalog.js';
-import { defaultFurniture, rotatedFootprint, walkFloors } from './layout.js';
+import {
+  FOUNTAIN,
+  defaultFurniture,
+  furnitureHalfSize,
+  gardenTreeSpots,
+  gardenRockSpots,
+  keepFountain,
+  playerWalkFloors,
+  pointOnFloors,
+  rotatedFootprint,
+  walkFloors,
+} from './layout.js';
 
 export const FLOOR = { minX: -3.72, maxX: 3.72, minZ: -3.18, maxZ: 3.28 };
 export const PLAYER_RADIUS = 0.28;
@@ -49,10 +60,13 @@ export function shopObstacles(shop = SHOP, furniture = null) {
   if (poses.cauldron) blocks.push(blockFromPose(poses.cauldron, 0.32, 0.32));
   const displayPoses = poses.displays ?? [];
   const kinds = furniture?.displayKinds;
+  const removed = furniture?.displayRemoved;
   const count = Math.max(shop.displays.length, displayPoses.length);
   for (let index = 0; index < count; index += 1) {
+    if (removed?.[index]) continue;
     const spot = shop.displays[index];
     const pose = displayPoses[index] ?? { x: spot?.x ?? 0, z: spot?.z ?? 0, rot: spot?.rot ?? 0 };
+    if (Math.abs(pose.x) > 80 || Math.abs(pose.z) > 80) continue;
     const kind = kinds?.[index] ?? spot?.kind ?? 'table';
     if (kind === 'shelf') blocks.push(blockFromPose(pose, 0.75, 0.25));
     else if (kind === 'stand') blocks.push(blockFromPose(pose, 0.36, 0.36));
@@ -68,12 +82,67 @@ export function floorsForState(state) {
   return walkFloors(state?.expansions ?? []);
 }
 
-export function liveObstacles(state, shop = SHOP) {
+export function liveObstacles(state, shop = SHOP, skip = null) {
   const furniture = { ...(state?.furniture ?? defaultFurniture()) };
   furniture.displayKinds = (state?.displays ?? []).map((display, index) => (
     display?.kind ?? shop.displays[index]?.kind ?? 'table'
   ));
+  furniture.displayRemoved = (state?.displays ?? []).map((display) => Boolean(display?.removed));
+  if (skip?.id === 'cauldron') furniture.cauldron = null;
+  if (skip?.id === 'anvil') furniture.anvil = { x: 999, z: 999, rot: 0 };
+  if (skip?.id === 'chest') furniture.chest = { x: 999, z: 999, rot: 0 };
+  if (skip?.id === 'range') furniture.range = { x: 999, z: 999, rot: 0 };
+  if (skip?.id === 'counter') furniture.counter = { x: 999, z: 999, rot: 0 };
+  if (skip?.id === 'display' && skip.index != null) {
+    const displays = [...(furniture.displays ?? [])];
+    displays[skip.index] = { x: 999, z: 999, rot: 0 };
+    furniture.displays = displays;
+  }
   return shopObstacles(shop, furniture);
+}
+
+export function gardenObstacles(expansionIds = []) {
+  const blocks = [];
+  if (keepFountain(expansionIds)) {
+    const size = (FOUNTAIN.radius + 0.22) * 2;
+    blocks.push(rectFromCenter(FOUNTAIN.x, FOUNTAIN.z, size, size));
+  }
+  for (const tree of gardenTreeSpots(expansionIds)) {
+    blocks.push(rectFromCenter(tree.x, tree.z, 0.62, 0.62));
+  }
+  for (const rock of gardenRockSpots(expansionIds)) {
+    const s = 0.45 * (rock.scale ?? 1);
+    blocks.push(rectFromCenter(rock.x, rock.z, s, s));
+  }
+  return blocks;
+}
+
+export function playerObstacles(state, shop = SHOP) {
+  return [...liveObstacles(state, shop), ...gardenObstacles(state?.expansions ?? [])];
+}
+
+function rectsOverlap(a, b, pad = 0) {
+  return !(
+    a.maxX + pad < b.minX
+    || a.minX - pad > b.maxX
+    || a.maxZ + pad < b.minZ
+    || a.minZ - pad > b.maxZ
+  );
+}
+
+export function placementBlocked(pose, kind, obstacles, floors, { checkAisle = true } = {}) {
+  if (!pose) return 'That spot is off the shop floor.';
+  const { hw, hd } = furnitureHalfSize(kind);
+  const span = rotatedFootprint(hw, hd, pose.rot ?? 0);
+  if (!pointOnFloors(pose.x, pose.z, floors, 0.28)) return 'That spot is off the shop floor.';
+  if (checkAisle && kind !== 'counter' && rectHitsAisle(pose.x, pose.z, span.hw, span.hd)) {
+    return 'That spot blocks the customer queue.';
+  }
+  const rect = rectFromCenter(pose.x, pose.z, span.hw * 2, span.hd * 2);
+  for (const block of obstacles) {
+    if (rectsOverlap(rect, block, 0.02)) return 'That spot overlaps other furniture.';
+  }
+  return null;
 }
 
 export function pointInRect(x, z, rect, pad = 0) {
@@ -167,7 +236,7 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
   const seen = new Set();
   let steps = 0;
 
-  while (open.length && steps < 4000) {
+  while (open.length && steps < 9000) {
     steps += 1;
     let best = 0;
     for (let i = 1; i < open.length; i += 1) {
@@ -217,6 +286,21 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
 }
 
 export function planWalk(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR]) {
+  return findPath(from, to, obstacles, radius, floors);
+}
+
+export function planPlayerWalk(from, to, state, radius = PLAYER_RADIUS) {
+  const indoor = walkFloors(state?.expansions ?? []);
+  const floors = playerWalkFloors(state?.expansions ?? []);
+  const obstacles = playerObstacles(state);
+  const door = { x: SHOP.door.x, z: SHOP.door.z };
+  const fromInside = indoor.some((rect) => pointInRect(from.x, from.z, rect, -0.05));
+  const toInside = indoor.some((rect) => pointInRect(to.x, to.z, rect, -0.05));
+  if (fromInside !== toInside) {
+    const first = findPath(from, door, obstacles, radius, floors);
+    const second = findPath(door, to, obstacles, radius, floors);
+    if (first.length || second.length) return [...first, ...second];
+  }
   return findPath(from, to, obstacles, radius, floors);
 }
 

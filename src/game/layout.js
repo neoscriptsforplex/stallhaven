@@ -130,6 +130,43 @@ export function walkFloors(expansionIds = []) {
   return floors;
 }
 
+const DOOR_HALF = 0.65;
+
+/** Grass, path, and the front-door strip connecting the shop to the garden. */
+export function outdoorWalkFloors(expansionIds = []) {
+  const grass = gardenBox(expansionIds);
+  const shop = footprintBox(expansionIds);
+  const gap = 0.08;
+  const frontDoor = {
+    minX: -DOOR_HALF,
+    maxX: DOOR_HALF,
+    minZ: ORIGIN_FLOOR.maxZ - 0.2,
+    maxZ: shop.maxZ + 0.35,
+  };
+  return [
+    { minX: grass.minX, maxX: grass.maxX, minZ: shop.maxZ + gap, maxZ: grass.maxZ },
+    { minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: shop.minZ - gap },
+    { minX: grass.minX, maxX: shop.minX - gap, minZ: shop.minZ - gap, maxZ: shop.maxZ + gap },
+    { minX: shop.maxX + gap, maxX: grass.maxX, minZ: shop.minZ - gap, maxZ: shop.maxZ + gap },
+    frontDoor,
+  ];
+}
+
+export function playerWalkFloors(expansionIds = []) {
+  return [...walkFloors(expansionIds), ...outdoorWalkFloors(expansionIds)];
+}
+
+export function furnitureHalfSize(kind) {
+  if (kind === 'cauldron') return { hw: 0.32, hd: 0.32 };
+  if (kind === 'anvil') return { hw: 0.44, hd: 0.35 };
+  if (kind === 'chest') return { hw: 0.49, hd: 0.36 };
+  if (kind === 'range') return { hw: 0.34, hd: 0.28 };
+  if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
+  if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
+  if (kind === 'stand') return { hw: 0.36, hd: 0.36 };
+  return { hw: 0.76, hd: 0.51 };
+}
+
 export function padConnects(pad, expansionIds = []) {
   const keys = occupiedKeys(expansionIds);
   const neigh = [

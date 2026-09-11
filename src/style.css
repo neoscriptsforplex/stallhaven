@@ -454,7 +454,7 @@ button:disabled {
 }
 
 .upload-sheet {
-  width: min(380px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - 32px));
 }
 
 .upload-drop {
@@ -475,6 +475,42 @@ button:disabled {
 [data-upload-pick] {
   width: 100%;
   margin-bottom: 8px;
+}
+
+.tag-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.look-label {
+  margin: 8px 0 4px;
+  font-size: 0.78rem;
+  color: #d7c09a;
+}
+
+.chest-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.chest-bin {
+  min-width: auto;
+  padding: 4px 8px;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.discard-confirm {
+  margin: 8px 0 12px;
+  padding: 10px;
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  background: rgba(24, 14, 8, 0.55);
+}
+
+.discard-confirm p {
+  margin: 0 0 8px;
 }
 
 .error {

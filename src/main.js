@@ -40,13 +40,21 @@ if (!hasWebGL()) {
     for (const record of records) {
       try {
         const scene = await parseModelBuffer(record.buffer, record.name);
-        normalizeImported(scene, 1, true);
-        if (record.kind === 'furniture' && record.displayIndex != null) {
-          world.replaceFurniture(record.displayIndex, scene);
-        } else if (record.kind === 'furniture') {
-          world.replaceFurniture(state.selectedDisplay, scene);
-        } else if (record.kind === 'ware' && record.recipeId) {
-          world.bindWareLook(record.recipeId, scene);
+        if (record.kind === 'player') {
+          const result = world.setPlayerLook(scene);
+          if (!result?.ok) continue;
+        } else if (record.kind === 'customer') {
+          const result = world.setCustomerLook(scene);
+          if (!result?.ok) continue;
+        } else {
+          normalizeImported(scene, 1, true);
+          if (record.kind === 'furniture' && record.displayIndex != null) {
+            world.replaceFurniture(record.displayIndex, scene);
+          } else if (record.kind === 'furniture') {
+            world.replaceFurniture(state.selectedDisplay, scene);
+          } else if (record.kind === 'ware' && record.recipeId) {
+            world.bindWareLook(record.recipeId, scene);
+          }
         }
       } catch {
         // Skip a broken stored model and keep the stall playable.

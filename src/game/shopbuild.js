@@ -295,17 +295,63 @@ function makePlaque(text) {
   return group;
 }
 
+function woodFloorMap() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#6a4a2c';
+  ctx.fillRect(0, 0, 256, 64);
+  let seed = 3181;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+  for (let i = 0; i < 40; i += 1) {
+    const y = rand() * 64;
+    ctx.strokeStyle = `rgba(${90 + rand() * 40}, ${50 + rand() * 24}, ${20 + rand() * 16}, ${0.18 + rand() * 0.22})`;
+    ctx.lineWidth = 0.8 + rand();
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.bezierCurveTo(80, y + (rand() - 0.5) * 8, 160, y + (rand() - 0.5) * 8, 256, y);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(40, 24, 12, 0.35)';
+  ctx.fillRect(0, 0, 256, 3);
+  ctx.fillRect(0, 61, 256, 3);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function addFloor(root, center) {
-  const floorMat = wood(0x6a4a2e, 0.9);
-  const floor = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W, 0.08, ROOM_D), floorMat));
-  floor.position.set(center.x, 0.04, center.z);
-  root.add(floor);
-  for (let i = 0; i < 9; i += 1) {
+  const base = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(ROOM_W, 0.08, ROOM_D),
+    wood(0x5a3a22, 0.92),
+  ));
+  base.position.set(center.x, 0.04, center.z);
+  root.add(base);
+  const plankW = 0.28;
+  const count = Math.ceil(ROOM_D / plankW);
+  for (let i = 0; i < count; i += 1) {
+    const map = woodFloorMap();
+    map.repeat.set(ROOM_W / 1.4, 1);
+    const mat = new THREE.MeshStandardMaterial({
+      map,
+      color: i % 2 ? 0xc4a070 : 0xb48a58,
+      roughness: 0.88,
+      metalness: 0.04,
+    });
     const plank = addShadow(new THREE.Mesh(
-      new THREE.BoxGeometry(ROOM_W - 0.15, 0.02, 0.62),
-      wood(i % 2 ? 0x5c3d24 : 0x704a2c),
+      new THREE.BoxGeometry(ROOM_W - 0.18, 0.025, plankW - 0.03),
+      mat,
     ));
-    plank.position.set(center.x, 0.09, center.z - ROOM_D / 2 + 0.45 + i * 0.78);
+    const z = center.z - ROOM_D / 2 + plankW * 0.5 + i * plankW;
+    plank.position.set(center.x, 0.085, z);
     root.add(plank);
   }
 }
@@ -323,7 +369,7 @@ function addBeams(root, center) {
   root.add(sideBeam2);
 }
 
-function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
+function addRoofForRoom(roofs, walls, center, neigh = {}, isOrigin = false) {
   const group = new THREE.Group();
   group.position.copy(new THREE.Vector3(center.x, 0, center.z));
   const thatch = new THREE.MeshStandardMaterial({
@@ -335,26 +381,54 @@ function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
     depthWrite: true,
   });
   const tilt = 0.42;
-  const roofDepth = ROOM_D / 2 + 0.45;
-  const rise = (roofDepth / 2) * Math.sin(tilt);
+  const roofSpan = ROOM_W / 2 + 0.45;
+  const rise = (roofSpan / 2) * Math.sin(tilt);
   const eaveY = 2.82;
   const ridgeY = eaveY + rise * 2;
-  const slope = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W + 0.55, 0.1, roofDepth), thatch));
-  slope.position.set(0, eaveY + rise, -ROOM_D / 4);
-  slope.rotation.x = -tilt;
+  const slope = addShadow(new THREE.Mesh(new THREE.BoxGeometry(roofSpan, 0.1, ROOM_D + 0.55), thatch));
+  slope.position.set(-ROOM_W / 4, eaveY + rise, 0);
+  slope.rotation.z = tilt;
   group.add(slope);
   const slope2 = slope.clone();
-  slope2.position.z = ROOM_D / 4;
-  slope2.rotation.x = tilt;
+  slope2.position.x = ROOM_W / 4;
+  slope2.rotation.z = -tilt;
   group.add(slope2);
-  const ridge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W + 0.4, 0.14, 0.22), wood(0x3c2616)));
+  const ridge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, ROOM_D + 0.4), wood(0x3c2616)));
   ridge.position.set(0, ridgeY, 0);
   group.add(ridge);
-  const rafter = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, ROOM_D - 0.2), wood(0x3c2616)));
+  const rafter = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W - 0.2, 0.12, 0.12), wood(0x3c2616)));
   rafter.position.set(0, 2.55, 0);
   group.add(rafter);
   roofs.add(group);
+  addRoofGables(walls, center, neigh, ridgeY);
   return group;
+}
+
+function addRoofGables(root, center, neigh, ridgeY) {
+  const wallTop = 2.66;
+  const peakH = Math.max(0.2, ridgeY - wallTop);
+  const thick = 0.2;
+  const ends = [];
+  if (!neigh?.front) ends.push({ x: center.x, z: center.z + ROOM_D / 2, rotY: 0 });
+  if (!neigh?.back) ends.push({ x: center.x, z: center.z - ROOM_D / 2, rotY: Math.PI });
+  if (!neigh?.left) ends.push({ x: center.x - ROOM_W / 2, z: center.z, rotY: Math.PI / 2, side: true });
+  if (!neigh?.right) ends.push({ x: center.x + ROOM_W / 2, z: center.z, rotY: -Math.PI / 2, side: true });
+  for (const end of ends) {
+    const width = end.side ? ROOM_D : ROOM_W;
+    const height = end.side ? Math.min(0.22, peakH) : peakH;
+    const shape = new THREE.Shape();
+    shape.moveTo(-width / 2, 0);
+    shape.lineTo(width / 2, 0);
+    shape.lineTo(0, height);
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false, steps: 1 });
+    geo.translate(0, 0, -thick / 2);
+    const mat = cobbleMat(width * COBBLE_U, Math.max(0.45, height * 1.05));
+    const mesh = addShadow(new THREE.Mesh(geo, mat));
+    mesh.position.set(end.x, wallTop, end.z);
+    mesh.rotation.y = end.rotY;
+    root.add(mesh);
+  }
 }
 
 function addOriginFront(root, center) {
@@ -420,9 +494,16 @@ function addOriginFront(root, center) {
     root.add(cap);
   }
 
+  const awningZ = center.z + ROOM_D / 2 + 0.47;
   const plaque = makePlaque('General Store');
-  plaque.position.set(center.x, 2.58, center.z + ROOM_D / 2 + 0.18);
+  plaque.position.set(center.x, 1.94, awningZ);
   root.add(plaque);
+  const chainMat = metal(0x9a9aa2);
+  for (const side of [-0.82, 0.82]) {
+    const chain = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.36, 6), chainMat));
+    chain.position.set(center.x + side, 2.14, awningZ);
+    root.add(chain);
+  }
 }
 
 function addOriginDecor(root, center) {
@@ -979,6 +1060,13 @@ function buildTrapdoor() {
   const ring = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 10), metal(0xb08a3c)));
   ring.position.set(0, 0.12, 0.22);
   group.add(ring);
+  const pick = new THREE.Mesh(
+    new THREE.BoxGeometry(1.05, 0.45, 1.05),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  pick.position.y = 0.2;
+  pick.userData.kind = 'trapdoor';
+  group.add(pick);
   return group;
 }
 
@@ -1058,7 +1146,7 @@ export function buildShop(expansionIds = []) {
     addFloor(root, c);
     addBeams(root, c);
     addRoomWalls(root, cell, neigh, isOrigin);
-    addRoofForRoom(roofs, c, neigh, isOrigin);
+    addRoofForRoom(roofs, root, c, neigh, isOrigin);
     if (isOrigin) addOriginDecor(root, c);
 
     const ground = new THREE.Mesh(
@@ -1070,6 +1158,16 @@ export function buildShop(expansionIds = []) {
     ground.userData.kind = 'ground';
     grounds.add(ground);
   }
+
+  const grass = gardenBox(expansionIds);
+  const yard = new THREE.Mesh(
+    new THREE.PlaneGeometry(grass.maxX - grass.minX, grass.maxZ - grass.minZ),
+    new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
+  );
+  yard.rotation.x = -Math.PI / 2;
+  yard.position.set((grass.minX + grass.maxX) / 2, 0.02, (grass.minZ + grass.maxZ) / 2);
+  yard.userData.kind = 'ground';
+  grounds.add(yard);
 
   for (const pad of EXPANSION_PADS) {
     if (expansionIds.includes(pad.id)) continue;
@@ -1105,6 +1203,150 @@ export function buildShop(expansionIds = []) {
   }
 
   return { root, roofs, grounds, pads };
+}
+
+export function buildDungeon() {
+  const root = new THREE.Group();
+  root.name = 'dungeon';
+  const grounds = new THREE.Group();
+  grounds.name = 'dungeon-grounds';
+  const W = 11;
+  const D = 9;
+  const H = 3.4;
+  const floor = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(W, 0.12, D),
+    cobbleMat(6.5, 5.2),
+  ));
+  floor.position.y = -0.04;
+  root.add(floor);
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(W - 0.2, D - 0.2),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = 0.04;
+  ground.userData.kind = 'ground';
+  grounds.add(ground);
+
+  const wallMat = cobbleMat(6.5, 2.8);
+  const walls = [
+    { x: 0, z: -D / 2, w: W, d: 0.22 },
+    { x: 0, z: D / 2, w: W, d: 0.22 },
+    { x: -W / 2, z: 0, w: 0.22, d: D },
+    { x: W / 2, z: 0, w: 0.22, d: D },
+  ];
+  for (const wall of walls) {
+    const mesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(wall.w, H, wall.d), wallMat));
+    mesh.position.set(wall.x, H / 2, wall.z);
+    root.add(mesh);
+  }
+
+  addWallTorch(root, -W / 2 + 0.18, 1.7, -2.2, Math.PI / 2);
+  addWallTorch(root, -W / 2 + 0.18, 1.7, 2.2, Math.PI / 2);
+  addWallTorch(root, W / 2 - 0.18, 1.7, -2.2, -Math.PI / 2);
+  addWallTorch(root, W / 2 - 0.18, 1.7, 2.2, -Math.PI / 2);
+
+  const cobweb = () => {
+    const group = new THREE.Group();
+    const silk = new THREE.MeshStandardMaterial({
+      color: 0xe8e0d4,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide,
+      roughness: 0.9,
+    });
+    for (let i = 0; i < 5; i += 1) {
+      const strand = new THREE.Mesh(new THREE.PlaneGeometry(0.55 - i * 0.07, 0.02), silk);
+      strand.rotation.z = i * 0.4;
+      strand.position.set(0.1, -i * 0.08, 0);
+      group.add(strand);
+    }
+    return group;
+  };
+  const corners = [
+    { x: -W / 2 + 0.3, z: -D / 2 + 0.3, rot: 0.4 },
+    { x: W / 2 - 0.3, z: -D / 2 + 0.3, rot: -0.5 },
+    { x: -W / 2 + 0.3, z: D / 2 - 0.3, rot: 2.2 },
+    { x: W / 2 - 0.3, z: D / 2 - 0.3, rot: 3.5 },
+  ];
+  for (const corner of corners) {
+    const web = cobweb();
+    web.position.set(corner.x, 2.6, corner.z);
+    web.rotation.y = corner.rot;
+    root.add(web);
+  }
+
+  const bone = new THREE.MeshStandardMaterial({ color: 0xe8dcc4, roughness: 0.7 });
+  const skull = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), bone));
+  skull.position.set(1.6, 0.12, -1.4);
+  skull.scale.set(1, 0.85, 1.15);
+  root.add(skull);
+  const jaw = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.08), bone));
+  jaw.position.set(1.6, 0.04, -1.28);
+  root.add(jaw);
+  for (const [x, z, rot] of [[1.35, -1.55, 0.6], [1.85, -1.2, -0.4], [1.5, -1.05, 1.2], [1.95, -1.55, 0.2]]) {
+    const rib = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.32, 6), bone));
+    rib.position.set(x, 0.08, z);
+    rib.rotation.z = rot;
+    rib.rotation.x = 1.1;
+    root.add(rib);
+  }
+
+  const rats = [];
+  for (let i = 0; i < 4; i += 1) {
+    const rat = buildRat();
+    rat.position.set(-2 + i * 1.1, 0.06, 1.2 - i * 0.6);
+    root.add(rat);
+    rats.push(rat);
+  }
+
+  const ladder = buildDungeonLadder();
+  ladder.position.set(-W / 2 + 0.22, 0, 0.4);
+  root.add(ladder);
+
+  return { root, grounds, rats, ladder, size: { w: W, d: D } };
+}
+
+function buildRat() {
+  const group = new THREE.Group();
+  group.name = 'rat';
+  const fur = new THREE.MeshStandardMaterial({ color: 0x4a3a32, roughness: 0.9 });
+  const body = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), fur));
+  body.scale.set(1.4, 0.8, 0.9);
+  body.position.y = 0.05;
+  group.add(body);
+  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.045, 7, 6), fur));
+  head.position.set(0, 0.06, 0.08);
+  group.add(head);
+  const tail = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.014, 0.16, 5), fur));
+  tail.rotation.x = 1.1;
+  tail.position.set(0, 0.04, -0.1);
+  group.add(tail);
+  return group;
+}
+
+function buildDungeonLadder() {
+  const group = new THREE.Group();
+  group.name = 'ladder';
+  const rail = wood(0x5a3a22);
+  for (const x of [-0.18, 0.18]) {
+    const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.05), rail));
+    post.position.set(x, 1.3, 0);
+    group.add(post);
+  }
+  for (let i = 0; i < 8; i += 1) {
+    const rung = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.04, 0.05), rail));
+    rung.position.set(0, 0.28 + i * 0.3, 0.02);
+    group.add(rung);
+  }
+  const pick = new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 2.6, 0.4),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  pick.position.set(0, 1.3, 0.1);
+  pick.userData.kind = 'ladder';
+  group.add(pick);
+  return group;
 }
 
 function roundRect(ctx, x, y, w, h, r) {

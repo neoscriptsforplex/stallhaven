@@ -10,7 +10,73 @@ export const SKYBOXES = [
   { id: 'dark-grey', label: 'Dark Grey', color: 0x3a3a40, fog: 0x3a3a40 },
   { id: 'blue', label: 'Blue', color: 0x5aa0d8, fog: 0x6aadd8 },
   { id: 'light-grey', label: 'Light Grey', color: 0xc5c5ca, fog: 0xc5c5ca },
+  { id: 'peach', label: 'Peach', color: 0xf4c49a, fog: 0xf0c4a0 },
 ];
+
+export const KING_ROALD_MIN = 10 * 60;
+export const KING_ROALD_MAX = 60 * 60;
+
+export const HAIR_STYLES = [
+  { id: 'short', label: 'Short' },
+  { id: 'long', label: 'Long' },
+  { id: 'bun', label: 'Bun' },
+  { id: 'ponytail', label: 'Ponytail' },
+];
+
+export const FACE_HAIR = [
+  { id: 'none', label: 'Clean shaven' },
+  { id: 'beard', label: 'Beard' },
+  { id: 'moustache', label: 'Moustache' },
+  { id: 'goatee', label: 'Goatee' },
+];
+
+export const PLAYER_COLORS = {
+  shirt: [
+    { id: 'brown', label: 'Brown', color: 0x4a3020 },
+    { id: 'red', label: 'Red', color: 0x8a2424 },
+    { id: 'blue', label: 'Blue', color: 0x2a4a8a },
+    { id: 'green', label: 'Green', color: 0x2d6a32 },
+    { id: 'cream', label: 'Cream', color: 0xd8c8a8 },
+    { id: 'black', label: 'Black', color: 0x1c1c1c },
+  ],
+  legs: [
+    { id: 'brown', label: 'Brown', color: 0x2e2418 },
+    { id: 'grey', label: 'Grey', color: 0x4a4a50 },
+    { id: 'green', label: 'Green', color: 0x3a4a32 },
+    { id: 'navy', label: 'Navy', color: 0x24304a },
+  ],
+  boots: [
+    { id: 'black', label: 'Black', color: 0x24180e },
+    { id: 'brown', label: 'Brown', color: 0x5a3a22 },
+    { id: 'tan', label: 'Tan', color: 0x8a6a3b },
+  ],
+};
+
+export function defaultAppearance() {
+  return {
+    hair: 'short',
+    shirt: 'brown',
+    legs: 'brown',
+    boots: 'black',
+    faceHair: 'none',
+  };
+}
+
+export function appearanceColor(slot, id) {
+  const list = PLAYER_COLORS[slot] ?? [];
+  return list.find((item) => item.id === id)?.color ?? list[0]?.color ?? 0x4a3020;
+}
+
+export function normalizeAppearance(raw) {
+  const fallback = defaultAppearance();
+  if (!raw || typeof raw !== 'object') return fallback;
+  const hair = HAIR_STYLES.some((item) => item.id === raw.hair) ? raw.hair : fallback.hair;
+  const shirt = PLAYER_COLORS.shirt.some((item) => item.id === raw.shirt) ? raw.shirt : fallback.shirt;
+  const legs = PLAYER_COLORS.legs.some((item) => item.id === raw.legs) ? raw.legs : fallback.legs;
+  const boots = PLAYER_COLORS.boots.some((item) => item.id === raw.boots) ? raw.boots : fallback.boots;
+  const faceHair = FACE_HAIR.some((item) => item.id === raw.faceHair) ? raw.faceHair : fallback.faceHair;
+  return { hair, shirt, legs, boots, faceHair };
+}
 
 export const OTHER_CHANCE = 0.18;
 export const ASPIRE_CHANCE = 0.25;
@@ -87,13 +153,13 @@ function regenEvery(tier) {
 }
 
 export const MATERIALS = {
-  bronze: { id: 'bronze', name: 'Bronze', restock: 3, start: 12, tier: 1, regenEvery: regenEvery(1) },
-  iron: { id: 'iron', name: 'Iron', restock: 5, start: 2, tier: 2, regenEvery: regenEvery(2) },
-  steel: { id: 'steel', name: 'Steel', restock: 7, start: 1, tier: 3, regenEvery: regenEvery(3) },
-  mithril: { id: 'mithril', name: 'Mithril', restock: 10, start: 1, tier: 4, regenEvery: regenEvery(4) },
-  adamant: { id: 'adamant', name: 'Adamant', restock: 13, start: 0, tier: 5, regenEvery: regenEvery(5) },
-  runite: { id: 'runite', name: 'Runite', restock: 16, start: 0, tier: 6, regenEvery: regenEvery(6) },
-  dragon: { id: 'dragon', name: 'Dragon', restock: 22, start: 0, tier: 7, regenEvery: regenEvery(7) },
+  bronze: { id: 'bronze', name: 'Bronze Ore', restock: 3, start: 12, tier: 1, regenEvery: regenEvery(1) },
+  iron: { id: 'iron', name: 'Iron Ore', restock: 5, start: 2, tier: 2, regenEvery: regenEvery(2) },
+  steel: { id: 'steel', name: 'Steel Ore', restock: 7, start: 1, tier: 3, regenEvery: regenEvery(3) },
+  mithril: { id: 'mithril', name: 'Mithril Ore', restock: 10, start: 1, tier: 4, regenEvery: regenEvery(4) },
+  adamant: { id: 'adamant', name: 'Adamant Ore', restock: 13, start: 0, tier: 5, regenEvery: regenEvery(5) },
+  runite: { id: 'runite', name: 'Runite Ore', restock: 16, start: 0, tier: 6, regenEvery: regenEvery(6) },
+  dragon: { id: 'dragon', name: 'Dragon Ore', restock: 22, start: 0, tier: 7, regenEvery: regenEvery(7) },
   logs: { id: 'logs', name: 'Logs', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
   string: { id: 'string', name: 'String', restock: 4, start: 6, tier: 1, regenEvery: regenEvery(1) },
   cloth: { id: 'cloth', name: 'Cloth', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
@@ -190,6 +256,7 @@ const RANGE_WEAPONS = [
   { id: 'crossbow', name: 'Crossbow', slot: 'bow', shape: 'crossbow', extra: { logs: 1 } },
   { id: 'knives', name: 'Knives', slot: 'thrown', shape: 'knives' },
   { id: 'thrownaxe', name: 'Thrown Axe', slot: 'thrown', shape: 'thrownaxe' },
+  { id: 'arrows', name: 'Arrows', slot: 'ammo', shape: 'arrows', extra: { logs: 1 } },
 ];
 
 for (const piece of RANGE_WEAPONS) {
@@ -203,6 +270,7 @@ for (const piece of RANGE_WEAPONS) {
 }
 
 const DHIDE_PIECES = [
+  { id: 'coif', name: 'Coif', slot: 'helm', shape: 'dhide_coif' },
   { id: 'body', name: 'Body', slot: 'body', shape: 'dhide_body' },
   { id: 'chaps', name: 'Chaps', slot: 'legs', shape: 'dhide_chaps' },
   { id: 'vambraces', name: 'Vambraces', slot: 'gloves', shape: 'dhide_vambraces' },
@@ -423,6 +491,18 @@ export const CUSTOMERS = {
     accent: 0x7b4ea0,
     offer: { materialId: 'cloth', price: 5 },
   },
+  kingroald: {
+    id: 'kingroald',
+    name: 'King Roald',
+    combatClass: null,
+    prefers: [],
+    patient: true,
+    leaveIfEmpty: false,
+    robe: 0x6a1c28,
+    accent: 0xe3b34a,
+    offer: null,
+    special: true,
+  },
 };
 
 export const SHOP = {
@@ -637,18 +717,49 @@ function recipeUnlocked(state, recipe) {
 }
 
 function pickWeighted(recipes, rng) {
+  if (!recipes.length) return null;
   const weighted = [];
   for (const recipe of recipes) {
-    const tier = recipe.tier ?? 1;
-    const copies = tier === 1 ? 5 : tier === 2 ? 3 : tier === 3 ? 2 : 1;
+    const copies = (recipe.tier ?? 1) <= 1 ? 2 : 1;
     for (let i = 0; i < copies; i += 1) weighted.push(recipe);
   }
-  if (!weighted.length) return recipes[0] ?? null;
   return weighted[Math.floor(rng() * weighted.length)] ?? recipes[0];
+}
+
+export function mostExpensiveChestId(state) {
+  let best = null;
+  let bestPrice = -1;
+  for (const [id, count] of Object.entries(state?.chest ?? {})) {
+    if (!count) continue;
+    const recipe = RECIPES[id];
+    if (!recipe) continue;
+    const price = recipe.price ?? 0;
+    if (price > bestPrice) {
+      bestPrice = price;
+      best = id;
+    }
+  }
+  return best;
+}
+
+export function scheduleKingRoald(fromSeconds, rng = Math.random) {
+  const span = KING_ROALD_MAX - KING_ROALD_MIN;
+  return fromSeconds + KING_ROALD_MIN + rng() * span;
 }
 
 export function decideRequest(customerId, rng = Math.random, state = null) {
   const customer = CUSTOMERS[customerId];
+  if (customerId === 'kingroald') {
+    const recipeId = mostExpensiveChestId(state);
+    const recipe = RECIPES[recipeId];
+    if (!recipe) return null;
+    return {
+      recipeId: recipe.id,
+      gold: recipe.price,
+      offer: null,
+      royal: true,
+    };
+  }
   const preferred = customer.prefers
     .map((id) => RECIPES[id])
     .filter(Boolean)

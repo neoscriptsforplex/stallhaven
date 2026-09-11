@@ -15,6 +15,7 @@ import {
   defaultAppearance,
   displayKind,
   formatGold,
+  isCraftedMaterial,
   materialList,
   normalizeAppearance,
   offerClassLabel,
@@ -45,13 +46,14 @@ import {
 import {
   assignStandPiece,
   applyCheat,
-  buyCauldron,
   buyExpansion,
   buyFromCustomer,
   buyFurniture,
+  buyStation,
   canBuyCauldron,
   canBuyExpansion,
   canBuyFurniture,
+  canBuyStation,
   canCraft,
   canRestock,
   canUpgradeChest,
@@ -71,6 +73,7 @@ import {
   isUnlocked,
   nextFurnitureCost,
   ownsCauldron,
+  ownsStation,
   placeFromChest,
   pushLog,
   restock,
@@ -79,6 +82,7 @@ import {
   sellToCustomer,
   shopProgress,
   startCraft,
+  stationCost,
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
@@ -90,6 +94,8 @@ import {
   furnitureKindForType,
   furnitureLabelForType,
   padById,
+  stationLabel,
+  STATION_UNLOCKS,
 } from './layout.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 
@@ -160,6 +166,8 @@ export function bindHud(root, state, world) {
   function currentRecipes() {
     if (craftStation === 'range') return recipesForTab('food');
     if (craftStation === 'cauldron') return recipesForTab('potion');
+    if (craftStation === 'furnace') return recipesForTab('smelt');
+    if (craftStation === 'wheel') return recipesForTab('spin');
     return recipesForTab(craftTab, craftSubtab);
   }
 
@@ -209,19 +217,34 @@ export function bindHud(root, state, world) {
   function paintCrafts() {
     const rangeMode = craftStation === 'range';
     const cauldronMode = craftStation === 'cauldron';
-    tabsEl.hidden = rangeMode || cauldronMode;
-    subtabsEl.hidden = rangeMode || cauldronMode;
+    const furnaceMode = craftStation === 'furnace';
+    const wheelMode = craftStation === 'wheel';
+    const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode;
+    tabsEl.hidden = simpleStation;
+    subtabsEl.hidden = simpleStation;
     const title = craftModal.querySelector('[data-craft-title]');
     const blurb = craftModal.querySelector('[data-craft-blurb]');
     if (title) {
-      title.textContent = rangeMode ? 'Cooking Range' : cauldronMode ? 'Cauldron' : 'Anvil';
+      title.textContent = rangeMode
+        ? 'Cooking Range'
+        : cauldronMode
+          ? 'Cauldron'
+          : furnaceMode
+            ? 'Furnace'
+            : wheelMode
+              ? 'Spinning Wheel'
+              : 'Anvil';
     }
     if (blurb) {
       blurb.textContent = rangeMode
         ? 'Bake food here. Finished plates land in the chest or on a wall shelf.'
         : cauldronMode
           ? 'Brew potions from herbs and water. Finished vials land in the chest and sit on wall shelves.'
-          : 'Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.';
+          : furnaceMode
+            ? 'Smelt ores into metal bars. Bars are used at the anvil for weapons and armour — they are not restocked for free.'
+            : wheelMode
+              ? 'Spin flax into bow string. Bows and crossbows need bow string; it is not restocked for free.'
+              : 'Work a ware here. Finished pieces land in the chest. Weapons and armour use metal bars. Bows and crossbows also need bow string.';
     }
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
       btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
@@ -244,10 +267,12 @@ export function bindHud(root, state, world) {
   function fillMats(container) {
     if (!container || container.dataset.ready) return;
     container.innerHTML = materialList().map((mat) => `
-      <div class="mat" data-mat="${mat.id}">
+      <div class="mat${isCraftedMaterial(mat.id) ? ' is-crafted' : ''}" data-mat="${mat.id}">
         <span class="mat-name">${mat.name}</span>
         <span class="mat-count" data-count="${mat.id}">0</span>
-        <button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>
+        ${isCraftedMaterial(mat.id)
+          ? '<span class="mat-crafted">Crafted</span>'
+          : `<button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>`}
       </div>
     `).join('');
     container.dataset.ready = '1';
@@ -391,6 +416,8 @@ export function bindHud(root, state, world) {
     craftFocusId = options.focusId ?? null;
     if (craftStation === 'range') craftTab = 'food';
     else if (craftStation === 'cauldron') craftTab = 'potion';
+    else if (craftStation === 'furnace') craftTab = 'smelt';
+    else if (craftStation === 'wheel') craftTab = 'spin';
     else {
       craftTab = recipe ? anvilTabForRecipe(recipe) : (craftTab === 'food' || craftTab === 'potion' ? 'melee' : craftTab);
       craftSubtab = recipe ? anvilSubtabForRecipe(recipe) : (craftSubtab === 'armour' ? craftSubtab : 'weapon');
@@ -1029,20 +1056,24 @@ export function bindHud(root, state, world) {
         : target.id === 'anvil' ? 'Anvil'
           : target.id === 'range' ? 'Cooking Range'
             : target.id === 'cauldron' ? 'Cauldron'
-              : target.id === 'counter' ? 'Counter'
-                : target.id === 'display' && displayKind(target.index, state) === 'stand' ? 'Mannequin'
-                  : target.id === 'display' && displayKind(target.index, state) === 'shelf' ? 'Shelf'
-                    : target.id === 'display' ? 'Table'
-                      : 'Display'
+              : target.id === 'furnace' ? 'Furnace'
+                : target.id === 'wheel' ? 'Spinning Wheel'
+                  : target.id === 'counter' ? 'Counter'
+                    : target.id === 'display' && displayKind(target.index, state) === 'stand' ? 'Mannequin'
+                      : target.id === 'display' && displayKind(target.index, state) === 'shelf' ? 'Shelf'
+                        : target.id === 'display' ? 'Table'
+                          : 'Display'
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
     const upgradeBtn = furnMenu.querySelector('[data-furn-upgrade]');
-    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron') {
+    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel') {
       useBtn.hidden = false;
       useBtn.textContent = target.id === 'chest' ? 'Open Chest'
         : target.id === 'range' ? 'Cook'
           : target.id === 'cauldron' ? 'Potions'
-            : 'Craft';
+            : target.id === 'furnace' ? 'Smelt'
+              : target.id === 'wheel' ? 'Spin'
+                : 'Craft';
     } else {
       useBtn.hidden = true;
     }
@@ -1206,6 +1237,22 @@ export function bindHud(root, state, world) {
       buyBtn.disabled = !canBuyCauldron(state);
       buyBtn.textContent = `Buy · ${formatGold(CAULDRON_COST)} gp`;
     }
+    for (const station of STATION_UNLOCKS) {
+      const itemStatus = buildModal.querySelector(`[data-${station.id}-status]`);
+      const itemBuy = buildModal.querySelector(`[data-${station.id}-buy]`);
+      if (!itemStatus || !itemBuy) continue;
+      if (ownsStation(state, station.id)) {
+        itemStatus.textContent = `Placed in the shop. Click it to use, or right-click to move.`;
+        itemStatus.classList.remove('craft-note');
+        itemBuy.disabled = true;
+        itemBuy.textContent = 'Owned';
+      } else {
+        itemStatus.textContent = `Costs ${formatGold(station.cost)} gp.`;
+        itemStatus.classList.remove('craft-note');
+        itemBuy.disabled = !canBuyStation(state, station.id);
+        itemBuy.textContent = `Buy · ${formatGold(station.cost)} gp`;
+      }
+    }
     const expandStatus = buildModal.querySelector('[data-expand-status]');
     const expandBuy = buildModal.querySelector('[data-expand-buy]');
     const owned = (state.expansions ?? []).length;
@@ -1244,13 +1291,11 @@ export function bindHud(root, state, world) {
     const blurb = placeModal.querySelector('[data-place-blurb]');
     const costEl = placeModal.querySelector('[data-place-cost]');
     const note = placeModal.querySelector('[data-place-note]');
-    const label = pendingPlace.type === 'cauldron'
-      ? 'Cauldron'
-      : furnitureLabelForType(pendingPlace.type);
+    const label = stationLabel(pendingPlace.type);
     if (title) title.textContent = `Place ${label}`;
     if (blurb) {
-      blurb.textContent = pendingPlace.type === 'cauldron'
-        ? 'Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement.'
+      blurb.textContent = STATION_UNLOCKS.some((item) => item.id === pendingPlace.type)
+        ? 'Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Double-click a highlighted cell to confirm.'
         : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
     }
     if (costEl) costEl.textContent = `Cost: ${formatGold(pendingPlace.cost)} gp.`;
@@ -1321,10 +1366,12 @@ export function bindHud(root, state, world) {
     closeBuild();
     openExpand();
   });
-  buildModal.querySelector('[data-cauldron-buy]').addEventListener('click', () => {
-    if (!canBuyCauldron(state)) {
-      const status = buildModal.querySelector('[data-cauldron-status]');
-      const msg = `Need ${formatGold(CAULDRON_COST)}g to buy a cauldron. You have ${formatGold(state.gold)}g.`;
+  function startStationPlace(id) {
+    const cost = stationCost(id);
+    const label = stationLabel(id).toLowerCase();
+    const status = buildModal.querySelector(`[data-${id}-status]`);
+    if (!canBuyStation(state, id)) {
+      const msg = `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(state.gold)}g.`;
       if (status) {
         status.textContent = msg;
         status.classList.add('craft-note');
@@ -1333,12 +1380,18 @@ export function bindHud(root, state, world) {
       render(performance.now() / 1000);
       return;
     }
-    pendingPlace = { type: 'cauldron', cost: CAULDRON_COST, note: '' };
-    world.beginPlaceUnlock('cauldron');
+    pendingPlace = { type: id, cost, note: '' };
+    world.beginPlaceUnlock(id);
     openPlaceDock();
     paintPlaceDock();
     render(performance.now() / 1000);
-  });
+  }
+
+  for (const station of STATION_UNLOCKS) {
+    buildModal.querySelector(`[data-${station.id}-buy]`)?.addEventListener('click', () => {
+      startStationPlace(station.id);
+    });
+  }
   buildModal.querySelector('[data-table-buy]')?.addEventListener('click', () => startFurniturePlace('table'));
   buildModal.querySelector('[data-mannequin-buy]')?.addEventListener('click', () => startFurniturePlace('mannequin'));
   function confirmPendingPlace() {
@@ -1353,21 +1406,22 @@ export function bindHud(root, state, world) {
     }
     const pose = check.pose;
     const pending = pendingPlace;
-    if (pending.type === 'cauldron') {
-      if (state.gold < CAULDRON_COST) {
-        pendingPlace.note = `Need ${formatGold(CAULDRON_COST)}g. You have ${formatGold(state.gold)}g.`;
+    if (STATION_UNLOCKS.some((item) => item.id === pending.type)) {
+      const cost = stationCost(pending.type);
+      if (state.gold < cost) {
+        pendingPlace.note = `Need ${formatGold(cost)}g. You have ${formatGold(state.gold)}g.`;
         paintPlaceDock();
         pushLog(state, pendingPlace.note);
         render(performance.now() / 1000);
         return;
       }
-      if (!buyCauldron(state, pose)) {
+      if (!buyStation(state, pending.type, pose)) {
         render(performance.now() / 1000);
         return;
       }
       world.confirmPlaceUnlock();
       closePlace();
-      pushLog(state, `Placed a cauldron for ${formatGold(CAULDRON_COST)} gp.`);
+      pushLog(state, `Placed a ${stationLabel(pending.type).toLowerCase()} for ${formatGold(cost)} gp.`);
       render(performance.now() / 1000);
       return;
     }
@@ -1425,6 +1479,8 @@ export function bindHud(root, state, world) {
     if (target?.id === 'anvil') openCraft('anvil');
     if (target?.id === 'range') openCraft('range');
     if (target?.id === 'cauldron') openPotion();
+    if (target?.id === 'furnace') openCraft('furnace');
+    if (target?.id === 'wheel') openCraft('wheel');
   });
 
   function closeFillPicker() {
@@ -1797,6 +1853,8 @@ export function bindHud(root, state, world) {
     if (event.type === 'anvil') openCraft('anvil');
     if (event.type === 'range') openCraft('range');
     if (event.type === 'cauldron') openPotion();
+    if (event.type === 'furnace') openCraft('furnace');
+    if (event.type === 'wheel') openCraft('wheel');
     if (event.type === 'display-select') render(performance.now() / 1000);
     if (event.type === 'chest-upgrade') openUpgrade();
     if (event.type === 'furn-menu') showFurnMenu(event.furniture, event.clientX, event.clientY);

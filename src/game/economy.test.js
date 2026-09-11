@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CUSTOMERS,
   MATERIALS,
+  METALS,
   RECIPES,
   SHOP,
   SKYBOXES,
@@ -29,10 +30,17 @@ import {
   buyExpansion,
   buyFromCustomer,
   buyFurniture,
+  buyFurnace,
+  buyWheel,
   canBuyCauldron,
+  canBuyFurnace,
+  canBuyWheel,
+  canRestock,
   canBuyFurniture,
   canCraft,
   CAULDRON_COST,
+  FURNACE_COST,
+  WHEEL_COST,
   chestCapacity,
   chestCount,
   chestTotal,
@@ -48,6 +56,8 @@ import {
   offerChoices,
   OLD_DEFAULT_DISPLAYS,
   ownsCauldron,
+  ownsFurnace,
+  ownsWheel,
   placeFromChest,
   placeOnDisplay,
   restock,
@@ -63,6 +73,11 @@ import {
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 
 function finishCraft(state, recipeId, at = 0) {
+  const recipe = RECIPES[recipeId];
+  const cost = recipeCost(recipe);
+  for (const [id, n] of Object.entries(cost.materials)) {
+    state.materials[id] = Math.max(state.materials[id] ?? 0, n);
+  }
   assert.equal(startCraft(state, recipeId, at), true, `could not start ${recipeId}`);
   const done = completeCrafts(state, at + RECIPES[recipeId].time);
   assert.ok(done.includes(recipeId), `did not finish ${recipeId}`);
@@ -78,11 +93,16 @@ describe('stall economy', () => {
     const state = createState();
     assert.equal(state.gold, START_GOLD);
     assert.equal(state.materials.bronze, 12);
+    assert.equal(state.materials.bronze_bar, 0);
+    assert.equal(state.materials.bow_string, 0);
+    assert.equal(state.materials.flax, 8);
     assert.equal(state.materials.flour, 10);
     assert.equal(state.materials.logs, 8);
     assert.equal(state.materials.hide, 8);
     assert.equal(state.materials.herbs, 8);
     assert.equal(state.materials.water, 12);
+    assert.equal(state.materials.string, undefined);
+    assert.equal(MATERIALS.string, undefined);
   });
 
   it('crafts from materials into the chest without auto-placing on stalls', () => {
@@ -215,6 +235,7 @@ describe('unlock lines', () => {
     finishCraft(state, 'bronze_sword', 200);
     assert.equal(state.craftCounts.bronze_sword, 20);
     assert.equal(isUnlocked(state, 'iron_sword'), true);
+    state.materials.iron_bar = 1;
     assert.equal(canCraft(state, 'iron_sword'), true);
   });
 
@@ -268,6 +289,9 @@ describe('save and load', () => {
     }), true);
     assert.equal(state.gold, 12);
     assert.equal(state.materials.bronze, 4);
+    assert.equal(state.materials.bronze_bar, 4);
+    assert.equal(state.materials.bow_string, 0);
+    assert.equal(state.materials.string, undefined);
     assert.equal(state.materials.herbs, 8);
     assert.equal(state.materials.water, 12);
     assert.equal(state.chest.bread, 2);
@@ -410,8 +434,13 @@ describe('catalog', () => {
       const cost = recipeCost(recipe);
       for (const id of Object.keys(cost.materials)) {
         assert.ok(MATERIALS[id], `missing material ${id} on ${recipe.id}`);
+        assert.notEqual(id, 'string', `${recipe.id} still uses old String`);
       }
       assert.ok(recipe.time > 0, recipe.id);
+      if (recipe.outputMaterial) {
+        assert.ok(MATERIALS[recipe.outputMaterial], recipe.id);
+        continue;
+      }
       assert.ok(recipe.price > 0, recipe.id);
       assert.ok(recipe.buyers.length, recipe.id);
     }
@@ -522,6 +551,10 @@ describe('catalog', () => {
     assert.ok(!melee.some((r) => r.id === 'staff'));
     assert.ok(magic.some((r) => r.id === 'staff'));
     assert.ok(ranged.some((r) => r.id === 'bronze_shortbow'));
+    assert.equal(recipeCost(RECIPES.bronze_shortbow).materials.bow_string, 1);
+    assert.equal(recipeCost(RECIPES.dragon_crossbow).materials.bow_string, 1);
+    assert.equal(recipeCost(RECIPES.bronze_sword).materials.bronze_bar, 1);
+    assert.equal(recipeCost(RECIPES.bronze_sword).materials.bronze, undefined);
     assert.ok(ranged.some((r) => r.id === 'bronze_arrows'));
     assert.ok(ranged.some((r) => r.id === 'blue_dhide_coif'));
     assert.ok(food.some((r) => r.id === 'bread'));
@@ -587,6 +620,21 @@ describe('material regen', () => {
     assert.equal(state.materials.bronze, 250);
     tickMaterials(state, 80);
     assert.equal(state.materials.bronze, 250);
+  });
+
+  it('does not regenerate or restock metal bars or bow string', () => {
+    const state = createState();
+    assert.equal(state.materials.bronze_bar, 0);
+    assert.equal(state.materials.bow_string, 0);
+    tickMaterials(state, 120);
+    assert.equal(state.materials.bronze_bar, 0);
+    assert.equal(state.materials.bow_string, 0);
+    state.gold = 1000;
+    assert.equal(canRestock(state, 'bronze_bar'), false);
+    assert.equal(canRestock(state, 'bow_string'), false);
+    assert.equal(restock(state, 'bronze_bar'), false);
+    assert.equal(restock(state, 'bow_string'), false);
+    assert.equal(canRestock(state, 'flax'), true);
   });
 });
 
@@ -655,6 +703,71 @@ describe('cauldron unlock', () => {
     assert.equal(state.materials.water, 11);
     state.craftCounts.strength_potion = 5;
     assert.equal(isUnlocked(state, 'prayer_potion'), true);
+  });
+});
+
+describe('furnace and spinning wheel', () => {
+  it('sells a furnace for 3000 gp and smelts ore into a bar', () => {
+    const state = createState();
+    assert.equal(ownsFurnace(state), false);
+    assert.match(craftBlockReason(state, 'smelt_bronze'), /furnace/i);
+    state.gold = FURNACE_COST;
+    assert.equal(canBuyFurnace(state), true);
+    assert.equal(buyFurnace(state, { x: -1, z: 0.6, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(ownsFurnace(state), true);
+    const ore = state.materials.bronze;
+    assert.equal(canCraft(state, 'smelt_bronze'), true);
+    finishCraft(state, 'smelt_bronze');
+    assert.equal(state.materials.bronze, ore - 1);
+    assert.equal(state.materials.bronze_bar, 1);
+    assert.equal(state.chest.smelt_bronze, undefined);
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(ownsFurnace(next), true);
+    assert.equal(next.furniture.furnace.x, -1);
+    assert.equal(next.materials.bronze_bar, 1);
+  });
+
+  it('sells a spinning wheel for 500 gp and spins flax into bow string', () => {
+    const state = createState();
+    assert.equal(ownsWheel(state), false);
+    assert.match(craftBlockReason(state, 'spin_bow_string'), /spinning wheel/i);
+    state.gold = WHEEL_COST;
+    assert.equal(canBuyWheel(state), true);
+    assert.equal(buyWheel(state, { x: 1.1, z: 0.4, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    const flax = state.materials.flax;
+    finishCraft(state, 'spin_bow_string');
+    assert.equal(state.materials.flax, flax - 1);
+    assert.equal(state.materials.bow_string, 1);
+    assert.equal(state.chest.spin_bow_string, undefined);
+  });
+
+  it('requires bow string on every bow and crossbow tier', () => {
+    for (const metal of METALS) {
+      for (const piece of ['shortbow', 'longbow', 'crossbow']) {
+        const recipe = RECIPES[`${metal.id}_${piece}`];
+        assert.ok(recipe, `${metal.id}_${piece}`);
+        assert.equal(recipeCost(recipe).materials.bow_string, 1, recipe.id);
+        assert.equal(recipeCost(recipe).materials.string, undefined, recipe.id);
+        assert.ok(recipeCost(recipe).materials[`${metal.id}_bar`] >= 1, recipe.id);
+      }
+    }
+  });
+
+  it('does not turn old String stock into free bow string', () => {
+    const state = createState();
+    assert.equal(applyState(state, {
+      version: 7,
+      gold: 40,
+      materials: { bronze: 9, string: 40, flax: 3 },
+    }), true);
+    assert.equal(state.materials.string, undefined);
+    assert.equal(state.materials.bow_string, 0);
+    assert.equal(state.materials.bronze_bar, 9);
+    assert.equal(state.materials.flax, 3);
   });
 });
 
@@ -817,10 +930,16 @@ describe('default display order', () => {
 });
 
 describe('ores, appearance, king, and chest bin', () => {
-  it('names metal materials as ore', () => {
+  it('names metal materials as ore and matching bars', () => {
     assert.equal(MATERIALS.bronze.name, 'Bronze Ore');
     assert.equal(MATERIALS.runite.name, 'Runite Ore');
     assert.equal(MATERIALS.dragon.name, 'Dragon Ore');
+    assert.equal(MATERIALS.bronze_bar.name, 'Bronze Bar');
+    assert.equal(MATERIALS.runite_bar.name, 'Runite Bar');
+    assert.equal(MATERIALS.dragon_bar.name, 'Dragon Bar');
+    assert.equal(MATERIALS.bow_string.name, 'Bow String');
+    assert.equal(MATERIALS.flax.name, 'Flax');
+    assert.equal(MATERIALS.string, undefined);
   });
 
   it('lists peach among skyboxes', () => {

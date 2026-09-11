@@ -46,9 +46,9 @@
     <div id="help-modal" class="modal" hidden>
       <div class="sheet">
         <h2>Help</h2>
-        <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the anvil, range, chest, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. Double-click a highlighted cell to confirm a new table, mannequin, or cauldron. Scroll to zoom out for the roof and garden.</p>
+        <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the anvil, range, chest, furnace, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. Double-click a highlighted cell to confirm a new table, mannequin, furnace, spinning wheel, or cauldron. Scroll to zoom out for the roof and garden.</p>
         <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back.</p>
-        <p>Click the anvil to smith Melee, Magic, or Ranged (Weapons and Armour). Click the cooking range for Food. Click a placed cauldron for Potions. Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
+        <p>Click the anvil to smith Melee, Magic, or Ranged (Weapons and Armour) from metal bars. Click a placed furnace to smelt ores into bars. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Click the cooking range for Food. Click a placed cauldron for Potions. Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
         <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Right-click furniture for Move or Rotate — wares travel with the piece. The counter only moves from a right-click.</p>
         <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist you upload — Shuffle, Play, Pause, Skip, and Stop. The cog beside it opens Settings for the skybox, player look, and cheat codes. Upload a .glb as Furniture, Ware, Player, or Customer.</p>
@@ -169,7 +169,7 @@
 
     <aside id="build-dock" class="expand-dock" hidden>
       <h2>Upgrade</h2>
-      <p>Unlockables for the shop. Rooms use the same gold pads as before. Potion brewing needs a cauldron. Extra tables and mannequins sit on the floor snap grid.</p>
+      <p>Unlockables for the shop. Rooms use the same gold pads as before. Smelting needs a furnace. Bow string needs a spinning wheel. Potion brewing needs a cauldron. Extra tables and mannequins sit on the floor snap grid.</p>
       <article class="build-item">
         <h3>Shop Room</h3>
         <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
@@ -187,6 +187,18 @@
         <p>Buy another armour mannequin. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count.</p>
         <p data-mannequin-status class="meta">First extra mannequin costs 500g.</p>
         <button type="button" data-mannequin-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Spinning Wheel</h3>
+        <p>Spin flax into bow string. Place it on the floor snap grid, then confirm. The wheel turns while a string is spinning.</p>
+        <p data-wheel-status class="meta">Costs 500 gp.</p>
+        <button type="button" data-wheel-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Furnace</h3>
+        <p>Smelt ores into metal bars for the anvil. Place it on the floor snap grid, then confirm. Costs 3,000 gp — between the spinning wheel and the cauldron.</p>
+        <p data-furnace-status class="meta">Costs 3,000 gp.</p>
+        <button type="button" data-furnace-buy>Buy · 3,000 gp</button>
       </article>
       <article class="build-item">
         <h3>Cauldron</h3>

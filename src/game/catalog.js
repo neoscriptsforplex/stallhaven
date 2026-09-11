@@ -161,7 +161,16 @@ export const MATERIALS = {
   runite: { id: 'runite', name: 'Runite Ore', restock: 16, start: 0, tier: 6, regenEvery: regenEvery(6) },
   dragon: { id: 'dragon', name: 'Dragon Ore', restock: 22, start: 0, tier: 7, regenEvery: regenEvery(7) },
   logs: { id: 'logs', name: 'Logs', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
-  string: { id: 'string', name: 'String', restock: 4, start: 6, tier: 1, regenEvery: regenEvery(1) },
+  flax: { id: 'flax', name: 'Flax', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  bow_string: {
+    id: 'bow_string',
+    name: 'Bow String',
+    restock: 0,
+    start: 0,
+    tier: 1,
+    regenEvery: 0,
+    crafted: true,
+  },
   cloth: { id: 'cloth', name: 'Cloth', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   hide: { id: 'hide', name: 'Hide', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   egg: { id: 'egg', name: 'Egg', restock: 4, start: 4, tier: 1, regenEvery: regenEvery(1) },
@@ -172,6 +181,29 @@ export const MATERIALS = {
   herbs: { id: 'herbs', name: 'Herbs', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   water: { id: 'water', name: 'Water', restock: 2, start: 12, tier: 1, regenEvery: regenEvery(1) },
 };
+
+METALS.forEach((metal, index) => {
+  MATERIALS[`${metal.id}_bar`] = {
+    id: `${metal.id}_bar`,
+    name: `${metal.name} Bar`,
+    restock: 0,
+    start: 0,
+    tier: index + 1,
+    regenEvery: 0,
+    crafted: true,
+    bar: true,
+    metalId: metal.id,
+    tint: metal.tint,
+  };
+});
+
+export function isCraftedMaterial(materialId) {
+  return Boolean(MATERIALS[materialId]?.crafted);
+}
+
+export function barIdForMetal(metalId) {
+  return `${metalId}_bar`;
+}
 
 export const ARMOUR_SLOTS = ['helm', 'body', 'legs', 'boots', 'gloves'];
 
@@ -211,7 +243,7 @@ function metalLine({ piece, category, combatClass, buyers, extraMats = {}, gold0
       unlockNeed: unlockNeed(index),
       tier: index + 1,
       cost: {
-        materials: { [metal.id]: piece.metalCost ?? 1, ...extraMats },
+        materials: { [barIdForMetal(metal.id)]: piece.metalCost ?? 1, ...extraMats },
         gold: gold0 + index * 2,
       },
       time: time0 + index,
@@ -251,9 +283,9 @@ for (const piece of MELEE_ARMOUR) {
 }
 
 const RANGE_WEAPONS = [
-  { id: 'shortbow', name: 'Shortbow', slot: 'bow', shape: 'shortbow', extra: { logs: 1, string: 1 } },
-  { id: 'longbow', name: 'Longbow', slot: 'bow', shape: 'longbow', extra: { logs: 1, string: 1 } },
-  { id: 'crossbow', name: 'Crossbow', slot: 'bow', shape: 'crossbow', extra: { logs: 1 } },
+  { id: 'shortbow', name: 'Shortbow', slot: 'bow', shape: 'shortbow', extra: { logs: 1, bow_string: 1 } },
+  { id: 'longbow', name: 'Longbow', slot: 'bow', shape: 'longbow', extra: { logs: 1, bow_string: 1 } },
+  { id: 'crossbow', name: 'Crossbow', slot: 'bow', shape: 'crossbow', extra: { logs: 1, bow_string: 1 } },
   { id: 'knives', name: 'Knives', slot: 'thrown', shape: 'knives' },
   { id: 'thrownaxe', name: 'Thrown Axe', slot: 'thrown', shape: 'thrownaxe' },
   { id: 'arrows', name: 'Arrows', slot: 'ammo', shape: 'arrows', extra: { logs: 1 } },
@@ -440,6 +472,54 @@ POTION_LINE.forEach((potion, index) => {
   });
 });
 
+METALS.forEach((metal, index) => {
+  addRecipe({
+    id: `smelt_${metal.id}`,
+    name: `${metal.name} Bar`,
+    category: 'smelt',
+    combatClass: null,
+    slot: 'bar',
+    shape: 'bar',
+    setKey: 'smelt',
+    lineId: 'smelt-bars',
+    lineName: 'Metal Bars',
+    lineIndex: index,
+    previousId: null,
+    unlockNeed: 0,
+    tier: index + 1,
+    cost: { materials: { [metal.id]: 1 }, gold: 0 },
+    time: 3 + index,
+    price: 0,
+    buyers: [],
+    tint: metal.tint,
+    outputMaterial: `${metal.id}_bar`,
+    outputCount: 1,
+  });
+});
+
+addRecipe({
+  id: 'spin_bow_string',
+  name: 'Bow String',
+  category: 'spin',
+  combatClass: null,
+  slot: 'fibre',
+  shape: 'bow_string',
+  setKey: 'spin',
+  lineId: 'spin-fibre',
+  lineName: 'Fibre',
+  lineIndex: 0,
+  previousId: null,
+  unlockNeed: 0,
+  tier: 1,
+  cost: { materials: { flax: 1 }, gold: 0 },
+  time: 4,
+  price: 0,
+  buyers: [],
+  tint: 0xd8c8a0,
+  outputMaterial: 'bow_string',
+  outputCount: 1,
+});
+
 export const CUSTOMERS = {
   pilgrim: {
     id: 'pilgrim',
@@ -515,6 +595,8 @@ export const SHOP = {
   range: { x: 1.92, z: -2.22 },
   chest: { x: 2.98, z: -2.42 },
   cauldron: { x: 0, z: 0.8 },
+  furnace: { x: -1.2, z: 0.8 },
+  wheel: { x: 1.2, z: 0.8 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [
     { id: 'left-front', name: 'Left Front Table', x: -2.95, z: 1.85, kind: 'table' },
@@ -574,7 +656,13 @@ export function stationForRecipe(recipe) {
   if (!recipe) return 'anvil';
   if (recipe.category === 'food') return 'range';
   if (recipe.category === 'potion') return 'cauldron';
+  if (recipe.category === 'smelt') return 'furnace';
+  if (recipe.category === 'spin') return 'wheel';
   return 'anvil';
+}
+
+export function isMaterialCraft(recipe) {
+  return Boolean(recipe?.outputMaterial);
 }
 
 export function anvilTabForRecipe(recipe) {
@@ -612,6 +700,8 @@ export function recipeCost(recipe) {
 export function recipesForTab(tabId, subtabId = null) {
   if (tabId === 'potion') return recipeList().filter((recipe) => recipe.category === 'potion');
   if (tabId === 'food') return recipeList().filter((recipe) => recipe.category === 'food');
+  if (tabId === 'smelt') return recipeList().filter((recipe) => recipe.category === 'smelt');
+  if (tabId === 'spin') return recipeList().filter((recipe) => recipe.category === 'spin');
   const combatClass = tabId === 'ranged' ? 'range' : tabId;
   const list = recipeList().filter((recipe) => recipe.combatClass === combatClass);
   if (subtabId === 'weapon' || subtabId === 'armour') {

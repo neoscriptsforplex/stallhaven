@@ -357,6 +357,13 @@ h2 {
   color: #f0d9a8;
 }
 
+.mat-crafted {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #c4a06a;
+}
+
 button {
   font: inherit;
   cursor: pointer;

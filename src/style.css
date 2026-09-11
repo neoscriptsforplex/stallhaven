@@ -185,6 +185,26 @@ body {
   width: min(460px, calc(100vw - 32px));
 }
 
+.shelf-slot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.shelf-slot-grid button {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  min-height: 3.4rem;
+  padding: 8px 10px;
+}
+
+.shelf-slot-grid button:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
 #mat-strip {
   position: absolute;
   left: 0;
@@ -613,7 +633,9 @@ body.modal-open #view {
 #offer-modal .offer-row,
 #display-modal .sheet,
 #display-modal .offer-list,
-#display-modal .offer-row {
+#display-modal .offer-row,
+#display-modal .shelf-slot-grid,
+#display-modal .shelf-slot-grid button {
   pointer-events: auto;
   position: relative;
   z-index: 1;

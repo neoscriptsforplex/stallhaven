@@ -493,11 +493,14 @@ export function bindHud(root, state, world) {
     const pickEl = displayModal.querySelector('[data-display-pick]');
     const slotEl = displayModal.querySelector('[data-display-slot]');
     const confirm = displayModal.querySelector('[data-display-confirm]');
+    const slotGrid = displayModal.querySelector('[data-display-slots]');
     const index = displayTarget?.index ?? state.selectedDisplay;
     const kind = displayKind(index, state);
-    const slotIndex = displayTarget?.slotIndex ?? 0;
-    if (kind === 'shelf') {
-      slotEl.textContent = `Placing on ${SHELF_SLOT_LABELS[slotIndex] ?? 'a shelf slot'}. The current item, if any, returns to the chest.`;
+    const isShelf = kind === 'shelf';
+    if (slotGrid) slotGrid.hidden = !isShelf;
+    if (confirm) confirm.hidden = isShelf;
+    if (isShelf) {
+      slotEl.textContent = 'Pick a chest item, then a shelf slot. An occupied slot sends its ware back to the chest.';
     } else {
       slotEl.textContent = 'Placing on this table. The current item, if any, returns to the chest.';
     }
@@ -507,7 +510,8 @@ export function bindHud(root, state, world) {
       selectedDisplayId = null;
       displayItems.innerHTML = '<p class="empty">The chest is empty. Craft a ware, then display it here.</p>';
       pickEl.textContent = 'No chest item to display.';
-      confirm.disabled = true;
+      if (confirm) confirm.disabled = true;
+      paintShelfSlotButtons(index, false);
       return;
     }
     if (selectedDisplayId && !items.some((item) => item.recipeId === selectedDisplayId)) {
@@ -532,11 +536,33 @@ export function bindHud(root, state, world) {
     }
     const selected = items.find((item) => item.recipeId === selectedDisplayId);
     if (selected) {
-      pickEl.textContent = `Selected: ${selected.recipe.name}.`;
-      confirm.disabled = false;
+      pickEl.textContent = isShelf
+        ? `Selected: ${selected.recipe.name}. Click Top Left, Top Right, Bottom Left, or Bottom Right.`
+        : `Selected: ${selected.recipe.name}.`;
+      if (confirm) confirm.disabled = false;
     } else {
-      pickEl.textContent = 'No item selected yet. Click a chest item, then Place.';
-      confirm.disabled = true;
+      pickEl.textContent = isShelf
+        ? 'No item selected yet. Click a chest item, then a shelf slot.'
+        : 'No item selected yet. Click a chest item, then Place.';
+      if (confirm) confirm.disabled = true;
+    }
+    paintShelfSlotButtons(index, Boolean(selectedDisplayId));
+  }
+
+  function paintShelfSlotButtons(index, canPlace) {
+    const slotGrid = displayModal?.querySelector('[data-display-slots]');
+    if (!slotGrid || slotGrid.hidden) return;
+    const slots = state.displays[index]?.shelfSlots ?? [];
+    for (const btn of slotGrid.querySelectorAll('[data-shelf-slot]')) {
+      const slot = Number(btn.dataset.shelfSlot);
+      const occ = btn.querySelector('[data-shelf-occ]');
+      const occupying = slots[slot] ? RECIPES[slots[slot]] : null;
+      if (occ) {
+        occ.textContent = occupying
+          ? (canPlace ? `Swap · ${occupying.name}` : occupying.name)
+          : (canPlace ? 'Place here' : 'Empty');
+      }
+      btn.disabled = !canPlace;
     }
   }
 
@@ -545,6 +571,25 @@ export function bindHud(root, state, world) {
     if (!chestList(state).some((item) => item.recipeId === recipeId)) return false;
     selectedDisplayId = recipeId;
     paintDisplayPicker();
+    return true;
+  }
+
+  function confirmDisplay(slotIndex = 0) {
+    const recipeId = selectedDisplayId;
+    const index = displayTarget?.index ?? state.selectedDisplay;
+    if (!recipeId || !placeOnDisplay(state, recipeId, index, slotIndex)) {
+      paintDisplayPicker();
+      return false;
+    }
+    playClick('ui');
+    const slotName = displayKind(index, state) === 'shelf' ? SHELF_SLOT_LABELS[slotIndex] : null;
+    pushLog(state, slotName
+      ? `Displayed ${RECIPES[recipeId].name} on ${slotName}.`
+      : `Displayed ${RECIPES[recipeId].name}.`);
+    world.syncDisplays();
+    world.refreshSelection(true);
+    closeDisplayPicker();
+    render(performance.now() / 1000);
     return true;
   }
 
@@ -882,19 +927,14 @@ export function bindHud(root, state, world) {
   displayModal?.querySelector('[data-display-confirm]')?.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const recipeId = selectedDisplayId;
-    const index = displayTarget?.index ?? state.selectedDisplay;
-    const slotIndex = displayTarget?.slotIndex ?? 0;
-    if (!recipeId || !placeOnDisplay(state, recipeId, index, slotIndex)) {
-      paintDisplayPicker();
-      return;
-    }
-    playClick('ui');
-    pushLog(state, `Displayed ${RECIPES[recipeId].name}.`);
-    world.syncDisplays();
-    world.refreshSelection(true);
-    closeDisplayPicker();
-    render(performance.now() / 1000);
+    confirmDisplay(0);
+  });
+  displayModal?.querySelector('[data-display-slots]')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-shelf-slot]');
+    if (!btn || btn.disabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    confirmDisplay(Number(btn.dataset.shelfSlot));
   });
 
   craftModal.querySelector('[data-craft-close]').addEventListener('click', closeCraft);

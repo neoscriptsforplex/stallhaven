@@ -16,6 +16,7 @@ import {
   ANVIL_SUBTABS,
   nearestShelfSlot,
   SHELF_SLOT_COUNT,
+  SHELF_SLOT_LABELS,
   offerClassOf,
 } from './catalog.js';
 import {
@@ -152,6 +153,7 @@ describe('stall economy', () => {
     assert.equal(state.displays[shelfIndex].shelfSlots[0], 'bronze_sword');
     assert.equal(state.displays[shelfIndex].shelfSlots[3], 'bread');
     assert.equal(SHELF_SLOT_COUNT, 4);
+    assert.deepEqual(SHELF_SLOT_LABELS, ['Top Left', 'Top Right', 'Bottom Left', 'Bottom Right']);
     assert.equal(nearestShelfSlot(-0.4, 0.02), 0);
     assert.equal(nearestShelfSlot(0.4, 0.02), 1);
     assert.equal(nearestShelfSlot(-0.4, -0.44), 2);

@@ -13,7 +13,6 @@ import {
   displayKind,
   emptySlots,
   emptyShelfSlots,
-  nearestShelfSlot,
   shelfSlotPoses,
   SHELF_SLOT_COUNT,
 } from './catalog.js';
@@ -668,13 +667,6 @@ export function createWorld(canvas, state) {
     return true;
   }
 
-  function nearestShelfSlotFromPoint(index, point) {
-    const slot = displays[index];
-    if (!slot || slot.spot.kind !== 'shelf' || !point) return 0;
-    const local = slot.wareAnchor.worldToLocal(point.clone());
-    return nearestShelfSlot(local.x, local.y, local.z);
-  }
-
   function hitFurniture(hits) {
     const chestHit = hits.find((h) => h.object.userData.kind === 'chest');
     const interactHits = hits.filter((h) => (
@@ -833,15 +825,11 @@ export function createWorld(canvas, state) {
     if (data.kind === 'display') {
       state.selectedDisplay = data.displayIndex;
       refreshSelection();
-      const slotIndex = displayKind(data.displayIndex, state) === 'shelf'
-        ? nearestShelfSlotFromPoint(data.displayIndex, picked.point)
-        : 0;
       pickHandler?.({
         type: 'furn-menu',
         furniture: {
           ...furn,
           kind: displayKind(data.displayIndex, state),
-          slotIndex,
         },
         clientX: event.clientX,
         clientY: event.clientY,

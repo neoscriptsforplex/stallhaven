@@ -102,7 +102,7 @@ function buildClouds() {
       s.position.set(j * 1.35 - 1.2, rand() * 0.35, (rand() - 0.5) * 1.1);
       puff.add(s);
     }
-    puff.position.set((rand() - 0.5) * 48, 13 + rand() * 7, (rand() - 0.5) * 48);
+    puff.position.set((rand() - 0.5) * 34, 8.5 + rand() * 5, 6 + (rand() - 0.4) * 30);
     puff.userData.drift = 0.12 + rand() * 0.18;
     group.add(puff);
   }
@@ -542,17 +542,23 @@ export function createWorld(canvas, state) {
   let lastNow = 0;
   const goblins = [];
 
-  function grassWanderPoint() {
+  function grassWanderPoint(from = null) {
     const grass = gardenBox(state.expansions ?? []);
-    for (let i = 0; i < 24; i += 1) {
+    for (let i = 0; i < 28; i += 1) {
       const x = grass.minX + 1.4 + Math.random() * (grass.maxX - grass.minX - 2.8);
       const z = grass.minZ + 1.4 + Math.random() * (grass.maxZ - grass.minZ - 2.8);
       if (pointOnFloors(x, z, floors, 0.45)) continue;
-      if (pointHitsShop(x, z, state.expansions ?? [], 0.6)) continue;
-      if (Math.abs(x) < 1.35 && z > 3.6) continue;
+      if (pointHitsShop(x, z, state.expansions ?? [], 1.05)) continue;
+      if (Math.abs(x) < 1.55 && z > 3.4) continue;
+      if (from) {
+        if (from.x < -2 && x > 1.2) continue;
+        if (from.x > 2 && x < -1.2) continue;
+        if (from.z > 4.2 && z < 1.5) continue;
+        if (from.z < -2 && z > 2.2) continue;
+      }
       return { x, z };
     }
-    return { x: -6.2, z: 8.4 };
+    return { x: from?.x ?? -6.2, z: from?.z ?? 8.4 };
   }
 
   function spawnGoblins() {
@@ -565,7 +571,7 @@ export function createWorld(canvas, state) {
       scene.add(mesh);
       goblins.push({
         mesh,
-        goal: grassWanderPoint(),
+        goal: grassWanderPoint(start),
         waitUntil: 0,
       });
     }
@@ -585,13 +591,20 @@ export function createWorld(canvas, state) {
       const dist = Math.hypot(dx, dz);
       if (dist < 0.18) {
         gob.waitUntil = now + 1.2 + Math.random() * 2.4;
-        gob.goal = grassWanderPoint();
+        gob.goal = grassWanderPoint({ x: pos.x, z: pos.z });
         continue;
       }
       const step = 0.72 * dt;
       const t = Math.min(1, step / dist);
-      pos.x += dx * t;
-      pos.z += dz * t;
+      const nx = pos.x + dx * t;
+      const nz = pos.z + dz * t;
+      if (pointHitsShop(nx, nz, state.expansions ?? [], 0.95) || pointOnFloors(nx, nz, floors, 0.4)) {
+        gob.goal = grassWanderPoint({ x: pos.x, z: pos.z });
+        gob.waitUntil = now + 0.35;
+        continue;
+      }
+      pos.x = nx;
+      pos.z = nz;
       gob.mesh.rotation.y = Math.atan2(dx, dz);
       gob.mesh.position.y = Math.abs(Math.sin(now * 5)) * 0.03;
     }

@@ -557,7 +557,7 @@ body.modal-open #view {
 
 .craft-sheet,
 #potion-modal .craft-sheet {
-  width: min(1480px, calc(100vw - 24px));
+  width: min(880px, calc(100vw - 24px));
   max-height: min(92vh, 920px);
   overflow: hidden;
   display: flex;
@@ -895,6 +895,11 @@ body.modal-open #view {
   color: var(--parchment);
   max-height: min(88vh, 820px);
   overflow: auto;
+}
+
+.sheet.craft-sheet,
+#potion-modal .sheet.craft-sheet {
+  width: min(880px, calc(100vw - 24px));
 }
 
 .sheet h2 {

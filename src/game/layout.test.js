@@ -26,6 +26,8 @@ import {
   snapToFloor,
   walkFloors,
   wallVineMounts,
+  outdoorWalkFloors,
+  playerWalkFloors,
 } from './layout.js';
 import { FLOOR, isWalkable, shopObstacles } from './nav.js';
 import { SHOP } from './catalog.js';
@@ -158,5 +160,15 @@ describe('layout numbers', () => {
     assert.ok(Math.abs(side.x - 1.4) < 1e-9);
     assert.ok(Math.abs(along.z - 1.4) < 1e-9);
     assert.notEqual(along.z, side.z);
+  });
+
+  it('lets the player walk the grass and path outside the shop', () => {
+    const outdoor = outdoorWalkFloors([]);
+    const player = playerWalkFloors([]);
+    assert.ok(outdoor.length >= 4);
+    assert.ok(player.length > walkFloors([]).length);
+    assert.equal(isWalkable(0, 6.2, [], 0.28, player), true);
+    assert.equal(isWalkable(0, 6.2, [], 0.28, [FLOOR]), false);
+    assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, shopObstacles(SHOP), 0.28, player), true);
   });
 });

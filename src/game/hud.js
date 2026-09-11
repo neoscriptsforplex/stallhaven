@@ -2,16 +2,21 @@ import {
   ANVIL_SUBTABS,
   ANVIL_TABS,
   CUSTOMERS,
+  FACE_HAIR,
+  HAIR_STYLES,
   MATERIALS,
+  PLAYER_COLORS,
   RECIPES,
   SKYBOXES,
   anvilSubtabForRecipe,
   anvilTabForRecipe,
   classLabel,
   costLabel,
+  defaultAppearance,
   displayKind,
   formatGold,
   materialList,
+  normalizeAppearance,
   offerClassLabel,
   offerClassOf,
   recipeMatsLabel,
@@ -33,6 +38,7 @@ import {
   playTrackAt,
   removePlaylistTrack,
   setMusicVolume,
+  skipTrack,
   stopMusic,
   toggleShuffle,
 } from './audio.js';
@@ -57,6 +63,7 @@ import {
   craftDuration,
   craftProgress,
   DEFAULT_MUSIC_VOLUME,
+  discardFromChest,
   fillStandFromRecipe,
   furnitureNeedGold,
   hasStock,
@@ -127,6 +134,7 @@ export function bindHud(root, state, world) {
   let fillClass = 'melee';
   let selectedFillId = null;
   let fillTarget = null;
+  let pendingDiscardId = null;
 
   let craftTab = 'melee';
   let craftSubtab = 'weapon';
@@ -311,6 +319,16 @@ export function bindHud(root, state, world) {
     if (event.target === chestModal) closeChest();
   });
   chestItems.addEventListener('click', (event) => {
+    const discardBtn = event.target.closest('[data-discard]');
+    if (discardBtn) {
+      pendingDiscardId = discardBtn.dataset.discard;
+      const box = chestModal.querySelector('[data-discard-box]');
+      const msg = chestModal.querySelector('[data-discard-msg]');
+      const recipe = RECIPES[pendingDiscardId];
+      if (msg) msg.textContent = `Throw away ${recipe?.name ?? 'this ware'}? It cannot be undone.`;
+      if (box) box.hidden = false;
+      return;
+    }
     const btn = event.target.closest('[data-place]');
     if (!btn) return;
     if (placeFromChest(state, btn.dataset.place)) {
@@ -318,6 +336,21 @@ export function bindHud(root, state, world) {
       paintChest();
       render(performance.now() / 1000);
     }
+  });
+  chestModal.querySelector('[data-discard-no]')?.addEventListener('click', () => {
+    pendingDiscardId = null;
+    const box = chestModal.querySelector('[data-discard-box]');
+    if (box) box.hidden = true;
+  });
+  chestModal.querySelector('[data-discard-yes]')?.addEventListener('click', () => {
+    if (pendingDiscardId && discardFromChest(state, pendingDiscardId)) {
+      pushLog(state, `Discarded ${RECIPES[pendingDiscardId]?.name ?? 'a ware'}.`);
+    }
+    pendingDiscardId = null;
+    const box = chestModal.querySelector('[data-discard-box]');
+    if (box) box.hidden = true;
+    paintChest();
+    render(performance.now() / 1000);
   });
 
   function setModalOpen() {
@@ -476,6 +509,8 @@ export function bindHud(root, state, world) {
     const n = chestTotal(state);
     if (chestCapEl) chestCapEl.textContent = `Level ${level} · ${n} / ${cap} slots`;
     const items = chestList(state);
+    const discardBox = chestModal.querySelector('[data-discard-box]');
+    if (discardBox && !pendingDiscardId) discardBox.hidden = true;
     if (!items.length) {
       chestItems.innerHTML = '<p class="empty">The chest is empty. Craft a ware and it will land here.</p>';
       return;
@@ -487,7 +522,10 @@ export function bindHud(root, state, world) {
           <strong>${recipe.name}</strong>
           <span class="meta">×${count} · ${classLabel(recipe.combatClass, recipe.category)} · sells ${formatGold(recipe.price)}g</span>
         </div>
-        ${standSelected ? `<button type="button" data-place="${recipe.id}">Place on Stand</button>` : ''}
+        <div class="chest-actions">
+          ${standSelected ? `<button type="button" data-place="${recipe.id}">Place on Stand</button>` : ''}
+          <button type="button" class="chest-bin" data-discard="${recipe.id}" title="Discard">🗑</button>
+        </div>
       </div>
     `).join('');
   }
@@ -1299,17 +1337,18 @@ export function bindHud(root, state, world) {
   });
   buildModal.querySelector('[data-table-buy]')?.addEventListener('click', () => startFurniturePlace('table'));
   buildModal.querySelector('[data-mannequin-buy]')?.addEventListener('click', () => startFurniturePlace('mannequin'));
-  placeModal.querySelector('[data-place-cancel]').addEventListener('click', () => {
-    closePlace(true);
-    render(performance.now() / 1000);
-  });
-  placeModal.querySelector('[data-place-confirm]').addEventListener('click', () => {
-    const pose = world.getPlacePose();
-    const pending = pendingPlace;
-    if (!pose || !pending) {
+  function confirmPendingPlace() {
+    if (!pendingPlace) return;
+    const check = world.tryConfirmPlace?.() ?? { ok: Boolean(world.getPlacePose()), pose: world.getPlacePose() };
+    if (!check?.ok) {
+      pendingPlace.note = check?.reason ?? 'Cannot place there.';
+      paintPlaceDock();
+      pushLog(state, pendingPlace.note);
       render(performance.now() / 1000);
       return;
     }
+    const pose = check.pose;
+    const pending = pendingPlace;
     if (pending.type === 'cauldron') {
       if (state.gold < CAULDRON_COST) {
         pendingPlace.note = `Need ${formatGold(CAULDRON_COST)}g. You have ${formatGold(state.gold)}g.`;
@@ -1348,6 +1387,14 @@ export function bindHud(root, state, world) {
     const label = furnitureLabelForType(pending.type);
     pushLog(state, `Placed a ${label.toLowerCase()} for ${formatGold(cost)} gp.`);
     render(performance.now() / 1000);
+  }
+
+  placeModal.querySelector('[data-place-cancel]').addEventListener('click', () => {
+    closePlace(true);
+    render(performance.now() / 1000);
+  });
+  placeModal.querySelector('[data-place-confirm]').addEventListener('click', () => {
+    confirmPendingPlace();
   });
 
   furnMenu.querySelector('[data-furn-close]').addEventListener('click', hideFurnMenu);
@@ -1600,6 +1647,10 @@ export function bindHud(root, state, world) {
     stopMusic();
     paintMusic();
   });
+  musicDock?.querySelector('[data-music-skip]')?.addEventListener('click', async () => {
+    await skipTrack();
+    paintMusic();
+  });
   musicDock?.querySelector('[data-music-volume]')?.addEventListener('input', (event) => {
     const volume = Number(event.target.value) / 100;
     setMusicVolume(volume);
@@ -1619,11 +1670,58 @@ export function bindHud(root, state, world) {
   });
   setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
 
+  function lookOptions(slot) {
+    if (slot === 'hair') return HAIR_STYLES;
+    if (slot === 'faceHair') return FACE_HAIR;
+    return PLAYER_COLORS[slot] ?? [];
+  }
+
+  function fillLookGrids() {
+    if (!settingsDock) return;
+    for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
+      const row = settingsDock.querySelector(`[data-look="${slot}"]`);
+      if (!row || row.dataset.ready) continue;
+      row.innerHTML = lookOptions(slot).map((item) => (
+        `<button type="button" data-look-id="${item.id}">${item.label}</button>`
+      )).join('');
+      row.dataset.ready = '1';
+      row.addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-look-id]');
+        if (!btn) return;
+        const next = normalizeAppearance({
+          ...(state.appearance ?? defaultAppearance()),
+          [slot]: btn.dataset.lookId,
+        });
+        const applied = world.setAppearance?.(next);
+        if (applied === false) {
+          state.appearance = next;
+        }
+        paintSettings();
+        render(performance.now() / 1000);
+      });
+    }
+  }
+
   function paintSettings() {
     if (!settingsDock) return;
+    fillLookGrids();
     const current = state.skybox ?? 'blue';
     for (const btn of settingsDock.querySelectorAll('[data-skybox]')) {
       btn.classList.toggle('is-on', btn.dataset.skybox === current);
+    }
+    const look = normalizeAppearance(state.appearance);
+    for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
+      const row = settingsDock.querySelector(`[data-look="${slot}"]`);
+      if (!row) continue;
+      for (const btn of row.querySelectorAll('[data-look-id]')) {
+        btn.classList.toggle('is-on', btn.dataset.lookId === look[slot]);
+      }
+    }
+    const note = settingsDock.querySelector('[data-look-note]');
+    if (note) {
+      note.textContent = world.hasCustomPlayer?.()
+        ? 'A custom player mesh is active. Walking still works; hair and colour customizer may not apply until you clear the upload.'
+        : 'Hair, shirt, legs, boots, and face hair save with the shop.';
     }
   }
 
@@ -1674,6 +1772,9 @@ export function bindHud(root, state, world) {
     }
     const messages = {
       motherlode: 'Motherlode: +10,000 gp.',
+      '-motherlode': state.gold <= 0
+        ? '−Motherlode: −10,000 gp (clamped at 0).'
+        : '−Motherlode: −10,000 gp.',
       freshstart: 'Fresh start. All progress reset.',
       maxcape: 'Maxcape: every craft line is unlocked.',
       onesmallfavour: 'A chef hat sits on your head.',
@@ -1698,6 +1799,18 @@ export function bindHud(root, state, world) {
     if (event.type === 'expand-pad') paintExpand();
     if (event.type === 'customer' && event.actor?.state === 'request') openTrade(event.actor);
     if (event.type === 'furniture-cancel') closePlace();
+    if (event.type === 'furniture-place-confirm' && pendingPlace) confirmPendingPlace();
+    if (event.type === 'furniture-place-blocked' && pendingPlace) {
+      pendingPlace.note = event.reason || 'That spot overlaps other furniture.';
+      paintPlaceDock();
+      render(performance.now() / 1000);
+    }
+    if (event.type === 'trapdoor') {
+      fadeShop(() => world.enterDungeon?.());
+    }
+    if (event.type === 'ladder') {
+      fadeShop(() => world.exitDungeon?.());
+    }
   });
 
   function closeHelp() {

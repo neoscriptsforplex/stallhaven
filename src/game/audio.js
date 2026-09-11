@@ -234,6 +234,15 @@ export function stopMusic() {
   stopCurrent(true);
 }
 
+export async function skipTrack() {
+  if (!playlist.length) return false;
+  if (currentIndex < 0) return playTrackAt(0);
+  const next = shuffle && playlist.length > 1
+    ? pickShuffledIndex(currentIndex)
+    : (currentIndex + 1) % playlist.length;
+  return playTrackAt(next);
+}
+
 export function clearMusic() {
   stopCurrent();
   for (const track of playlist) {

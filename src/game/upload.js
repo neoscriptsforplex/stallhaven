@@ -30,6 +30,12 @@ function syncModalClass() {
   document.body.classList.toggle('modal-open', any);
 }
 
+const KIND_IDS = {
+  furniture: 'furniture-look',
+  player: 'player-look',
+  customer: 'customer-look',
+};
+
 export function bindUploadUI({ button, modal, state, world, onChange }) {
   const fileInput = modal.querySelector('input[type="file"]');
   const pickBtn = modal.querySelector('[data-upload-pick]');
@@ -37,6 +43,8 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
   const title = modal.querySelector('[data-import-name]');
   const furnitureBtn = modal.querySelector('[data-tag="furniture"]');
   const wareBtn = modal.querySelector('[data-tag="ware"]');
+  const playerBtn = modal.querySelector('[data-tag="player"]');
+  const customerBtn = modal.querySelector('[data-tag="customer"]');
   const tagRow = modal.querySelector('[data-tags]');
   const recipeRow = modal.querySelector('[data-recipes]');
   const cancelBtn = modal.querySelector('[data-cancel]');
@@ -89,7 +97,6 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
     }
     try {
       const scene = await parseModelFile(file);
-      normalizeImported(scene, 1, true);
       const buffer = await file.arrayBuffer();
       pending = {
         id: `up-${Date.now()}`,
@@ -106,32 +113,67 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
       title.textContent = file.name;
       pending = null;
       showTags(false);
-      showError(err.message || 'Could not read that model.');
+      showError(err.message || 'Could not read that model. The default look is unchanged.');
       modal.hidden = false;
       syncModalClass();
+    }
+  }
+
+  async function persist(record) {
+    try {
+      await saveModel(record);
+    } catch {
+      // Memory-only is fine for a session.
     }
   }
 
   async function applyTag(kind, recipeId) {
     if (!pending) return;
     const record = {
-      id: pending.id,
+      id: KIND_IDS[kind] ?? pending.id,
       name: pending.name,
       kind,
       recipeId: recipeId ?? null,
       displayIndex: kind === 'furniture' ? state.selectedDisplay : null,
       buffer: pending.buffer,
     };
-    try {
-      await saveModel(record);
-    } catch {
-      // Memory-only is fine for a session.
-    }
+
     if (kind === 'furniture') {
-      world.replaceFurniture(state.selectedDisplay, pending.scene);
-    } else {
-      world.bindWareLook(recipeId, pending.scene);
+      try {
+        const furniture = pending.scene.clone(true);
+        normalizeImported(furniture, 1.25, true);
+        await persist(record);
+        world.replaceFurniture(state.selectedDisplay, pending.scene);
+      } catch (err) {
+        showError(err.message || 'Could not replace that furniture. The table is unchanged.');
+        return;
+      }
+    } else if (kind === 'ware') {
+      try {
+        const ware = pending.scene.clone(true);
+        normalizeImported(ware, 0.55, true);
+        await persist(record);
+        world.bindWareLook(recipeId, pending.scene);
+      } catch (err) {
+        showError(err.message || 'Could not bind that ware. The recipe look is unchanged.');
+        return;
+      }
+    } else if (kind === 'player') {
+      const result = world.setPlayerLook(pending.scene);
+      if (!result?.ok) {
+        showError(result?.reason || 'Could not use that as a player model. The default character is unchanged.');
+        return;
+      }
+      await persist(record);
+    } else if (kind === 'customer') {
+      const result = world.setCustomerLook(pending.scene);
+      if (!result?.ok) {
+        showError(result?.reason || 'Could not use that as a customer model. Default travelers are unchanged.');
+        return;
+      }
+      await persist(record);
     }
+
     onChange();
     close();
   }
@@ -158,6 +200,8 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
   });
 
   furnitureBtn.addEventListener('click', () => applyTag('furniture'));
+  playerBtn?.addEventListener('click', () => applyTag('player'));
+  customerBtn?.addEventListener('click', () => applyTag('customer'));
   wareBtn.addEventListener('click', () => {
     recipeRow.hidden = false;
   });

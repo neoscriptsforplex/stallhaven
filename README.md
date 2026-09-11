@@ -27,7 +27,7 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 5. **Click the traveler at the front** to open trade: **Sell** if you have the item, **Offer** a different chest item at a reduced price (click the item, then Confirm), **Craft** what they asked for on the anvil, range, or cauldron, **Refuse** to send them off, or **Buy their goods** for a scrap of material.
 6. Basic materials refill slowly on their own up to 250; higher-tier metals refill slower. Restock with gold from a craft window (anvil, range, or cauldron). Clicks make a short sound.
 7. **Save** and **Load** in the top right write or read a JSON file on your computer. The fullscreen button fills the window. **Upgrade** unlocks extra rooms (10,000g, then ×3, up to 5: click a pad, then Confirm), extra **tables** and **mannequins** (500g, then ×3 per type; starting pieces do not count), and a **cauldron** for 10,000 gp. Side rooms clear the trees on that side of the shop. The music-note button (right of Load) plays uploaded MP3, WAV, or OGG tracks as a playlist.
-8. Optional: tap **Upload** beside Coins to add a `.glb` or `.gltf`. Tag it **Furniture** to replace the selected table, or **Ware** to change how a recipe looks. Models stay in this browser only.
+8. Optional: tap **Upload** beside Coins to add a `.glb` or `.gltf`. Tag it **Furniture** (selected table), **Ware** (a recipe look), **Player** (your character mesh), or **Customer** (shared NPC body; types keep colours and labels). Models stay in this browser. A custom player mesh still walks; hair/colour customizer may not apply to it.
 
 You start with 40 gold. Bronze gear, a Staff, Blue D'hide, and Bread are unlocked.
 

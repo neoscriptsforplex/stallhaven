@@ -15,6 +15,8 @@ import {
   displayKind,
   emptySlots,
   emptyShelfSlots,
+  mostExpensiveChestId,
+  scheduleKingRoald,
   shelfSlotPoses,
   SHELF_SLOT_COUNT,
 } from './catalog.js';
@@ -25,12 +27,22 @@ import {
   FURNITURE_SNAP,
   cloneFurniture,
   gardenBox,
+  gardenTrapdoorSpot,
+  playerWalkFloors,
   pointHitsShop,
   pointOnFloors,
   snapToFloor,
   walkFloors,
 } from './layout.js';
-import { PLAYER_RADIUS, floorsForState, liveObstacles, planWalk, queueSlot } from './nav.js';
+import {
+  PLAYER_RADIUS,
+  floorsForState,
+  liveObstacles,
+  placementBlocked,
+  planPlayerWalk,
+  planWalk,
+  queueSlot,
+} from './nav.js';
 import { playClick } from './audio.js';
 import {
   buildAdventurer,
@@ -49,9 +61,11 @@ import {
   setDoorOpen,
   setSpeechText,
   slotPose,
+  updateWalkPose,
   wareTopY,
+  wrapImportedCharacter,
 } from './models.js';
-import { buildCauldron, buildRange, buildShop } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildRange, buildShop } from './shopbuild.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
@@ -157,6 +171,7 @@ export function createWorld(canvas, state) {
   let groundGroup = null;
   let padGroup = null;
   let floors = walkFloors(state.expansions ?? []);
+  let playerFloors = playerWalkFloors(state.expansions ?? []);
   const obstacles = liveObstacles(state);
   let expandMode = false;
   let selectedPad = null;
@@ -190,6 +205,7 @@ export function createWorld(canvas, state) {
     scene.add(groundGroup);
     scene.add(padGroup);
     floors = floorsForState(state);
+    playerFloors = playerWalkFloors(state.expansions ?? []);
     rebuildNav();
     rebuildSnapGrid();
   }
@@ -206,13 +222,24 @@ export function createWorld(canvas, state) {
   const dust = buildDust();
   scene.add(dust);
 
-  const shopkeeper = buildShopkeeper({ chefHat: Boolean(state.chefHat) });
+  let shopkeeper = buildShopkeeper({
+    chefHat: Boolean(state.chefHat),
+    appearance: state.appearance,
+  });
   shopkeeper.position.set(SHOP.keeper.x, 0, SHOP.keeper.z);
   shopkeeper.rotation.y = 0.35;
   shopkeeper.scale.setScalar(1.16);
   scene.add(shopkeeper);
+  let customPlayerSource = null;
+  let customCustomerSource = null;
   const clouds = buildClouds();
   scene.add(clouds);
+  let sceneMode = 'shop';
+  let dungeon = null;
+  let pendingUse = null;
+  let lastPlaceClickAt = 0;
+  const DUNGEON_FLOOR = { minX: -5.2, maxX: 5.2, minZ: -4.2, maxZ: 4.2 };
+  const shopReturnPos = { x: SHOP.keeper.x, z: SHOP.keeper.z };
   const playerPath = [];
   const moveMarker = new THREE.Mesh(
     new THREE.RingGeometry(0.16, 0.24, 24),
@@ -356,9 +383,11 @@ export function createWorld(canvas, state) {
     const slot = displays[index];
     const pose = poseForDisplay(index);
     if (!slot || !pose) return;
+    const removed = Boolean(state.displays[index]?.removed);
+    slot.anchor.visible = !removed;
+    slot.pick.visible = !removed && !(placeDraft?.id === 'display' && placeDraft.index === index);
     slot.anchor.position.set(pose.x, 0, pose.z);
     slot.anchor.rotation.y = pose.rot ?? FURNITURE_FORWARD;
-    slot.pick.visible = !(placeDraft?.id === 'display' && placeDraft.index === index);
   }
 
   function poseOf(target) {
@@ -582,7 +611,7 @@ export function createWorld(canvas, state) {
     for (const gob of goblins) {
       if (now < gob.waitUntil) {
         gob.mesh.rotation.y += dt * 0.4;
-        gob.mesh.position.y = Math.abs(Math.sin(now * 2.2)) * 0.02;
+        updateWalkPose(gob.mesh, false, dt, now);
         continue;
       }
       const pos = gob.mesh.position;
@@ -606,7 +635,7 @@ export function createWorld(canvas, state) {
       pos.x = nx;
       pos.z = nz;
       gob.mesh.rotation.y = Math.atan2(dx, dz);
-      gob.mesh.position.y = Math.abs(Math.sin(now * 5)) * 0.03;
+      updateWalkPose(gob.mesh, true, dt, now);
     }
   }
 
@@ -621,18 +650,31 @@ export function createWorld(canvas, state) {
   }
   window.addEventListener('resize', resize);
 
+  function trapdoorPicks() {
+    const found = [];
+    architecture?.traverse((child) => {
+      if (child.userData?.kind === 'trapdoor') found.push(child);
+    });
+    dungeon?.root?.traverse((child) => {
+      if (child.userData?.kind === 'ladder') found.push(child);
+    });
+    return found;
+  }
+
   function allPicks() {
+    if (sceneMode === 'dungeon') return trapdoorPicks();
     const extra = expandMode && padGroup
       ? padGroup.children.filter((child) => child.userData.kind === 'expand-pad')
       : [];
     return [
-      ...displays.map((d) => d.pick),
+      ...displays.map((d) => d.pick).filter((pick) => pick.visible),
       chestPick,
       anvilPick,
       rangePick,
       ...(state.furniture.cauldron ? [cauldronPick] : []),
       counterPick,
       ...extra,
+      ...trapdoorPicks(),
       ...customers
         .filter((actor) => actor.state === 'request')
         .map((actor) => actor.mesh.userData.pick)
@@ -641,6 +683,7 @@ export function createWorld(canvas, state) {
   }
 
   function groundMeshes() {
+    if (sceneMode === 'dungeon') return dungeon?.grounds?.children ?? [];
     return groundGroup ? groundGroup.children : [];
   }
 
@@ -655,16 +698,19 @@ export function createWorld(canvas, state) {
 
   function setMoveTarget(x, z) {
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
-    const path = planWalk(from, { x, z }, obstacles, PLAYER_RADIUS, floors);
+    const path = sceneMode === 'dungeon'
+      ? planWalk(from, { x, z }, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
+      : planPlayerWalk(from, { x, z }, state, PLAYER_RADIUS);
     playerPath.length = 0;
     if (!path.length) {
       moveMarker.visible = false;
-      return;
+      return false;
     }
     playerPath.push(...path);
     const goal = path[path.length - 1];
     moveMarker.position.set(goal.x, 0.1, goal.z);
     moveMarker.visible = true;
+    return true;
   }
 
   function walkToward(actor, goal, dt, speed = CUSTOMER_SPEED) {
@@ -672,27 +718,68 @@ export function createWorld(canvas, state) {
     const dx = goal.x - pos.x;
     const dz = goal.z - pos.z;
     const dist = Math.hypot(dx, dz);
-    if (dist < 0.08) return true;
+    if (dist < 0.08) {
+      updateWalkPose(actor.mesh, false, dt, performance.now() / 1000);
+      return true;
+    }
     const step = speed * dt;
     const t = Math.min(1, step / dist);
     pos.x += dx * t;
     pos.z += dz * t;
     actor.mesh.rotation.y = Math.atan2(dx, dz);
-    actor.mesh.position.y = Math.abs(Math.sin(performance.now() * 0.01)) * 0.03;
+    updateWalkPose(actor.mesh, true, dt, performance.now() / 1000);
     return false;
+  }
+
+  function approachPoint(pose) {
+    const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
+    const near = { x: pose.x, z: pose.z + 0.85 };
+    const snapped = sceneMode === 'dungeon'
+      ? planWalk(from, near, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
+      : planPlayerWalk(from, near, state, PLAYER_RADIUS);
+    if (snapped.length) return snapped[snapped.length - 1];
+    return near;
+  }
+
+  function isNearPose(pose, dist = 1.15) {
+    return Math.hypot(shopkeeper.position.x - pose.x, shopkeeper.position.z - pose.z) <= dist;
+  }
+
+  function queueUse(type, pose) {
+    if (isNearPose(pose)) {
+      pendingUse = null;
+      pickHandler?.({ type });
+      return;
+    }
+    pendingUse = { type, x: pose.x, z: pose.z };
+    setMoveTarget(pose.x, pose.z + 0.7);
+    playClick('move');
   }
 
   function updatePlayer(dt, now) {
     if (playerPath.length) {
       if (walkToward({ mesh: shopkeeper }, playerPath[0], dt, PLAYER_SPEED)) {
         playerPath.shift();
-        if (!playerPath.length) moveMarker.visible = false;
+        if (!playerPath.length) {
+          moveMarker.visible = false;
+          if (pendingUse && isNearPose(pendingUse, 1.35)) {
+            const type = pendingUse.type;
+            pendingUse = null;
+            pickHandler?.({ type });
+          }
+        }
       }
       return;
     }
-    shopkeeper.position.y = Math.abs(Math.sin(now * 1.7)) * 0.018;
+    updateWalkPose(shopkeeper, false, dt, now);
+    if (pendingUse && isNearPose(pendingUse, 1.35)) {
+      const type = pendingUse.type;
+      pendingUse = null;
+      pickHandler?.({ type });
+      return;
+    }
     const front = customers.find((actor) => actor.state === 'request');
-    if (front) {
+    if (front && sceneMode === 'shop') {
       const dx = front.mesh.position.x - shopkeeper.position.x;
       const dz = front.mesh.position.z - shopkeeper.position.z;
       if (Math.hypot(dx, dz) > 0.05) shopkeeper.rotation.y = Math.atan2(dx, dz);
@@ -725,6 +812,10 @@ export function createWorld(canvas, state) {
 
   function updateRoofFade() {
     if (!roofGroup) return;
+    if (sceneMode === 'dungeon') {
+      roofGroup.visible = false;
+      return;
+    }
     const t = Math.min(1, Math.max(0, (cam.distance - ROOF_FADE_START) / (ROOF_FADE_FULL - ROOF_FADE_START)));
     roofGroup.visible = t > 0.02;
     roofGroup.traverse((child) => {
@@ -765,10 +856,60 @@ export function createWorld(canvas, state) {
     return null;
   }
 
+  function placeKindOf(target) {
+    if (!target) return 'table';
+    if (target.id === 'display') {
+      return displayKind(target.index, state) || target.kind || 'table';
+    }
+    return target.id;
+  }
+
+  function blockedPlaceReason(pose, target = moveTarget) {
+    if (!pose || !target) return 'That spot is off the shop floor.';
+    const kind = placeKindOf(target);
+    const skip = target.id === 'display' ? { id: 'display', index: target.index } : { id: target.id };
+    const blocks = liveObstacles(state, SHOP, skip);
+    return placementBlocked(pose, kind, blocks, floors, { checkAisle: kind !== 'counter' });
+  }
+
+  function visualPlacePose() {
+    if (!moveTarget) return null;
+    if (moveTarget.id === 'display') {
+      const slot = displays[moveTarget.index];
+      if (!slot) return null;
+      return { x: slot.anchor.position.x, z: slot.anchor.position.z, rot: slot.anchor.rotation.y };
+    }
+    const slot = fixtureMeshes[moveTarget.id];
+    if (!slot) return poseOf(moveTarget);
+    return { x: slot.mesh.position.x, z: slot.mesh.position.z, rot: slot.mesh.rotation.y };
+  }
+
+  function tryConfirmPlace() {
+    const pose = visualPlacePose();
+    if (!pose) return { ok: false, reason: 'Nothing to place.' };
+    const reason = blockedPlaceReason(pose);
+    if (reason) return { ok: false, reason, pose };
+    const draft = poseOf(moveTarget);
+    if (draft) {
+      draft.x = pose.x;
+      draft.z = pose.z;
+      draft.rot = pose.rot;
+    }
+    return { ok: true, pose };
+  }
+
   function placeMovingFurniture(x, z) {
     if (!moveTarget) return false;
     previewFurnitureAt(x, z);
+    const pose = visualPlacePose();
+    const reason = blockedPlaceReason(pose);
+    const cell = snapGrid?.userData.cell;
+    if (cell) cell.material.color.setHex(reason ? 0xc45a32 : 0xf0d27a);
     if (placeNeedsConfirm) return true;
+    if (reason) {
+      pickHandler?.({ type: 'furniture-place-blocked', reason });
+      return false;
+    }
     rebuildNav();
     clearMoveMode();
     return true;
@@ -809,6 +950,13 @@ export function createWorld(canvas, state) {
       if (point) {
         placeMovingFurniture(point.x, point.z);
         playClick('ui');
+        const nowClick = performance.now();
+        if (placeNeedsConfirm && nowClick - lastPlaceClickAt < 420) {
+          lastPlaceClickAt = 0;
+          pickHandler?.({ type: 'furniture-place-confirm' });
+          return;
+        }
+        lastPlaceClickAt = nowClick;
         pickHandler?.({ type: placeNeedsConfirm ? 'furniture-place-preview' : 'furniture-moved' });
       }
       return;
@@ -848,29 +996,34 @@ export function createWorld(canvas, state) {
     const picked = hitFurniture(hits);
     if (picked) {
       const data = picked.object.userData;
+      if (data.kind === 'trapdoor') {
+        const hatch = gardenTrapdoorSpot(state.expansions ?? []);
+        queueUse('trapdoor', hatch ?? { x: shopkeeper.position.x, z: shopkeeper.position.z });
+        return;
+      }
+      if (data.kind === 'ladder') {
+        queueUse('ladder', { x: -4.2, z: 0.4 });
+        return;
+      }
       if (data.kind === 'chest' && held >= 500) {
         playClick('ui');
         pickHandler?.({ type: 'chest-upgrade' });
         return;
       }
       if (data.kind === 'chest') {
-        playClick('ui');
-        pickHandler?.({ type: 'chest', furniture: { id: 'chest' } });
+        queueUse('chest', state.furniture.chest);
         return;
       }
       if (data.kind === 'anvil') {
-        playClick('ui');
-        pickHandler?.({ type: 'anvil', furniture: { id: 'anvil' } });
+        queueUse('anvil', state.furniture.anvil);
         return;
       }
       if (data.kind === 'range') {
-        playClick('ui');
-        pickHandler?.({ type: 'range', furniture: { id: 'range' } });
+        queueUse('range', state.furniture.range);
         return;
       }
       if (data.kind === 'cauldron') {
-        playClick('ui');
-        pickHandler?.({ type: 'cauldron', furniture: { id: 'cauldron' } });
+        if (state.furniture.cauldron) queueUse('cauldron', state.furniture.cauldron);
         return;
       }
       if (data.kind === 'counter') {
@@ -892,21 +1045,27 @@ export function createWorld(canvas, state) {
       const rangePos = state.furniture.range;
       const cauldronPos = state.furniture.cauldron;
       if (Math.hypot(point.x - chestPos.x, point.z - chestPos.z) < 0.72) {
-        pickHandler?.({ type: 'chest', furniture: { id: 'chest' } });
+        queueUse('chest', chestPos);
         return;
       }
       if (Math.hypot(point.x - anvilPos.x, point.z - anvilPos.z) < 0.62) {
-        pickHandler?.({ type: 'anvil', furniture: { id: 'anvil' } });
+        queueUse('anvil', anvilPos);
         return;
       }
       if (Math.hypot(point.x - rangePos.x, point.z - rangePos.z) < 0.5) {
-        pickHandler?.({ type: 'range', furniture: { id: 'range' } });
+        queueUse('range', rangePos);
         return;
       }
       if (cauldronPos && Math.hypot(point.x - cauldronPos.x, point.z - cauldronPos.z) < 0.5) {
-        pickHandler?.({ type: 'cauldron', furniture: { id: 'cauldron' } });
+        queueUse('cauldron', cauldronPos);
         return;
       }
+      const hatch = gardenTrapdoorSpot(state.expansions ?? []);
+      if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 0.7) {
+        queueUse('trapdoor', hatch);
+        return;
+      }
+      pendingUse = null;
       setMoveTarget(point.x, point.z);
       playClick('move');
       if (state.selectedDisplay !== -1) {
@@ -1307,13 +1466,52 @@ export function createWorld(canvas, state) {
   }
 
   function spawnCustomer(now) {
+    if (sceneMode !== 'shop') return;
     const inShop = customers.filter((actor) => actor.state !== 'leave').length;
     if (inShop >= MAX_CUSTOMERS) return;
-    const types = Object.keys(CUSTOMERS);
+    if (!state.kingRoaldAt) state.kingRoaldAt = scheduleKingRoald(state.playTime ?? 0);
+    const kingHere = customers.some((actor) => actor.typeId === 'kingroald' && actor.state !== 'leave');
+    const wantKing = !kingHere && (state.playTime ?? 0) >= (state.kingRoaldAt ?? Infinity);
+    const recipeId = wantKing ? mostExpensiveChestId(state) : null;
+    if (wantKing && recipeId) {
+      spawnActor('kingroald', now, {
+        recipeId,
+        gold: RECIPES[recipeId].price,
+        offer: null,
+        royal: true,
+      });
+      return;
+    }
+    if (wantKing && !recipeId) {
+      state.kingRoaldAt = (state.playTime ?? 0) + 90;
+    }
+    const types = Object.keys(CUSTOMERS).filter((id) => id !== 'kingroald');
     const typeId = firstSpawn ? 'pilgrim' : types[Math.floor(Math.random() * types.length)];
     firstSpawn = false;
     const request = decideRequest(typeId, Math.random, state);
-    const mesh = buildAdventurer(typeId);
+    if (!request) return;
+    spawnActor(typeId, now, request);
+  }
+
+  function makeCustomerMesh(typeId, seed) {
+    if (customCustomerSource) {
+      const type = CUSTOMERS[typeId] ?? CUSTOMERS.pilgrim;
+      const wrapped = wrapImportedCharacter(customCustomerSource, {
+        name: typeId,
+        label: type.name,
+        height: 1.65,
+        tint: type.robe,
+        speech: true,
+        pickKind: 'customer',
+        ring: true,
+      });
+      return wrapped;
+    }
+    return buildAdventurer(typeId, { seed });
+  }
+
+  function spawnActor(typeId, now, request) {
+    const mesh = makeCustomerMesh(typeId, customerSerial + Math.random());
     mesh.userData.pick.userData.customerId = customerSerial;
     mesh.position.set(SHOP.outside.x, 0, SHOP.outside.z + 0.15);
     setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
@@ -1335,11 +1533,16 @@ export function createWorld(canvas, state) {
       carried: null,
       queueIndex: -1,
       browsing: true,
+      royal: Boolean(request.royal),
     };
     customerSerial += 1;
     customers.push(actor);
     nextSpawnAt = now + SPAWN_GAP_MIN + Math.random() * (SPAWN_GAP_MAX - SPAWN_GAP_MIN);
-    pushLog(state, `${CUSTOMERS[typeId].name} looks around for ${RECIPES[request.recipeId].name}.`);
+    if (typeId === 'kingroald') {
+      pushLog(state, `King Roald arrives, seeking ${RECIPES[request.recipeId].name}.`);
+    } else {
+      pushLog(state, `${CUSTOMERS[typeId].name} looks around for ${RECIPES[request.recipeId].name}.`);
+    }
   }
 
   function joinQueue(actor, now) {
@@ -1395,7 +1598,8 @@ export function createWorld(canvas, state) {
   function dismissCustomer(actor, sold, farewell = null) {
     if (!actor || actor.state === 'leave') return;
     if (sold && actor.pendingCarry) {
-      actor.mesh.userData.hand.add(actor.pendingCarry);
+      const hand = actor.mesh.userData.hand ?? actor.mesh;
+      hand.add(actor.pendingCarry);
       actor.pendingCarry.position.set(0, 0, 0);
       actor.pendingCarry.scale.setScalar(0.7);
       actor.carried = actor.pendingCarry;
@@ -1403,6 +1607,9 @@ export function createWorld(canvas, state) {
     }
     setSpeechText(actor.mesh, sold ? 'Thanks!' : farewell);
     if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = false;
+    if (actor.typeId === 'kingroald') {
+      state.kingRoaldAt = scheduleKingRoald(state.playTime ?? 0);
+    }
     actor.state = 'leave';
     actor.path = [
       { x: SHOP.door.x, z: SHOP.door.z - 0.4 },
@@ -1459,6 +1666,7 @@ export function createWorld(canvas, state) {
 
   function tick(dt, now) {
     lastNow = now;
+    state.playTime = (state.playTime ?? 0) + dt;
     updatePlayer(dt, now);
     updateFollowCamera(dt);
     dust.rotation.y += dt * 0.03;
@@ -1484,9 +1692,121 @@ export function createWorld(canvas, state) {
       outlineEdgeMat.opacity = 0.82 + Math.sin(now * 3.1) * 0.16;
       outlineBoxMat.opacity = 0.72 + Math.sin(now * 2.4) * 0.18;
     }
-    updateCustomers(dt, now);
-    updateGoblins(dt, now);
+    if (sceneMode === 'shop') {
+      updateCustomers(dt, now);
+      updateGoblins(dt, now);
+    } else if (dungeon?.rats) {
+      dungeon.rats.forEach((rat, i) => {
+        rat.rotation.y += dt * (1.2 + i * 0.35);
+        rat.position.x += Math.sin(now * 1.4 + i) * dt * 0.12;
+        rat.position.x = Math.max(-4.6, Math.min(4.6, rat.position.x));
+      });
+    }
     renderer.render(scene, camera);
+  }
+
+  function replaceShopkeeperMesh(next) {
+    next.position.copy(shopkeeper.position);
+    next.rotation.copy(shopkeeper.rotation);
+    next.scale.copy(shopkeeper.scale);
+    scene.add(next);
+    scene.remove(shopkeeper);
+    shopkeeper = next;
+  }
+
+  function rebuildCustomerMeshes() {
+    for (const actor of customers) {
+      const pos = actor.mesh.position.clone();
+      const rotY = actor.mesh.rotation.y;
+      const ringOn = Boolean(actor.mesh.userData.ring?.visible);
+      const carried = actor.carried;
+      if (carried && actor.mesh.userData.hand) actor.mesh.userData.hand.remove(carried);
+      scene.remove(actor.mesh);
+      actor.mesh = makeCustomerMesh(actor.typeId, actor.id);
+      actor.mesh.position.copy(pos);
+      actor.mesh.rotation.y = rotY;
+      if (actor.mesh.userData.pick) actor.mesh.userData.pick.userData.customerId = actor.id;
+      if (actor.requestRecipeId && actor.state !== 'leave') {
+        setSpeechText(actor.mesh, `${RECIPES[actor.requestRecipeId].name}?`);
+      }
+      if (ringOn && actor.mesh.userData.ring) actor.mesh.userData.ring.visible = true;
+      if (carried) {
+        const hand = actor.mesh.userData.hand ?? actor.mesh;
+        hand.add(carried);
+      }
+      actor.mesh.visible = sceneMode === 'shop';
+      scene.add(actor.mesh);
+    }
+  }
+
+  function setShopLayerVisible(on) {
+    if (architecture) architecture.visible = on;
+    if (roofGroup) roofGroup.visible = on;
+    if (groundGroup) groundGroup.visible = on;
+    if (padGroup) padGroup.visible = on && expandMode;
+    shopDoor.visible = on;
+    dust.visible = on;
+    clouds.visible = on;
+    if (on) applyAllPoses();
+    else {
+      for (const id of Object.keys(fixtureMeshes)) {
+        const slot = fixtureMeshes[id];
+        slot.mesh.visible = false;
+        slot.pick.visible = false;
+        if (slot.glow) slot.glow.visible = false;
+      }
+      displays.forEach((slot) => {
+        slot.anchor.visible = false;
+        slot.pick.visible = false;
+      });
+    }
+    customers.forEach((actor) => {
+      actor.mesh.visible = on;
+    });
+    goblins.forEach((gob) => {
+      gob.mesh.visible = on;
+    });
+  }
+
+  function ensureDungeon() {
+    if (dungeon) return dungeon;
+    dungeon = buildDungeon();
+    dungeon.root.visible = false;
+    dungeon.grounds.visible = false;
+    scene.add(dungeon.root);
+    scene.add(dungeon.grounds);
+    return dungeon;
+  }
+
+  function enterDungeonNow() {
+    if (sceneMode === 'dungeon') return;
+    const hatch = gardenTrapdoorSpot(state.expansions ?? []);
+    shopReturnPos.x = hatch?.x ?? shopkeeper.position.x;
+    shopReturnPos.z = hatch?.z ?? shopkeeper.position.z;
+    ensureDungeon();
+    sceneMode = 'dungeon';
+    playerPath.length = 0;
+    pendingUse = null;
+    moveMarker.visible = false;
+    setShopLayerVisible(false);
+    dungeon.root.visible = true;
+    dungeon.grounds.visible = true;
+    shopkeeper.position.set(-4.15, 0, 0.4);
+    shopkeeper.rotation.y = Math.PI / 2;
+  }
+
+  function exitDungeonNow() {
+    if (sceneMode !== 'dungeon') return;
+    sceneMode = 'shop';
+    playerPath.length = 0;
+    pendingUse = null;
+    if (dungeon) {
+      dungeon.root.visible = false;
+      dungeon.grounds.visible = false;
+    }
+    setShopLayerVisible(true);
+    shopkeeper.position.set(shopReturnPos.x, 0, shopReturnPos.z);
+    shopkeeper.rotation.y = Math.PI;
   }
 
   return {
@@ -1501,12 +1821,22 @@ export function createWorld(canvas, state) {
       ?? 'Display'
     ),
     applyLayout() {
+      if (sceneMode === 'dungeon') exitDungeonNow();
       syncDisplaySlots();
       applyAllPoses();
       rebuildArchitecture();
       applyAllPoses();
       spawnGoblins();
-      setChefHatVisible(shopkeeper, Boolean(state.chefHat));
+      if (!customPlayerSource) {
+        const next = buildShopkeeper({
+          chefHat: Boolean(state.chefHat),
+          appearance: state.appearance,
+        });
+        next.scale.setScalar(1.16);
+        replaceShopkeeperMesh(next);
+      } else {
+        setChefHatVisible(shopkeeper, Boolean(state.chefHat));
+      }
       applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
     },
     setChestOpen(open) {
@@ -1601,7 +1931,12 @@ export function createWorld(canvas, state) {
     },
     confirmPlaceUnlock() {
       if (!moveTarget || !placeNeedsConfirm) return null;
-      const pose = placeDraft ? { x: placeDraft.x, z: placeDraft.z, rot: placeDraft.rot } : null;
+      const check = tryConfirmPlace();
+      if (!check.ok) {
+        pickHandler?.({ type: 'furniture-place-blocked', reason: check.reason });
+        return null;
+      }
+      const pose = { x: check.pose.x, z: check.pose.z, rot: check.pose.rot };
       const target = { id: moveTarget.id, index: moveTarget.index };
       rebuildNav();
       clearMoveMode();
@@ -1609,8 +1944,9 @@ export function createWorld(canvas, state) {
       else applyFixturePose(target.id);
       return pose;
     },
+    tryConfirmPlace,
     getPlacePose() {
-      return moveTarget && placeNeedsConfirm ? poseOf(moveTarget) : null;
+      return moveTarget && placeNeedsConfirm ? visualPlacePose() : null;
     },
     isPlacingUnlock() {
       return Boolean(placeNeedsConfirm);
@@ -1653,6 +1989,78 @@ export function createWorld(canvas, state) {
     setChefHat(on) {
       state.chefHat = Boolean(on);
       setChefHatVisible(shopkeeper, state.chefHat);
+    },
+    setAppearance(look) {
+      state.appearance = look;
+      if (customPlayerSource) return false;
+      const next = buildShopkeeper({
+        chefHat: Boolean(state.chefHat),
+        appearance: state.appearance,
+      });
+      next.scale.setScalar(1.16);
+      replaceShopkeeperMesh(next);
+      return true;
+    },
+    hasCustomPlayer() {
+      return Boolean(customPlayerSource);
+    },
+    setPlayerLook(model) {
+      try {
+        if (!model) {
+          customPlayerSource = null;
+          const next = buildShopkeeper({
+            chefHat: Boolean(state.chefHat),
+            appearance: state.appearance,
+          });
+          next.scale.setScalar(1.16);
+          replaceShopkeeperMesh(next);
+          return { ok: true };
+        }
+        const wrapped = wrapImportedCharacter(model, {
+          name: 'shopkeeper',
+          label: 'You',
+          height: 1.72,
+          chefHat: true,
+          chefHatOn: Boolean(state.chefHat),
+        });
+        wrapped.scale.setScalar(1.16);
+        customPlayerSource = model;
+        replaceShopkeeperMesh(wrapped);
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, reason: err.message || 'Could not use that as a player model.' };
+      }
+    },
+    setCustomerLook(model) {
+      try {
+        if (!model) {
+          customCustomerSource = null;
+          rebuildCustomerMeshes();
+          return { ok: true };
+        }
+        wrapImportedCharacter(model, {
+          name: 'customer',
+          label: 'Customer',
+          height: 1.65,
+          speech: true,
+          pickKind: 'customer',
+          ring: true,
+        });
+        customCustomerSource = model;
+        rebuildCustomerMeshes();
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, reason: err.message || 'Could not use that as a customer model.' };
+      }
+    },
+    enterDungeon() {
+      enterDungeonNow();
+    },
+    exitDungeon() {
+      exitDungeonNow();
+    },
+    isInDungeon() {
+      return sceneMode === 'dungeon';
     },
   };
 }

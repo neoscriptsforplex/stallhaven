@@ -10,6 +10,7 @@ import {
   SHOP_MAX_LEVEL,
   SKYBOXES,
   START_GOLD,
+  defaultAppearance,
   displayKind,
   emptyShelfSlots,
   emptySlots,
@@ -17,10 +18,12 @@ import {
   matchingArmourIds,
   masteryNeed,
   MASTERY_SPEED,
+  normalizeAppearance,
   offerClassLabel,
   offerClassOf,
   recipeCost,
   recipeList,
+  scheduleKingRoald,
 } from './catalog.js';
 import {
   CAULDRON_COST,
@@ -53,7 +56,7 @@ export {
   SKYBOXES,
 };
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
@@ -115,6 +118,11 @@ export function grantShopXp(state, recipeId) {
 
 export function applyCheat(state, raw) {
   const code = String(raw ?? '').trim().toLowerCase();
+  if (code === '-motherlode') {
+    const before = state.gold ?? 0;
+    state.gold = Math.max(0, before - 10000);
+    return '-motherlode';
+  }
   if (code === 'motherlode') {
     state.gold = (state.gold ?? 0) + 10000;
     return 'motherlode';
@@ -154,6 +162,7 @@ function emptyDisplay(spot) {
     kind,
     name: spot?.name ?? (kind === 'stand' ? 'Mannequin' : kind === 'shelf' ? 'Shelf' : 'Table'),
     bought: Boolean(spot?.bought),
+    removed: Boolean(spot?.removed),
   };
 }
 
@@ -188,6 +197,7 @@ function readSavedDisplay(saved, fallback) {
     kind,
     name: typeof saved.name === 'string' && saved.name ? saved.name : base.name,
     bought: Boolean(saved.bought || fallback?.bought),
+    removed: Boolean(saved.removed || fallback?.removed),
   };
 }
 
@@ -217,6 +227,9 @@ export function createState() {
     shopLevel: 1,
     skybox: DEFAULT_SKYBOX,
     chefHat: false,
+    appearance: defaultAppearance(),
+    playTime: 0,
+    kingRoaldAt: scheduleKingRoald(0),
     log: [],
   };
 }
@@ -337,6 +350,42 @@ export function addToChest(state, recipeId) {
   return true;
 }
 
+export function discardFromChest(state, recipeId, amount = 1) {
+  const have = chestCount(state, recipeId);
+  if (have < 1) return 0;
+  const n = Math.min(have, Math.max(1, Math.round(Number(amount) || 1)));
+  const left = have - n;
+  if (left) state.chest[recipeId] = left;
+  else delete state.chest[recipeId];
+  if (state.ready) state.ready = chestReadyIds(state);
+  return n;
+}
+
+export function backWallShelfIndex() {
+  return SHOP.displays.findIndex((spot) => spot.id === 'shelf-center');
+}
+
+export function clearBackWallShelf(state) {
+  const index = backWallShelfIndex();
+  if (index < 0) return false;
+  const display = state.displays[index];
+  if (!display || display.removed) return false;
+  const ids = [];
+  if (Array.isArray(display.shelfSlots)) {
+    for (const id of display.shelfSlots) {
+      if (id) ids.push(id);
+    }
+  } else if (display.ware?.recipeId) {
+    ids.push(display.ware.recipeId);
+  }
+  for (const id of ids) addToChest(state, id);
+  display.ware = null;
+  display.slots = emptySlots();
+  display.shelfSlots = emptyShelfSlots();
+  display.removed = true;
+  return true;
+}
+
 export function canUpgradeChest(state) {
   const level = state.chestLevel ?? 1;
   if (level >= CHEST_MAX_LEVEL) return false;
@@ -366,6 +415,7 @@ export function buyExpansion(state, padId) {
   const cost = expansionCost((state.expansions ?? []).length);
   state.gold -= cost;
   state.expansions = [...(state.expansions ?? []), padId];
+  if (padId === 'back') clearBackWallShelf(state);
   return true;
 }
 
@@ -700,6 +750,9 @@ export function serializeState(state) {
     shopLevel: shopProgress(state.shopXp ?? 0).level,
     skybox: skyboxId(state.skybox),
     chefHat: Boolean(state.chefHat),
+    appearance: normalizeAppearance(state.appearance),
+    playTime: Math.max(0, Number(state.playTime) || 0),
+    kingRoaldAt: Number.isFinite(state.kingRoaldAt) ? state.kingRoaldAt : scheduleKingRoald(Math.max(0, Number(state.playTime) || 0)),
     displays: state.displays.map((display, index) => ({
       ware: display.ware ? { recipeId: display.ware.recipeId } : null,
       furnitureId: display.furnitureId ?? null,
@@ -710,6 +763,7 @@ export function serializeState(state) {
       kind: display.kind ?? displayKind(index, state),
       name: display.name ?? SHOP.displays[index]?.name ?? null,
       bought: Boolean(display.bought),
+      removed: Boolean(display.removed),
     })),
     boughtFurniture: {
       table: boughtFurnitureCount(state, 'table'),
@@ -822,6 +876,15 @@ export function applyState(state, data) {
   next.shopLevel = shopProgress(next.shopXp).level;
   next.skybox = skyboxId(data.skybox);
   if (typeof data.chefHat === 'boolean') next.chefHat = data.chefHat;
+  next.appearance = normalizeAppearance(data.appearance);
+  if (typeof data.playTime === 'number' && Number.isFinite(data.playTime)) {
+    next.playTime = Math.max(0, data.playTime);
+  }
+  if (typeof data.kingRoaldAt === 'number' && Number.isFinite(data.kingRoaldAt)) {
+    next.kingRoaldAt = Math.max(0, data.kingRoaldAt);
+  } else {
+    next.kingRoaldAt = scheduleKingRoald(next.playTime);
+  }
   if (data.furniture && typeof data.furniture === 'object') {
     const defaults = defaultFurniture();
     const readPose = (saved, fallback) => {
@@ -870,9 +933,13 @@ export function applyState(state, data) {
   state.shopLevel = next.shopLevel;
   state.skybox = next.skybox;
   state.chefHat = next.chefHat;
+  state.appearance = next.appearance;
+  state.playTime = next.playTime;
+  state.kingRoaldAt = next.kingRoaldAt;
   state.ready = [];
   claimLoadedDisplays(state);
   refreshShowcases(state);
+  if ((state.expansions ?? []).includes('back')) clearBackWallShelf(state);
   return true;
 }
 

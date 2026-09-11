@@ -5,6 +5,7 @@ import {
   FLOOR,
   isWalkable,
   nearestWalkable,
+  placementBlocked,
   planWalk,
   queueSlot,
   shopObstacles,
@@ -60,5 +61,14 @@ describe('shop navigation', () => {
     assert.ok(behindChest);
     assert.equal(isWalkable(behindAnvil.x, behindAnvil.z, obstacles), true);
     assert.equal(isWalkable(behindChest.x, behindChest.z, obstacles), true);
+  });
+
+  it('refuses a placement that overlaps another obstacle', () => {
+    const floors = [FLOOR];
+    const blocks = [{ minX: -1, maxX: 1, minZ: -2.2, maxZ: -1.2 }];
+    const overlap = placementBlocked({ x: 0, z: -1.7, rot: 0 }, 'chest', blocks, floors, { checkAisle: false });
+    assert.equal(overlap, 'That spot overlaps other furniture.');
+    const clear = placementBlocked({ x: -2.2, z: 0.4, rot: 0 }, 'table', [], floors, { checkAisle: false });
+    assert.equal(clear, null);
   });
 });

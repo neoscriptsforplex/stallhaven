@@ -236,7 +236,7 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
   const seen = new Set();
   let steps = 0;
 
-  while (open.length && steps < 9000) {
+  while (open.length && steps < 40000) {
     steps += 1;
     let best = 0;
     for (let i = 1; i < open.length; i += 1) {
@@ -293,13 +293,15 @@ export function planPlayerWalk(from, to, state, radius = PLAYER_RADIUS) {
   const indoor = walkFloors(state?.expansions ?? []);
   const floors = playerWalkFloors(state?.expansions ?? []);
   const obstacles = playerObstacles(state);
-  const door = { x: SHOP.door.x, z: SHOP.door.z };
+  const doorIn = { x: 0, z: FLOOR.maxZ - radius - 0.08 };
+  const doorOut = { x: 0, z: FLOOR.maxZ + radius + 0.35 };
   const fromInside = indoor.some((rect) => pointInRect(from.x, from.z, rect, -0.05));
   const toInside = indoor.some((rect) => pointInRect(to.x, to.z, rect, -0.05));
   if (fromInside !== toInside) {
-    const first = findPath(from, door, obstacles, radius, floors);
-    const second = findPath(door, to, obstacles, radius, floors);
-    if (first.length || second.length) return [...first, ...second];
+    const first = findPath(from, fromInside ? doorIn : doorOut, obstacles, radius, floors);
+    const second = findPath(fromInside ? doorOut : doorIn, to, obstacles, radius, floors);
+    const joined = [...first, ...second];
+    if (joined.length) return joined;
   }
   return findPath(from, to, obstacles, radius, floors);
 }

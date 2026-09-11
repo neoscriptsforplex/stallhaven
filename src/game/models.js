@@ -638,9 +638,19 @@ export function addFaceHair(group, pose, style = 'none', color = 0x3a2416) {
 
 export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
   const rig = mesh?.userData?.rig;
+  const settle = (obj) => {
+    if (!obj) return;
+    const k = 1 - Math.exp(-dt * 16);
+    obj.rotation.x += (0 - obj.rotation.x) * k;
+    if (Math.abs(obj.rotation.x) < 0.012) obj.rotation.x = 0;
+  };
   if (!rig?.legL || !rig?.legR) {
-    if (moving) mesh.position.y = Math.abs(Math.sin(now * 8)) * 0.03;
-    else mesh.position.y = Math.abs(Math.sin(now * 1.7)) * 0.012;
+    if (moving) {
+      mesh.position.y = Math.abs(Math.sin(now * 8)) * 0.03;
+      return;
+    }
+    mesh.position.y += (0 - mesh.position.y) * (1 - Math.exp(-dt * 16));
+    if (Math.abs(mesh.position.y) < 0.002) mesh.position.y = 0;
     return;
   }
   const phase = mesh.userData.walkPhase ?? 0;
@@ -654,13 +664,13 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
     mesh.position.y = Math.abs(Math.sin(mesh.userData.walkPhase * 2)) * 0.028;
     return;
   }
-  mesh.userData.walkPhase = phase * Math.max(0, 1 - dt * 8);
-  const rest = 1 - Math.min(1, dt * 10);
-  rig.legL.rotation.x *= rest;
-  rig.legR.rotation.x *= rest;
-  if (rig.armL) rig.armL.rotation.x *= rest;
-  if (rig.armR) rig.armR.rotation.x *= rest;
-  mesh.position.y = Math.abs(Math.sin(now * 1.6)) * 0.012;
+  mesh.userData.walkPhase = 0;
+  settle(rig.legL);
+  settle(rig.legR);
+  settle(rig.armL);
+  settle(rig.armR);
+  mesh.position.y += (0 - mesh.position.y) * (1 - Math.exp(-dt * 16));
+  if (Math.abs(mesh.position.y) < 0.002) mesh.position.y = 0;
 }
 
 function hashStyle(seed) {

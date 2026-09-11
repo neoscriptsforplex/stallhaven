@@ -170,5 +170,7 @@ describe('layout numbers', () => {
     assert.equal(isWalkable(0, 6.2, [], 0.28, player), true);
     assert.equal(isWalkable(0, 6.2, [], 0.28, [FLOOR]), false);
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, shopObstacles(SHOP), 0.28, player), true);
+    assert.equal(isWalkable(0, SHOP.door.z, [], 0.28, player), true);
+    assert.equal(isWalkable(0, 4.6, [], 0.28, player), true);
   });
 });

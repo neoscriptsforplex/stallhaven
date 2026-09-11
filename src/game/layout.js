@@ -130,24 +130,23 @@ export function walkFloors(expansionIds = []) {
   return floors;
 }
 
-const DOOR_HALF = 0.65;
+const DOOR_HALF = 1.05;
 
-/** Grass, path, and the front-door strip connecting the shop to the garden. */
+/** Grass, path, and a door corridor wide enough for the player radius. */
 export function outdoorWalkFloors(expansionIds = []) {
   const grass = gardenBox(expansionIds);
   const shop = footprintBox(expansionIds);
-  const gap = 0.08;
   const frontDoor = {
     minX: -DOOR_HALF,
     maxX: DOOR_HALF,
-    minZ: ORIGIN_FLOOR.maxZ - 0.2,
-    maxZ: shop.maxZ + 0.35,
+    minZ: ORIGIN_FLOOR.maxZ - 1.05,
+    maxZ: Math.max(shop.maxZ + 1.45, PATH_START_Z + 1.15),
   };
   return [
-    { minX: grass.minX, maxX: grass.maxX, minZ: shop.maxZ + gap, maxZ: grass.maxZ },
-    { minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: shop.minZ - gap },
-    { minX: grass.minX, maxX: shop.minX - gap, minZ: shop.minZ - gap, maxZ: shop.maxZ + gap },
-    { minX: shop.maxX + gap, maxX: grass.maxX, minZ: shop.minZ - gap, maxZ: shop.maxZ + gap },
+    { minX: grass.minX, maxX: grass.maxX, minZ: shop.maxZ, maxZ: grass.maxZ },
+    { minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: shop.minZ },
+    { minX: grass.minX, maxX: shop.minX, minZ: shop.minZ, maxZ: shop.maxZ },
+    { minX: shop.maxX, maxX: grass.maxX, minZ: shop.minZ, maxZ: shop.maxZ },
     frontDoor,
   ];
 }

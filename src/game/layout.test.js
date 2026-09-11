@@ -3,13 +3,18 @@ import assert from 'node:assert/strict';
 import {
   CHEST_MAX_LEVEL,
   EXPANSION_PADS,
+  FURNITURE_FORWARD,
+  FURNITURE_ROT_STEP,
   SWAP_PRICE_RATIO,
   chestSlots,
   chestUpgradeCost,
+  defaultFurniture,
   expansionCost,
   occupiedCells,
   padConnects,
   padById,
+  rotatePose,
+  snapToFloor,
   walkFloors,
 } from './layout.js';
 import { FLOOR, isWalkable, shopObstacles } from './nav.js';
@@ -51,5 +56,27 @@ describe('layout numbers', () => {
     const obstacles = shopObstacles(SHOP);
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, obstacles, 0.28, expanded), true);
     assert.equal(occupiedCells(['left', 'back']).length, 3);
+  });
+
+  it('defaults every furniture piece to the shared door-facing rotation', () => {
+    const furniture = defaultFurniture();
+    assert.equal(furniture.counter.rot, FURNITURE_FORWARD);
+    assert.equal(furniture.anvil.rot, FURNITURE_FORWARD);
+    assert.equal(furniture.chest.rot, FURNITURE_FORWARD);
+    assert.equal(furniture.range.rot, FURNITURE_FORWARD);
+    for (const pose of furniture.displays) {
+      assert.equal(pose.rot, FURNITURE_FORWARD);
+    }
+    const turned = rotatePose(furniture.range, 1);
+    assert.ok(Math.abs(turned.rot - FURNITURE_ROT_STEP) < 1e-9);
+  });
+
+  it('snaps furniture on both floor axes, not only sideways', () => {
+    const floors = walkFloors([]);
+    const side = snapToFloor(1.37, 0.11, floors);
+    const along = snapToFloor(0.11, 1.37, floors);
+    assert.ok(Math.abs(side.x - 1.4) < 1e-9);
+    assert.ok(Math.abs(along.z - 1.4) < 1e-9);
+    assert.notEqual(along.z, side.z);
   });
 });

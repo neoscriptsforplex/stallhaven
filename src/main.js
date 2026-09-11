@@ -28,7 +28,7 @@ if (!hasWebGL()) {
   window.stallhaven = { world, state };
   const hud = bindHud(hudRoot, state, world);
   bindUploadUI({
-    zone: document.querySelector('#drop'),
+    button: document.querySelector('#upload-btn'),
     modal: document.querySelector('#import-modal'),
     state,
     world,

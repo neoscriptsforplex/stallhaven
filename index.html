@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rune Craft</title>
-    <meta name="description" content="Keep Rune Craft. Craft gear into a chest, then trade with travelers at the counter." />
+    <meta name="description" content="Rune Craft. Craft gear into a chest, then trade with travelers at the counter." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%236b4423' width='64' height='64' rx='10'/%3E%3Cpath fill='%23e8c37a' d='M12 40h40v8H12z'/%3E%3Cpath fill='%238b4336' d='M8 20h48l-6 12H14z'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./src/style.css" />
   </head>
@@ -22,10 +22,10 @@
 
     <aside id="hud">
       <header class="ledger">
-        <p class="place">A roadside shop</p>
         <h1>Rune Craft</h1>
         <div class="ledger-row">
           <p id="gold" class="gold">40g</p>
+          <button type="button" id="upload-btn" title="Upload a .glb or .gltf">Upload</button>
         </div>
         <div id="active-craft" class="active-craft" hidden>
           <p data-active-craft-name>Crafting</p>
@@ -34,16 +34,6 @@
       </header>
 
       <section class="panel" id="stock" hidden aria-label="Chest wares"></section>
-
-      <section class="panel drop-wrap" aria-label="Model upload">
-        <div id="drop" class="drop" role="button" tabindex="0">
-          <input type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
-          <strong>Drop a .glb / .gltf</strong>
-          <span>or click to choose. Tag it furniture or ware.</span>
-        </div>
-      </section>
-
-      <ol id="log" class="log" aria-live="polite"></ol>
     </aside>
 
     <p id="hint" class="hint">Click the floor to walk. Click the anvil to smith, the range to cook. Right-click the chest to upgrade it. Scroll to zoom out for the roof and garden.</p>
@@ -54,12 +44,12 @@
 
     <div id="tooltip" class="modal" hidden>
       <div class="sheet">
-        <h2>Keep Rune Craft</h2>
-        <p>You keep Rune Craft. Click the floor to walk — the camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden.</p>
-        <p>Click the anvil to smith Melee, Magic, Ranged, or Potions. Click the compact cooking range for Food. Bronze gear, a Staff, Blue d'hide, and Bread start unlocked. Craft enough of a piece to open the next tier in that line.</p>
-        <p>Travelers line up at the counter. Click the traveler at the front to sell, swap a different stocked item at a reduced price, refuse, or buy a scrap they offer.</p>
-        <p>Click the wooden chest to see your inventory. Right-click the chest to upgrade its space. Click a table, shelf, or armour stand, then place a ware. Food sits on the wall shelves.</p>
-        <p>The expand button beside Save buys extra rooms. Click furniture and use Move or Rotate — wares sit tight while the piece moves. Save and Load write a JSON file on your computer.</p>
+        <h2>How to play</h2>
+        <p>Click the floor to walk. The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden.</p>
+        <p>Click the anvil to smith Melee, Magic, Ranged, or Potions. Click the cooking range for Food. Finished pieces land in the chest. Right-click the chest to upgrade its space.</p>
+        <p>Travelers line up at the counter. Click the one at the front to sell, swap a different stocked item at a reduced price, refuse, or buy a scrap they offer.</p>
+        <p>Click a table, shelf, or armour stand, then place a ware from the chest. Food sits on the wall shelves. Click furniture for Move or Rotate — wares travel with the piece.</p>
+        <p>The expand button beside Save buys extra rooms. Save and Load write a JSON file on your computer.</p>
         <button type="button" data-dismiss>Got it</button>
       </div>
     </div>
@@ -113,11 +103,15 @@
     </div>
 
     <div id="import-modal" class="modal" hidden>
-      <div class="sheet">
-        <h2>Place this model</h2>
+      <div class="sheet upload-sheet">
+        <h2>Upload a model</h2>
+        <p class="meta">Accepts .glb or .gltf. Tag it as furniture or a ware.</p>
+        <div data-upload-drop class="upload-drop">Drop a file here, or choose one.</div>
+        <button type="button" data-upload-pick>Choose file</button>
+        <input type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
         <p data-import-name></p>
         <p data-error class="error" hidden></p>
-        <div class="row">
+        <div class="row" data-tags hidden>
           <button type="button" data-tag="furniture">Furniture — replace selected table</button>
           <button type="button" data-tag="ware">Ware — sit on a table</button>
         </div>

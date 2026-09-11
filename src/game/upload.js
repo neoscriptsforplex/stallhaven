@@ -25,11 +25,19 @@ export function parseModelBuffer(buffer, name) {
   });
 }
 
-export function bindUploadUI({ zone, modal, state, world, onChange }) {
-  const fileInput = zone.querySelector('input[type="file"]');
+function syncModalClass() {
+  const any = [...document.querySelectorAll('.modal')].some((el) => !el.hidden);
+  document.body.classList.toggle('modal-open', any);
+}
+
+export function bindUploadUI({ button, modal, state, world, onChange }) {
+  const fileInput = modal.querySelector('input[type="file"]');
+  const pickBtn = modal.querySelector('[data-upload-pick]');
+  const dropHint = modal.querySelector('[data-upload-drop]');
   const title = modal.querySelector('[data-import-name]');
   const furnitureBtn = modal.querySelector('[data-tag="furniture"]');
   const wareBtn = modal.querySelector('[data-tag="ware"]');
+  const tagRow = modal.querySelector('[data-tags]');
   const recipeRow = modal.querySelector('[data-recipes]');
   const cancelBtn = modal.querySelector('[data-cancel]');
   const errorEl = modal.querySelector('[data-error]');
@@ -45,20 +53,38 @@ export function bindUploadUI({ zone, modal, state, world, onChange }) {
     errorEl.hidden = !text;
   }
 
+  function showTags(on) {
+    if (tagRow) tagRow.hidden = !on;
+    recipeRow.hidden = true;
+  }
+
   function close() {
     pending = null;
     modal.hidden = true;
-    recipeRow.hidden = true;
+    showTags(false);
     showError('');
+    title.textContent = '';
+    syncModalClass();
+  }
+
+  function openModal() {
+    pending = null;
+    title.textContent = '';
+    showTags(false);
+    showError('');
+    modal.hidden = false;
+    syncModalClass();
   }
 
   async function receiveFile(file) {
     const lower = file.name.toLowerCase();
     if (!lower.endsWith('.glb') && !lower.endsWith('.gltf')) {
-      showError('Drop a .glb or .gltf file.');
-      modal.hidden = false;
+      showError('Choose a .glb or .gltf file.');
       title.textContent = file.name;
       pending = null;
+      showTags(false);
+      modal.hidden = false;
+      syncModalClass();
       return;
     }
     try {
@@ -72,14 +98,17 @@ export function bindUploadUI({ zone, modal, state, world, onChange }) {
         scene,
       };
       title.textContent = file.name;
-      recipeRow.hidden = true;
       showError('');
+      showTags(true);
       modal.hidden = false;
+      syncModalClass();
     } catch (err) {
       title.textContent = file.name;
       pending = null;
+      showTags(false);
       showError(err.message || 'Could not read that model.');
       modal.hidden = false;
+      syncModalClass();
     }
   }
 
@@ -107,26 +136,20 @@ export function bindUploadUI({ zone, modal, state, world, onChange }) {
     close();
   }
 
-  zone.addEventListener('dragover', (event) => {
+  button.addEventListener('click', openModal);
+  pickBtn.addEventListener('click', () => fileInput.click());
+
+  const dropTarget = dropHint ?? modal;
+  dropTarget.addEventListener('dragover', (event) => {
     event.preventDefault();
-    zone.classList.add('is-hot');
+    dropHint?.classList.add('is-hot');
   });
-  zone.addEventListener('dragleave', () => zone.classList.remove('is-hot'));
-  zone.addEventListener('drop', (event) => {
+  dropTarget.addEventListener('dragleave', () => dropHint?.classList.remove('is-hot'));
+  dropTarget.addEventListener('drop', (event) => {
     event.preventDefault();
-    zone.classList.remove('is-hot');
+    dropHint?.classList.remove('is-hot');
     const file = event.dataTransfer?.files?.[0];
     if (file) receiveFile(file);
-  });
-  zone.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      fileInput.click();
-    }
-  });
-  zone.addEventListener('click', (event) => {
-    if (event.target === fileInput) return;
-    fileInput.click();
   });
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
@@ -143,4 +166,7 @@ export function bindUploadUI({ zone, modal, state, world, onChange }) {
     if (btn) applyTag('ware', btn.dataset.recipe);
   });
   cancelBtn.addEventListener('click', close);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) close();
+  });
 }

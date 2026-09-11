@@ -1,15 +1,19 @@
 import {
   ARMOUR_SLOTS,
   CUSTOMERS,
+  DEFAULT_SKYBOX,
   MATERIALS,
   OTHER_CHANCE,
   RECIPES,
   SHOP,
   SHELF_SLOT_COUNT,
+  SHOP_MAX_LEVEL,
+  SKYBOXES,
   START_GOLD,
   displayKind,
   emptyShelfSlots,
   emptySlots,
+  formatGold,
   matchingArmourIds,
   masteryNeed,
   MASTERY_SPEED,
@@ -38,13 +42,106 @@ import {
   padConnects,
 } from './layout.js';
 
-export { CAULDRON_COST, furnitureBuyCost, masteryNeed, MASTERY_SPEED };
+export {
+  CAULDRON_COST,
+  furnitureBuyCost,
+  masteryNeed,
+  MASTERY_SPEED,
+  formatGold,
+  SHOP_MAX_LEVEL,
+  DEFAULT_SKYBOX,
+  SKYBOXES,
+};
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
+export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
 function emptyBoughtFurniture() {
   return { table: 0, mannequin: 0 };
+}
+
+export function skyboxId(id) {
+  return SKYBOXES.some((item) => item.id === id) ? id : DEFAULT_SKYBOX;
+}
+
+/** XP granted for finishing a ware. Higher catalog tiers give more. */
+export function craftXp(recipe) {
+  const tier = Math.max(1, recipe?.tier ?? 1);
+  return 6 + tier * 10;
+}
+
+/** XP needed to go from `level` to `level + 1`. */
+export function xpToNextLevel(level) {
+  const lv = Math.max(1, Math.min(SHOP_MAX_LEVEL, Math.round(Number(level) || 1)));
+  if (lv >= SHOP_MAX_LEVEL) return 0;
+  return Math.floor(35 + lv * 16 + lv * lv * 1.8);
+}
+
+export function shopProgress(xp = 0) {
+  const total = Math.max(0, Math.round(Number(xp) || 0));
+  let level = 1;
+  let remain = total;
+  while (level < SHOP_MAX_LEVEL) {
+    const need = xpToNextLevel(level);
+    if (remain < need) break;
+    remain -= need;
+    level += 1;
+  }
+  const need = xpToNextLevel(level);
+  return {
+    level,
+    xp: total,
+    xpIntoLevel: remain,
+    xpForLevel: need,
+    t: need > 0 ? Math.min(1, remain / need) : 1,
+  };
+}
+
+export function grantShopXp(state, recipeId) {
+  const recipe = RECIPES[recipeId];
+  if (!recipe) return 0;
+  const before = shopProgress(state.shopXp ?? 0);
+  if (before.level >= SHOP_MAX_LEVEL) {
+    state.shopLevel = SHOP_MAX_LEVEL;
+    return 0;
+  }
+  const gained = craftXp(recipe);
+  state.shopXp = (state.shopXp ?? 0) + gained;
+  const after = shopProgress(state.shopXp);
+  state.shopLevel = after.level;
+  return gained;
+}
+
+export function applyCheat(state, raw) {
+  const code = String(raw ?? '').trim().toLowerCase();
+  if (code === 'motherlode') {
+    state.gold = (state.gold ?? 0) + 10000;
+    return 'motherlode';
+  }
+  if (code === 'freshstart') {
+    const next = createState();
+    for (const key of Object.keys(next)) {
+      state[key] = next[key];
+    }
+    state.crafts = {};
+    state.ready = [];
+    state.log = [];
+    return 'freshstart';
+  }
+  if (code === 'maxcape') {
+    if (!state.craftCounts) state.craftCounts = {};
+    for (const recipe of recipeList()) {
+      const need = Math.max(masteryNeed(recipe), recipe.unlockNeed ?? 0, 80);
+      state.craftCounts[recipe.id] = Math.max(state.craftCounts[recipe.id] ?? 0, need);
+    }
+    return 'maxcape';
+  }
+  if (code === 'onesmallfavour') {
+    state.chefHat = true;
+    return 'onesmallfavour';
+  }
+  return null;
 }
 
 function emptyDisplay(spot) {
@@ -116,6 +213,10 @@ export function createState() {
     fullscreen: false,
     music: { volume: DEFAULT_MUSIC_VOLUME },
     boughtFurniture: emptyBoughtFurniture(),
+    shopXp: 0,
+    shopLevel: 1,
+    skybox: DEFAULT_SKYBOX,
+    chefHat: false,
     log: [],
   };
 }
@@ -160,7 +261,7 @@ export function craftBlockReason(state, recipeId) {
   if (state.crafts[recipeId]) return `${recipe.name} is already in progress.`;
   if (!chestHasSpace(state)) return 'The chest is full.';
   const cost = recipeCost(recipe);
-  if ((cost.gold || 0) > state.gold) return `Need ${cost.gold}g more.`;
+  if ((cost.gold || 0) > state.gold) return `Need ${formatGold(cost.gold)}g more.`;
   for (const [materialId, need] of Object.entries(cost.materials)) {
     const have = state.materials[materialId] ?? 0;
     if (have < need) {
@@ -305,7 +406,7 @@ export function furnitureNeedGold(state, type) {
   const have = state.gold ?? 0;
   if (have >= cost) return '';
   const label = furnitureLabelForType(type).toLowerCase();
-  return `Need ${cost.toLocaleString()}g to buy a ${label}. You have ${have.toLocaleString()}g.`;
+  return `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(have)}g.`;
 }
 
 export function buyFurniture(state, type, pose) {
@@ -443,6 +544,7 @@ export function completeCrafts(state, nowSeconds) {
       addToChest(state, recipeId);
       if (!state.craftCounts) state.craftCounts = {};
       state.craftCounts[recipeId] = craftCount(state, recipeId) + 1;
+      grantShopXp(state, recipeId);
       finished.push(recipeId);
     }
   }
@@ -594,6 +696,10 @@ export function serializeState(state) {
     furniture,
     fullscreen: Boolean(state.fullscreen),
     music: { volume: Number.isFinite(state.music?.volume) ? state.music.volume : DEFAULT_MUSIC_VOLUME },
+    shopXp: Math.max(0, Math.round(state.shopXp ?? 0)),
+    shopLevel: shopProgress(state.shopXp ?? 0).level,
+    skybox: skyboxId(state.skybox),
+    chefHat: Boolean(state.chefHat),
     displays: state.displays.map((display, index) => ({
       ware: display.ware ? { recipeId: display.ware.recipeId } : null,
       furnitureId: display.furnitureId ?? null,
@@ -639,17 +745,33 @@ export function applyState(state, data) {
       next.craftCounts[id] = Math.max(0, Math.round(count));
     }
   }
-  if (Array.isArray(data.displays)) {
+  let savedDisplays = Array.isArray(data.displays) ? data.displays : null;
+  let savedFurnitureDisplays = Array.isArray(data.furniture?.displays) ? data.furniture.displays : null;
+  if ((data.version ?? 0) < 6 && savedDisplays && savedDisplays.length >= OLD_DEFAULT_DISPLAYS) {
+    savedDisplays = [
+      ...savedDisplays.slice(0, OLD_DEFAULT_DISPLAYS),
+      { kind: 'shelf', name: 'Back Wall Shelf', ware: null, shelfSlots: emptyShelfSlots() },
+      ...savedDisplays.slice(OLD_DEFAULT_DISPLAYS),
+    ];
+    if (savedFurnitureDisplays) {
+      savedFurnitureDisplays = [
+        ...savedFurnitureDisplays.slice(0, OLD_DEFAULT_DISPLAYS),
+        { x: 0, z: -3.22, rot: 0 },
+        ...savedFurnitureDisplays.slice(OLD_DEFAULT_DISPLAYS),
+      ];
+    }
+  }
+  if (savedDisplays) {
     next.displays = SHOP.displays.map((spot, index) => (
-      readSavedDisplay(data.displays[index], emptyDisplay(spot))
+      readSavedDisplay(savedDisplays[index], emptyDisplay(spot))
     ));
-    for (let index = SHOP.displays.length; index < data.displays.length; index += 1) {
-      const saved = data.displays[index];
+    for (let index = SHOP.displays.length; index < savedDisplays.length; index += 1) {
+      const saved = savedDisplays[index];
       if (!saved || typeof saved !== 'object') continue;
-      const kind = saved.kind === 'stand' ? 'stand' : 'table';
+      const kind = saved.kind === 'stand' ? 'stand' : saved.kind === 'shelf' ? 'shelf' : 'table';
       next.displays.push(readSavedDisplay(saved, emptyDisplay({
         kind,
-        name: saved.name || (kind === 'stand' ? 'Mannequin' : 'Table'),
+        name: saved.name || (kind === 'stand' ? 'Mannequin' : kind === 'shelf' ? 'Shelf' : 'Table'),
         bought: true,
       })));
     }
@@ -694,6 +816,12 @@ export function applyState(state, data) {
       next.music.volume = Math.min(1, Math.max(0, volume));
     }
   }
+  if (typeof data.shopXp === 'number' && Number.isFinite(data.shopXp)) {
+    next.shopXp = Math.max(0, Math.round(data.shopXp));
+  }
+  next.shopLevel = shopProgress(next.shopXp).level;
+  next.skybox = skyboxId(data.skybox);
+  if (typeof data.chefHat === 'boolean') next.chefHat = data.chefHat;
   if (data.furniture && typeof data.furniture === 'object') {
     const defaults = defaultFurniture();
     const readPose = (saved, fallback) => {
@@ -717,7 +845,7 @@ export function applyState(state, data) {
           z: 0.8,
           rot: FURNITURE_FORWARD,
         };
-        return readPose(data.furniture.displays?.[index], fallback);
+        return readPose(savedFurnitureDisplays?.[index] ?? data.furniture.displays?.[index], fallback);
       }),
     };
   }
@@ -738,6 +866,10 @@ export function applyState(state, data) {
   state.fullscreen = next.fullscreen;
   state.music = next.music;
   state.boughtFurniture = next.boughtFurniture;
+  state.shopXp = next.shopXp;
+  state.shopLevel = next.shopLevel;
+  state.skybox = next.skybox;
+  state.chefHat = next.chefHat;
   state.ready = [];
   claimLoadedDisplays(state);
   refreshShowcases(state);

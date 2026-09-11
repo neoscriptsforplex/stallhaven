@@ -20,12 +20,17 @@
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
       <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
+      <button type="button" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
       <input id="music-file" type="file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav" multiple hidden />
     </aside>
 
     <aside id="hud">
       <header class="ledger">
+        <div class="shop-xp" aria-label="Shop level">
+          <span id="shop-level">Lv 1</span>
+          <span class="xp-bar" title="Shop XP"><i data-shop-xp-bar></i></span>
+        </div>
         <div class="ledger-row">
           <p id="gold" class="gold">Coins: 40</p>
           <button type="button" id="upload-btn" title="Upload a .glb or .gltf">Upload</button>
@@ -46,7 +51,7 @@
         <p>Click the anvil to smith Melee, Magic, or Ranged (Weapons and Armour). Click the cooking range for Food. Click a placed cauldron for Potions. Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
         <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Right-click furniture for Move or Rotate — wares travel with the piece. The counter only moves from a right-click.</p>
-        <p>Upgrade unlocks extra rooms, tables, mannequins, and a cauldron. Extra tables and mannequins start at 500g, then ×3 for each further purchase of that type. The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a looping track you upload.</p>
+        <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist you upload — Shuffle, Play, Pause, and Stop. The cog beside it opens Settings for the skybox and cheat codes.</p>
         <button type="button" data-dismiss>Close</button>
       </div>
     </div>
@@ -205,6 +210,27 @@
       </div>
     </div>
 
+    <aside id="settings-dock" class="expand-dock" hidden>
+      <h2>Settings</h2>
+      <h3>Skybox colour</h3>
+      <p class="meta">Fake white clouds sit in every sky. Default is Blue.</p>
+      <div class="skybox-grid" data-skybox-list>
+        <button type="button" data-skybox="white">White</button>
+        <button type="button" data-skybox="black">Black</button>
+        <button type="button" data-skybox="dark-grey">Dark Grey</button>
+        <button type="button" data-skybox="blue">Blue</button>
+        <button type="button" data-skybox="light-grey">Light Grey</button>
+      </div>
+      <h3>Cheats</h3>
+      <p class="meta">Type a code and press Enter. Codes are not case-sensitive.</p>
+      <form data-cheat-form class="cheat-form">
+        <input type="text" data-cheat-code autocomplete="off" spellcheck="false" placeholder="Enter code" aria-label="Cheat code" />
+        <button type="submit">Enter</button>
+      </form>
+      <p data-cheat-note class="craft-note" hidden></p>
+      <button type="button" class="ghost" data-settings-close>Close</button>
+    </aside>
+
     <aside id="music-dock" class="expand-dock" hidden>
       <h2>Music</h2>
       <div class="tabs">
@@ -221,7 +247,9 @@
         </label>
         <div class="row furn-row">
           <button type="button" data-music-upload>Upload</button>
+          <button type="button" data-music-shuffle>Shuffle</button>
           <button type="button" data-music-play>Play</button>
+          <button type="button" data-music-pause>Pause</button>
           <button type="button" data-music-stop>Stop</button>
         </div>
       </div>

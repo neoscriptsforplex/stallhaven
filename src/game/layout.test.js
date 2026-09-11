@@ -13,6 +13,12 @@ import {
   expansionCost,
   furnitureBuyCost,
   gardenTreeSpots,
+  gardenRockSpots,
+  gardenTrapdoorSpot,
+  gardenBox,
+  cobblePathSpan,
+  keepFountain,
+  FOUNTAIN,
   occupiedCells,
   padConnects,
   padById,
@@ -113,6 +119,36 @@ describe('layout numbers', () => {
     assert.equal(right.some((spot) => spot.side === 'right' || spot.side === 'front-right'), false);
     assert.ok(right.some((spot) => spot.side === 'left'));
     assert.equal(CAULDRON_COST, 10000);
+  });
+
+  it('keeps the cobble path on the grass tile and puts the fountain mid-path', () => {
+    const grass = gardenBox([]);
+    const path = cobblePathSpan([]);
+    assert.ok(path.minZ > 4, 'path should start away from the door');
+    assert.ok(path.maxZ <= grass.maxZ);
+    assert.ok(path.minX >= grass.minX);
+    assert.ok(path.maxX <= grass.maxX);
+    assert.ok(FOUNTAIN.z > path.minZ + 1.5);
+    assert.ok(FOUNTAIN.z < path.maxZ - 1.5);
+    assert.equal(keepFountain([]), true);
+    assert.ok(Math.abs(FOUNTAIN.x) < 0.05);
+    const apron = FOUNTAIN.apron ?? 1.42;
+    assert.ok(FOUNTAIN.x - apron >= grass.minX);
+    assert.ok(FOUNTAIN.x + apron <= grass.maxX);
+    assert.ok(FOUNTAIN.z - apron >= path.minZ);
+    assert.ok(FOUNTAIN.z + apron <= path.maxZ);
+    assert.ok(FOUNTAIN.z + apron <= grass.maxZ);
+  });
+
+  it('clears path-side rocks, trapdoor, and extra trees when they hit a room', () => {
+    const originTrees = gardenTreeSpots([]);
+    assert.ok(originTrees.some((spot) => spot.side === 'path' || spot.side === 'edge'));
+    assert.ok(gardenRockSpots([]).length >= 2);
+    assert.ok(gardenTrapdoorSpot([]));
+    const left = gardenTreeSpots(['left']);
+    assert.equal(left.some((spot) => spot.side === 'left' || spot.side === 'front-left'), false);
+    const leftRocks = gardenRockSpots(['left']);
+    assert.equal(leftRocks.some((spot) => spot.side === 'left'), false);
   });
 
   it('snaps furniture on both floor axes, not only sideways', () => {

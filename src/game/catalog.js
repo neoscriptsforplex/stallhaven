@@ -2,6 +2,16 @@
 
 export const START_GOLD = 40;
 
+export const SHOP_MAX_LEVEL = 99;
+export const DEFAULT_SKYBOX = 'blue';
+export const SKYBOXES = [
+  { id: 'white', label: 'White', color: 0xf4f4f0, fog: 0xeaeae4 },
+  { id: 'black', label: 'Black', color: 0x0b0b0e, fog: 0x121218 },
+  { id: 'dark-grey', label: 'Dark Grey', color: 0x3a3a40, fog: 0x3a3a40 },
+  { id: 'blue', label: 'Blue', color: 0x5aa0d8, fog: 0x6aadd8 },
+  { id: 'light-grey', label: 'Light Grey', color: 0xc5c5ca, fog: 0xc5c5ca },
+];
+
 export const OTHER_CHANCE = 0.18;
 export const ASPIRE_CHANCE = 0.25;
 export const MAX_CUSTOMERS = 3;
@@ -435,6 +445,7 @@ export const SHOP = {
     { id: 'shelf-right', name: 'Right Wall Shelf', x: 2.48, z: -3.22, kind: 'shelf' },
     { id: 'stand-left', name: 'Left Armour Stand', x: -1.58, z: 2.68, kind: 'stand' },
     { id: 'stand-right', name: 'Right Armour Stand', x: 1.58, z: 2.68, kind: 'stand' },
+    { id: 'shelf-center', name: 'Back Wall Shelf', x: 0, z: -3.22, kind: 'shelf' },
   ],
   cameraStart: { x: -0.15, y: 3.35, z: 2.85 },
   cameraTarget: { x: -0.85, y: 0.95, z: -1.35 },
@@ -542,13 +553,21 @@ export function recipeMatsLabel(recipe) {
     .join(' · ');
 }
 
+/** Commas for prices of 1000 or more; smaller amounts stay plain. */
+export function formatGold(n) {
+  const v = Math.round(Number(n) || 0);
+  const abs = Math.abs(v);
+  const formatted = abs >= 1000 ? abs.toLocaleString('en-US') : String(abs);
+  return v < 0 ? `-${formatted}` : formatted;
+}
+
 export function costLabel(recipe, duration = recipe?.time) {
   const cost = recipeCost(recipe);
   const mats = recipeMatsLabel(recipe);
-  const gold = cost.gold ? ` + ${cost.gold}g` : '';
+  const gold = cost.gold ? ` + ${formatGold(cost.gold)}g` : '';
   const time = Number.isFinite(duration) ? duration : recipe.time;
   const timeText = Number.isInteger(time) ? `${time}s` : `${time.toFixed(1)}s`;
-  return `${mats}${gold} · ${timeText} · sells ${recipe.price}g`;
+  return `${mats}${gold} · ${timeText} · sells ${formatGold(recipe.price)}g`;
 }
 
 /** Offer/trade class: melee, ranged, magic, food, or potion. */

@@ -4,11 +4,13 @@ import {
   CUSTOMERS,
   MATERIALS,
   RECIPES,
+  SKYBOXES,
   anvilSubtabForRecipe,
   anvilTabForRecipe,
   classLabel,
   costLabel,
   displayKind,
+  formatGold,
   materialList,
   offerClassLabel,
   offerClassOf,
@@ -23,16 +25,20 @@ import {
   getMusicVolume,
   getPlaylist,
   isMusicPlaying,
+  isShuffle,
   movePlaylistTrack,
+  pauseMusic,
   playClick,
   playMusic,
   playTrackAt,
   removePlaylistTrack,
   setMusicVolume,
   stopMusic,
+  toggleShuffle,
 } from './audio.js';
 import {
   assignStandPiece,
+  applyCheat,
   buyCauldron,
   buyExpansion,
   buyFromCustomer,
@@ -64,6 +70,7 @@ import {
   offerChoices,
   placeOnDisplay,
   sellToCustomer,
+  shopProgress,
   startCraft,
   unlockRemaining,
   upgradeChest,
@@ -105,6 +112,8 @@ export function bindHud(root, state, world) {
   const placeModal = document.querySelector('#place-dock');
   const potionModal = document.querySelector('#potion-modal');
   const musicDock = document.querySelector('#music-dock');
+  const settingsDock = document.querySelector('#settings-dock');
+  const settingsBtn = document.querySelector('#settings-btn');
   const furnMenu = document.querySelector('#furn-menu');
   const shopFade = document.querySelector('#shop-fade');
   const activeCraft = root.querySelector('#active-craft');
@@ -131,6 +140,7 @@ export function bindHud(root, state, world) {
   let lastDisplayListKey = '';
   let displayTarget = null;
   let pendingPlace = null;
+  let resumeTrade = null;
 
   tabsEl.innerHTML = ANVIL_TABS.map((tab) => (
     `<button type="button" class="tab" data-tab="${tab.id}">${tab.label}</button>`
@@ -229,7 +239,7 @@ export function bindHud(root, state, world) {
       <div class="mat" data-mat="${mat.id}">
         <span class="mat-name">${mat.name}</span>
         <span class="mat-count" data-count="${mat.id}">0</span>
-        <button type="button" class="restock" data-restock="${mat.id}">${mat.restock}g</button>
+        <button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>
       </div>
     `).join('');
     container.dataset.ready = '1';
@@ -328,6 +338,10 @@ export function bindHud(root, state, world) {
     if (musicDock) musicDock.hidden = true;
   }
 
+  function closeSettingsDock() {
+    if (settingsDock) settingsDock.hidden = true;
+  }
+
   function openCraft(station = 'anvil', options = {}) {
     closeChest();
     closeTrade();
@@ -335,6 +349,7 @@ export function bindHud(root, state, world) {
     closePotion();
     hideFurnMenu();
     closeMusicDock();
+    closeSettingsDock();
     closeDisplayPicker();
     if (!helpModal.hidden) closeHelp();
     closeBuild();
@@ -418,7 +433,7 @@ export function bindHud(root, state, world) {
     }
     const cost = chestUpgradeCost(level);
     nextEl.textContent = `Level ${level + 1} adds 100 slots (${chestSlots(level + 1)} total).`;
-    costEl.textContent = `Cost: ${cost}g.`;
+    costEl.textContent = `Cost: ${formatGold(cost)}g.`;
     buyBtn.disabled = !canUpgradeChest(state);
   }
 
@@ -470,7 +485,7 @@ export function bindHud(root, state, world) {
       <div class="chest-row">
         <div>
           <strong>${recipe.name}</strong>
-          <span class="meta">×${count} · ${classLabel(recipe.combatClass, recipe.category)} · sells ${recipe.price}g</span>
+          <span class="meta">×${count} · ${classLabel(recipe.combatClass, recipe.category)} · sells ${formatGold(recipe.price)}g</span>
         </div>
         ${standSelected ? `<button type="button" data-place="${recipe.id}">Place on Stand</button>` : ''}
       </div>
@@ -526,7 +541,7 @@ export function bindHud(root, state, world) {
             <strong>${item.recipe.name}</strong>
             <span class="meta">×${item.count} in chest</span>
           </span>
-          <span class="offer-price">${item.recipe.price}g</span>
+          <span class="offer-price">${formatGold(item.recipe.price)}g</span>
         </button>
       `).join('');
     } else {
@@ -653,7 +668,7 @@ export function bindHud(root, state, world) {
     const offerMat = offer ? MATERIALS[offer.materialId] : null;
     tradeModal.querySelector('[data-trade-title]').textContent = CUSTOMERS[actor.typeId].name;
     tradeModal.querySelector('[data-trade-want]').textContent = `Wants ${recipe.name}.`;
-    tradeModal.querySelector('[data-trade-offer]').textContent = `Offers ${actor.offerGold}g.`;
+    tradeModal.querySelector('[data-trade-offer]').textContent = `Offers ${formatGold(actor.offerGold)}g.`;
     const haveEl = tradeModal.querySelector('[data-trade-have]');
     haveEl.textContent = have
       ? `You have ${recipe.name} in the chest.`
@@ -663,7 +678,7 @@ export function bindHud(root, state, world) {
     const buyLine = tradeModal.querySelector('[data-trade-buy]');
     if (offerMat) {
       buyLine.hidden = false;
-      buyLine.textContent = `They will sell 1 ${offerMat.name} for ${offer.price}g.`;
+      buyLine.textContent = `They will sell 1 ${offerMat.name} for ${formatGold(offer.price)}g.`;
     } else {
       buyLine.hidden = true;
     }
@@ -719,8 +734,8 @@ export function bindHud(root, state, world) {
             <span class="meta">×${choice.count} in chest</span>
           </span>
           <span>
-            <span class="offer-price">${choice.gold}g</span>
-            <span class="offer-was">${choice.listPrice}g</span>
+            <span class="offer-price">${formatGold(choice.gold)}g</span>
+            <span class="offer-was">${formatGold(choice.listPrice)}g</span>
           </span>
         </button>
       `).join('');
@@ -731,7 +746,7 @@ export function bindHud(root, state, world) {
     }
     const selected = choices.find((choice) => choice.recipeId === selectedOfferId);
     if (selected) {
-      pickEl.textContent = `Selected: ${selected.name} for ${selected.gold}g (reduced from ${selected.listPrice}g).`;
+      pickEl.textContent = `Selected: ${selected.name} for ${formatGold(selected.gold)}g (reduced from ${formatGold(selected.listPrice)}g).`;
       confirm.disabled = false;
     } else {
       pickEl.textContent = 'No item selected yet. Click a chest item, then Confirm.';
@@ -777,7 +792,7 @@ export function bindHud(root, state, world) {
       return;
     }
     playClick('trade');
-    pushLog(state, `Sold ${RECIPES[recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${paid}g.`);
+    pushLog(state, `Sold ${RECIPES[recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${formatGold(paid)}g.`);
     world.sellToActor(actor);
     world.syncDisplays();
     closeTrade();
@@ -800,7 +815,7 @@ export function bindHud(root, state, world) {
     if (buyFromCustomer(state, actor.offer.materialId, actor.offer.price)) {
       playClick('trade');
       const mat = MATERIALS[actor.offer.materialId];
-      pushLog(state, `Bought ${mat.name} from ${CUSTOMERS[actor.typeId].name} for ${actor.offer.price}g.`);
+      pushLog(state, `Bought ${mat.name} from ${CUSTOMERS[actor.typeId].name} for ${formatGold(actor.offer.price)}g.`);
       world.buyFromActor(actor);
       closeTrade();
       render(performance.now() / 1000);
@@ -830,7 +845,11 @@ export function bindHud(root, state, world) {
       craftNote.hidden = true;
       craftNote.dataset.sticky = '';
     }
+    const already = Boolean(state.crafts[recipe.id]);
     openCraft(stationForRecipe(recipe), { focusId: recipe.id, autoStart: true });
+    if (already || state.crafts[recipe.id]) {
+      resumeTrade = { id: actor.id, recipeId: recipe.id };
+    }
   });
 
   function onOfferClick(event) {
@@ -896,7 +915,7 @@ export function bindHud(root, state, world) {
       return;
     }
     playClick('trade');
-    pushLog(state, `Offered ${RECIPES[choice.recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${paid}g (reduced from ${choice.listPrice}g).`);
+    pushLog(state, `Offered ${RECIPES[choice.recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${formatGold(paid)}g (reduced from ${formatGold(choice.listPrice)}g).`);
     actor.requestRecipeId = choice.recipeId;
     world.sellToActor(actor);
     world.syncDisplays();
@@ -951,6 +970,7 @@ export function bindHud(root, state, world) {
     closePotion();
     hideFurnMenu();
     closeMusicDock();
+    closeSettingsDock();
     closeDisplayPicker();
     closeBuild();
     closePlace(true);
@@ -1017,7 +1037,7 @@ export function bindHud(root, state, world) {
     const level = state.chestLevel ?? 1;
     const cost = chestUpgradeCost(level);
     if (upgradeChest(state)) {
-      pushLog(state, `Chest upgraded to level ${state.chestLevel} (${chestSlots(state.chestLevel)} slots) for ${cost}g.`);
+      pushLog(state, `Chest upgraded to level ${state.chestLevel} (${chestSlots(state.chestLevel)} slots) for ${formatGold(cost)}g.`);
       paintUpgrade();
       paintChest();
       render(performance.now() / 1000);
@@ -1029,7 +1049,7 @@ export function bindHud(root, state, world) {
     const owned = (state.expansions ?? []).length;
     expandModal.querySelector('[data-expand-cost]').textContent = owned >= 5
       ? 'Every expansion pad is in use.'
-      : `Next room costs ${cost}g.`;
+      : `Next room costs ${formatGold(cost)}g.`;
     const padId = world.getSelectedPad();
     const pickEl = expandModal.querySelector('[data-expand-pick]');
     const confirm = expandModal.querySelector('[data-expand-confirm]');
@@ -1062,6 +1082,7 @@ export function bindHud(root, state, world) {
     closePotion();
     hideFurnMenu();
     closeMusicDock();
+    closeSettingsDock();
     if (!helpModal.hidden) closeHelp();
     closeBuild();
     closePlace(true);
@@ -1124,7 +1145,7 @@ export function bindHud(root, state, world) {
       if (buyExpansion(state, padId)) {
         world.rebuildAfterExpansion();
         world.setExpandMode(false);
-        pushLog(state, `Opened a new room (${padById(padId)?.label ?? padId}) for ${cost}g.`);
+        pushLog(state, `Opened a new room (${padById(padId)?.label ?? padId}) for ${formatGold(cost)}g.`);
       }
       closeExpand();
       render(performance.now() / 1000);
@@ -1139,9 +1160,9 @@ export function bindHud(root, state, world) {
       buyBtn.disabled = true;
       buyBtn.textContent = 'Owned';
     } else {
-      status.textContent = `Costs ${CAULDRON_COST.toLocaleString()} gp.`;
+      status.textContent = `Costs ${formatGold(CAULDRON_COST)} gp.`;
       buyBtn.disabled = !canBuyCauldron(state);
-      buyBtn.textContent = `Buy · ${CAULDRON_COST.toLocaleString()} gp`;
+      buyBtn.textContent = `Buy · ${formatGold(CAULDRON_COST)} gp`;
     }
     const expandStatus = buildModal.querySelector('[data-expand-status]');
     const expandBuy = buildModal.querySelector('[data-expand-buy]');
@@ -1153,9 +1174,9 @@ export function bindHud(root, state, world) {
         expandBuy.textContent = 'Owned';
       } else {
         const cost = expansionCost(owned);
-        expandStatus.textContent = `Next room costs ${cost}g.`;
+        expandStatus.textContent = `Next room costs ${formatGold(cost)}g.`;
         expandBuy.disabled = state.gold < cost;
-        expandBuy.textContent = `Place Room · ${cost}g`;
+        expandBuy.textContent = `Place Room · ${formatGold(cost)}g`;
       }
     }
     for (const type of ['table', 'mannequin']) {
@@ -1166,12 +1187,12 @@ export function bindHud(root, state, world) {
       const label = furnitureLabelForType(type);
       const bought = state.boughtFurniture?.[type] ?? 0;
       const extra = bought === 0
-        ? `First extra ${label.toLowerCase()} costs ${cost.toLocaleString()}g. Starting pieces do not count.`
-        : `Next ${label.toLowerCase()} costs ${cost.toLocaleString()}g (${bought} bought).`;
+        ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
+        : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
       itemStatus.textContent = extra;
       itemStatus.classList.remove('craft-note');
       itemBuy.disabled = false;
-      itemBuy.textContent = `Buy · ${cost.toLocaleString()} gp`;
+      itemBuy.textContent = `Buy · ${formatGold(cost)} gp`;
     }
   }
 
@@ -1190,7 +1211,7 @@ export function bindHud(root, state, world) {
         ? 'Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement.'
         : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
     }
-    if (costEl) costEl.textContent = `Cost: ${pendingPlace.cost.toLocaleString()} gp.`;
+    if (costEl) costEl.textContent = `Cost: ${formatGold(pendingPlace.cost)} gp.`;
     if (note) {
       note.hidden = !pendingPlace.note;
       note.textContent = pendingPlace.note || '';
@@ -1203,7 +1224,7 @@ export function bindHud(root, state, world) {
     const status = buildModal.querySelector(`[data-${type}-status]`);
     if (!canBuyFurniture(state, type) || need) {
       if (status) {
-        status.textContent = need || `Need ${cost.toLocaleString()}g. You have ${state.gold.toLocaleString()}g.`;
+        status.textContent = need || `Need ${formatGold(cost)}g. You have ${formatGold(state.gold)}g.`;
         status.classList.add('craft-note');
       }
       pushLog(state, status?.textContent ?? need);
@@ -1231,6 +1252,7 @@ export function bindHud(root, state, world) {
     closeDisplayPicker();
     hideFurnMenu();
     closeMusicDock();
+    closeSettingsDock();
     if (!helpModal.hidden) closeHelp();
     closeExpand();
     closePlace(true);
@@ -1260,7 +1282,7 @@ export function bindHud(root, state, world) {
   buildModal.querySelector('[data-cauldron-buy]').addEventListener('click', () => {
     if (!canBuyCauldron(state)) {
       const status = buildModal.querySelector('[data-cauldron-status]');
-      const msg = `Need ${CAULDRON_COST.toLocaleString()}g to buy a cauldron. You have ${state.gold.toLocaleString()}g.`;
+      const msg = `Need ${formatGold(CAULDRON_COST)}g to buy a cauldron. You have ${formatGold(state.gold)}g.`;
       if (status) {
         status.textContent = msg;
         status.classList.add('craft-note');
@@ -1290,7 +1312,7 @@ export function bindHud(root, state, world) {
     }
     if (pending.type === 'cauldron') {
       if (state.gold < CAULDRON_COST) {
-        pendingPlace.note = `Need ${CAULDRON_COST.toLocaleString()}g. You have ${state.gold.toLocaleString()}g.`;
+        pendingPlace.note = `Need ${formatGold(CAULDRON_COST)}g. You have ${formatGold(state.gold)}g.`;
         paintPlaceDock();
         pushLog(state, pendingPlace.note);
         render(performance.now() / 1000);
@@ -1302,7 +1324,7 @@ export function bindHud(root, state, world) {
       }
       world.confirmPlaceUnlock();
       closePlace();
-      pushLog(state, `Placed a cauldron for ${CAULDRON_COST.toLocaleString()} gp.`);
+      pushLog(state, `Placed a cauldron for ${formatGold(CAULDRON_COST)} gp.`);
       render(performance.now() / 1000);
       return;
     }
@@ -1324,7 +1346,7 @@ export function bindHud(root, state, world) {
     world.refreshSelection(true);
     closePlace();
     const label = furnitureLabelForType(pending.type);
-    pushLog(state, `Placed a ${label.toLowerCase()} for ${cost.toLocaleString()} gp.`);
+    pushLog(state, `Placed a ${label.toLowerCase()} for ${formatGold(cost)} gp.`);
     render(performance.now() / 1000);
   });
 
@@ -1467,11 +1489,13 @@ export function bindHud(root, state, world) {
     const list = musicDock.querySelector('[data-playlist]');
     const tracks = getPlaylist();
     const track = getMusicTrackName();
+    const shuffleBtn = musicDock.querySelector('[data-music-shuffle]');
     if (nameEl) {
       nameEl.textContent = track
         ? `${isMusicPlaying() ? 'Playing' : 'Paused'}: ${track}`
         : 'No track loaded. Upload MP3, WAV, or OGG files.';
     }
+    if (shuffleBtn) shuffleBtn.classList.toggle('is-on', isShuffle());
     if (vol) vol.value = String(Math.round((state.music?.volume ?? getMusicVolume()) * 100));
     if (list) {
       if (!tracks.length) {
@@ -1511,6 +1535,7 @@ export function bindHud(root, state, world) {
   function openMusic() {
     closeBuild();
     closeExpand();
+    closeSettingsDock();
     hideFurnMenu();
     showMusicNote('');
     setMusicTab('play');
@@ -1563,6 +1588,14 @@ export function bindHud(root, state, world) {
     await playMusic();
     paintMusic();
   });
+  musicDock?.querySelector('[data-music-pause]')?.addEventListener('click', () => {
+    pauseMusic();
+    paintMusic();
+  });
+  musicDock?.querySelector('[data-music-shuffle]')?.addEventListener('click', () => {
+    toggleShuffle();
+    paintMusic();
+  });
   musicDock?.querySelector('[data-music-stop]')?.addEventListener('click', () => {
     stopMusic();
     paintMusic();
@@ -1585,6 +1618,73 @@ export function bindHud(root, state, world) {
     paintMusic();
   });
   setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
+
+  function paintSettings() {
+    if (!settingsDock) return;
+    const current = state.skybox ?? 'blue';
+    for (const btn of settingsDock.querySelectorAll('[data-skybox]')) {
+      btn.classList.toggle('is-on', btn.dataset.skybox === current);
+    }
+  }
+
+  function openSettings() {
+    closeBuild();
+    closeExpand();
+    closeMusicDock();
+    hideFurnMenu();
+    paintSettings();
+    if (settingsDock) settingsDock.hidden = false;
+  }
+
+  settingsBtn?.addEventListener('click', () => {
+    if (settingsDock?.hidden === false) closeSettingsDock();
+    else openSettings();
+  });
+  settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
+  settingsDock?.querySelector('[data-skybox-list]')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-skybox]');
+    if (!btn) return;
+    const id = SKYBOXES.some((item) => item.id === btn.dataset.skybox) ? btn.dataset.skybox : 'blue';
+    world.setSkybox(id);
+    paintSettings();
+  });
+  settingsDock?.querySelector('[data-cheat-form]')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = settingsDock.querySelector('[data-cheat-code]');
+    const note = settingsDock.querySelector('[data-cheat-note]');
+    const result = applyCheat(state, input?.value ?? '');
+    if (input) input.value = '';
+    if (!result) {
+      if (note) {
+        note.hidden = false;
+        note.textContent = 'Unknown code.';
+      }
+      return;
+    }
+    if (result === 'freshstart') {
+      world.applyLayout();
+      world.syncDisplays();
+      world.refreshSelection(true);
+      paintCrafts();
+      paintBuild();
+    } else if (result === 'onesmallfavour') {
+      world.setChefHat(true);
+    } else if (result === 'maxcape') {
+      paintCrafts();
+    }
+    const messages = {
+      motherlode: 'Motherlode: +10,000 gp.',
+      freshstart: 'Fresh start. All progress reset.',
+      maxcape: 'Maxcape: every craft line is unlocked.',
+      onesmallfavour: 'A chef hat sits on your head.',
+    };
+    if (note) {
+      note.hidden = false;
+      note.textContent = messages[result] ?? 'Done.';
+    }
+    pushLog(state, messages[result] ?? 'Cheat applied.');
+    render(performance.now() / 1000);
+  });
 
   world.onPick((event) => {
     if (event.type !== 'furn-menu') hideFurnMenu();
@@ -1615,6 +1715,7 @@ export function bindHud(root, state, world) {
     closePotion();
     hideFurnMenu();
     closeMusicDock();
+    closeSettingsDock();
     closeDisplayPicker();
     closeBuild();
     closePlace(true);
@@ -1651,6 +1752,7 @@ export function bindHud(root, state, world) {
         setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
         paintCrafts();
         paintMusic();
+        paintSettings();
         pushLog(state, 'Shop loaded from a file.');
       }
     } catch {
@@ -1701,7 +1803,25 @@ export function bindHud(root, state, world) {
   }
 
   function render(now) {
-    goldEl.textContent = `Coins: ${state.gold}`;
+    goldEl.textContent = `Coins: ${formatGold(state.gold)}`;
+    const xp = shopProgress(state.shopXp ?? 0);
+    const levelEl = document.querySelector('#shop-level');
+    const xpBar = document.querySelector('[data-shop-xp-bar]');
+    if (levelEl) levelEl.textContent = `Lv ${xp.level}`;
+    if (xpBar) {
+      const bar = xpBar.parentElement;
+      if (bar) bar.style.setProperty('--t', String(xp.t));
+    }
+    if (resumeTrade && !state.crafts[resumeTrade.recipeId]) {
+      const pending = resumeTrade;
+      resumeTrade = null;
+      const actor = world.getCustomer(pending.id);
+      if (actor && actor.state === 'request') {
+        closeCraft();
+        closePotion();
+        openTrade(actor);
+      }
+    }
     const chestN = chestTotal(state);
     if (chestCountEl) chestCountEl.textContent = `${chestN} piece${chestN === 1 ? '' : 's'} waiting`;
     if (!craftModal.hidden) syncMats(matsEl);

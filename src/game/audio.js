@@ -16,6 +16,7 @@ let volume = 0.75;
 const playlist = [];
 let currentIndex = -1;
 let serial = 1;
+let shuffle = false;
 
 function audio() {
   if (ctx) return ctx;
@@ -65,6 +66,29 @@ export function isMusicPlaying() {
   return Boolean(bg && !bg.paused);
 }
 
+export function isShuffle() {
+  return shuffle;
+}
+
+export function setShuffle(on) {
+  shuffle = Boolean(on);
+  return shuffle;
+}
+
+export function toggleShuffle() {
+  shuffle = !shuffle;
+  return shuffle;
+}
+
+function pickShuffledIndex(from) {
+  if (playlist.length <= 1) return 0;
+  let next = from;
+  while (next === from) {
+    next = Math.floor(Math.random() * playlist.length);
+  }
+  return next;
+}
+
 export function setMusicVolume(next) {
   volume = Math.min(1, Math.max(0, Number(next) || 0));
   if (bg) bg.volume = volume;
@@ -91,7 +115,9 @@ function bindTrack(index) {
   bg.volume = volume;
   bg.onended = () => {
     if (playlist.length === 0) return;
-    const next = (currentIndex + 1) % playlist.length;
+    const next = shuffle && playlist.length > 1
+      ? pickShuffledIndex(currentIndex)
+      : (currentIndex + 1) % playlist.length;
     playTrackAt(next).catch(() => {});
   };
   return track;
@@ -197,6 +223,11 @@ export async function playMusic() {
   } catch {
     return false;
   }
+}
+
+export function pauseMusic() {
+  if (!bg) return;
+  bg.pause();
 }
 
 export function stopMusic() {

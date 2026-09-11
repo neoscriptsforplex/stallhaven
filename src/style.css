@@ -121,6 +121,37 @@ body {
   white-space: nowrap;
 }
 
+.shop-xp {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+#shop-level {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #f0d9a8;
+  white-space: nowrap;
+}
+
+.xp-bar {
+  display: block;
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(16, 10, 6, 0.45);
+  overflow: hidden;
+  border: 1px solid rgba(227, 179, 74, 0.35);
+}
+
+.xp-bar i {
+  display: block;
+  height: 100%;
+  width: calc(var(--t, 0) * 100%);
+  background: linear-gradient(90deg, #3a8a45, #e3b34a);
+}
+
 #save-bar {
   position: absolute;
   top: 16px;
@@ -502,8 +533,7 @@ body.modal-open #view {
 }
 
 .chest-sheet,
-.trade-sheet,
-.craft-sheet {
+.trade-sheet {
   width: min(460px, calc(100vw - 32px));
 }
 
@@ -525,9 +555,10 @@ body.modal-open #view {
   scrollbar-color: #e3b34a #3e2616;
 }
 
-.craft-sheet {
-  width: min(760px, calc(100vw - 32px));
-  max-height: min(90vh, 860px);
+.craft-sheet,
+#potion-modal .craft-sheet {
+  width: min(880px, calc(100vw - 24px));
+  max-height: min(92vh, 920px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -569,8 +600,8 @@ body.modal-open #view {
 .craft-sheet #crafts,
 .craft-sheet #potion-crafts {
   flex: 1 1 auto;
-  min-height: 14rem;
-  max-height: min(48vh, 460px);
+  min-height: 16rem;
+  max-height: min(56vh, 560px);
   overflow: auto;
   margin-bottom: 8px;
   scrollbar-width: thin;
@@ -600,7 +631,7 @@ body.modal-open #view {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-height: 4.6rem;
+  max-height: 8.5rem;
   overflow: auto;
   margin: 0 0 8px;
   padding: 4px 0;
@@ -645,7 +676,8 @@ body.modal-open #view {
   cursor: pointer;
 }
 
-#music-btn {
+#music-btn,
+#settings-btn {
   min-width: 2.6rem;
   font-weight: 700;
   font-size: 1.1rem;
@@ -682,6 +714,11 @@ body.modal-open #view {
 .playlist-row.is-on .playlist-name {
   border-color: var(--gold);
   color: var(--gold);
+}
+
+[data-music-shuffle].is-on {
+  border-color: var(--gold);
+  background: linear-gradient(#8a5a30, #5a3518);
 }
 
 .playlist-name {
@@ -775,6 +812,40 @@ body.modal-open #view {
   width: 100%;
 }
 
+.skybox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+
+.skybox-grid button.is-on {
+  border-color: var(--gold);
+  background: linear-gradient(#8a5a30, #5a3518);
+}
+
+.cheat-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.cheat-form input {
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid #8a6238;
+  background: rgba(24, 14, 8, 0.45);
+  color: #f6e4c4;
+}
+
+.expand-dock h3 {
+  margin: 10px 0 4px;
+  font-size: 0.92rem;
+  color: #f3e2c0;
+}
+
 .furn-menu {
   position: absolute;
   z-index: 22;
@@ -824,6 +895,11 @@ body.modal-open #view {
   color: var(--parchment);
   max-height: min(88vh, 820px);
   overflow: auto;
+}
+
+.sheet.craft-sheet,
+#potion-modal .sheet.craft-sheet {
+  width: min(880px, calc(100vw - 24px));
 }
 
 .sheet h2 {

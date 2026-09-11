@@ -1,9 +1,16 @@
 import * as THREE from 'three';
 import {
   EXPANSION_PADS,
+  FOUNTAIN,
+  PATH_START_Z,
   ROOM_D,
   ROOM_W,
+  cobblePathSpan,
+  gardenBox,
+  gardenRockSpots,
+  gardenTrapdoorSpot,
   gardenTreeSpots,
+  keepFountain,
   neighborsOf,
   occupiedCells,
   padConnects,
@@ -288,39 +295,6 @@ function makePlaque(text) {
   return group;
 }
 
-function makeSign() {
-  const group = new THREE.Group();
-  const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.52, 0.08), wood(0x4e331f)));
-  group.add(board);
-  const canvas = document.createElement('canvas');
-  canvas.width = 640;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#4e331f';
-  ctx.fillRect(0, 0, 640, 128);
-  ctx.fillStyle = '#f0d9a8';
-  ctx.font = '700 56px Georgia, serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('RUNE CRAFT', 320, 64);
-  const tex = new THREE.CanvasTexture(canvas);
-  const label = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.4, 0.44),
-    new THREE.MeshBasicMaterial({ map: tex, transparent: true }),
-  );
-  label.position.z = 0.05;
-  group.add(label);
-  const left = buildTorch();
-  left.position.set(-1.42, 0.02, 0.08);
-  left.scale.setScalar(0.85);
-  group.add(left);
-  const right = buildTorch();
-  right.position.set(1.42, 0.02, 0.08);
-  right.scale.setScalar(0.85);
-  group.add(right);
-  return group;
-}
-
 function addFloor(root, center) {
   const floorMat = wood(0x6a4a2e, 0.9);
   const floor = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W, 0.08, ROOM_D), floorMat));
@@ -379,22 +353,6 @@ function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
   const rafter = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, ROOM_D - 0.2), wood(0x3c2616)));
   rafter.position.set(0, 2.55, 0);
   group.add(rafter);
-  if (!neigh.front) {
-    const high = addShadow(new THREE.Mesh(
-      new THREE.BoxGeometry(ROOM_W, ridgeY - 2.7, 0.14),
-      cobbleSlabMat(ROOM_W, ridgeY - 2.7, 0, 2.7),
-    ));
-    high.position.set(0, 2.7 + (ridgeY - 2.7) / 2, ROOM_D / 2);
-    group.add(high);
-  }
-  if (!neigh.back) {
-    const high = addShadow(new THREE.Mesh(
-      new THREE.BoxGeometry(ROOM_W, ridgeY - 2.7, 0.14),
-      cobbleSlabMat(ROOM_W, ridgeY - 2.7, 0, 2.7),
-    ));
-    high.position.set(0, 2.7 + (ridgeY - 2.7) / 2, -ROOM_D / 2);
-    group.add(high);
-  }
   roofs.add(group);
   return group;
 }
@@ -440,6 +398,27 @@ function addOriginFront(root, center) {
   const stripe2 = stripe.clone();
   stripe2.position.z = center.z + ROOM_D / 2 + 0.62;
   root.add(stripe2);
+
+  const join = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(ROOM_W + 0.18, 0.28, 0.48),
+    wood(0x3c2616, 0.78),
+  ));
+  join.position.set(center.x, 2.64, center.z + ROOM_D / 2 + 0.1);
+  root.add(join);
+  const fascia = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(ROOM_W + 0.12, 0.16, 0.28),
+    cobbleMat(4.2, 0.4),
+  ));
+  fascia.position.set(center.x, 2.78, center.z + ROOM_D / 2 + 0.02);
+  root.add(fascia);
+  for (const side of [-1, 1]) {
+    const cap = addShadow(new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.26, 0.5),
+      wood(0x3c2616, 0.78),
+    ));
+    cap.position.set(center.x + side * (ROOM_W / 2 - 0.1), 2.68, center.z + ROOM_D / 2 + 0.14);
+    root.add(cap);
+  }
 
   const plaque = makePlaque('General Store');
   plaque.position.set(center.x, 2.58, center.z + ROOM_D / 2 + 0.18);
@@ -500,11 +479,12 @@ function addRoomWalls(root, cell, neigh, isOrigin) {
     const back = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W, h, t), stoneBack));
     back.position.set(c.x, y, backZ);
     root.add(back);
-    if (isOrigin) {
-      const sign = makeSign();
-      sign.position.set(c.x, 2.08, backZ + 0.13);
-      root.add(sign);
-    }
+    const cap = addShadow(new THREE.Mesh(
+      new THREE.BoxGeometry(ROOM_W + 0.08, 0.14, 0.22),
+      wood(0x3c2616, 0.78),
+    ));
+    cap.position.set(c.x, 2.72, backZ);
+    root.add(cap);
   }
 
   if (!neigh.front) {
@@ -873,38 +853,46 @@ function addGarden(root, cells, expansionIds = []) {
     box.minZ = Math.min(box.minZ, c.z - ROOM_D / 2);
     box.maxZ = Math.max(box.maxZ, c.z + ROOM_D / 2);
   }
-  const pad = 9;
-  const grass = addShadow(new THREE.Mesh(
-    new THREE.PlaneGeometry((box.maxX - box.minX) + pad * 2, (box.maxZ - box.minZ) + pad * 2),
+  const grass = gardenBox(expansionIds);
+  const grassMesh = addShadow(new THREE.Mesh(
+    new THREE.PlaneGeometry(grass.maxX - grass.minX, grass.maxZ - grass.minZ),
     new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 }),
   ));
-  grass.rotation.x = -Math.PI / 2;
-  grass.position.set((box.minX + box.maxX) / 2, -0.02, (box.minZ + box.maxZ) / 2);
-  root.add(grass);
+  grassMesh.rotation.x = -Math.PI / 2;
+  grassMesh.position.set((grass.minX + grass.maxX) / 2, -0.02, (grass.minZ + grass.maxZ) / 2);
+  root.add(grassMesh);
 
-  const road = addShadow(new THREE.Mesh(
-    new THREE.PlaneGeometry(1.55, 12.5),
-    cobbleMat(1.55 * COBBLE_U, 12.5 * COBBLE_U),
-  ));
-  road.rotation.x = -Math.PI / 2;
-  road.position.set(0, -0.008, 9.2);
-  root.add(road);
+  addCobblePath(root, expansionIds);
+  if (keepFountain(expansionIds)) addFountain(root, FOUNTAIN.x, FOUNTAIN.z);
 
-  addFountain(root, -2.55, 6.35);
   addGardenBed(root, 2.45, 6.2, randAt(2201));
   addGardenBed(root, -2.7, 7.6, randAt(3311));
+  addGardenBed(root, -3.15, 10.6, randAt(4411));
+  addGardenBed(root, 3.2, 11.15, randAt(5511));
 
   const rand = randAt(1337 + cells.length * 17);
   const hasLeft = expansionIds.includes('left');
   const hasRight = expansionIds.includes('right');
-  // Side trees must clear for side expansions — see gardenTreeSpots().
   for (const spot of gardenTreeSpots(expansionIds)) {
-    const tree = buildTree(0.85 + rand() * 0.45);
+    const tree = buildTree((spot.side === 'edge' ? 1.15 : 0.85) + rand() * 0.45);
     tree.position.set(spot.x, 0, spot.z);
     tree.rotation.y = rand() * Math.PI * 2;
     tree.userData.gardenSide = spot.side;
     root.add(tree);
   }
+  for (const spot of gardenRockSpots(expansionIds)) {
+    const rock = buildBoulder(spot.scale ?? 1);
+    rock.position.set(spot.x, 0, spot.z);
+    rock.rotation.y = rand() * Math.PI * 2;
+    root.add(rock);
+  }
+  const hatch = gardenTrapdoorSpot(expansionIds);
+  if (hatch) {
+    const door = buildTrapdoor();
+    door.position.set(hatch.x, 0, hatch.z);
+    root.add(door);
+  }
+  addEdgeGrass(root, grass, expansionIds, rand);
   for (let i = 0; i < 14; i += 1) {
     const leftSide = i % 2 === 0;
     if (leftSide && hasLeft) continue;
@@ -925,6 +913,129 @@ function addGarden(root, cells, expansionIds = []) {
     );
     root.add(flowers);
   }
+}
+
+function addPathRect(root, minX, maxX, minZ, maxZ) {
+  const w = maxX - minX;
+  const d = maxZ - minZ;
+  if (w < 0.05 || d < 0.05) return;
+  const mesh = addShadow(new THREE.Mesh(
+    new THREE.PlaneGeometry(w, d),
+    cobbleMat(w * COBBLE_U, d * COBBLE_U),
+  ));
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set((minX + maxX) / 2, -0.008, (minZ + maxZ) / 2);
+  root.add(mesh);
+}
+
+function addCobblePath(root, expansionIds = []) {
+  const span = cobblePathSpan(expansionIds);
+  if (span.maxZ <= span.minZ) return;
+  const fountainOn = keepFountain(expansionIds)
+    && FOUNTAIN.z > span.minZ + 1.1
+    && FOUNTAIN.z < span.maxZ - 1.1;
+  const apron = FOUNTAIN.apron ?? 1.42;
+  if (fountainOn) {
+    addPathRect(root, span.minX, span.maxX, span.minZ, FOUNTAIN.z - apron);
+    addPathRect(root, span.minX, span.maxX, FOUNTAIN.z + apron, span.maxZ);
+    const ring = addShadow(new THREE.Mesh(
+      new THREE.RingGeometry(FOUNTAIN.radius + 0.04, apron, 28),
+      cobbleMat(apron * 2 * COBBLE_U, apron * 2 * COBBLE_U),
+    ));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(FOUNTAIN.x, -0.006, FOUNTAIN.z);
+    root.add(ring);
+  } else {
+    addPathRect(root, span.minX, span.maxX, span.minZ, span.maxZ);
+  }
+}
+
+function buildBoulder(scale = 1) {
+  const group = new THREE.Group();
+  const stone = new THREE.MeshStandardMaterial({ color: 0x6a6560, roughness: 0.94 });
+  const body = addShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.28 * scale, 0), stone));
+  body.scale.set(1.15, 0.72, 1);
+  body.position.y = 0.14 * scale;
+  group.add(body);
+  const bump = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.14 * scale, 6, 5), stone));
+  bump.position.set(0.1 * scale, 0.16 * scale, -0.06 * scale);
+  group.add(bump);
+  return group;
+}
+
+function buildTrapdoor() {
+  const group = new THREE.Group();
+  group.name = 'trapdoor';
+  const frame = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.95), wood(0x3f2716)));
+  frame.position.y = 0.04;
+  group.add(frame);
+  const door = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.04, 0.72), wood(0x6a4324)));
+  door.position.set(0, 0.08, 0.08);
+  door.rotation.x = -0.28;
+  group.add(door);
+  const hinge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.03, 0.06), metal(0xb08a3c)));
+  hinge.position.set(0, 0.09, -0.34);
+  group.add(hinge);
+  const ring = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 10), metal(0xb08a3c)));
+  ring.position.set(0, 0.12, 0.22);
+  group.add(ring);
+  return group;
+}
+
+function addEdgeGrass(root, grass, expansionIds, rand) {
+  const tufts = 22;
+  for (let i = 0; i < tufts; i += 1) {
+    const along = i / tufts;
+    const edge = i % 4;
+    let x;
+    let z;
+    if (edge === 0) {
+      x = grass.minX + 0.6 + rand() * 1.2;
+      z = grass.minZ + along * (grass.maxZ - grass.minZ);
+    } else if (edge === 1) {
+      x = grass.maxX - 0.6 - rand() * 1.2;
+      z = grass.minZ + along * (grass.maxZ - grass.minZ);
+    } else if (edge === 2) {
+      x = grass.minX + along * (grass.maxX - grass.minX);
+      z = grass.minZ + 0.6 + rand() * 1.2;
+    } else {
+      x = grass.minX + along * (grass.maxX - grass.minX);
+      z = grass.maxZ - 0.6 - rand() * 1.2;
+    }
+    if (pointHitsShopSafe(x, z, expansionIds) || Math.abs(x) < 1.4 && z > PATH_START_Z) continue;
+    const clump = buildGrassTuft(0.9 + rand() * 0.7, rand);
+    clump.position.set(x, 0, z);
+    clump.rotation.y = rand() * Math.PI * 2;
+    root.add(clump);
+  }
+}
+
+function pointHitsShopSafe(x, z, expansionIds) {
+  return occupiedCells(expansionIds).some((cell) => {
+    const c = roomCenter(cell.gx, cell.gz);
+    return x >= c.x - ROOM_W / 2 - 0.8
+      && x <= c.x + ROOM_W / 2 + 0.8
+      && z >= c.z - ROOM_D / 2 - 0.8
+      && z <= c.z + ROOM_D / 2 + 0.8;
+  });
+}
+
+function buildGrassTuft(scale, rand) {
+  const group = new THREE.Group();
+  const green = new THREE.MeshStandardMaterial({
+    color: 0x3d7a32,
+    roughness: 0.92,
+    side: THREE.DoubleSide,
+  });
+  const count = 5 + Math.floor(rand() * 4);
+  for (let i = 0; i < count; i += 1) {
+    const blade = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.32 * scale, 5), green));
+    blade.position.set((rand() - 0.5) * 0.22, 0.14 * scale, (rand() - 0.5) * 0.22);
+    blade.rotation.z = (rand() - 0.5) * 0.45;
+    blade.rotation.x = (rand() - 0.5) * 0.3;
+    group.add(blade);
+  }
+  return group;
 }
 
 export function buildShop(expansionIds = []) {

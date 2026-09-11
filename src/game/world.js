@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import {
   ARMOUR_SLOTS,
   CUSTOMERS,
+  DEFAULT_SKYBOX,
   FIRST_CUSTOMER_DELAY,
   MAX_CUSTOMERS,
   RECIPES,
   REQUEST_WAIT,
   SHOP,
+  SKYBOXES,
   SPAWN_GAP_MAX,
   SPAWN_GAP_MIN,
   decideRequest,
@@ -22,6 +24,9 @@ import {
   FURNITURE_ROT_STEP,
   FURNITURE_SNAP,
   cloneFurniture,
+  gardenBox,
+  pointHitsShop,
+  pointOnFloors,
   snapToFloor,
   walkFloors,
 } from './layout.js';
@@ -34,10 +39,12 @@ import {
   buildCounter,
   buildDust,
   buildFurniture,
+  buildGoblin,
   buildShopDoor,
   buildShopkeeper,
   buildWare,
   normalizeImported,
+  setChefHatVisible,
   setChestLid,
   setDoorOpen,
   setSpeechText,
@@ -57,6 +64,50 @@ const CAM_MIN_PITCH = 0.28;
 const CAM_MAX_PITCH = 1.18;
 const ROOF_FADE_START = 13.7;
 const ROOF_FADE_FULL = 20.5;
+const GOBLIN_COUNT = 3;
+
+function skyPreset(id) {
+  return SKYBOXES.find((item) => item.id === id) ?? SKYBOXES.find((item) => item.id === DEFAULT_SKYBOX);
+}
+
+function applySkyColor(scene, id) {
+  const preset = skyPreset(id);
+  const color = preset.color;
+  scene.background = new THREE.Color(color);
+  scene.fog = new THREE.Fog(preset.fog ?? color, 14, 42);
+}
+
+function buildClouds() {
+  const group = new THREE.Group();
+  group.name = 'clouds';
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xf4f7fb,
+    roughness: 1,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+  });
+  let seed = 4242;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+  for (let i = 0; i < 12; i += 1) {
+    const puff = new THREE.Group();
+    const n = 3 + Math.floor(rand() * 3);
+    for (let j = 0; j < n; j += 1) {
+      const s = new THREE.Mesh(new THREE.SphereGeometry(1.1 + rand() * 0.7, 8, 6), mat);
+      s.scale.set(1.7 + rand() * 0.6, 0.42 + rand() * 0.16, 1.05 + rand() * 0.4);
+      s.position.set(j * 1.35 - 1.2, rand() * 0.35, (rand() - 0.5) * 1.1);
+      puff.add(s);
+    }
+    puff.position.set((rand() - 0.5) * 48, 13 + rand() * 7, (rand() - 0.5) * 48);
+    puff.userData.drift = 0.12 + rand() * 0.18;
+    group.add(puff);
+  }
+  return group;
+}
 
 export function createWorld(canvas, state) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -69,8 +120,7 @@ export function createWorld(canvas, state) {
   renderer.toneMappingExposure = 1.05;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xc9b48a);
-  scene.fog = new THREE.Fog(0xc9b48a, 12, 26);
+  applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
 
   const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.08, 180);
   const cam = {
@@ -156,11 +206,13 @@ export function createWorld(canvas, state) {
   const dust = buildDust();
   scene.add(dust);
 
-  const shopkeeper = buildShopkeeper();
+  const shopkeeper = buildShopkeeper({ chefHat: Boolean(state.chefHat) });
   shopkeeper.position.set(SHOP.keeper.x, 0, SHOP.keeper.z);
   shopkeeper.rotation.y = 0.35;
-  shopkeeper.scale.setScalar(1.12);
+  shopkeeper.scale.setScalar(1.16);
   scene.add(shopkeeper);
+  const clouds = buildClouds();
+  scene.add(clouds);
   const playerPath = [];
   const moveMarker = new THREE.Mesh(
     new THREE.RingGeometry(0.16, 0.24, 24),
@@ -207,30 +259,26 @@ export function createWorld(canvas, state) {
   const anvil = buildAnvil();
   scene.add(anvil);
   const anvilPick = makePick(0.95, 1.45, 0.72, 'anvil');
-  const anvilGlow = makeGlow(0.52, 0.68);
 
   const chest = buildChest();
   scene.add(chest);
   const chestPick = makePick(1.28, 1.45, 1.02, 'chest');
-  const chestGlow = makeGlow(0.62, 0.74);
   let chestOpen = false;
 
   const rangeMesh = buildRange();
   scene.add(rangeMesh);
   const rangePick = makePick(0.78, 1.35, 0.62, 'range');
-  const rangeGlow = makeGlow(0.4, 0.54);
 
   const cauldronMesh = buildCauldron();
   scene.add(cauldronMesh);
   const cauldronPick = makePick(0.72, 1.15, 0.72, 'cauldron');
-  const cauldronGlow = makeGlow(0.38, 0.52);
 
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
-    anvil: { mesh: anvil, pick: anvilPick, glow: anvilGlow, pickY: 0.72 },
-    chest: { mesh: chest, pick: chestPick, glow: chestGlow, pickY: 0.72 },
-    range: { mesh: rangeMesh, pick: rangePick, glow: rangeGlow, pickY: 0.68 },
-    cauldron: { mesh: cauldronMesh, pick: cauldronPick, glow: cauldronGlow, pickY: 0.58 },
+    anvil: { mesh: anvil, pick: anvilPick, glow: null, pickY: 0.72 },
+    chest: { mesh: chest, pick: chestPick, glow: null, pickY: 0.72 },
+    range: { mesh: rangeMesh, pick: rangePick, glow: null, pickY: 0.68 },
+    cauldron: { mesh: cauldronMesh, pick: cauldronPick, glow: null, pickY: 0.58 },
   };
 
   function applyFixturePose(id) {
@@ -241,13 +289,13 @@ export function createWorld(canvas, state) {
     const owned = Boolean(pose);
     slot.mesh.visible = owned;
     slot.pick.visible = owned && !draft;
-    slot.glow.visible = owned;
+    if (slot.glow) slot.glow.visible = owned;
     if (!pose) return;
     slot.mesh.position.set(pose.x, 0, pose.z);
     slot.mesh.rotation.y = pose.rot ?? FURNITURE_FORWARD;
     slot.pick.position.set(pose.x, slot.pickY, pose.z);
     slot.pick.rotation.y = pose.rot ?? FURNITURE_FORWARD;
-    slot.glow.position.set(pose.x, 0.08, pose.z);
+    if (slot.glow) slot.glow.position.set(pose.x, 0.08, pose.z);
   }
 
   function makeDisplaySlot(spot, index, pose) {
@@ -269,7 +317,7 @@ export function createWorld(canvas, state) {
       new THREE.BoxGeometry(...pickSize),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    pick.position.y = spot.kind === 'shelf' ? 1.16 : spot.kind === 'stand' ? 0.95 : 0.6;
+    pick.position.y = spot.kind === 'shelf' ? 1.34 : spot.kind === 'stand' ? 0.95 : 0.6;
     pick.userData.kind = 'display';
     pick.userData.displayIndex = index;
     anchor.add(pick);
@@ -492,6 +540,62 @@ export function createWorld(canvas, state) {
   let ignorePicksUntil = 0;
   let tradingId = null;
   let lastNow = 0;
+  const goblins = [];
+
+  function grassWanderPoint() {
+    const grass = gardenBox(state.expansions ?? []);
+    for (let i = 0; i < 24; i += 1) {
+      const x = grass.minX + 1.4 + Math.random() * (grass.maxX - grass.minX - 2.8);
+      const z = grass.minZ + 1.4 + Math.random() * (grass.maxZ - grass.minZ - 2.8);
+      if (pointOnFloors(x, z, floors, 0.45)) continue;
+      if (pointHitsShop(x, z, state.expansions ?? [], 0.6)) continue;
+      if (Math.abs(x) < 1.35 && z > 3.6) continue;
+      return { x, z };
+    }
+    return { x: -6.2, z: 8.4 };
+  }
+
+  function spawnGoblins() {
+    for (const gob of goblins) scene.remove(gob.mesh);
+    goblins.length = 0;
+    for (let i = 0; i < GOBLIN_COUNT; i += 1) {
+      const start = grassWanderPoint();
+      const mesh = buildGoblin();
+      mesh.position.set(start.x, 0, start.z);
+      scene.add(mesh);
+      goblins.push({
+        mesh,
+        goal: grassWanderPoint(),
+        waitUntil: 0,
+      });
+    }
+  }
+  spawnGoblins();
+
+  function updateGoblins(dt, now) {
+    for (const gob of goblins) {
+      if (now < gob.waitUntil) {
+        gob.mesh.rotation.y += dt * 0.4;
+        gob.mesh.position.y = Math.abs(Math.sin(now * 2.2)) * 0.02;
+        continue;
+      }
+      const pos = gob.mesh.position;
+      const dx = gob.goal.x - pos.x;
+      const dz = gob.goal.z - pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 0.18) {
+        gob.waitUntil = now + 1.2 + Math.random() * 2.4;
+        gob.goal = grassWanderPoint();
+        continue;
+      }
+      const step = 0.72 * dt;
+      const t = Math.min(1, step / dist);
+      pos.x += dx * t;
+      pos.z += dz * t;
+      gob.mesh.rotation.y = Math.atan2(dx, dz);
+      gob.mesh.position.y = Math.abs(Math.sin(now * 5)) * 0.03;
+    }
+  }
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -1353,12 +1457,12 @@ export function createWorld(canvas, state) {
     }
     positions.needsUpdate = true;
     setChestLid(chest, chestOpen, dt);
-    chestGlow.material.opacity = 0.28 + Math.sin(now * 2.2) * 0.08;
-    anvilGlow.material.opacity = 0.26 + Math.sin(now * 2.4) * 0.1;
-    rangeGlow.material.opacity = 0.24 + Math.sin(now * 2.1) * 0.1;
-    cauldronGlow.material.opacity = state.furniture.cauldron ? 0.22 + Math.sin(now * 1.9) * 0.1 : 0;
     counterGlow.material.opacity = moveTarget?.id === 'counter' ? 0.7 : 0.0;
     setDoorOpen(shopDoor, true, dt);
+    for (const puff of clouds.children) {
+      puff.position.x += (puff.userData.drift ?? 0.15) * dt;
+      if (puff.position.x > 28) puff.position.x = -28;
+    }
     syncDisplays();
     refreshSelection();
     const selected = displays[state.selectedDisplay];
@@ -1368,6 +1472,7 @@ export function createWorld(canvas, state) {
       outlineBoxMat.opacity = 0.72 + Math.sin(now * 2.4) * 0.18;
     }
     updateCustomers(dt, now);
+    updateGoblins(dt, now);
     renderer.render(scene, camera);
   }
 
@@ -1387,6 +1492,9 @@ export function createWorld(canvas, state) {
       applyAllPoses();
       rebuildArchitecture();
       applyAllPoses();
+      spawnGoblins();
+      setChefHatVisible(shopkeeper, Boolean(state.chefHat));
+      applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
     },
     setChestOpen(open) {
       chestOpen = Boolean(open);
@@ -1523,6 +1631,15 @@ export function createWorld(canvas, state) {
     rebuildAfterExpansion() {
       rebuildArchitecture();
       applyAllPoses();
+      spawnGoblins();
+    },
+    setSkybox(id) {
+      state.skybox = id;
+      applySkyColor(scene, id);
+    },
+    setChefHat(on) {
+      state.chefHat = Boolean(on);
+      setChefHatVisible(shopkeeper, state.chefHat);
     },
   };
 }

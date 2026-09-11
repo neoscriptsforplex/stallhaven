@@ -7,6 +7,7 @@ import {
   SHOP,
   START_GOLD,
   decideRequest,
+  formatGold,
   matchingArmourIds,
   recipeCost,
   recipeList,
@@ -21,6 +22,7 @@ import {
 } from './catalog.js';
 import {
   applyState,
+  applyCheat,
   buyCauldron,
   buyExpansion,
   buyFromCustomer,
@@ -34,18 +36,21 @@ import {
   chestTotal,
   completeCrafts,
   craftBlockReason,
+  craftXp,
   createState,
   decideAfterWait,
   decidePurchase,
   hasStock,
   isUnlocked,
   offerChoices,
+  OLD_DEFAULT_DISPLAYS,
   ownsCauldron,
   placeFromChest,
   placeOnDisplay,
   restock,
   sellToCustomer,
   serializeState,
+  shopProgress,
   startCraft,
   swapOffer,
   tickMaterials,
@@ -231,6 +236,8 @@ describe('save and load', () => {
     state.expansions = ['left'];
     state.furniture.anvil.x = -2.4;
     state.materialAcc.bronze = 0.4;
+    state.skybox = 'black';
+    state.chefHat = true;
     const saved = serializeState(state);
     const other = createState();
     assert.equal(applyState(other, saved), true);
@@ -243,6 +250,10 @@ describe('save and load', () => {
     assert.equal(other.materialAcc.bronze, 0.4);
     assert.equal(other.chest.bronze_scimitar, 1);
     assert.equal(other.music.volume, state.music.volume);
+    assert.equal(other.skybox, 'black');
+    assert.equal(other.chefHat, true);
+    assert.ok(other.shopXp > 0);
+    assert.equal(other.shopLevel, shopProgress(other.shopXp).level);
   });
 
   it('loads older save JSON that is missing new fields', () => {
@@ -259,6 +270,10 @@ describe('save and load', () => {
     assert.equal(state.chest.bread, 2);
     assert.equal(state.fullscreen, false);
     assert.ok(state.music.volume > 0);
+    assert.equal(state.skybox, 'blue');
+    assert.equal(state.chefHat, false);
+    assert.equal(state.shopXp, 0);
+    assert.equal(state.shopLevel, 1);
     const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
     assert.equal(state.displays[shelfIndex].shelfSlots.length, 4);
     assert.equal(state.displays[shelfIndex].shelfSlots.every((id) => id == null), true);
@@ -679,7 +694,7 @@ describe('build furniture', () => {
     const state = createState();
     assert.equal(applyState(state, {
       gold: 500,
-      displays: SHOP.displays.map(() => ({ ware: null })),
+      displays: Array.from({ length: OLD_DEFAULT_DISPLAYS }, () => ({ ware: null })),
     }), true);
     assert.equal(state.boughtFurniture.table, 0);
     assert.equal(state.boughtFurniture.mannequin, 0);
@@ -687,5 +702,97 @@ describe('build furniture', () => {
     assert.equal(buyFurniture(state, 'table', { x: 0, z: 0.8, rot: 0 }), true);
     assert.equal(state.gold, 0);
     assert.equal(state.boughtFurniture.table, 1);
+  });
+});
+
+describe('gold formatting', () => {
+  it('adds commas only for amounts of 1000 or more', () => {
+    assert.equal(formatGold(40), '40');
+    assert.equal(formatGold(999), '999');
+    assert.equal(formatGold(1000), '1,000');
+    assert.equal(formatGold(10000), '10,000');
+    assert.equal(formatGold(1500), '1,500');
+  });
+});
+
+describe('shop XP', () => {
+  it('grants more XP for higher-tier crafts and caps at level 99', () => {
+    const bread = craftXp(RECIPES.bread);
+    const dragon = craftXp(RECIPES.dragon_sword);
+    assert.ok(dragon > bread);
+    const state = createState();
+    assert.equal(state.shopLevel, 1);
+    assert.equal(state.shopXp, 0);
+    finishCraft(state, 'bread');
+    assert.equal(state.shopXp, bread);
+    assert.equal(state.shopLevel, shopProgress(state.shopXp).level);
+    state.shopXp = 0;
+    for (let i = 1; i < 200; i += 1) state.shopXp += 5000;
+    const maxed = shopProgress(state.shopXp);
+    assert.equal(maxed.level, 99);
+    assert.equal(maxed.t, 1);
+  });
+});
+
+describe('cheat codes', () => {
+  it('applies motherlode, maxcape, onesmallfavour, and freshstart case-insensitively', () => {
+    const state = createState();
+    const gold = state.gold;
+    assert.equal(applyCheat(state, 'MoThErLoDe'), 'motherlode');
+    assert.equal(state.gold, gold + 10000);
+    assert.equal(applyCheat(state, 'onesmallfavour'), 'onesmallfavour');
+    assert.equal(state.chefHat, true);
+    assert.equal(applyCheat(state, 'MAXCAPE'), 'maxcape');
+    assert.equal(isUnlocked(state, 'dragon_sword'), true);
+    assert.equal(isUnlocked(state, 'runite_platebody'), true);
+    state.gold = 80;
+    state.chest.bread = 4;
+    assert.equal(applyCheat(state, 'freshstart'), 'freshstart');
+    assert.equal(state.gold, START_GOLD);
+    assert.equal(state.chest.bread, undefined);
+    assert.equal(state.chefHat, false);
+    assert.equal(state.shopXp, 0);
+  });
+});
+
+describe('center wall shelf save migration', () => {
+  it('keeps a bought table when loading a version 5 save with eight default displays', () => {
+    const state = createState();
+    assert.equal(applyState(state, {
+      version: 5,
+      gold: 40,
+      displays: [
+        ...Array.from({ length: 8 }, () => ({ ware: null })),
+        { kind: 'table', name: 'Table 1', bought: true, ware: null },
+      ],
+      furniture: {
+        counter: { x: 0, z: -1.72, rot: 0 },
+        anvil: { x: -2.98, z: -2.42, rot: 0 },
+        chest: { x: 2.98, z: -2.42, rot: 0 },
+        range: { x: 1.92, z: -2.22, rot: 0 },
+        displays: [
+          ...SHOP.displays.slice(0, 8).map((spot) => ({ x: spot.x, z: spot.z, rot: 0 })),
+          { x: 0.4, z: 0.2, rot: 0 },
+        ],
+      },
+      boughtFurniture: { table: 1, mannequin: 0 },
+    }), true);
+    assert.equal(state.displays.length, SHOP.displays.length + 1);
+    const center = SHOP.displays.findIndex((d) => d.id === 'shelf-center');
+    assert.ok(center >= 0);
+    assert.equal(state.displays[center].kind, 'shelf');
+    assert.equal(state.displays.at(-1).kind, 'table');
+    assert.equal(state.displays.at(-1).bought, true);
+    assert.equal(state.furniture.displays.at(-1).x, 0.4);
+  });
+});
+
+describe('default display order', () => {
+  it('appends the extra back-wall shelf after the original eight displays', () => {
+    assert.equal(SHOP.displays.length, 9);
+    assert.equal(SHOP.displays[6].id, 'stand-left');
+    assert.equal(SHOP.displays[7].id, 'stand-right');
+    assert.equal(SHOP.displays[8].id, 'shelf-center');
+    assert.equal(SHOP.displays[8].kind, 'shelf');
   });
 });

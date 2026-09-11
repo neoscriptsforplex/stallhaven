@@ -37,6 +37,12 @@ export const FURNITURE_SHOP = [
   { type: 'mannequin', kind: 'stand', label: 'Mannequin' },
 ];
 
+export const GRASS_PAD = 9;
+export const FOUNTAIN = { x: 0, z: 8.85, radius: 0.7, apron: 1.42 };
+export const PATH_HALF_W = 0.72;
+export const PATH_START_Z = 4.22;
+export const TRAPDOOR = { x: 3.35, z: 9.55 };
+
 export function furnitureBuyCost(boughtCount = 0) {
   const n = Math.max(0, Math.round(Number(boughtCount) || 0));
   return FURNITURE_BUY_BASE * (FURNITURE_BUY_MULT ** n);
@@ -176,6 +182,53 @@ export function cloneFurniture(furniture = defaultFurniture()) {
   };
 }
 
+export function gardenBox(expansionIds = []) {
+  const box = footprintBox(expansionIds);
+  return {
+    minX: box.minX - GRASS_PAD,
+    maxX: box.maxX + GRASS_PAD,
+    minZ: box.minZ - GRASS_PAD,
+    maxZ: box.maxZ + GRASS_PAD,
+    cx: (box.minX + box.maxX) / 2,
+    cz: (box.minZ + box.maxZ) / 2,
+  };
+}
+
+export function cobblePathSpan(expansionIds = []) {
+  const grass = gardenBox(expansionIds);
+  return {
+    minX: -PATH_HALF_W,
+    maxX: PATH_HALF_W,
+    minZ: PATH_START_Z,
+    maxZ: grass.maxZ - 0.16,
+  };
+}
+
+export function pointHitsShop(x, z, expansionIds = [], pad = 1.15) {
+  return occupiedCells(expansionIds).some((cell) => {
+    const c = roomCenter(cell.gx, cell.gz);
+    return x >= c.x - ROOM_W / 2 - pad
+      && x <= c.x + ROOM_W / 2 + pad
+      && z >= c.z - ROOM_D / 2 - pad
+      && z <= c.z + ROOM_D / 2 + pad;
+  });
+}
+
+export function pointOnPath(x, z, expansionIds = [], pad = 0.2) {
+  const path = cobblePathSpan(expansionIds);
+  const dx = x - FOUNTAIN.x;
+  const dz = z - FOUNTAIN.z;
+  const dist = Math.hypot(dx, dz);
+  const apron = FOUNTAIN.apron ?? 1.42;
+  if (dist <= FOUNTAIN.radius + 0.08) return false;
+  if (dist <= apron + pad) return true;
+  const onStrip = x >= path.minX - pad
+    && x <= path.maxX + pad
+    && z >= path.minZ - pad
+    && z <= path.maxZ + pad;
+  return onStrip;
+}
+
 export function footprintBox(expansionIds = []) {
   const cells = occupiedCells(expansionIds);
   let minX = Infinity;
@@ -198,12 +251,26 @@ export function footprintBox(expansionIds = []) {
  * through the new walls. Rear trees can stay unless they collide with a
  * back room.
  */
-export function gardenTreeSpots(expansionIds = []) {
-  const box = footprintBox(expansionIds);
-  const cx = (box.minX + box.maxX) / 2;
-  const cz = (box.minZ + box.maxZ) / 2;
+function keepGardenSpot(spot, expansionIds = []) {
   const hasLeft = expansionIds.includes('left');
   const hasRight = expansionIds.includes('right');
+  if (spot.side === 'left' && hasLeft) return false;
+  if (spot.side === 'right' && hasRight) return false;
+  if (spot.side === 'front-left' && hasLeft) return false;
+  if (spot.side === 'front-right' && hasRight) return false;
+  if (pointHitsShop(spot.x, spot.z, expansionIds, 1.15)) return false;
+  if (pointOnPath(spot.x, spot.z, expansionIds, 0.55)) return false;
+  const dx = spot.x - FOUNTAIN.x;
+  const dz = spot.z - FOUNTAIN.z;
+  if ((dx * dx + dz * dz) < 1.55 ** 2) return false;
+  return true;
+}
+
+export function gardenTreeSpots(expansionIds = []) {
+  const box = footprintBox(expansionIds);
+  const grass = gardenBox(expansionIds);
+  const cx = (box.minX + box.maxX) / 2;
+  const cz = (box.minZ + box.maxZ) / 2;
   const spots = [
     { x: box.minX - 2.2, z: box.minZ + 1.4, side: 'left' },
     { x: box.minX - 2.8, z: cz, side: 'left' },
@@ -216,23 +283,45 @@ export function gardenTreeSpots(expansionIds = []) {
     { x: cx, z: box.minZ - 2.8, side: 'rear' },
     { x: box.minX - 1.6, z: box.maxZ + 2.4, side: 'front-left' },
     { x: box.maxX + 1.6, z: box.maxZ + 2.4, side: 'front-right' },
+    { x: -2.55, z: 7.15, side: 'path' },
+    { x: 2.62, z: 7.35, side: 'path' },
+    { x: -2.85, z: 10.2, side: 'path' },
+    { x: 2.95, z: 10.45, side: 'path' },
+    { x: -2.15, z: 11.8, side: 'path' },
+    { x: 2.25, z: 11.55, side: 'path' },
+    { x: grass.minX + 1.4, z: grass.minZ + 1.6, side: 'edge' },
+    { x: grass.maxX - 1.4, z: grass.minZ + 1.8, side: 'edge' },
+    { x: grass.minX + 1.6, z: grass.maxZ - 1.5, side: 'edge' },
+    { x: grass.maxX - 1.7, z: grass.maxZ - 1.6, side: 'edge' },
+    { x: grass.minX + 2.2, z: cz, side: 'edge' },
+    { x: grass.maxX - 2.1, z: cz, side: 'edge' },
+    { x: cx - 5.4, z: grass.minZ + 1.3, side: 'edge' },
+    { x: cx + 5.6, z: grass.minZ + 1.4, side: 'edge' },
   ];
-  return spots.filter((spot) => {
-    if (Math.abs(spot.x) < 2.4 && spot.z > 4.2) return false;
-    if (spot.side === 'left' && hasLeft) return false;
-    if (spot.side === 'right' && hasRight) return false;
-    if (spot.side === 'front-left' && hasLeft) return false;
-    if (spot.side === 'front-right' && hasRight) return false;
-    const rooms = occupiedCells(expansionIds);
-    const pad = 1.15;
-    return !rooms.some((cell) => {
-      const c = roomCenter(cell.gx, cell.gz);
-      return spot.x >= c.x - ROOM_W / 2 - pad
-        && spot.x <= c.x + ROOM_W / 2 + pad
-        && spot.z >= c.z - ROOM_D / 2 - pad
-        && spot.z <= c.z + ROOM_D / 2 + pad;
-    });
-  });
+  return spots.filter((spot) => keepGardenSpot(spot, expansionIds));
+}
+
+export function gardenRockSpots(expansionIds = []) {
+  const spots = [
+    { x: -3.45, z: 8.15, scale: 0.85, side: 'path' },
+    { x: 3.55, z: 7.65, scale: 1.05, side: 'path' },
+    { x: -4.15, z: 11.1, scale: 0.7, side: 'path' },
+    { x: 4.35, z: 10.7, scale: 0.9, side: 'path' },
+    { x: -6.2, z: -5.4, scale: 1.15, side: 'rear' },
+    { x: 6.4, z: -4.8, scale: 0.8, side: 'rear' },
+    { x: -7.4, z: 2.2, scale: 0.95, side: 'left' },
+    { x: 7.6, z: 1.6, scale: 1.1, side: 'right' },
+  ];
+  return spots.filter((spot) => keepGardenSpot(spot, expansionIds));
+}
+
+export function gardenTrapdoorSpot(expansionIds = []) {
+  const spot = { ...TRAPDOOR, side: 'path' };
+  return keepGardenSpot(spot, expansionIds) ? spot : null;
+}
+
+export function keepFountain(expansionIds = []) {
+  return !pointHitsShop(FOUNTAIN.x, FOUNTAIN.z, expansionIds, 1.15);
 }
 
 /** Wall vines that stay off food/potion display shelves on the back wall. */

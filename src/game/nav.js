@@ -46,6 +46,7 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     blockFromPose(poses.chest, 0.49, 0.36),
     blockFromPose(poses.range, 0.34, 0.28),
   ];
+  if (poses.cauldron) blocks.push(blockFromPose(poses.cauldron, 0.32, 0.32));
   const displayPoses = poses.displays ?? [];
   for (const [index, spot] of shop.displays.entries()) {
     const pose = displayPoses[index] ?? { x: spot.x, z: spot.z, rot: spot.rot ?? 0 };

@@ -3,10 +3,12 @@ import {
   EXPANSION_PADS,
   ROOM_D,
   ROOM_W,
+  gardenTreeSpots,
   neighborsOf,
   occupiedCells,
   padConnects,
   roomCenter,
+  wallVineMounts,
 } from './layout.js';
 
 function wood(color, roughness = 0.86) {
@@ -579,19 +581,10 @@ function mountWallVines(root, x, y, z, rotY, seed) {
 }
 
 function addWallVines(root, center) {
-  const leftX = center.x - ROOM_W / 2 + 0.14;
-  const rightX = center.x + ROOM_W / 2 - 0.14;
-  const backZ = center.z - ROOM_D / 2 + 0.14;
-  const frontZ = center.z + ROOM_D / 2 - 0.14;
-
-  mountWallVines(root, leftX, 1.92, center.z - 2.42, Math.PI / 2, 1);
-  mountWallVines(root, leftX, 1.78, center.z + 2.42, Math.PI / 2, 2);
-  mountWallVines(root, rightX, 1.92, center.z - 2.42, -Math.PI / 2, 3);
-  mountWallVines(root, rightX, 1.78, center.z + 2.42, -Math.PI / 2, 4);
-  mountWallVines(root, center.x - 2.28, 2.02, backZ, 0, 5);
-  mountWallVines(root, center.x + 2.28, 2.02, backZ, 0, 6);
-  mountWallVines(root, center.x - 3.05, 1.84, frontZ, Math.PI, 7);
-  mountWallVines(root, center.x + 3.05, 1.84, frontZ, Math.PI, 8);
+  // Food/potion wall shelves stay vine-free so plates and flasks can sit on them.
+  wallVineMounts(center).forEach((spot, index) => {
+    mountWallVines(root, spot.x, spot.y, spot.z, spot.rotY, index + 1);
+  });
 }
 
 export function buildRange() {
@@ -632,6 +625,53 @@ export function buildRange() {
   group.userData.wareY = 0.68;
   const label = makeNameSprite('Range');
   label.position.y = 1.22;
+  group.add(label);
+  return group;
+}
+
+export function buildCauldron() {
+  const group = new THREE.Group();
+  group.name = 'cauldron';
+  const iron = metal(0x3a4248);
+  const dark = metal(0x1c2226);
+  const ring = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.045, 8, 18), iron));
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.52;
+  group.add(ring);
+  const bowl = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10, 0, Math.PI * 2, 0, Math.PI / 1.35), dark));
+  bowl.position.y = 0.38;
+  group.add(bowl);
+  const brew = new THREE.Mesh(
+    new THREE.CircleGeometry(0.22, 14),
+    new THREE.MeshStandardMaterial({
+      color: 0x4a8a3e,
+      emissive: 0x2a6a28,
+      emissiveIntensity: 0.55,
+      roughness: 0.35,
+    }),
+  );
+  brew.rotation.x = -Math.PI / 2;
+  brew.position.y = 0.5;
+  group.add(brew);
+  for (const [x, z] of [[-0.2, 0.12], [0.2, 0.12], [0, -0.22]]) {
+    const leg = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.04, 0.34, 6), iron));
+    leg.position.set(x, 0.17, z);
+    leg.rotation.z = x * 0.35;
+    leg.rotation.x = -z * 0.25;
+    group.add(leg);
+  }
+  const fire = new THREE.Mesh(
+    new THREE.ConeGeometry(0.1, 0.16, 6),
+    new THREE.MeshStandardMaterial({ color: 0xffc56a, emissive: 0xff7a18, emissiveIntensity: 1.2, roughness: 0.5 }),
+  );
+  fire.position.y = 0.1;
+  group.add(fire);
+  const glow = new THREE.PointLight(0xff9a3a, 0.55, 2.4, 2);
+  glow.position.y = 0.18;
+  group.add(glow);
+  group.userData.wareY = 0.58;
+  const label = makeNameSprite('Cauldron');
+  label.position.y = 1.05;
   group.add(label);
   return group;
 }
@@ -697,23 +737,20 @@ function buildFlowerCluster(rand) {
   return group;
 }
 
-function footprint(cells) {
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minZ = Infinity;
-  let maxZ = -Infinity;
+function addGarden(root, cells, expansionIds = []) {
+  const box = {
+    minX: Infinity,
+    maxX: -Infinity,
+    minZ: Infinity,
+    maxZ: -Infinity,
+  };
   for (const cell of cells) {
     const c = roomCenter(cell.gx, cell.gz);
-    minX = Math.min(minX, c.x - ROOM_W / 2);
-    maxX = Math.max(maxX, c.x + ROOM_W / 2);
-    minZ = Math.min(minZ, c.z - ROOM_D / 2);
-    maxZ = Math.max(maxZ, c.z + ROOM_D / 2);
+    box.minX = Math.min(box.minX, c.x - ROOM_W / 2);
+    box.maxX = Math.max(box.maxX, c.x + ROOM_W / 2);
+    box.minZ = Math.min(box.minZ, c.z - ROOM_D / 2);
+    box.maxZ = Math.max(box.maxZ, c.z + ROOM_D / 2);
   }
-  return { minX, maxX, minZ, maxZ };
-}
-
-function addGarden(root, cells) {
-  const box = footprint(cells);
   const pad = 9;
   const grass = addShadow(new THREE.Mesh(
     new THREE.PlaneGeometry((box.maxX - box.minX) + pad * 2, (box.maxZ - box.minZ) + pad * 2),
@@ -731,30 +768,21 @@ function addGarden(root, cells) {
   root.add(road);
 
   const rand = randAt(1337 + cells.length * 17);
-  const cx = (box.minX + box.maxX) / 2;
-  const cz = (box.minZ + box.maxZ) / 2;
-  const treeSpots = [
-    [box.minX - 2.2, box.minZ + 1.4],
-    [box.minX - 2.8, cz],
-    [box.minX - 1.8, box.maxZ - 1.2],
-    [box.maxX + 2.2, box.minZ + 1.4],
-    [box.maxX + 2.6, cz],
-    [box.maxX + 1.9, box.maxZ - 1.4],
-    [cx - 3.2, box.minZ - 2.4],
-    [cx + 3.2, box.minZ - 2.4],
-    [cx, box.minZ - 2.8],
-    [box.minX - 1.6, box.maxZ + 2.4],
-    [box.maxX + 1.6, box.maxZ + 2.4],
-  ];
-  for (const [x, z] of treeSpots) {
-    if (Math.abs(x) < 2.4 && z > 4.2) continue;
+  const hasLeft = expansionIds.includes('left');
+  const hasRight = expansionIds.includes('right');
+  // Side trees must clear for side expansions — see gardenTreeSpots().
+  for (const spot of gardenTreeSpots(expansionIds)) {
     const tree = buildTree(0.85 + rand() * 0.45);
-    tree.position.set(x, 0, z);
+    tree.position.set(spot.x, 0, spot.z);
     tree.rotation.y = rand() * Math.PI * 2;
+    tree.userData.gardenSide = spot.side;
     root.add(tree);
   }
   for (let i = 0; i < 14; i += 1) {
-    const side = i % 2 === 0 ? box.minX - 1.1 : box.maxX + 1.1;
+    const leftSide = i % 2 === 0;
+    if (leftSide && hasLeft) continue;
+    if (!leftSide && hasRight) continue;
+    const side = leftSide ? box.minX - 1.1 : box.maxX + 1.1;
     const z = box.minZ - 1.2 + rand() * ((box.maxZ - box.minZ) + 3);
     if (Math.abs(side) < 2.2 && z > 4) continue;
     const flowers = buildFlowerCluster(rand);
@@ -783,7 +811,7 @@ export function buildShop(expansionIds = []) {
   pads.name = 'expand-pads';
 
   const cells = occupiedCells(expansionIds);
-  addGarden(root, cells);
+  addGarden(root, cells, expansionIds);
 
   for (const cell of cells) {
     const c = roomCenter(cell.gx, cell.gz);

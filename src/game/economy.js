@@ -13,7 +13,9 @@ import {
   recipeList,
 } from './catalog.js';
 import {
+  CAULDRON_COST,
   CHEST_MAX_LEVEL,
+  FURNITURE_FORWARD,
   MATERIAL_CAP,
   SWAP_PRICE_RATIO,
   chestSlots,
@@ -25,6 +27,8 @@ import {
   padById,
   padConnects,
 } from './layout.js';
+
+export { CAULDRON_COST };
 
 export const SAVE_VERSION = 2;
 
@@ -164,6 +168,25 @@ export function buyExpansion(state, padId) {
   const cost = expansionCost((state.expansions ?? []).length);
   state.gold -= cost;
   state.expansions = [...(state.expansions ?? []), padId];
+  return true;
+}
+
+export function ownsCauldron(state) {
+  return Boolean(state.furniture?.cauldron);
+}
+
+export function canBuyCauldron(state) {
+  return !ownsCauldron(state) && state.gold >= CAULDRON_COST;
+}
+
+export function buyCauldron(state, pose) {
+  if (state.gold < CAULDRON_COST || !pose) return false;
+  state.gold -= CAULDRON_COST;
+  state.furniture.cauldron = {
+    x: pose.x,
+    z: pose.z,
+    rot: pose.rot ?? FURNITURE_FORWARD,
+  };
   return true;
 }
 
@@ -445,6 +468,9 @@ export function applyState(state, data) {
       anvil: readPose(data.furniture.anvil, defaults.anvil),
       chest: readPose(data.furniture.chest, defaults.chest),
       range: readPose(data.furniture.range, defaults.range),
+      cauldron: data.furniture.cauldron
+        ? readPose(data.furniture.cauldron, SHOP.cauldron)
+        : null,
       displays: defaults.displays.map((pose, index) => readPose(data.furniture.displays?.[index], pose)),
     };
   }

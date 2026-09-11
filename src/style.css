@@ -501,9 +501,14 @@ body.modal-open #view {
 }
 
 #expand-btn,
-#help-btn {
+#help-btn,
+#build-btn {
   min-width: 2.6rem;
   font-weight: 700;
+}
+
+#build-btn {
+  min-width: 4.2rem;
 }
 
 #help-btn {
@@ -539,6 +544,22 @@ body.modal-open #view {
   margin: 0 0 8px;
   font-size: 0.82rem;
   color: #e6d3b2;
+}
+
+.build-item {
+  margin: 8px 0 12px;
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--line);
+}
+
+.build-item h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: #f3e2c0;
+}
+
+.build-item button {
+  width: 100%;
 }
 
 .furn-menu {

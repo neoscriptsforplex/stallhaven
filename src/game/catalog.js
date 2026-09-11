@@ -363,8 +363,10 @@ export const SHOP = {
   counter: { x: 0, z: -1.72 },
   keeper: { x: -0.48, z: -2.52 },
   anvil: { x: -2.98, z: -2.42 },
-  range: { x: 1.18, z: -2.52 },
+  // Floor, right of the counter, in the gap before the chest (not the back-left corner).
+  range: { x: 1.92, z: -2.22 },
   chest: { x: 2.98, z: -2.42 },
+  cauldron: { x: 0, z: 0.8 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [
     { id: 'left-front', name: 'Left Front Table', x: -2.95, z: 1.85, kind: 'table' },

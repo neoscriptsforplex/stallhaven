@@ -16,9 +16,12 @@ import {
 } from './catalog.js';
 import {
   applyState,
+  buyCauldron,
   buyExpansion,
   buyFromCustomer,
+  canBuyCauldron,
   canCraft,
+  CAULDRON_COST,
   chestCapacity,
   chestCount,
   chestTotal,
@@ -29,6 +32,7 @@ import {
   hasStock,
   isUnlocked,
   offerChoices,
+  ownsCauldron,
   placeFromChest,
   restock,
   sellToCustomer,
@@ -489,5 +493,32 @@ describe('shop expansions', () => {
     assert.equal(buyExpansion(state, 'back-left'), false);
     assert.equal(buyExpansion(state, 'back'), true);
     assert.equal(buyExpansion(state, 'back-left'), true);
+  });
+});
+
+describe('cauldron unlock', () => {
+  it('sells one cauldron for 20000 gp and keeps the pose in a save', () => {
+    const state = createState();
+    assert.equal(ownsCauldron(state), false);
+    assert.equal(canBuyCauldron(state), false);
+    state.gold = CAULDRON_COST;
+    assert.equal(canBuyCauldron(state), true);
+    assert.equal(buyCauldron(state, { x: 1.2, z: 0.8, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(ownsCauldron(state), true);
+    assert.equal(state.furniture.cauldron.x, 1.2);
+    assert.equal(canBuyCauldron(state), false);
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(ownsCauldron(next), true);
+    assert.equal(next.furniture.cauldron.z, 0.8);
+  });
+
+  it('does not sell a cauldron without the gold', () => {
+    const state = createState();
+    state.gold = CAULDRON_COST - 1;
+    assert.equal(buyCauldron(state, { x: 0, z: 0, rot: 0 }), false);
+    assert.equal(ownsCauldron(state), false);
   });
 });

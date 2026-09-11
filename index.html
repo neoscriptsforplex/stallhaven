@@ -15,6 +15,7 @@
       <button type="button" id="expand-btn" title="Expand the shop" aria-label="Expand the shop">
         <span class="expand-icon" aria-hidden="true">⤢</span>
       </button>
+      <button type="button" id="build-btn" title="Build" aria-label="Build">Build</button>
       <button type="button" id="help-btn" title="Help" aria-label="Help">?</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
@@ -48,7 +49,7 @@
         <p>Click the anvil to smith Melee, Magic, Ranged, or Potions. Click the cooking range for Food. Finished pieces land in the chest. Right-click the chest to upgrade its space.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, refuse, or buy a scrap they offer.</p>
         <p>Click a table, shelf, or armour stand, then place a ware from the chest. Food sits on the wall shelves. Click furniture for Move or Rotate — wares travel with the piece.</p>
-        <p>The expand button beside Save buys extra rooms. Save and Load write a JSON file on your computer.</p>
+        <p>The expand button buys extra rooms. Build (beside Expand) unlocks a cauldron for potion crafting later. Save and Load write a JSON file on your computer.</p>
         <button type="button" data-dismiss>Close</button>
       </div>
     </div>
@@ -155,6 +156,41 @@
         <button type="button" class="ghost" data-expand-close>Cancel</button>
       </div>
     </aside>
+
+    <aside id="build-dock" class="expand-dock" hidden>
+      <h2>Build</h2>
+      <p>Unlockables for the shop. Potion recipes come later.</p>
+      <article class="build-item">
+        <h3>Cauldron</h3>
+        <p>Unlocks potion crafting later. No potion recipes yet — this is the station they will use.</p>
+        <p data-cauldron-status class="meta">Costs 20,000 gp.</p>
+        <button type="button" data-cauldron-buy>Buy · 20,000 gp</button>
+      </article>
+      <button type="button" class="ghost" data-build-close>Close</button>
+    </aside>
+
+    <aside id="place-dock" class="expand-dock" hidden>
+      <h2>Place Cauldron</h2>
+      <p>Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement.</p>
+      <p data-place-cost class="meta">Cost: 20,000 gp.</p>
+      <div class="row furn-row">
+        <button type="button" data-place-confirm>Confirm Placement</button>
+        <button type="button" class="ghost" data-place-cancel>Cancel</button>
+      </div>
+    </aside>
+
+    <div id="potion-modal" class="modal" hidden>
+      <div class="sheet">
+        <h2>Cauldron</h2>
+        <p>Potions coming soon.</p>
+        <p class="meta">This cauldron unlocks potion crafting later. No potion recipes yet.</p>
+        <div class="row furn-row">
+          <button type="button" data-potion-move>Move Furniture</button>
+          <button type="button" data-potion-rotate>Rotate 15°</button>
+        </div>
+        <button type="button" class="ghost" data-potion-close>Close</button>
+      </div>
+    </div>
 
     <div id="furn-menu" class="furn-menu" hidden>
       <p data-furn-name>Furniture</p>

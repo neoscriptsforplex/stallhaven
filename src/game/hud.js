@@ -10,18 +10,22 @@ import {
 } from './catalog.js';
 import { playClick } from './audio.js';
 import {
+  buyCauldron,
   buyExpansion,
   buyFromCustomer,
+  canBuyCauldron,
   canBuyExpansion,
   canCraft,
   canRestock,
   canUpgradeChest,
+  CAULDRON_COST,
   chestCapacity,
   chestList,
   chestTotal,
   craftProgress,
   hasStock,
   isUnlocked,
+  ownsCauldron,
   placeFromChest,
   pushLog,
   restock,
@@ -58,6 +62,9 @@ export function bindHud(root, state, world) {
   const craftModal = document.querySelector('#craft-modal');
   const upgradeModal = document.querySelector('#chest-upgrade-modal');
   const expandModal = document.querySelector('#expand-dock');
+  const buildModal = document.querySelector('#build-dock');
+  const placeModal = document.querySelector('#place-dock');
+  const potionModal = document.querySelector('#potion-modal');
   const furnMenu = document.querySelector('#furn-menu');
   const shopFade = document.querySelector('#shop-fade');
   const activeCraft = root.querySelector('#active-craft');
@@ -192,7 +199,8 @@ export function bindHud(root, state, world) {
 
   function setModalOpen() {
     const open = !chestModal.hidden || !tradeModal.hidden || !helpModal.hidden || !craftModal.hidden
-      || !upgradeModal.hidden || !offerModal.hidden || (importModal && !importModal.hidden);
+      || !upgradeModal.hidden || !offerModal.hidden || !potionModal.hidden
+      || (importModal && !importModal.hidden);
     document.body.classList.toggle('modal-open', open);
   }
 
@@ -205,8 +213,10 @@ export function bindHud(root, state, world) {
     closeChest();
     closeTrade();
     closeUpgrade();
+    closePotion();
     hideFurnMenu();
     if (!helpModal.hidden) closeHelp();
+    closeBuild();
     craftStation = station;
     if (station === 'range') craftTab = 'food';
     else if (craftTab === 'food') craftTab = 'melee';
@@ -225,6 +235,24 @@ export function bindHud(root, state, world) {
   function closeUpgrade() {
     upgradeModal.hidden = true;
     world.ignorePicks(280);
+    setModalOpen();
+  }
+
+  function closePotion() {
+    potionModal.hidden = true;
+    world.ignorePicks(280);
+    setModalOpen();
+  }
+
+  function openPotion() {
+    closeChest();
+    closeCraft();
+    closeTrade();
+    closeUpgrade();
+    hideFurnMenu();
+    if (!helpModal.hidden) closeHelp();
+    closeBuild();
+    potionModal.hidden = false;
     setModalOpen();
   }
 
@@ -530,7 +558,10 @@ export function bindHud(root, state, world) {
     closeCraft();
     closeTrade();
     closeUpgrade();
+    closePotion();
     hideFurnMenu();
+    closeBuild();
+    closePlace(true);
     world.beginMoveFurniture(target);
     render(performance.now() / 1000);
   }
@@ -547,13 +578,17 @@ export function bindHud(root, state, world) {
       target.id === 'chest' ? 'Chest'
         : target.id === 'anvil' ? 'Anvil'
           : target.id === 'range' ? 'Cooking Range'
-            : target.id === 'counter' ? 'Counter'
-              : 'Display'
+            : target.id === 'cauldron' ? 'Cauldron'
+              : target.id === 'counter' ? 'Counter'
+                : 'Display'
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
-    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range') {
+    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron') {
       useBtn.hidden = false;
-      useBtn.textContent = target.id === 'chest' ? 'Open Chest' : target.id === 'range' ? 'Cook' : 'Craft';
+      useBtn.textContent = target.id === 'chest' ? 'Open Chest'
+        : target.id === 'range' ? 'Cook'
+          : target.id === 'cauldron' ? 'Potions'
+            : 'Craft';
     } else {
       useBtn.hidden = true;
     }
@@ -573,6 +608,13 @@ export function bindHud(root, state, world) {
   craftModal.querySelector('[data-craft-rotate]')?.addEventListener('click', () => {
     doRotate({ id: craftStation === 'range' ? 'range' : 'anvil' });
   });
+
+  potionModal.querySelector('[data-potion-close]').addEventListener('click', closePotion);
+  potionModal.addEventListener('click', (event) => {
+    if (event.target === potionModal) closePotion();
+  });
+  potionModal.querySelector('[data-potion-move]').addEventListener('click', () => startMove({ id: 'cauldron' }));
+  potionModal.querySelector('[data-potion-rotate]').addEventListener('click', () => doRotate({ id: 'cauldron' }));
 
   upgradeModal.querySelector('[data-upgrade-close]').addEventListener('click', closeUpgrade);
   upgradeModal.addEventListener('click', (event) => {
@@ -618,6 +660,8 @@ export function bindHud(root, state, world) {
     closeUpgrade();
     hideFurnMenu();
     if (!helpModal.hidden) closeHelp();
+    closeBuild();
+    closePlace(true);
     if ((state.expansions ?? []).length >= 5) {
       pushLog(state, 'The shop already uses every expansion pad.');
       render(performance.now() / 1000);
@@ -660,6 +704,82 @@ export function bindHud(root, state, world) {
     });
   });
 
+  function paintBuild() {
+    const status = buildModal.querySelector('[data-cauldron-status]');
+    const buyBtn = buildModal.querySelector('[data-cauldron-buy]');
+    if (ownsCauldron(state)) {
+      status.textContent = 'Placed in the shop. Click it to move or to open the potion note.';
+      buyBtn.disabled = true;
+      buyBtn.textContent = 'Owned';
+      return;
+    }
+    status.textContent = `Costs ${CAULDRON_COST.toLocaleString()} gp.`;
+    buyBtn.disabled = !canBuyCauldron(state);
+    buyBtn.textContent = `Buy · ${CAULDRON_COST.toLocaleString()} gp`;
+  }
+
+  function closeBuild() {
+    if (!buildModal) return;
+    buildModal.hidden = true;
+  }
+
+  function openBuild() {
+    closeChest();
+    closeCraft();
+    closeTrade();
+    closeUpgrade();
+    closePotion();
+    hideFurnMenu();
+    if (!helpModal.hidden) closeHelp();
+    closeExpand();
+    closePlace(true);
+    paintBuild();
+    buildModal.hidden = false;
+  }
+
+  function closePlace(cancelWorld = false) {
+    if (!placeModal) return;
+    placeModal.hidden = true;
+    if (cancelWorld && world.isPlacingUnlock?.()) world.cancelMoveFurniture();
+    world.ignorePicks(280);
+  }
+
+  function openPlaceDock() {
+    closeBuild();
+    placeModal.hidden = false;
+  }
+
+  document.querySelector('#build-btn')?.addEventListener('click', openBuild);
+  buildModal.querySelector('[data-build-close]').addEventListener('click', closeBuild);
+  buildModal.querySelector('[data-cauldron-buy]').addEventListener('click', () => {
+    if (!canBuyCauldron(state)) {
+      paintBuild();
+      return;
+    }
+    world.beginPlaceUnlock('cauldron');
+    openPlaceDock();
+    render(performance.now() / 1000);
+  });
+  placeModal.querySelector('[data-place-cancel]').addEventListener('click', () => {
+    closePlace(true);
+    render(performance.now() / 1000);
+  });
+  placeModal.querySelector('[data-place-confirm]').addEventListener('click', () => {
+    const pose = world.getPlacePose();
+    if (!pose || state.gold < CAULDRON_COST) {
+      render(performance.now() / 1000);
+      return;
+    }
+    if (!buyCauldron(state, pose)) {
+      render(performance.now() / 1000);
+      return;
+    }
+    world.confirmPlaceUnlock();
+    closePlace();
+    pushLog(state, `Placed a cauldron for ${CAULDRON_COST.toLocaleString()} gp.`);
+    render(performance.now() / 1000);
+  });
+
   furnMenu.querySelector('[data-furn-close]').addEventListener('click', hideFurnMenu);
   furnMenu.querySelector('[data-furn-move]').addEventListener('click', () => startMove(furnTarget));
   furnMenu.querySelector('[data-furn-rotate]').addEventListener('click', () => doRotate(furnTarget));
@@ -669,6 +789,7 @@ export function bindHud(root, state, world) {
     if (target?.id === 'chest') openChest();
     if (target?.id === 'anvil') openCraft('anvil');
     if (target?.id === 'range') openCraft('range');
+    if (target?.id === 'cauldron') openPotion();
   });
 
   world.onPick((event) => {
@@ -678,12 +799,14 @@ export function bindHud(root, state, world) {
     if (event.type === 'chest') openChest();
     if (event.type === 'anvil') openCraft('anvil');
     if (event.type === 'range') openCraft('range');
+    if (event.type === 'cauldron') openPotion();
     if (event.type === 'counter') showFurnMenu(event.furniture, event.clientX, event.clientY);
     if (event.type === 'display') showFurnMenu(event.furniture, event.clientX, event.clientY);
     if (event.type === 'chest-upgrade') openUpgrade();
     if (event.type === 'furn-menu') showFurnMenu(event.furniture, event.clientX, event.clientY);
     if (event.type === 'expand-pad') paintExpand();
     if (event.type === 'customer' && event.actor?.state === 'request') openTrade(event.actor);
+    if (event.type === 'furniture-cancel') closePlace();
   });
 
   function closeHelp() {
@@ -698,7 +821,10 @@ export function bindHud(root, state, world) {
     closeCraft();
     closeTrade();
     closeUpgrade();
+    closePotion();
     hideFurnMenu();
+    closeBuild();
+    closePlace(true);
     helpModal.hidden = false;
     setModalOpen();
   }

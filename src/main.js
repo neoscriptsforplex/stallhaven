@@ -27,6 +27,7 @@ if (!hasWebGL()) {
   const world = createWorld(canvas, state);
   window.stallhaven = { world, state };
   const hud = bindHud(hudRoot, state, world);
+  window.stallhaven.hud = hud;
   bindUploadUI({
     button: document.querySelector('#upload-btn'),
     modal: document.querySelector('#import-modal'),

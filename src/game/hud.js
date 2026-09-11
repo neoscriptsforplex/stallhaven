@@ -25,9 +25,9 @@ import {
   placeFromChest,
   pushLog,
   restock,
+  offerChoices,
   sellToCustomer,
   startCraft,
-  swapOffer,
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
@@ -48,11 +48,13 @@ export function bindHud(root, state, world) {
   const stockEl = root.querySelector('#stock');
   const chestCountEl = document.querySelector('#chest-count');
   const importModal = document.querySelector('#import-modal');
-  const tooltip = document.querySelector('#tooltip');
-  const dismiss = tooltip.querySelector('[data-dismiss]');
+  const helpModal = document.querySelector('#help-modal');
+  const dismiss = helpModal.querySelector('[data-dismiss]');
   const chestModal = document.querySelector('#chest-modal');
   const chestItems = document.querySelector('#chest-items');
   const tradeModal = document.querySelector('#trade-modal');
+  const offerModal = document.querySelector('#offer-modal');
+  const offerItems = document.querySelector('#offer-items');
   const craftModal = document.querySelector('#craft-modal');
   const upgradeModal = document.querySelector('#chest-upgrade-modal');
   const expandModal = document.querySelector('#expand-dock');
@@ -66,6 +68,7 @@ export function bindHud(root, state, world) {
   let craftStation = 'anvil';
   let tradeActor = null;
   let furnTarget = null;
+  let selectedOfferId = null;
 
   tabsEl.innerHTML = ANVIL_TABS.map((tab) => (
     `<button type="button" class="tab" data-tab="${tab.id}">${tab.label}</button>`
@@ -81,7 +84,7 @@ export function bindHud(root, state, world) {
     tabsEl.hidden = rangeMode;
     const title = craftModal.querySelector('[data-craft-title]');
     const blurb = craftModal.querySelector('[data-craft-blurb]');
-    if (title) title.textContent = rangeMode ? 'Cooking range' : 'Anvil';
+    if (title) title.textContent = rangeMode ? 'Cooking Range' : 'Anvil';
     if (blurb) {
       blurb.textContent = rangeMode
         ? 'Bake food here. Finished plates land in the chest or on a wall shelf.'
@@ -188,8 +191,8 @@ export function bindHud(root, state, world) {
   });
 
   function setModalOpen() {
-    const open = !chestModal.hidden || !tradeModal.hidden || !tooltip.hidden || !craftModal.hidden
-      || !upgradeModal.hidden || (importModal && !importModal.hidden);
+    const open = !chestModal.hidden || !tradeModal.hidden || !helpModal.hidden || !craftModal.hidden
+      || !upgradeModal.hidden || !offerModal.hidden || (importModal && !importModal.hidden);
     document.body.classList.toggle('modal-open', open);
   }
 
@@ -203,6 +206,7 @@ export function bindHud(root, state, world) {
     closeTrade();
     closeUpgrade();
     hideFurnMenu();
+    if (!helpModal.hidden) closeHelp();
     craftStation = station;
     if (station === 'range') craftTab = 'food';
     else if (craftTab === 'food') craftTab = 'melee';
@@ -248,6 +252,7 @@ export function bindHud(root, state, world) {
     closeCraft();
     closeTrade();
     hideFurnMenu();
+    if (!helpModal.hidden) closeHelp();
     paintUpgrade();
     upgradeModal.hidden = false;
     setModalOpen();
@@ -256,6 +261,7 @@ export function bindHud(root, state, world) {
   function openChest() {
     closeTrade();
     closeCraft();
+    if (!helpModal.hidden) closeHelp();
     paintChest();
     chestModal.hidden = false;
     world.setChestOpen(true);
@@ -285,15 +291,24 @@ export function bindHud(root, state, world) {
           <strong>${recipe.name}</strong>
           <span class="meta">×${count} · ${classLabel(recipe.combatClass)} · sells ${recipe.price}g</span>
         </div>
-        <button type="button" data-place="${recipe.id}">Place on stall</button>
+        <button type="button" data-place="${recipe.id}">Place on Stall</button>
       </div>
     `).join('');
+  }
+
+  function closeOfferPicker() {
+    offerModal.hidden = true;
+    selectedOfferId = null;
+    if (tradeActor) tradeModal.hidden = false;
+    setModalOpen();
   }
 
   function openTrade(actor) {
     if (!actor || actor.state === 'leave') return;
     closeChest();
     closeCraft();
+    closeOfferPicker();
+    if (!helpModal.hidden) closeHelp();
     tradeActor = actor;
     world.setTrading(actor.id);
     paintTrade();
@@ -302,8 +317,9 @@ export function bindHud(root, state, world) {
   }
 
   function closeTrade() {
-    tradeModal.hidden = true;
     tradeActor = null;
+    closeOfferPicker();
+    tradeModal.hidden = true;
     world.setTrading(null);
     world.ignorePicks(280);
     setModalOpen();
@@ -332,22 +348,76 @@ export function bindHud(root, state, world) {
     } else {
       buyLine.hidden = true;
     }
-    const swap = swapOffer(state, actor.typeId, actor.requestRecipeId);
-    actor.swap = swap;
-    const swapLine = tradeModal.querySelector('[data-trade-swap]');
-    const swapBtn = tradeModal.querySelector('[data-trade-swap-btn]');
-    if (swap) {
-      const alt = RECIPES[swap.recipeId];
-      swapLine.hidden = false;
-      swapLine.textContent = `Swap: they will take ${alt.name} for ${swap.gold}g (reduced from ${swap.listPrice}g).`;
-      swapBtn.disabled = false;
+    const choices = offerChoices(state, actor.requestRecipeId);
+    const offerLine = tradeModal.querySelector('[data-trade-offer-hint]');
+    const offerBtn = tradeModal.querySelector('[data-trade-offer-btn]');
+    if (choices.length) {
+      offerLine.hidden = false;
+      offerLine.textContent = `You can choose a chest item to sell at a reduced price (${choices.length} available).`;
+      offerBtn.disabled = false;
     } else {
-      swapLine.hidden = false;
-      swapLine.textContent = 'Swap: no other stocked item they will take.';
-      swapBtn.disabled = true;
+      offerLine.hidden = false;
+      offerLine.textContent = 'No other chest item to trade at a reduced price.';
+      offerBtn.disabled = true;
     }
     tradeModal.querySelector('[data-trade-sell]').disabled = !have;
     tradeModal.querySelector('[data-trade-buy-btn]').disabled = !offer || state.gold < offer.price;
+  }
+
+  function paintOfferPicker() {
+    const actor = tradeActor;
+    const pickEl = offerModal.querySelector('[data-offer-pick]');
+    const confirm = offerModal.querySelector('[data-offer-confirm]');
+    if (!actor) {
+      offerItems.innerHTML = '<p class="empty">No traveler is waiting.</p>';
+      pickEl.textContent = 'No item selected yet.';
+      confirm.disabled = true;
+      return;
+    }
+    const choices = offerChoices(state, actor.requestRecipeId);
+    if (!choices.length) {
+      offerItems.innerHTML = '<p class="empty">The chest has no other item to offer.</p>';
+      selectedOfferId = null;
+      pickEl.textContent = 'No item selected yet.';
+      confirm.disabled = true;
+      return;
+    }
+    if (selectedOfferId && !choices.some((choice) => choice.recipeId === selectedOfferId)) {
+      selectedOfferId = null;
+    }
+    offerItems.innerHTML = choices.map((choice) => `
+      <button type="button" class="offer-row${choice.recipeId === selectedOfferId ? ' is-on' : ''}" data-offer-item="${choice.recipeId}">
+        <span>
+          <strong>${choice.name}</strong>
+          <span class="meta">×${choice.count} in chest</span>
+        </span>
+        <span>
+          <span class="offer-price">${choice.gold}g</span>
+          <span class="offer-was">${choice.listPrice}g</span>
+        </span>
+      </button>
+    `).join('');
+    const selected = choices.find((choice) => choice.recipeId === selectedOfferId);
+    if (selected) {
+      pickEl.textContent = `Selected: ${selected.name} for ${selected.gold}g (reduced from ${selected.listPrice}g).`;
+      confirm.disabled = false;
+    } else {
+      pickEl.textContent = 'No item selected yet.';
+      confirm.disabled = true;
+    }
+  }
+
+  function openOfferPicker() {
+    const actor = tradeActor;
+    if (!actor || actor.state === 'leave') {
+      closeTrade();
+      return;
+    }
+    selectedOfferId = null;
+    paintOfferPicker();
+    tradeModal.hidden = true;
+    offerModal.hidden = false;
+    setModalOpen();
   }
 
   tradeModal.querySelector('[data-trade-sell]').addEventListener('click', () => {
@@ -393,25 +463,54 @@ export function bindHud(root, state, world) {
     }
   });
 
-  tradeModal.querySelector('[data-trade-swap-btn]').addEventListener('click', () => {
-    const actor = tradeActor && world.getCustomer(tradeActor.id);
-    if (!actor) {
+  function onOfferClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const actor = tradeActor;
+    if (!actor || actor.state === 'leave') {
       closeTrade();
       return;
     }
-    const swap = swapOffer(state, actor.typeId, actor.requestRecipeId);
-    if (!swap) {
+    const choices = offerChoices(state, actor.requestRecipeId);
+    if (!choices.length) {
       paintTrade();
       return;
     }
-    const paid = sellToCustomer(state, swap.recipeId, swap.gold);
+    openOfferPicker();
+  }
+  tradeModal.querySelector('[data-trade-offer-btn]').addEventListener('click', onOfferClick);
+
+  offerItems.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-offer-item]');
+    if (!btn) return;
+    selectedOfferId = btn.dataset.offerItem;
+    paintOfferPicker();
+  });
+
+  offerModal.querySelector('[data-offer-cancel]').addEventListener('click', () => {
+    closeOfferPicker();
+    world.ignorePicks(280);
+  });
+  offerModal.querySelector('[data-offer-confirm]').addEventListener('click', () => {
+    const actor = tradeActor;
+    if (!actor || actor.state === 'leave') {
+      closeTrade();
+      return;
+    }
+    const choice = offerChoices(state, actor.requestRecipeId).find((item) => item.recipeId === selectedOfferId);
+    if (!choice) {
+      paintOfferPicker();
+      return;
+    }
+    const paid = sellToCustomer(state, choice.recipeId, choice.gold);
     if (!paid) {
+      paintOfferPicker();
       paintTrade();
       return;
     }
     playClick('trade');
-    pushLog(state, `Swapped ${RECIPES[swap.recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${paid}g (reduced).`);
-    actor.requestRecipeId = swap.recipeId;
+    pushLog(state, `Offered ${RECIPES[choice.recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${paid}g (reduced from ${choice.listPrice}g).`);
+    actor.requestRecipeId = choice.recipeId;
     world.sellToActor(actor);
     world.syncDisplays();
     closeTrade();
@@ -419,9 +518,6 @@ export function bindHud(root, state, world) {
   });
 
   tradeModal.querySelector('[data-trade-close]').addEventListener('click', closeTrade);
-  tradeModal.addEventListener('click', (event) => {
-    if (event.target === tradeModal) closeTrade();
-  });
 
   craftModal.querySelector('[data-craft-close]').addEventListener('click', closeCraft);
   craftModal.addEventListener('click', (event) => {
@@ -450,14 +546,14 @@ export function bindHud(root, state, world) {
     furnMenu.querySelector('[data-furn-name]').textContent = (
       target.id === 'chest' ? 'Chest'
         : target.id === 'anvil' ? 'Anvil'
-          : target.id === 'range' ? 'Cooking range'
+          : target.id === 'range' ? 'Cooking Range'
             : target.id === 'counter' ? 'Counter'
               : 'Display'
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
     if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range') {
       useBtn.hidden = false;
-      useBtn.textContent = target.id === 'chest' ? 'Open chest' : target.id === 'range' ? 'Cook' : 'Craft';
+      useBtn.textContent = target.id === 'chest' ? 'Open Chest' : target.id === 'range' ? 'Cook' : 'Craft';
     } else {
       useBtn.hidden = true;
     }
@@ -521,6 +617,7 @@ export function bindHud(root, state, world) {
     closeTrade();
     closeUpgrade();
     hideFurnMenu();
+    if (!helpModal.hidden) closeHelp();
     if ((state.expansions ?? []).length >= 5) {
       pushLog(state, 'The shop already uses every expansion pad.');
       render(performance.now() / 1000);
@@ -589,15 +686,31 @@ export function bindHud(root, state, world) {
     if (event.type === 'customer' && event.actor?.state === 'request') openTrade(event.actor);
   });
 
-  if (!localStorage.getItem('stallhaven-tip')) {
-    tooltip.hidden = false;
-  }
-  dismiss.addEventListener('click', () => {
-    tooltip.hidden = true;
+  function closeHelp() {
+    helpModal.hidden = true;
     localStorage.setItem('stallhaven-tip', '1');
     world.ignorePicks(280);
     setModalOpen();
+  }
+
+  function openHelp() {
+    closeChest();
+    closeCraft();
+    closeTrade();
+    closeUpgrade();
+    hideFurnMenu();
+    helpModal.hidden = false;
+    setModalOpen();
+  }
+
+  if (!localStorage.getItem('stallhaven-tip')) {
+    helpModal.hidden = false;
+  }
+  dismiss.addEventListener('click', closeHelp);
+  helpModal.addEventListener('click', (event) => {
+    if (event.target === helpModal) closeHelp();
   });
+  document.querySelector('#help-btn')?.addEventListener('click', openHelp);
   setModalOpen();
 
   const saveBtn = document.querySelector('#save-btn');
@@ -629,7 +742,7 @@ export function bindHud(root, state, world) {
   document.addEventListener('click', (event) => {
     const btn = event.target.closest('button');
     if (!btn) return;
-    if (btn.dataset.craft || btn.hasAttribute('data-trade-sell') || btn.hasAttribute('data-trade-buy-btn') || btn.hasAttribute('data-trade-swap-btn')) return;
+    if (btn.dataset.craft || btn.hasAttribute('data-trade-sell') || btn.hasAttribute('data-trade-buy-btn') || btn.hasAttribute('data-trade-offer-btn') || btn.hasAttribute('data-offer-confirm')) return;
     playClick('ui');
   });
 
@@ -637,7 +750,7 @@ export function bindHud(root, state, world) {
   let lastUnlockKey = null;
 
   function render(now) {
-    goldEl.textContent = `${state.gold}g`;
+    goldEl.textContent = `Coins: ${state.gold}`;
     const chestN = chestTotal(state);
     chestCountEl.textContent = `${chestN} piece${chestN === 1 ? '' : 's'} waiting`;
     for (const mat of materialList()) {
@@ -688,7 +801,7 @@ export function bindHud(root, state, world) {
       const items = chestList(state);
       if (items.length) {
         stockEl.hidden = false;
-        stockEl.innerHTML = '<p>Chest — click to show on the selected stall</p>' + items.map((item) => (
+        stockEl.innerHTML = '<p>Chest — Click to Show on the Selected Stall</p>' + items.map((item) => (
           `<button type="button" data-stock="${item.recipeId}">${item.recipe.name} ×${item.count}</button>`
         )).join('');
       } else {
@@ -697,12 +810,16 @@ export function bindHud(root, state, world) {
       }
       if (!chestModal.hidden) paintChest();
     }
-    if (!tradeModal.hidden && tradeActor) {
+    if (tradeActor) {
       const live = world.getCustomer(tradeActor.id);
-      if (!live || live.state === 'leave') closeTrade();
-      else paintTrade();
+      if (live) tradeActor = live;
+      if (tradeActor.state === 'leave') closeTrade();
+      else {
+        if (!tradeModal.hidden) paintTrade();
+        if (!offerModal.hidden) paintOfferPicker();
+      }
     }
   }
 
-  return { render, openChest, openTrade, openCraft };
+  return { render, openChest, openTrade, openCraft, openOfferPicker };
 }

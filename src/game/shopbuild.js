@@ -381,17 +381,7 @@ function addOriginDecor(root, center) {
   rug.position.set(center.x, 0.11, center.z + 0.15);
   root.add(rug);
 
-  const plantSpots = [
-    [center.x - 3.45, center.z - 1.15],
-    [center.x + 3.45, center.z - 1.15],
-    [center.x - 3.45, center.z + 2.15],
-    [center.x + 3.45, center.z + 2.15],
-  ];
-  for (const [x, z] of plantSpots) {
-    const plant = buildPottedPlant();
-    plant.position.set(x, 0.09, z);
-    root.add(plant);
-  }
+  addWallVines(root, center);
 
   addWallTorch(root, center.x - ROOM_W / 2 + 0.18, 1.62, center.z - 1.85, Math.PI / 2);
   addWallTorch(root, center.x - ROOM_W / 2 + 0.18, 1.62, center.z + 1.85, Math.PI / 2);
@@ -513,25 +503,95 @@ export function buildRug() {
   return group;
 }
 
-export function buildPottedPlant() {
+function leafMat(color) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.82,
+    metalness: 0.02,
+    side: THREE.DoubleSide,
+  });
+}
+
+export function buildWallVines(seed = 1) {
   const group = new THREE.Group();
-  group.name = 'plant';
-  const pot = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.14, 8), wood(0x8a4332, 0.8)));
-  pot.position.y = 0.08;
-  group.add(pot);
-  const dirt = addShadow(new THREE.Mesh(
-    new THREE.CylinderGeometry(0.07, 0.07, 0.03, 8),
+  group.name = 'wall-vines';
+  const rand = randAt(4100 + seed * 131);
+
+  const trough = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.78, 0.13, 0.18),
+    wood(0x6a3a22, 0.8),
+  ));
+  trough.position.set(0, 0.04, 0.01);
+  group.add(trough);
+  const lip = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.82, 0.035, 0.05),
+    wood(0x4a2816, 0.78),
+  ));
+  lip.position.set(0, 0.1, 0.1);
+  group.add(lip);
+  const soil = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.68, 0.05, 0.12),
     new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1 }),
   ));
-  dirt.position.y = 0.15;
-  group.add(dirt);
-  const leaf = cloth(0x3d7a38);
-  for (const [x, z, s] of [[0, 0, 1], [0.04, 0.03, 0.8], [-0.03, -0.02, 0.7]]) {
-    const bush = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.1 * s, 8, 6), leaf));
-    bush.position.set(x, 0.24 + 0.04 * s, z);
-    group.add(bush);
+  soil.position.set(0, 0.12, 0.02);
+  group.add(soil);
+
+  const greens = [0x245828, 0x2f6a32, 0x3d7a38, 0x4a8a3e, 0x1f4f24];
+  const strands = 6;
+  for (let s = 0; s < strands; s += 1) {
+    const x0 = -0.3 + s * 0.12 + (rand() - 0.5) * 0.04;
+    const length = 0.62 + rand() * 0.58;
+    const segs = 6 + Math.floor(rand() * 4);
+    for (let i = 0; i < segs; i += 1) {
+      const t = i / (segs - 1);
+      const y = 0.08 - t * length;
+      const z = 0.1 + Math.sin((t + s * 0.2) * 3.1) * 0.05 + t * 0.07;
+      const x = x0 + Math.sin((t * 4.2) + s) * 0.07;
+      const leaf = addShadow(new THREE.Mesh(
+        new THREE.SphereGeometry(0.05 + rand() * 0.03, 6, 5),
+        leafMat(greens[Math.floor(rand() * greens.length)]),
+      ));
+      leaf.scale.set(1.55, 0.38 + rand() * 0.16, 0.95);
+      leaf.position.set(x, y, z);
+      leaf.rotation.set(0.35 + rand() * 0.6, rand() * Math.PI, 0.15 + rand() * 0.4);
+      group.add(leaf);
+    }
+  }
+
+  const blooms = [0xc45a32, 0xe3b34a, 0xd7c09a, 0x8a3a6a];
+  for (let i = 0; i < 4; i += 1) {
+    const blossom = addShadow(new THREE.Mesh(
+      new THREE.SphereGeometry(0.03 + rand() * 0.012, 6, 5),
+      new THREE.MeshStandardMaterial({ color: blooms[i % blooms.length], roughness: 0.62 }),
+    ));
+    blossom.position.set(-0.24 + i * 0.16, 0.18 + rand() * 0.06, 0.07);
+    group.add(blossom);
   }
   return group;
+}
+
+function mountWallVines(root, x, y, z, rotY, seed) {
+  const vines = buildWallVines(seed);
+  vines.position.set(x, y, z);
+  vines.rotation.y = rotY;
+  root.add(vines);
+  return vines;
+}
+
+function addWallVines(root, center) {
+  const leftX = center.x - ROOM_W / 2 + 0.14;
+  const rightX = center.x + ROOM_W / 2 - 0.14;
+  const backZ = center.z - ROOM_D / 2 + 0.14;
+  const frontZ = center.z + ROOM_D / 2 - 0.14;
+
+  mountWallVines(root, leftX, 1.92, center.z - 2.42, Math.PI / 2, 1);
+  mountWallVines(root, leftX, 1.78, center.z + 2.42, Math.PI / 2, 2);
+  mountWallVines(root, rightX, 1.92, center.z - 2.42, -Math.PI / 2, 3);
+  mountWallVines(root, rightX, 1.78, center.z + 2.42, -Math.PI / 2, 4);
+  mountWallVines(root, center.x - 2.28, 2.02, backZ, 0, 5);
+  mountWallVines(root, center.x + 2.28, 2.02, backZ, 0, 6);
+  mountWallVines(root, center.x - 3.05, 1.84, frontZ, Math.PI, 7);
+  mountWallVines(root, center.x + 3.05, 1.84, frontZ, Math.PI, 8);
 }
 
 export function buildRange() {

@@ -15,6 +15,7 @@
       <button type="button" id="expand-btn" title="Expand the shop" aria-label="Expand the shop">
         <span class="expand-icon" aria-hidden="true">⤢</span>
       </button>
+      <button type="button" id="help-btn" title="Help" aria-label="Help">?</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
@@ -22,9 +23,8 @@
 
     <aside id="hud">
       <header class="ledger">
-        <h1>Rune Craft</h1>
         <div class="ledger-row">
-          <p id="gold" class="gold">40g</p>
+          <p id="gold" class="gold">Coins: 40</p>
           <button type="button" id="upload-btn" title="Upload a .glb or .gltf">Upload</button>
         </div>
         <div id="active-craft" class="active-craft" hidden>
@@ -36,33 +36,32 @@
       <section class="panel" id="stock" hidden aria-label="Chest wares"></section>
     </aside>
 
-    <p id="hint" class="hint">Click the floor to walk. Click the anvil to smith, the range to cook. Right-click the chest to upgrade it. Scroll to zoom out for the roof and garden.</p>
-
     <aside id="mat-strip" aria-label="Materials">
       <div id="materials"></div>
     </aside>
 
-    <div id="tooltip" class="modal" hidden>
+    <div id="help-modal" class="modal" hidden>
       <div class="sheet">
-        <h2>How to play</h2>
-        <p>Click the floor to walk. The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden.</p>
+        <h2>Help</h2>
+        <p class="help-tip">Click the floor to walk. Click the anvil to smith, the range to cook. Right-click the chest to upgrade it. Scroll to zoom out for the roof and garden.</p>
+        <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden.</p>
         <p>Click the anvil to smith Melee, Magic, Ranged, or Potions. Click the cooking range for Food. Finished pieces land in the chest. Right-click the chest to upgrade its space.</p>
-        <p>Travelers line up at the counter. Click the one at the front to sell, swap a different stocked item at a reduced price, refuse, or buy a scrap they offer.</p>
+        <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, refuse, or buy a scrap they offer.</p>
         <p>Click a table, shelf, or armour stand, then place a ware from the chest. Food sits on the wall shelves. Click furniture for Move or Rotate — wares travel with the piece.</p>
         <p>The expand button beside Save buys extra rooms. Save and Load write a JSON file on your computer.</p>
-        <button type="button" data-dismiss>Got it</button>
+        <button type="button" data-dismiss>Close</button>
       </div>
     </div>
 
     <div id="chest-modal" class="modal" hidden>
       <div class="sheet chest-sheet">
-        <h2>Shop chest</h2>
+        <h2>Shop Chest</h2>
         <p class="chest-tally" id="chest-count">0 pieces waiting</p>
         <p id="chest-cap" class="meta">Level 1 · 100 slots</p>
         <p>Crafted gear waits here. Place a piece on the selected table, shelf, or armour stand, or sell it when an adventurer asks.</p>
         <div id="chest-items"></div>
         <div class="row furn-row">
-          <button type="button" data-chest-move>Move furniture</button>
+          <button type="button" data-chest-move>Move Furniture</button>
           <button type="button" data-chest-rotate>Rotate 15°</button>
           <button type="button" data-chest-upgrade>Upgrade</button>
         </div>
@@ -77,7 +76,7 @@
         <div id="craft-tabs" class="tabs"></div>
         <div id="crafts"></div>
         <div class="row furn-row">
-          <button type="button" data-craft-move>Move furniture</button>
+          <button type="button" data-craft-move>Move Furniture</button>
           <button type="button" data-craft-rotate>Rotate 15°</button>
         </div>
         <button type="button" class="ghost" data-craft-close>Close</button>
@@ -91,29 +90,42 @@
         <p data-trade-offer></p>
         <p data-trade-have></p>
         <p data-trade-buy hidden></p>
-        <p data-trade-swap hidden></p>
+        <p data-trade-offer-hint hidden></p>
         <div class="row">
           <button type="button" data-trade-sell>Sell</button>
-          <button type="button" data-trade-swap-btn>Swap</button>
-          <button type="button" data-trade-buy-btn>Buy their goods</button>
+          <button type="button" data-trade-offer-btn>Offer</button>
+          <button type="button" data-trade-buy-btn>Buy Their Goods</button>
           <button type="button" data-trade-refuse>Refuse</button>
         </div>
         <button type="button" class="ghost" data-trade-close>Close</button>
       </div>
     </div>
 
+    <div id="offer-modal" class="modal" hidden>
+      <div class="sheet offer-sheet">
+        <h2>Choose an Offer</h2>
+        <p>Pick a chest item to offer at a reduced sale price.</p>
+        <p data-offer-pick class="meta">No item selected yet.</p>
+        <div id="offer-items" class="offer-list"></div>
+        <div class="row furn-row">
+          <button type="button" data-offer-confirm disabled>Confirm</button>
+          <button type="button" class="ghost" data-offer-cancel>Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <div id="import-modal" class="modal" hidden>
       <div class="sheet upload-sheet">
-        <h2>Upload a model</h2>
+        <h2>Upload a Model</h2>
         <p class="meta">Accepts .glb or .gltf. Tag it as furniture or a ware.</p>
         <div data-upload-drop class="upload-drop">Drop a file here, or choose one.</div>
-        <button type="button" data-upload-pick>Choose file</button>
+        <button type="button" data-upload-pick>Choose File</button>
         <input type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
         <p data-import-name></p>
         <p data-error class="error" hidden></p>
         <div class="row" data-tags hidden>
-          <button type="button" data-tag="furniture">Furniture — replace selected table</button>
-          <button type="button" data-tag="ware">Ware — sit on a table</button>
+          <button type="button" data-tag="furniture">Furniture — Replace Selected Table</button>
+          <button type="button" data-tag="ware">Ware — Sit on a Table</button>
         </div>
         <div data-recipes class="row" hidden></div>
         <button type="button" class="ghost" data-cancel>Cancel</button>
@@ -122,7 +134,7 @@
 
     <div id="chest-upgrade-modal" class="modal" hidden>
       <div class="sheet">
-        <h2>Upgrade chest</h2>
+        <h2>Upgrade Chest</h2>
         <p data-upgrade-now></p>
         <p data-upgrade-next></p>
         <p data-upgrade-cost></p>
@@ -134,7 +146,7 @@
     </div>
 
     <aside id="expand-dock" class="expand-dock" hidden>
-      <h2>Expand the shop</h2>
+      <h2>Expand the Shop</h2>
       <p>Click a gold pad (three behind, one either side). Confirm before gold is spent. New rooms match the original size.</p>
       <p data-expand-cost></p>
       <p data-expand-pick class="meta">No pad selected yet.</p>
@@ -147,7 +159,7 @@
     <div id="furn-menu" class="furn-menu" hidden>
       <p data-furn-name>Furniture</p>
       <button type="button" data-furn-use hidden>Use</button>
-      <button type="button" data-furn-move>Move furniture</button>
+      <button type="button" data-furn-move>Move Furniture</button>
       <button type="button" data-furn-rotate>Rotate 15°</button>
       <button type="button" class="ghost" data-furn-close>Close</button>
     </div>

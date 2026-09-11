@@ -405,6 +405,10 @@ button:disabled {
   pointer-events: auto;
 }
 
+#offer-modal {
+  z-index: 24;
+}
+
 body.modal-open #view {
   pointer-events: none;
 }

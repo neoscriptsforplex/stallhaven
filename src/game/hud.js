@@ -298,7 +298,9 @@ export function bindHud(root, state, world) {
 
   function closeOfferPicker() {
     offerModal.hidden = true;
+    offerModal.style.pointerEvents = '';
     selectedOfferId = null;
+    if (tradeActor) tradeModal.hidden = false;
     setModalOpen();
   }
 
@@ -316,9 +318,9 @@ export function bindHud(root, state, world) {
   }
 
   function closeTrade() {
+    tradeActor = null;
     closeOfferPicker();
     tradeModal.hidden = true;
-    tradeActor = null;
     world.setTrading(null);
     world.ignorePicks(280);
     setModalOpen();
@@ -414,8 +416,13 @@ export function bindHud(root, state, world) {
     }
     selectedOfferId = null;
     paintOfferPicker();
+    tradeModal.hidden = true;
     offerModal.hidden = false;
+    offerModal.style.pointerEvents = 'none';
     setModalOpen();
+    window.setTimeout(() => {
+      if (!offerModal.hidden) offerModal.style.pointerEvents = '';
+    }, 280);
   }
 
   tradeModal.querySelector('[data-trade-sell]').addEventListener('click', () => {
@@ -461,7 +468,9 @@ export function bindHud(root, state, world) {
     }
   });
 
-  tradeModal.querySelector('[data-trade-offer-btn]').addEventListener('click', () => {
+  tradeModal.querySelector('[data-trade-offer-btn]').addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     const actor = tradeActor && world.getCustomer(tradeActor.id);
     if (!actor) {
       closeTrade();
@@ -811,11 +820,11 @@ export function bindHud(root, state, world) {
       }
       if (!chestModal.hidden) paintChest();
     }
-    if (!tradeModal.hidden && tradeActor) {
+    if (tradeActor) {
       const live = world.getCustomer(tradeActor.id);
       if (!live || live.state === 'leave') closeTrade();
       else {
-        paintTrade();
+        if (!tradeModal.hidden) paintTrade();
         if (!offerModal.hidden) paintOfferPicker();
       }
     }

@@ -1,20 +1,36 @@
 import {
+  ANVIL_SUBTABS,
   ANVIL_TABS,
   CUSTOMERS,
   MATERIALS,
   RECIPES,
+  anvilSubtabForRecipe,
+  anvilTabForRecipe,
   classLabel,
   costLabel,
+  displayKind,
   materialList,
   recipesForTab,
+  SHELF_SLOT_LABELS,
+  stationForRecipe,
 } from './catalog.js';
-import { playClick } from './audio.js';
+import {
+  getMusicTrackName,
+  getMusicVolume,
+  loadMusicFile,
+  playClick,
+  playMusic,
+  setMusicVolume,
+  stopMusic,
+} from './audio.js';
 import {
   buyCauldron,
   buyExpansion,
   buyFromCustomer,
+  buyFurniture,
   canBuyCauldron,
   canBuyExpansion,
+  canBuyFurniture,
   canCraft,
   canRestock,
   canUpgradeChest,
@@ -22,14 +38,19 @@ import {
   chestCapacity,
   chestList,
   chestTotal,
+  craftBlockReason,
   craftProgress,
+  DEFAULT_MUSIC_VOLUME,
+  furnitureNeedGold,
   hasStock,
   isUnlocked,
+  nextFurnitureCost,
   ownsCauldron,
   placeFromChest,
   pushLog,
   restock,
   offerChoices,
+  placeOnDisplay,
   sellToCustomer,
   startCraft,
   unlockRemaining,
@@ -40,6 +61,8 @@ import {
   chestSlots,
   chestUpgradeCost,
   expansionCost,
+  furnitureKindForType,
+  furnitureLabelForType,
   padById,
 } from './layout.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
@@ -47,9 +70,11 @@ import { loadStateFromFile, saveStateToFile } from './savefile.js';
 export function bindHud(root, state, world) {
   const goldEl = root.querySelector('#gold');
   const matsEl = document.querySelector('#materials');
+  const potionMatsEl = document.querySelector('#potion-materials');
   const craftsEl = document.querySelector('#crafts');
+  const potionCraftsEl = document.querySelector('#potion-crafts');
   const tabsEl = document.querySelector('#craft-tabs');
-  const stockEl = root.querySelector('#stock');
+  const subtabsEl = document.querySelector('#craft-subtabs');
   const chestCountEl = document.querySelector('#chest-count');
   const importModal = document.querySelector('#import-modal');
   const helpModal = document.querySelector('#help-modal');
@@ -59,129 +84,195 @@ export function bindHud(root, state, world) {
   const tradeModal = document.querySelector('#trade-modal');
   const offerModal = document.querySelector('#offer-modal');
   const offerItems = document.querySelector('#offer-items');
+  const displayModal = document.querySelector('#display-modal');
+  const displayItems = document.querySelector('#display-items');
   const craftModal = document.querySelector('#craft-modal');
   const upgradeModal = document.querySelector('#chest-upgrade-modal');
   const expandModal = document.querySelector('#expand-dock');
   const buildModal = document.querySelector('#build-dock');
   const placeModal = document.querySelector('#place-dock');
   const potionModal = document.querySelector('#potion-modal');
+  const musicDock = document.querySelector('#music-dock');
   const furnMenu = document.querySelector('#furn-menu');
   const shopFade = document.querySelector('#shop-fade');
   const activeCraft = root.querySelector('#active-craft');
   const activeCraftName = activeCraft?.querySelector('[data-active-craft-name]');
   const chestCapEl = document.querySelector('#chest-cap');
+  const expandBtn = document.querySelector('#expand-btn');
+  const musicBtn = document.querySelector('#music-btn');
+  const musicFile = document.querySelector('#music-file');
 
   let craftTab = 'melee';
+  let craftSubtab = 'weapon';
   let craftStation = 'anvil';
+  let craftFocusId = null;
   let tradeActor = null;
   let furnTarget = null;
   let selectedOfferId = null;
+  let lastOfferListKey = '';
+  let selectedDisplayId = null;
+  let lastDisplayListKey = '';
+  let displayTarget = null;
+  let pendingPlace = null;
 
   tabsEl.innerHTML = ANVIL_TABS.map((tab) => (
     `<button type="button" class="tab" data-tab="${tab.id}">${tab.label}</button>`
   )).join('');
+  subtabsEl.innerHTML = ANVIL_SUBTABS.map((tab) => (
+    `<button type="button" class="tab" data-subtab="${tab.id}">${tab.label}</button>`
+  )).join('');
 
   function currentRecipes() {
     if (craftStation === 'range') return recipesForTab('food');
-    return recipesForTab(craftTab);
+    if (craftStation === 'cauldron') return recipesForTab('potion');
+    return recipesForTab(craftTab, craftSubtab);
   }
 
-  function paintCrafts() {
-    const rangeMode = craftStation === 'range';
-    tabsEl.hidden = rangeMode;
-    const title = craftModal.querySelector('[data-craft-title]');
-    const blurb = craftModal.querySelector('[data-craft-blurb]');
-    if (title) title.textContent = rangeMode ? 'Cooking Range' : 'Anvil';
-    if (blurb) {
-      blurb.textContent = rangeMode
-        ? 'Bake food here. Finished plates land in the chest or on a wall shelf.'
-        : 'Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.';
-    }
-    for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
-      btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
-    }
-    if (!rangeMode && craftTab === 'potion') {
-      craftsEl.innerHTML = '<p class="empty">Potion recipes are coming later.</p>';
-      return;
-    }
-    const recipes = currentRecipes();
-    const groups = new Map();
+  function setCraftNote(text) {
+    const note = craftModal.querySelector('[data-craft-note]');
+    if (!note) return;
+    note.hidden = !text;
+    note.textContent = text || '';
+  }
+
+  function paintRecipeButtons(container, recipes) {
+    if (!container) return;
+    const lines = new Map();
     for (const recipe of recipes) {
-      const groupKey = recipe.category === 'armour' ? 'armour' : recipe.category === 'food' ? 'food' : 'weapon';
-      if (!groups.has(groupKey)) groups.set(groupKey, new Map());
-      const lines = groups.get(groupKey);
       const lineId = recipe.lineId || recipe.id;
       if (!lines.has(lineId)) lines.set(lineId, []);
       lines.get(lineId).push(recipe);
     }
-    const groupTitle = { weapon: 'Weapons', armour: 'Armour', food: 'Kitchen' };
-    craftsEl.innerHTML = [...groups.entries()].map(([key, lines]) => {
-      const heading = groups.size > 1 ? `<h3 class="group">${groupTitle[key] ?? classLabel(key)}</h3>` : '';
-      const blocks = [...lines.entries()].map(([, list]) => {
-        list.sort((a, b) => a.lineIndex - b.lineIndex);
-        const lineTitle = list[0]?.lineName ? `<h4 class="line">${list[0].lineName}</h4>` : '';
-        return lineTitle + list.map((recipe) => {
-          const locked = !isUnlocked(state, recipe.id);
-          const prev = recipe.previousId ? RECIPES[recipe.previousId] : null;
-          const remain = unlockRemaining(state, recipe.id);
-          const lockText = locked
-            ? `Locked · ${remain} more ${prev?.name ?? 'crafts'}`
-            : costLabel(recipe);
-          return `
-            <button type="button" class="craft${locked ? ' is-locked' : ''}" data-craft="${recipe.id}">
-              <strong>${recipe.name}</strong>
-              <span class="meta">${lockText}</span>
-              <span class="timer" data-timer="${recipe.id}"></span>
-              <span class="craft-bar" aria-hidden="true"><i data-bar="${recipe.id}"></i></span>
-            </button>
-          `;
-        }).join('');
+    container.innerHTML = [...lines.values()].map((list) => {
+      list.sort((a, b) => a.lineIndex - b.lineIndex);
+      const lineTitle = list[0]?.lineName ? `<h4 class="line">${list[0].lineName}</h4>` : '';
+      return lineTitle + list.map((recipe) => {
+        const locked = !isUnlocked(state, recipe.id);
+        const prev = recipe.previousId ? RECIPES[recipe.previousId] : null;
+        const remain = unlockRemaining(state, recipe.id);
+        const lockText = locked
+          ? `Locked · ${remain} more ${prev?.name ?? 'crafts'}`
+          : costLabel(recipe);
+        const focus = recipe.id === craftFocusId ? ' is-focus' : '';
+        return `
+          <button type="button" class="craft${locked ? ' is-locked' : ''}${focus}" data-craft="${recipe.id}">
+            <strong>${recipe.name}</strong>
+            <span class="meta">${lockText}</span>
+            <span class="timer" data-timer="${recipe.id}"></span>
+            <span class="craft-bar" aria-hidden="true"><i data-bar="${recipe.id}"></i></span>
+          </button>
+        `;
       }).join('');
-      return heading + blocks;
     }).join('');
+  }
+
+  function paintCrafts() {
+    const rangeMode = craftStation === 'range';
+    const cauldronMode = craftStation === 'cauldron';
+    tabsEl.hidden = rangeMode || cauldronMode;
+    subtabsEl.hidden = rangeMode || cauldronMode;
+    const title = craftModal.querySelector('[data-craft-title]');
+    const blurb = craftModal.querySelector('[data-craft-blurb]');
+    if (title) {
+      title.textContent = rangeMode ? 'Cooking Range' : cauldronMode ? 'Cauldron' : 'Anvil';
+    }
+    if (blurb) {
+      blurb.textContent = rangeMode
+        ? 'Bake food here. Finished plates land in the chest or on a wall shelf.'
+        : cauldronMode
+          ? 'Brew potions from herbs and water. Finished vials land in the chest and sit on wall shelves.'
+          : 'Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.';
+    }
+    for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
+      btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
+    }
+    for (const btn of subtabsEl.querySelectorAll('[data-subtab]')) {
+      btn.classList.toggle('is-on', btn.dataset.subtab === craftSubtab);
+    }
+    paintRecipeButtons(craftsEl, currentRecipes());
+    if (potionCraftsEl) paintRecipeButtons(potionCraftsEl, recipesForTab('potion'));
+    if (craftFocusId) {
+      requestAnimationFrame(() => {
+        const el = (cauldronMode ? potionCraftsEl : craftsEl)?.querySelector(`[data-craft="${craftFocusId}"]`)
+          ?? craftsEl.querySelector(`[data-craft="${craftFocusId}"]`);
+        el?.scrollIntoView({ block: 'center' });
+      });
+    }
   }
   paintCrafts();
 
-  matsEl.innerHTML = materialList().map((mat) => `
-    <div class="mat" data-mat="${mat.id}">
-      <span class="mat-name">${mat.name}</span>
-      <span class="mat-count" data-count="${mat.id}">0</span>
-      <button type="button" class="restock" data-restock="${mat.id}">${mat.restock}g</button>
-    </div>
-  `).join('');
+  function fillMats(container) {
+    if (!container || container.dataset.ready) return;
+    container.innerHTML = materialList().map((mat) => `
+      <div class="mat" data-mat="${mat.id}">
+        <span class="mat-name">${mat.name}</span>
+        <span class="mat-count" data-count="${mat.id}">0</span>
+        <button type="button" class="restock" data-restock="${mat.id}">${mat.restock}g</button>
+      </div>
+    `).join('');
+    container.dataset.ready = '1';
+    container.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-restock]');
+      if (!btn) return;
+      if (restock(state, btn.dataset.restock)) render(performance.now() / 1000);
+    });
+  }
+  fillMats(matsEl);
+  fillMats(potionMatsEl);
+
+  function syncMats(container) {
+    if (!container) return;
+    for (const mat of materialList()) {
+      const count = container.querySelector(`[data-count="${mat.id}"]`);
+      if (count) count.textContent = `×${state.materials[mat.id] ?? 0}`;
+      const btn = container.querySelector(`[data-restock="${mat.id}"]`);
+      if (btn) btn.disabled = !canRestock(state, mat.id);
+    }
+  }
 
   tabsEl.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-tab]');
     if (!btn) return;
     craftTab = btn.dataset.tab;
+    craftSubtab = 'weapon';
+    craftFocusId = null;
+    setCraftNote('');
     paintCrafts();
     render(performance.now() / 1000);
   });
 
-  craftsEl.addEventListener('click', (event) => {
+  subtabsEl.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-subtab]');
+    if (!btn) return;
+    craftSubtab = btn.dataset.subtab;
+    craftFocusId = null;
+    setCraftNote('');
+    paintCrafts();
+    render(performance.now() / 1000);
+  });
+
+  function onCraftClick(event) {
     const btn = event.target.closest('[data-craft]');
     if (!btn) return;
-    if (startCraft(state, btn.dataset.craft, performance.now() / 1000)) {
+    const recipeId = btn.dataset.craft;
+    craftFocusId = recipeId;
+    const reason = craftBlockReason(state, recipeId);
+    if (reason) {
+      setCraftNote(reason);
+      paintCrafts();
+      render(performance.now() / 1000);
+      return;
+    }
+    if (startCraft(state, recipeId, performance.now() / 1000)) {
       playClick('craft');
-      pushLog(state, `Crafting ${RECIPES[btn.dataset.craft].name}…`);
+      setCraftNote('');
+      pushLog(state, `Crafting ${RECIPES[recipeId].name}…`);
+      paintCrafts();
       render(performance.now() / 1000);
     }
-  });
-
-  matsEl.addEventListener('click', (event) => {
-    const btn = event.target.closest('[data-restock]');
-    if (!btn) return;
-    if (restock(state, btn.dataset.restock)) render(performance.now() / 1000);
-  });
-
-  stockEl.addEventListener('click', (event) => {
-    const btn = event.target.closest('[data-stock]');
-    if (!btn) return;
-    if (placeFromChest(state, btn.dataset.stock)) {
-      world.syncDisplays();
-      render(performance.now() / 1000);
-    }
-  });
+  }
+  craftsEl.addEventListener('click', onCraftClick);
+  potionCraftsEl?.addEventListener('click', onCraftClick);
 
   chestModal.querySelector('[data-chest-close]').addEventListener('click', closeChest);
   chestModal.addEventListener('click', (event) => {
@@ -200,6 +291,7 @@ export function bindHud(root, state, world) {
   function setModalOpen() {
     const open = !chestModal.hidden || !tradeModal.hidden || !helpModal.hidden || !craftModal.hidden
       || !upgradeModal.hidden || !offerModal.hidden || !potionModal.hidden
+      || (displayModal && !displayModal.hidden)
       || (importModal && !importModal.hidden);
     document.body.classList.toggle('modal-open', open);
   }
@@ -209,25 +301,65 @@ export function bindHud(root, state, world) {
     furnTarget = null;
   }
 
-  function openCraft(station = 'anvil') {
+  function closeMusicDock() {
+    if (musicDock) musicDock.hidden = true;
+  }
+
+  function openCraft(station = 'anvil', options = {}) {
     closeChest();
     closeTrade();
     closeUpgrade();
     closePotion();
     hideFurnMenu();
+    closeMusicDock();
+    closeDisplayPicker();
     if (!helpModal.hidden) closeHelp();
     closeBuild();
-    craftStation = station;
-    if (station === 'range') craftTab = 'food';
-    else if (craftTab === 'food') craftTab = 'melee';
+    const recipe = options.focusId ? RECIPES[options.focusId] : null;
+    craftStation = recipe ? stationForRecipe(recipe) : station;
+    craftFocusId = options.focusId ?? null;
+    if (craftStation === 'range') craftTab = 'food';
+    else if (craftStation === 'cauldron') craftTab = 'potion';
+    else {
+      craftTab = recipe ? anvilTabForRecipe(recipe) : (craftTab === 'food' || craftTab === 'potion' ? 'melee' : craftTab);
+      craftSubtab = recipe ? anvilSubtabForRecipe(recipe) : (craftSubtab === 'armour' ? craftSubtab : 'weapon');
+    }
+    if (craftStation === 'cauldron') {
+      craftModal.hidden = true;
+      potionModal.hidden = false;
+    } else {
+      potionModal.hidden = true;
+      craftModal.hidden = false;
+    }
+    const reason = craftFocusId ? craftBlockReason(state, craftFocusId) : '';
+    setCraftNote(options.note || (options.autoStart ? reason : ''));
+    const potionNote = potionModal.querySelector('[data-potion-note]');
+    if (potionNote) {
+      potionNote.hidden = !((craftStation === 'cauldron') && (options.note || (options.autoStart && reason)));
+      potionNote.textContent = options.note || reason || '';
+    }
     paintCrafts();
-    craftModal.hidden = false;
     setModalOpen();
+    if (options.autoStart && craftFocusId && canCraft(state, craftFocusId)) {
+      if (startCraft(state, craftFocusId, performance.now() / 1000)) {
+        playClick('craft');
+        setCraftNote('');
+        if (potionNote) {
+          potionNote.hidden = true;
+          potionNote.textContent = '';
+        }
+        pushLog(state, `Crafting ${RECIPES[craftFocusId].name}…`);
+      }
+    } else if (options.autoStart && reason) {
+      pushLog(state, reason);
+    }
     render(performance.now() / 1000);
   }
 
   function closeCraft() {
     craftModal.hidden = true;
+    craftFocusId = null;
+    setCraftNote('');
     world.ignorePicks(280);
     setModalOpen();
   }
@@ -244,16 +376,8 @@ export function bindHud(root, state, world) {
     setModalOpen();
   }
 
-  function openPotion() {
-    closeChest();
-    closeCraft();
-    closeTrade();
-    closeUpgrade();
-    hideFurnMenu();
-    if (!helpModal.hidden) closeHelp();
-    closeBuild();
-    potionModal.hidden = false;
-    setModalOpen();
+  function openPotion(options = {}) {
+    openCraft('cauldron', options);
   }
 
   function paintUpgrade() {
@@ -279,6 +403,8 @@ export function bindHud(root, state, world) {
     closeChest();
     closeCraft();
     closeTrade();
+    closePotion();
+    closeDisplayPicker();
     hideFurnMenu();
     if (!helpModal.hidden) closeHelp();
     paintUpgrade();
@@ -289,6 +415,9 @@ export function bindHud(root, state, world) {
   function openChest() {
     closeTrade();
     closeCraft();
+    closePotion();
+    closeDisplayPicker();
+    hideFurnMenu();
     if (!helpModal.hidden) closeHelp();
     paintChest();
     chestModal.hidden = false;
@@ -313,20 +442,111 @@ export function bindHud(root, state, world) {
       chestItems.innerHTML = '<p class="empty">The chest is empty. Craft a ware and it will land here.</p>';
       return;
     }
+    const standSelected = displayKind(state.selectedDisplay, state) === 'stand';
     chestItems.innerHTML = items.map(({ recipe, count }) => `
       <div class="chest-row">
         <div>
           <strong>${recipe.name}</strong>
-          <span class="meta">×${count} · ${classLabel(recipe.combatClass)} · sells ${recipe.price}g</span>
+          <span class="meta">×${count} · ${classLabel(recipe.combatClass, recipe.category)} · sells ${recipe.price}g</span>
         </div>
-        <button type="button" data-place="${recipe.id}">Place on Stall</button>
+        ${standSelected ? `<button type="button" data-place="${recipe.id}">Place on Stand</button>` : ''}
       </div>
     `).join('');
+  }
+
+  function closeDisplayPicker() {
+    if (!displayModal) return;
+    const wasOpen = !displayModal.hidden;
+    displayModal.hidden = true;
+    selectedDisplayId = null;
+    lastDisplayListKey = '';
+    displayTarget = null;
+    if (wasOpen) world.ignorePicks(280);
+    setModalOpen();
+  }
+
+  function paintDisplayPicker() {
+    if (!displayModal) return;
+    const pickEl = displayModal.querySelector('[data-display-pick]');
+    const slotEl = displayModal.querySelector('[data-display-slot]');
+    const confirm = displayModal.querySelector('[data-display-confirm]');
+    const index = displayTarget?.index ?? state.selectedDisplay;
+    const kind = displayKind(index, state);
+    const slotIndex = displayTarget?.slotIndex ?? 0;
+    if (kind === 'shelf') {
+      slotEl.textContent = `Placing on ${SHELF_SLOT_LABELS[slotIndex] ?? 'a shelf slot'}. The current item, if any, returns to the chest.`;
+    } else {
+      slotEl.textContent = 'Placing on this table. The current item, if any, returns to the chest.';
+    }
+    const items = chestList(state);
+    if (!items.length) {
+      lastDisplayListKey = 'empty';
+      selectedDisplayId = null;
+      displayItems.innerHTML = '<p class="empty">The chest is empty. Craft a ware, then display it here.</p>';
+      pickEl.textContent = 'No chest item to display.';
+      confirm.disabled = true;
+      return;
+    }
+    if (selectedDisplayId && !items.some((item) => item.recipeId === selectedDisplayId)) {
+      selectedDisplayId = null;
+    }
+    const listKey = items.map((item) => `${item.recipeId}:${item.count}`).join('|');
+    if (listKey !== lastDisplayListKey) {
+      lastDisplayListKey = listKey;
+      displayItems.innerHTML = items.map((item) => `
+        <button type="button" class="offer-row${item.recipeId === selectedDisplayId ? ' is-on' : ''}" data-display-item="${item.recipeId}">
+          <span>
+            <strong>${item.recipe.name}</strong>
+            <span class="meta">×${item.count} in chest</span>
+          </span>
+          <span class="offer-price">${item.recipe.price}g</span>
+        </button>
+      `).join('');
+    } else {
+      for (const btn of displayItems.querySelectorAll('[data-display-item]')) {
+        btn.classList.toggle('is-on', btn.dataset.displayItem === selectedDisplayId);
+      }
+    }
+    const selected = items.find((item) => item.recipeId === selectedDisplayId);
+    if (selected) {
+      pickEl.textContent = `Selected: ${selected.recipe.name}.`;
+      confirm.disabled = false;
+    } else {
+      pickEl.textContent = 'No item selected yet. Click a chest item, then Place.';
+      confirm.disabled = true;
+    }
+  }
+
+  function selectDisplayItem(recipeId) {
+    if (!recipeId || displayModal?.hidden) return false;
+    if (!chestList(state).some((item) => item.recipeId === recipeId)) return false;
+    selectedDisplayId = recipeId;
+    paintDisplayPicker();
+    return true;
+  }
+
+  function openDisplayPicker(target) {
+    closeChest();
+    closeCraft();
+    closeTrade();
+    closeUpgrade();
+    closePotion();
+    hideFurnMenu();
+    closeMusicDock();
+    if (!helpModal.hidden) closeHelp();
+    displayTarget = target;
+    state.selectedDisplay = target?.index ?? state.selectedDisplay;
+    selectedDisplayId = null;
+    lastDisplayListKey = '';
+    paintDisplayPicker();
+    displayModal.hidden = false;
+    setModalOpen();
   }
 
   function closeOfferPicker() {
     offerModal.hidden = true;
     selectedOfferId = null;
+    lastOfferListKey = '';
     if (tradeActor) tradeModal.hidden = false;
     setModalOpen();
   }
@@ -336,6 +556,9 @@ export function bindHud(root, state, world) {
     closeChest();
     closeCraft();
     closeOfferPicker();
+    closePotion();
+    closeDisplayPicker();
+    hideFurnMenu();
     if (!helpModal.hidden) closeHelp();
     tradeActor = actor;
     world.setTrading(actor.id);
@@ -390,6 +613,8 @@ export function bindHud(root, state, world) {
     }
     tradeModal.querySelector('[data-trade-sell]').disabled = !have;
     tradeModal.querySelector('[data-trade-buy-btn]').disabled = !offer || state.gold < offer.price;
+    const craftNote = tradeModal.querySelector('[data-trade-craft-note]');
+    if (craftNote && craftNote.dataset.sticky !== '1') craftNote.hidden = true;
   }
 
   function paintOfferPicker() {
@@ -397,6 +622,7 @@ export function bindHud(root, state, world) {
     const pickEl = offerModal.querySelector('[data-offer-pick]');
     const confirm = offerModal.querySelector('[data-offer-confirm]');
     if (!actor) {
+      lastOfferListKey = '';
       offerItems.innerHTML = '<p class="empty">No traveler is waiting.</p>';
       pickEl.textContent = 'No item selected yet.';
       confirm.disabled = true;
@@ -404,35 +630,55 @@ export function bindHud(root, state, world) {
     }
     const choices = offerChoices(state, actor.requestRecipeId);
     if (!choices.length) {
-      offerItems.innerHTML = '<p class="empty">The chest has no other item to offer.</p>';
+      lastOfferListKey = 'empty';
       selectedOfferId = null;
-      pickEl.textContent = 'No item selected yet.';
+      offerItems.innerHTML = '<p class="empty">The chest has no other item to offer at a reduced price.</p>';
+      pickEl.textContent = 'No eligible chest item to offer.';
       confirm.disabled = true;
       return;
     }
     if (selectedOfferId && !choices.some((choice) => choice.recipeId === selectedOfferId)) {
       selectedOfferId = null;
     }
-    offerItems.innerHTML = choices.map((choice) => `
-      <button type="button" class="offer-row${choice.recipeId === selectedOfferId ? ' is-on' : ''}" data-offer-item="${choice.recipeId}">
-        <span>
-          <strong>${choice.name}</strong>
-          <span class="meta">×${choice.count} in chest</span>
-        </span>
-        <span>
-          <span class="offer-price">${choice.gold}g</span>
-          <span class="offer-was">${choice.listPrice}g</span>
-        </span>
-      </button>
-    `).join('');
+    const listKey = choices.map((choice) => `${choice.recipeId}:${choice.count}:${choice.gold}`).join('|');
+    if (listKey !== lastOfferListKey) {
+      lastOfferListKey = listKey;
+      offerItems.innerHTML = choices.map((choice) => `
+        <button type="button" class="offer-row${choice.recipeId === selectedOfferId ? ' is-on' : ''}" data-offer-item="${choice.recipeId}">
+          <span>
+            <strong>${choice.name}</strong>
+            <span class="meta">×${choice.count} in chest</span>
+          </span>
+          <span>
+            <span class="offer-price">${choice.gold}g</span>
+            <span class="offer-was">${choice.listPrice}g</span>
+          </span>
+        </button>
+      `).join('');
+    } else {
+      for (const btn of offerItems.querySelectorAll('[data-offer-item]')) {
+        btn.classList.toggle('is-on', btn.dataset.offerItem === selectedOfferId);
+      }
+    }
     const selected = choices.find((choice) => choice.recipeId === selectedOfferId);
     if (selected) {
       pickEl.textContent = `Selected: ${selected.name} for ${selected.gold}g (reduced from ${selected.listPrice}g).`;
       confirm.disabled = false;
     } else {
-      pickEl.textContent = 'No item selected yet.';
+      pickEl.textContent = 'No item selected yet. Click a chest item, then Confirm.';
       confirm.disabled = true;
     }
+  }
+
+  function selectOfferItem(recipeId) {
+    if (!recipeId || offerModal.hidden) return false;
+    const actor = tradeActor;
+    if (!actor || actor.state === 'leave') return false;
+    const choices = offerChoices(state, actor.requestRecipeId);
+    if (!choices.some((choice) => choice.recipeId === recipeId)) return false;
+    selectedOfferId = recipeId;
+    paintOfferPicker();
+    return true;
   }
 
   function openOfferPicker() {
@@ -442,6 +688,7 @@ export function bindHud(root, state, world) {
       return;
     }
     selectedOfferId = null;
+    lastOfferListKey = '';
     paintOfferPicker();
     tradeModal.hidden = true;
     offerModal.hidden = false;
@@ -491,6 +738,32 @@ export function bindHud(root, state, world) {
     }
   });
 
+  tradeModal.querySelector('[data-trade-craft-btn]').addEventListener('click', () => {
+    const actor = tradeActor && world.getCustomer(tradeActor.id);
+    if (!actor || actor.state === 'leave') {
+      closeTrade();
+      return;
+    }
+    const recipe = RECIPES[actor.requestRecipeId];
+    const craftNote = tradeModal.querySelector('[data-trade-craft-note]');
+    if (recipe?.category === 'potion' && !ownsCauldron(state)) {
+      const msg = 'Place a cauldron from Build to brew potions.';
+      if (craftNote) {
+        craftNote.hidden = false;
+        craftNote.textContent = msg;
+        craftNote.dataset.sticky = '1';
+      }
+      pushLog(state, msg);
+      paintTrade();
+      return;
+    }
+    if (craftNote) {
+      craftNote.hidden = true;
+      craftNote.dataset.sticky = '';
+    }
+    openCraft(stationForRecipe(recipe), { focusId: recipe.id, autoStart: true });
+  });
+
   function onOfferClick(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -508,18 +781,28 @@ export function bindHud(root, state, world) {
   }
   tradeModal.querySelector('[data-trade-offer-btn]').addEventListener('click', onOfferClick);
 
+  offerModal.addEventListener('pointerdown', (event) => {
+    const btn = event.target.closest('[data-offer-item]');
+    if (!btn || !offerModal.contains(btn)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectOfferItem(btn.dataset.offerItem);
+  });
   offerItems.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-offer-item]');
     if (!btn) return;
-    selectedOfferId = btn.dataset.offerItem;
-    paintOfferPicker();
+    event.preventDefault();
+    event.stopPropagation();
+    selectOfferItem(btn.dataset.offerItem);
   });
 
   offerModal.querySelector('[data-offer-cancel]').addEventListener('click', () => {
     closeOfferPicker();
     world.ignorePicks(280);
   });
-  offerModal.querySelector('[data-offer-confirm]').addEventListener('click', () => {
+  offerModal.querySelector('[data-offer-confirm]').addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     const actor = tradeActor;
     if (!actor || actor.state === 'leave') {
       closeTrade();
@@ -532,6 +815,7 @@ export function bindHud(root, state, world) {
     }
     const paid = sellToCustomer(state, choice.recipeId, choice.gold);
     if (!paid) {
+      lastOfferListKey = '';
       paintOfferPicker();
       paintTrade();
       return;
@@ -547,6 +831,42 @@ export function bindHud(root, state, world) {
 
   tradeModal.querySelector('[data-trade-close]').addEventListener('click', closeTrade);
 
+  displayModal?.addEventListener('pointerdown', (event) => {
+    const btn = event.target.closest('[data-display-item]');
+    if (!btn || !displayModal.contains(btn)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectDisplayItem(btn.dataset.displayItem);
+  });
+  displayItems?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-display-item]');
+    if (!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectDisplayItem(btn.dataset.displayItem);
+  });
+  displayModal?.querySelector('[data-display-cancel]')?.addEventListener('click', closeDisplayPicker);
+  displayModal?.addEventListener('click', (event) => {
+    if (event.target === displayModal) closeDisplayPicker();
+  });
+  displayModal?.querySelector('[data-display-confirm]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const recipeId = selectedDisplayId;
+    const index = displayTarget?.index ?? state.selectedDisplay;
+    const slotIndex = displayTarget?.slotIndex ?? 0;
+    if (!recipeId || !placeOnDisplay(state, recipeId, index, slotIndex)) {
+      paintDisplayPicker();
+      return;
+    }
+    playClick('ui');
+    pushLog(state, `Displayed ${RECIPES[recipeId].name}.`);
+    world.syncDisplays();
+    world.refreshSelection(true);
+    closeDisplayPicker();
+    render(performance.now() / 1000);
+  });
+
   craftModal.querySelector('[data-craft-close]').addEventListener('click', closeCraft);
   craftModal.addEventListener('click', (event) => {
     if (event.target === craftModal) closeCraft();
@@ -560,6 +880,8 @@ export function bindHud(root, state, world) {
     closeUpgrade();
     closePotion();
     hideFurnMenu();
+    closeMusicDock();
+    closeDisplayPicker();
     closeBuild();
     closePlace(true);
     world.beginMoveFurniture(target);
@@ -580,9 +902,13 @@ export function bindHud(root, state, world) {
           : target.id === 'range' ? 'Cooking Range'
             : target.id === 'cauldron' ? 'Cauldron'
               : target.id === 'counter' ? 'Counter'
-                : 'Display'
+                : target.id === 'display' && displayKind(target.index, state) === 'stand' ? 'Mannequin'
+                  : target.id === 'display' && displayKind(target.index, state) === 'shelf' ? 'Shelf'
+                    : target.id === 'display' ? 'Table'
+                      : 'Display'
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
+    const upgradeBtn = furnMenu.querySelector('[data-furn-upgrade]');
     if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron') {
       useBtn.hidden = false;
       useBtn.textContent = target.id === 'chest' ? 'Open Chest'
@@ -592,29 +918,23 @@ export function bindHud(root, state, world) {
     } else {
       useBtn.hidden = true;
     }
+    const displayBtn = furnMenu.querySelector('[data-furn-display]');
+    const canDisplay = target.id === 'display' && displayKind(target.index, state) !== 'stand';
+    if (displayBtn) displayBtn.hidden = !canDisplay;
+    if (upgradeBtn) upgradeBtn.hidden = target.id !== 'chest';
     furnMenu.hidden = false;
     const x = Math.min(window.innerWidth - 230, Math.max(8, clientX ?? 24));
-    const y = Math.min(window.innerHeight - 180, Math.max(8, clientY ?? 80));
+    const y = Math.min(window.innerHeight - 220, Math.max(8, clientY ?? 80));
     furnMenu.style.left = `${x}px`;
     furnMenu.style.top = `${y}px`;
   }
 
-  chestModal.querySelector('[data-chest-move]')?.addEventListener('click', () => startMove({ id: 'chest' }));
-  chestModal.querySelector('[data-chest-rotate]')?.addEventListener('click', () => doRotate({ id: 'chest' }));
   chestModal.querySelector('[data-chest-upgrade]')?.addEventListener('click', openUpgrade);
-  craftModal.querySelector('[data-craft-move]')?.addEventListener('click', () => {
-    startMove({ id: craftStation === 'range' ? 'range' : 'anvil' });
-  });
-  craftModal.querySelector('[data-craft-rotate]')?.addEventListener('click', () => {
-    doRotate({ id: craftStation === 'range' ? 'range' : 'anvil' });
-  });
 
   potionModal.querySelector('[data-potion-close]').addEventListener('click', closePotion);
   potionModal.addEventListener('click', (event) => {
     if (event.target === potionModal) closePotion();
   });
-  potionModal.querySelector('[data-potion-move]').addEventListener('click', () => startMove({ id: 'cauldron' }));
-  potionModal.querySelector('[data-potion-rotate]').addEventListener('click', () => doRotate({ id: 'cauldron' }));
 
   upgradeModal.querySelector('[data-upgrade-close]').addEventListener('click', closeUpgrade);
   upgradeModal.addEventListener('click', (event) => {
@@ -633,10 +953,18 @@ export function bindHud(root, state, world) {
 
   function paintExpand() {
     const cost = expansionCost((state.expansions ?? []).length);
-    expandModal.querySelector('[data-expand-cost]').textContent = `Next room costs ${cost}g.`;
+    const owned = (state.expansions ?? []).length;
+    expandModal.querySelector('[data-expand-cost]').textContent = owned >= 5
+      ? 'Every expansion pad is in use.'
+      : `Next room costs ${cost}g.`;
     const padId = world.getSelectedPad();
     const pickEl = expandModal.querySelector('[data-expand-pick]');
     const confirm = expandModal.querySelector('[data-expand-confirm]');
+    if (owned >= 5) {
+      pickEl.textContent = 'The shop already uses every expansion pad.';
+      confirm.disabled = true;
+      return;
+    }
     if (!padId) {
       pickEl.textContent = 'Click a gold pad on the ground, then confirm.';
       confirm.disabled = true;
@@ -658,7 +986,9 @@ export function bindHud(root, state, world) {
     closeCraft();
     closeTrade();
     closeUpgrade();
+    closePotion();
     hideFurnMenu();
+    closeMusicDock();
     if (!helpModal.hidden) closeHelp();
     closeBuild();
     closePlace(true);
@@ -684,7 +1014,31 @@ export function bindHud(root, state, world) {
     }, 480);
   }
 
-  document.querySelector('#expand-btn')?.addEventListener('click', openExpand);
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      pushLog(state, 'Fullscreen is not available in this browser.');
+    }
+    syncFullscreenBtn();
+    render(performance.now() / 1000);
+  }
+
+  function syncFullscreenBtn() {
+    const on = Boolean(document.fullscreenElement);
+    state.fullscreen = on;
+    if (!expandBtn) return;
+    expandBtn.classList.toggle('is-on', on);
+    expandBtn.title = on ? 'Exit fullscreen' : 'Toggle fullscreen';
+    expandBtn.setAttribute('aria-label', expandBtn.title);
+  }
+  document.addEventListener('fullscreenchange', syncFullscreenBtn);
+  expandBtn?.addEventListener('click', toggleFullscreen);
+
   expandModal.querySelector('[data-expand-close]').addEventListener('click', closeExpand);
   expandModal.querySelector('[data-expand-confirm]').addEventListener('click', () => {
     const padId = world.getSelectedPad();
@@ -708,14 +1062,86 @@ export function bindHud(root, state, world) {
     const status = buildModal.querySelector('[data-cauldron-status]');
     const buyBtn = buildModal.querySelector('[data-cauldron-buy]');
     if (ownsCauldron(state)) {
-      status.textContent = 'Placed in the shop. Click it to move or to open the potion note.';
+      status.textContent = 'Placed in the shop. Click it to brew potions, or right-click to move.';
       buyBtn.disabled = true;
       buyBtn.textContent = 'Owned';
+    } else {
+      status.textContent = `Costs ${CAULDRON_COST.toLocaleString()} gp.`;
+      buyBtn.disabled = !canBuyCauldron(state);
+      buyBtn.textContent = `Buy · ${CAULDRON_COST.toLocaleString()} gp`;
+    }
+    const expandStatus = buildModal.querySelector('[data-expand-status]');
+    const expandBuy = buildModal.querySelector('[data-expand-buy]');
+    const owned = (state.expansions ?? []).length;
+    if (expandStatus && expandBuy) {
+      if (owned >= 5) {
+        expandStatus.textContent = 'Every expansion pad is in use.';
+        expandBuy.disabled = true;
+        expandBuy.textContent = 'Owned';
+      } else {
+        const cost = expansionCost(owned);
+        expandStatus.textContent = `Next room costs ${cost}g.`;
+        expandBuy.disabled = state.gold < cost;
+        expandBuy.textContent = `Place Room · ${cost}g`;
+      }
+    }
+    for (const type of ['table', 'mannequin']) {
+      const itemStatus = buildModal.querySelector(`[data-${type}-status]`);
+      const itemBuy = buildModal.querySelector(`[data-${type}-buy]`);
+      if (!itemStatus || !itemBuy) continue;
+      const cost = nextFurnitureCost(state, type);
+      const label = furnitureLabelForType(type);
+      const bought = state.boughtFurniture?.[type] ?? 0;
+      const extra = bought === 0
+        ? `First extra ${label.toLowerCase()} costs ${cost.toLocaleString()}g. Starting pieces do not count.`
+        : `Next ${label.toLowerCase()} costs ${cost.toLocaleString()}g (${bought} bought).`;
+      itemStatus.textContent = extra;
+      itemStatus.classList.remove('craft-note');
+      itemBuy.disabled = false;
+      itemBuy.textContent = `Buy · ${cost.toLocaleString()} gp`;
+    }
+  }
+
+  function paintPlaceDock() {
+    if (!placeModal || !pendingPlace) return;
+    const title = placeModal.querySelector('[data-place-title]');
+    const blurb = placeModal.querySelector('[data-place-blurb]');
+    const costEl = placeModal.querySelector('[data-place-cost]');
+    const note = placeModal.querySelector('[data-place-note]');
+    const label = pendingPlace.type === 'cauldron'
+      ? 'Cauldron'
+      : furnitureLabelForType(pendingPlace.type);
+    if (title) title.textContent = `Place ${label}`;
+    if (blurb) {
+      blurb.textContent = pendingPlace.type === 'cauldron'
+        ? 'Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement.'
+        : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
+    }
+    if (costEl) costEl.textContent = `Cost: ${pendingPlace.cost.toLocaleString()} gp.`;
+    if (note) {
+      note.hidden = !pendingPlace.note;
+      note.textContent = pendingPlace.note || '';
+    }
+  }
+
+  function startFurniturePlace(type) {
+    const cost = nextFurnitureCost(state, type);
+    const need = furnitureNeedGold(state, type);
+    const status = buildModal.querySelector(`[data-${type}-status]`);
+    if (!canBuyFurniture(state, type) || need) {
+      if (status) {
+        status.textContent = need || `Need ${cost.toLocaleString()}g. You have ${state.gold.toLocaleString()}g.`;
+        status.classList.add('craft-note');
+      }
+      pushLog(state, status?.textContent ?? need);
+      render(performance.now() / 1000);
       return;
     }
-    status.textContent = `Costs ${CAULDRON_COST.toLocaleString()} gp.`;
-    buyBtn.disabled = !canBuyCauldron(state);
-    buyBtn.textContent = `Buy · ${CAULDRON_COST.toLocaleString()} gp`;
+    pendingPlace = { type, cost, note: '' };
+    world.beginPlaceFurniture(furnitureKindForType(type));
+    openPlaceDock();
+    paintPlaceDock();
+    render(performance.now() / 1000);
   }
 
   function closeBuild() {
@@ -729,7 +1155,9 @@ export function bindHud(root, state, world) {
     closeTrade();
     closeUpgrade();
     closePotion();
+    closeDisplayPicker();
     hideFurnMenu();
+    closeMusicDock();
     if (!helpModal.hidden) closeHelp();
     closeExpand();
     closePlace(true);
@@ -740,6 +1168,7 @@ export function bindHud(root, state, world) {
   function closePlace(cancelWorld = false) {
     if (!placeModal) return;
     placeModal.hidden = true;
+    pendingPlace = null;
     if (cancelWorld && world.isPlacingUnlock?.()) world.cancelMoveFurniture();
     world.ignorePicks(280);
   }
@@ -751,38 +1180,93 @@ export function bindHud(root, state, world) {
 
   document.querySelector('#build-btn')?.addEventListener('click', openBuild);
   buildModal.querySelector('[data-build-close]').addEventListener('click', closeBuild);
+  buildModal.querySelector('[data-expand-buy]')?.addEventListener('click', () => {
+    closeBuild();
+    openExpand();
+  });
   buildModal.querySelector('[data-cauldron-buy]').addEventListener('click', () => {
     if (!canBuyCauldron(state)) {
-      paintBuild();
+      const status = buildModal.querySelector('[data-cauldron-status]');
+      const msg = `Need ${CAULDRON_COST.toLocaleString()}g to buy a cauldron. You have ${state.gold.toLocaleString()}g.`;
+      if (status) {
+        status.textContent = msg;
+        status.classList.add('craft-note');
+      }
+      pushLog(state, msg);
+      render(performance.now() / 1000);
       return;
     }
+    pendingPlace = { type: 'cauldron', cost: CAULDRON_COST, note: '' };
     world.beginPlaceUnlock('cauldron');
     openPlaceDock();
+    paintPlaceDock();
     render(performance.now() / 1000);
   });
+  buildModal.querySelector('[data-table-buy]')?.addEventListener('click', () => startFurniturePlace('table'));
+  buildModal.querySelector('[data-mannequin-buy]')?.addEventListener('click', () => startFurniturePlace('mannequin'));
   placeModal.querySelector('[data-place-cancel]').addEventListener('click', () => {
     closePlace(true);
     render(performance.now() / 1000);
   });
   placeModal.querySelector('[data-place-confirm]').addEventListener('click', () => {
     const pose = world.getPlacePose();
-    if (!pose || state.gold < CAULDRON_COST) {
+    const pending = pendingPlace;
+    if (!pose || !pending) {
       render(performance.now() / 1000);
       return;
     }
-    if (!buyCauldron(state, pose)) {
+    if (pending.type === 'cauldron') {
+      if (state.gold < CAULDRON_COST) {
+        pendingPlace.note = `Need ${CAULDRON_COST.toLocaleString()}g. You have ${state.gold.toLocaleString()}g.`;
+        paintPlaceDock();
+        pushLog(state, pendingPlace.note);
+        render(performance.now() / 1000);
+        return;
+      }
+      if (!buyCauldron(state, pose)) {
+        render(performance.now() / 1000);
+        return;
+      }
+      world.confirmPlaceUnlock();
+      closePlace();
+      pushLog(state, `Placed a cauldron for ${CAULDRON_COST.toLocaleString()} gp.`);
+      render(performance.now() / 1000);
+      return;
+    }
+    const cost = nextFurnitureCost(state, pending.type);
+    const need = furnitureNeedGold(state, pending.type);
+    if (need) {
+      pendingPlace.note = need;
+      paintPlaceDock();
+      pushLog(state, need);
+      render(performance.now() / 1000);
+      return;
+    }
+    if (!buyFurniture(state, pending.type, pose)) {
       render(performance.now() / 1000);
       return;
     }
     world.confirmPlaceUnlock();
+    world.syncDisplays();
+    world.refreshSelection(true);
     closePlace();
-    pushLog(state, `Placed a cauldron for ${CAULDRON_COST.toLocaleString()} gp.`);
+    const label = furnitureLabelForType(pending.type);
+    pushLog(state, `Placed a ${label.toLowerCase()} for ${cost.toLocaleString()} gp.`);
     render(performance.now() / 1000);
   });
 
   furnMenu.querySelector('[data-furn-close]').addEventListener('click', hideFurnMenu);
   furnMenu.querySelector('[data-furn-move]').addEventListener('click', () => startMove(furnTarget));
   furnMenu.querySelector('[data-furn-rotate]').addEventListener('click', () => doRotate(furnTarget));
+  furnMenu.querySelector('[data-furn-upgrade]')?.addEventListener('click', () => {
+    hideFurnMenu();
+    openUpgrade();
+  });
+  furnMenu.querySelector('[data-furn-display]')?.addEventListener('click', () => {
+    const target = furnTarget;
+    hideFurnMenu();
+    if (target?.id === 'display') openDisplayPicker(target);
+  });
   furnMenu.querySelector('[data-furn-use]').addEventListener('click', () => {
     const target = furnTarget;
     hideFurnMenu();
@@ -792,16 +1276,69 @@ export function bindHud(root, state, world) {
     if (target?.id === 'cauldron') openPotion();
   });
 
-  world.onPick((event) => {
-    if (event.type !== 'furn-menu' && event.type !== 'display' && event.type !== 'counter' && event.type !== 'expand-pad') {
-      hideFurnMenu();
+  function paintMusic() {
+    if (!musicDock) return;
+    const nameEl = musicDock.querySelector('[data-music-name]');
+    const vol = musicDock.querySelector('[data-music-volume]');
+    const track = getMusicTrackName();
+    if (nameEl) nameEl.textContent = track ? `Playing: ${track}` : 'No track loaded.';
+    if (vol) vol.value = String(Math.round((state.music?.volume ?? getMusicVolume()) * 100));
+  }
+
+  function openMusic() {
+    closeBuild();
+    closeExpand();
+    hideFurnMenu();
+    paintMusic();
+    if (musicDock) musicDock.hidden = false;
+  }
+
+  musicBtn?.addEventListener('click', () => {
+    if (musicDock?.hidden === false) closeMusicDock();
+    else openMusic();
+  });
+  musicDock?.querySelector('[data-music-close]')?.addEventListener('click', closeMusicDock);
+  musicDock?.querySelector('[data-music-upload]')?.addEventListener('click', () => musicFile?.click());
+  musicFile?.addEventListener('change', async () => {
+    const file = musicFile.files?.[0];
+    musicFile.value = '';
+    if (!file) return;
+    try {
+      await loadMusicFile(file);
+      pushLog(state, `Playing ${file.name} on a loop.`);
+    } catch {
+      pushLog(state, 'Could not play that audio file.');
     }
+    paintMusic();
+    render(performance.now() / 1000);
+  });
+  musicDock?.querySelector('[data-music-play]')?.addEventListener('click', async () => {
+    if (!getMusicTrackName()) {
+      musicFile?.click();
+      return;
+    }
+    await playMusic();
+    paintMusic();
+  });
+  musicDock?.querySelector('[data-music-stop]')?.addEventListener('click', () => {
+    stopMusic();
+    paintMusic();
+  });
+  musicDock?.querySelector('[data-music-volume]')?.addEventListener('input', (event) => {
+    const volume = Number(event.target.value) / 100;
+    setMusicVolume(volume);
+    if (!state.music) state.music = { volume: DEFAULT_MUSIC_VOLUME };
+    state.music.volume = volume;
+  });
+  setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
+
+  world.onPick((event) => {
+    if (event.type !== 'furn-menu') hideFurnMenu();
     if (event.type === 'chest') openChest();
     if (event.type === 'anvil') openCraft('anvil');
     if (event.type === 'range') openCraft('range');
     if (event.type === 'cauldron') openPotion();
-    if (event.type === 'counter') showFurnMenu(event.furniture, event.clientX, event.clientY);
-    if (event.type === 'display') showFurnMenu(event.furniture, event.clientX, event.clientY);
+    if (event.type === 'display-select') render(performance.now() / 1000);
     if (event.type === 'chest-upgrade') openUpgrade();
     if (event.type === 'furn-menu') showFurnMenu(event.furniture, event.clientX, event.clientY);
     if (event.type === 'expand-pad') paintExpand();
@@ -823,6 +1360,8 @@ export function bindHud(root, state, world) {
     closeUpgrade();
     closePotion();
     hideFurnMenu();
+    closeMusicDock();
+    closeDisplayPicker();
     closeBuild();
     closePlace(true);
     helpModal.hidden = false;
@@ -855,8 +1394,9 @@ export function bindHud(root, state, world) {
         world.applyLayout();
         world.syncDisplays();
         world.refreshSelection(true);
+        setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
         paintCrafts();
-        lastStockKey = null;
+        paintMusic();
         pushLog(state, 'Shop loaded from a file.');
       }
     } catch {
@@ -868,31 +1408,26 @@ export function bindHud(root, state, world) {
   document.addEventListener('click', (event) => {
     const btn = event.target.closest('button');
     if (!btn) return;
-    if (btn.dataset.craft || btn.hasAttribute('data-trade-sell') || btn.hasAttribute('data-trade-buy-btn') || btn.hasAttribute('data-trade-offer-btn') || btn.hasAttribute('data-offer-confirm')) return;
+    if (
+      btn.dataset.craft
+      ||       btn.dataset.offerItem
+      || btn.dataset.displayItem
+      || btn.hasAttribute('data-trade-sell')
+      || btn.hasAttribute('data-trade-buy-btn')
+      || btn.hasAttribute('data-trade-offer-btn')
+      || btn.hasAttribute('data-offer-confirm')
+    ) return;
     playClick('ui');
   });
 
-  let lastStockKey = null;
   let lastUnlockKey = null;
+  let lastChestKey = null;
 
-  function render(now) {
-    goldEl.textContent = `Coins: ${state.gold}`;
-    const chestN = chestTotal(state);
-    chestCountEl.textContent = `${chestN} piece${chestN === 1 ? '' : 's'} waiting`;
-    for (const mat of materialList()) {
-      const count = matsEl.querySelector(`[data-count="${mat.id}"]`);
-      if (count) count.textContent = `×${state.materials[mat.id] ?? 0}`;
-      const btn = matsEl.querySelector(`[data-restock="${mat.id}"]`);
-      if (btn) btn.disabled = !canRestock(state, mat.id);
-    }
-    const unlockKey = Object.entries(state.craftCounts ?? {}).map(([id, n]) => `${id}:${n}`).join('|');
-    if (unlockKey !== lastUnlockKey) {
-      lastUnlockKey = unlockKey;
-      paintCrafts();
-    }
-    for (const recipe of currentRecipes()) {
-      const btn = craftsEl.querySelector(`[data-craft="${recipe.id}"]`);
-      const timer = craftsEl.querySelector(`[data-timer="${recipe.id}"]`);
+  function paintBusy(container, recipes, now) {
+    if (!container) return;
+    for (const recipe of recipes) {
+      const btn = container.querySelector(`[data-craft="${recipe.id}"]`);
+      const timer = container.querySelector(`[data-timer="${recipe.id}"]`);
       if (!btn || !timer) continue;
       const progress = craftProgress(state, recipe.id, now);
       const locked = !isUnlocked(state, recipe.id);
@@ -909,6 +1444,21 @@ export function bindHud(root, state, world) {
         btn.style.setProperty('--t', '0');
       }
     }
+  }
+
+  function render(now) {
+    goldEl.textContent = `Coins: ${state.gold}`;
+    const chestN = chestTotal(state);
+    if (chestCountEl) chestCountEl.textContent = `${chestN} piece${chestN === 1 ? '' : 's'} waiting`;
+    if (!craftModal.hidden) syncMats(matsEl);
+    if (!potionModal.hidden) syncMats(potionMatsEl);
+    const unlockKey = Object.entries(state.craftCounts ?? {}).map(([id, n]) => `${id}:${n}`).join('|');
+    if (unlockKey !== lastUnlockKey) {
+      lastUnlockKey = unlockKey;
+      if (!craftModal.hidden || !potionModal.hidden) paintCrafts();
+    }
+    if (!craftModal.hidden) paintBusy(craftsEl, currentRecipes(), now);
+    if (!potionModal.hidden) paintBusy(potionCraftsEl, recipesForTab('potion'), now);
     const busyId = Object.keys(state.crafts ?? {})[0];
     if (activeCraft) {
       if (busyId) {
@@ -921,20 +1471,18 @@ export function bindHud(root, state, world) {
         activeCraft.style.setProperty('--t', '0');
       }
     }
-    const stockKey = chestList(state).map((item) => `${item.recipeId}:${item.count}`).join('|');
-    if (stockKey !== lastStockKey) {
-      lastStockKey = stockKey;
-      const items = chestList(state);
-      if (items.length) {
-        stockEl.hidden = false;
-        stockEl.innerHTML = '<p>Chest — Click to Show on the Selected Stall</p>' + items.map((item) => (
-          `<button type="button" data-stock="${item.recipeId}">${item.recipe.name} ×${item.count}</button>`
-        )).join('');
-      } else {
-        stockEl.hidden = true;
-        stockEl.innerHTML = '';
-      }
+    const chestKey = chestList(state).map((item) => `${item.recipeId}:${item.count}`).join('|');
+    if (chestKey !== lastChestKey) {
+      lastChestKey = chestKey;
       if (!chestModal.hidden) paintChest();
+      if (!offerModal.hidden) {
+        lastOfferListKey = '';
+        paintOfferPicker();
+      }
+      if (!displayModal?.hidden) {
+        lastDisplayListKey = '';
+        paintDisplayPicker();
+      }
     }
     if (tradeActor) {
       const live = world.getCustomer(tradeActor.id);
@@ -947,5 +1495,5 @@ export function bindHud(root, state, world) {
     }
   }
 
-  return { render, openChest, openTrade, openCraft, openOfferPicker };
+  return { render, openChest, openTrade, openCraft, openOfferPicker, selectOfferItem };
 }

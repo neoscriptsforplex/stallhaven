@@ -41,7 +41,7 @@ body {
   left: 16px;
   width: min(228px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
-  overflow: auto;
+  overflow: visible;
   display: grid;
   gap: 8px;
   pointer-events: none;
@@ -197,9 +197,15 @@ body {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.tabs.subtabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: -2px;
 }
 
 .tabs[hidden] {
@@ -406,7 +412,8 @@ button:disabled {
 }
 
 #offer-modal {
-  z-index: 24;
+  z-index: 32;
+  pointer-events: auto;
 }
 
 body.modal-open #view {
@@ -453,8 +460,10 @@ body.modal-open #view {
 
 .craft-sheet {
   width: min(520px, calc(100vw - 32px));
-  max-height: min(80vh, 720px);
-  overflow: auto;
+  max-height: min(88vh, 760px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   scrollbar-width: thin;
   scrollbar-color: #e3b34a #3e2616;
 }
@@ -481,12 +490,87 @@ body.modal-open #view {
   border: 1px solid #4a301c;
 }
 
-.craft-sheet #crafts {
-  max-height: 50vh;
+.craft-sheet #crafts,
+.craft-sheet #potion-crafts {
+  flex: 1 1 auto;
+  min-height: 7rem;
   overflow: auto;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   scrollbar-width: thin;
   scrollbar-color: #e3b34a #3e2616;
+}
+
+.craft-sheet > h2,
+.craft-sheet > p,
+.craft-sheet > .tabs,
+.craft-sheet > .ghost,
+.craft-sheet > .craft-mats {
+  flex-shrink: 0;
+}
+
+.craft-note {
+  color: #f0a07a;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.craft.is-focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(227, 179, 74, 0.7);
+}
+
+.craft-mats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 7.5rem;
+  overflow: auto;
+  margin: 0 0 8px;
+  padding: 4px 0;
+}
+
+#offer-modal,
+#display-modal {
+  z-index: 32;
+  pointer-events: auto;
+}
+
+#offer-modal .sheet,
+#offer-modal .offer-list,
+#offer-modal .offer-row,
+#display-modal .sheet,
+#display-modal .offer-list,
+#display-modal .offer-row {
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.offer-row {
+  cursor: pointer;
+}
+
+#music-btn {
+  min-width: 2.6rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.music-vol {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  font-size: 0.82rem;
+  color: #e6d3b2;
+}
+
+.music-vol input {
+  width: 100%;
+}
+
+#expand-btn.is-on {
+  border-color: var(--gold);
+  background: linear-gradient(#8a5a30, #5a3518);
 }
 
 .furn-row {
@@ -522,6 +606,8 @@ body.modal-open #view {
   right: 16px;
   z-index: 18;
   width: min(280px, calc(100vw - 32px));
+  max-height: calc(100vh - 80px);
+  overflow: auto;
   padding: 12px 14px;
   border-radius: 8px;
   background: var(--panel);

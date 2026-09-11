@@ -1,6 +1,10 @@
-/** Light UI clicks. No music. */
+/** Light UI clicks plus optional looping background music from an uploaded file. */
 
 let ctx = null;
+let bg = null;
+let objectUrl = null;
+let volume = 0.45;
+let trackName = '';
 
 function audio() {
   if (ctx) return ctx;
@@ -27,4 +31,71 @@ export function playClick(kind = 'ui') {
   gain.connect(ac.destination);
   osc.start(now);
   osc.stop(now + 0.08);
+}
+
+export function getMusicVolume() {
+  return volume;
+}
+
+export function getMusicTrackName() {
+  return trackName;
+}
+
+export function isMusicPlaying() {
+  return Boolean(bg && !bg.paused);
+}
+
+export function setMusicVolume(next) {
+  volume = Math.min(1, Math.max(0, Number(next) || 0));
+  if (bg) bg.volume = volume;
+  return volume;
+}
+
+function disposeTrack() {
+  if (bg) {
+    bg.pause();
+    bg.src = '';
+    bg = null;
+  }
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl);
+    objectUrl = null;
+  }
+}
+
+export async function loadMusicFile(file) {
+  if (!file) return null;
+  disposeTrack();
+  objectUrl = URL.createObjectURL(file);
+  trackName = file.name || 'Uploaded track';
+  bg = new Audio(objectUrl);
+  bg.loop = true;
+  bg.volume = volume;
+  try {
+    await bg.play();
+  } catch {
+    // Autoplay can wait for the next Play click.
+  }
+  return trackName;
+}
+
+export async function playMusic() {
+  if (!bg) return false;
+  try {
+    await bg.play();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function stopMusic() {
+  if (!bg) return;
+  bg.pause();
+  bg.currentTime = 0;
+}
+
+export function clearMusic() {
+  disposeTrack();
+  trackName = '';
 }

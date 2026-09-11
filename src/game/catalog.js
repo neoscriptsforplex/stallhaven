@@ -20,11 +20,19 @@ export const ANVIL_TABS = [
   { id: 'melee', label: 'Melee' },
   { id: 'magic', label: 'Magic' },
   { id: 'ranged', label: 'Ranged' },
-  { id: 'potion', label: 'Potions' },
+];
+
+export const ANVIL_SUBTABS = [
+  { id: 'weapon', label: 'Weapons' },
+  { id: 'armour', label: 'Armour' },
 ];
 
 /** @deprecated Food moved to the cooking range; anvil uses ANVIL_TABS. */
 export const CRAFT_TABS = ANVIL_TABS;
+
+export const SHELF_SLOT_COUNT = 4;
+export const SHELF_SLOT_IDS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+export const SHELF_SLOT_LABELS = ['Top Left', 'Top Right', 'Bottom Left', 'Bottom Right'];
 
 export const METALS = [
   { id: 'bronze', name: 'Bronze', tint: 0x8a5a32, restock: 3, start: 12 },
@@ -81,6 +89,8 @@ export const MATERIALS = {
   pineapple: { id: 'pineapple', name: 'Pineapple', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   raspberry: { id: 'raspberry', name: 'Raspberry', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   fish: { id: 'fish', name: 'Fish', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
+  herbs: { id: 'herbs', name: 'Herbs', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  water: { id: 'water', name: 'Water', restock: 2, start: 12, tier: 1, regenEvery: regenEvery(1) },
 };
 
 export const ARMOUR_SLOTS = ['helm', 'body', 'legs', 'boots', 'gloves'];
@@ -278,7 +288,7 @@ const FOOD_LINE = [
   { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, fish: 1 }, tint: 0xc8b07a },
 ];
 
-// Food is small and sits on wall shelves. Potions will share these shelves later; do not build potions now.
+// Food is small and sits on wall shelves. Potions share the same four shelf slots.
 FOOD_LINE.forEach((food, index) => {
   const previousId = index === 0 ? null : FOOD_LINE[index - 1].id;
   addRecipe({
@@ -304,12 +314,51 @@ FOOD_LINE.forEach((food, index) => {
   });
 });
 
+const POTION_LINE = [
+  { id: 'strength_potion', name: 'Strength Potion', tint: 0xe8d24a, buyers: ['mercenary'] },
+  { id: 'prayer_potion', name: 'Prayer Potion', tint: 0x3ec8c4, buyers: ['pilgrim', 'hedgemage'] },
+  { id: 'attack_potion', name: 'Attack Potion', tint: 0x40c8c0, buyers: ['mercenary'] },
+  { id: 'anti_poison_potion', name: 'Anti Poison Potion', tint: 0x8ee53f, buyers: ['mercenary', 'ranger'] },
+  { id: 'ranging_potion', name: 'Ranging Potion', tint: 0x87ceeb, buyers: ['ranger'] },
+  { id: 'antifire_potion', name: 'Antifire Potion', tint: 0x8a4ec8, buyers: ['mercenary', 'ranger'] },
+  { id: 'energy_potion', name: 'Energy Potion', tint: 0xe87aa8, buyers: ['pilgrim', 'ranger'] },
+  { id: 'magic_potion', name: 'Magic Potion', tint: 0xf4c49a, buyers: ['hedgemage'] },
+];
+
+POTION_LINE.forEach((potion, index) => {
+  const previousId = index === 0 ? null : POTION_LINE[index - 1].id;
+  addRecipe({
+    id: potion.id,
+    name: potion.name,
+    category: 'potion',
+    combatClass: null,
+    slot: 'potion',
+    shape: 'potion',
+    setKey: 'brew',
+    lineId: 'potion-brew',
+    lineName: 'Vials',
+    lineIndex: index,
+    previousId,
+    unlockNeed: index === 0 ? 0 : 5,
+    tier: index + 1,
+    cost: {
+      materials: { herbs: index >= 4 ? 2 : 1, water: 1 },
+      gold: 0,
+    },
+    time: 4 + index,
+    price: 12 + index * 6,
+    buyers: potion.buyers,
+    tint: potion.tint,
+    shelfItem: true,
+  });
+});
+
 export const CUSTOMERS = {
   pilgrim: {
     id: 'pilgrim',
     name: 'Pilgrim',
     combatClass: null,
-    prefers: FOOD_LINE.map((food) => food.id),
+    prefers: [...FOOD_LINE.map((food) => food.id), 'prayer_potion', 'energy_potion'],
     patient: true,
     leaveIfEmpty: false,
     robe: 0xc8b48a,
@@ -321,7 +370,7 @@ export const CUSTOMERS = {
     name: 'Mercenary',
     combatClass: 'melee',
     prefers: Object.values(RECIPES)
-      .filter((recipe) => recipe.combatClass === 'melee')
+      .filter((recipe) => recipe.combatClass === 'melee' || ['strength_potion', 'attack_potion', 'anti_poison_potion', 'antifire_potion'].includes(recipe.id))
       .map((recipe) => recipe.id),
     patient: false,
     leaveIfEmpty: true,
@@ -334,7 +383,7 @@ export const CUSTOMERS = {
     name: 'Ranger',
     combatClass: 'range',
     prefers: Object.values(RECIPES)
-      .filter((recipe) => recipe.combatClass === 'range')
+      .filter((recipe) => recipe.combatClass === 'range' || ['ranging_potion', 'antifire_potion', 'energy_potion', 'anti_poison_potion'].includes(recipe.id))
       .map((recipe) => recipe.id),
     patient: true,
     leaveIfEmpty: false,
@@ -347,7 +396,7 @@ export const CUSTOMERS = {
     name: 'Hedge Mage',
     combatClass: 'magic',
     prefers: Object.values(RECIPES)
-      .filter((recipe) => recipe.combatClass === 'magic')
+      .filter((recipe) => recipe.combatClass === 'magic' || ['magic_potion', 'prayer_potion'].includes(recipe.id))
       .map((recipe) => recipe.id),
     patient: false,
     leaveIfEmpty: false,
@@ -386,6 +435,58 @@ export function emptySlots() {
   return { helm: null, body: null, legs: null, boots: null, gloves: null };
 }
 
+export function emptyShelfSlots() {
+  return Array(SHELF_SLOT_COUNT).fill(null);
+}
+
+/** Positions relative to the top-board ware anchor on a wall shelf. */
+export function shelfSlotPoses() {
+  return [
+    { x: -0.42, y: 0.02, z: 0.04 },
+    { x: 0.42, y: 0.02, z: 0.04 },
+    { x: -0.42, y: -0.44, z: 0.04 },
+    { x: 0.42, y: -0.44, z: 0.04 },
+  ];
+}
+
+export function nearestShelfSlot(localX, localY, localZ = 0) {
+  const poses = shelfSlotPoses();
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < poses.length; i += 1) {
+    const dx = localX - poses[i].x;
+    const dy = localY - poses[i].y;
+    const dz = localZ - poses[i].z;
+    const dist = dx * dx + dy * dy + dz * dz;
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = i;
+    }
+  }
+  return best;
+}
+
+export function isShelfItem(recipe) {
+  return Boolean(recipe?.shelfItem || recipe?.category === 'food' || recipe?.category === 'potion');
+}
+
+export function stationForRecipe(recipe) {
+  if (!recipe) return 'anvil';
+  if (recipe.category === 'food') return 'range';
+  if (recipe.category === 'potion') return 'cauldron';
+  return 'anvil';
+}
+
+export function anvilTabForRecipe(recipe) {
+  if (recipe?.combatClass === 'magic') return 'magic';
+  if (recipe?.combatClass === 'range') return 'ranged';
+  return 'melee';
+}
+
+export function anvilSubtabForRecipe(recipe) {
+  return recipe?.category === 'armour' ? 'armour' : 'weapon';
+}
+
 export function recipeList() {
   return Object.values(RECIPES);
 }
@@ -408,11 +509,15 @@ export function recipeCost(recipe) {
   return { materials: {}, gold: 0 };
 }
 
-export function recipesForTab(tabId) {
-  if (tabId === 'potion') return [];
+export function recipesForTab(tabId, subtabId = null) {
+  if (tabId === 'potion') return recipeList().filter((recipe) => recipe.category === 'potion');
   if (tabId === 'food') return recipeList().filter((recipe) => recipe.category === 'food');
-  if (tabId === 'ranged') return recipeList().filter((recipe) => recipe.combatClass === 'range');
-  return recipeList().filter((recipe) => recipe.combatClass === tabId);
+  const combatClass = tabId === 'ranged' ? 'range' : tabId;
+  const list = recipeList().filter((recipe) => recipe.combatClass === combatClass);
+  if (subtabId === 'weapon' || subtabId === 'armour') {
+    return list.filter((recipe) => recipe.category === subtabId);
+  }
+  return list;
 }
 
 export function recipesInLine(lineId) {
@@ -430,15 +535,17 @@ export function costLabel(recipe) {
   return `${mats}${gold} · ${recipe.time}s · sells ${recipe.price}g`;
 }
 
-export function classLabel(combatClass) {
+export function classLabel(combatClass, category = null) {
+  if (category === 'potion') return 'Potion';
+  if (category === 'food' || (!combatClass && category !== 'weapon' && category !== 'armour')) return 'Food';
   if (combatClass === 'melee') return 'Melee';
   if (combatClass === 'range') return 'Ranged';
   if (combatClass === 'magic') return 'Magic';
   return 'Food';
 }
 
-export function displayKind(index) {
-  return SHOP.displays[index]?.kind ?? 'table';
+export function displayKind(index, state) {
+  return state?.displays?.[index]?.kind ?? SHOP.displays[index]?.kind ?? 'table';
 }
 
 export function matchingArmourIds(recipeId, ownedIds) {
@@ -489,7 +596,8 @@ export function decideRequest(customerId, rng = Math.random, state = null) {
   const customer = CUSTOMERS[customerId];
   const preferred = customer.prefers
     .map((id) => RECIPES[id])
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((recipe) => recipe.category !== 'potion' || Boolean(state?.furniture?.cauldron));
   const unlocked = preferred.filter((recipe) => recipeUnlocked(state, recipe));
   const maxUnlockedPrice = unlocked.reduce((max, recipe) => Math.max(max, recipe.price ?? 0), 0);
   const maxUnlockedTier = unlocked.reduce((max, recipe) => Math.max(max, recipe.tier ?? 1), 0);

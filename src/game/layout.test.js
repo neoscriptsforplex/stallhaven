@@ -11,6 +11,7 @@ import {
   chestUpgradeCost,
   defaultFurniture,
   expansionCost,
+  furnitureBuyCost,
   gardenTreeSpots,
   occupiedCells,
   padConnects,
@@ -37,6 +38,9 @@ describe('layout numbers', () => {
     assert.equal(expansionCost(2), 12500);
     assert.equal(chestUpgradeCost(1), 500);
     assert.equal(chestUpgradeCost(2), 1500);
+    assert.equal(furnitureBuyCost(0), 500);
+    assert.equal(furnitureBuyCost(1), 1500);
+    assert.equal(furnitureBuyCost(2), 4500);
     assert.equal(chestSlots(1), 100);
     assert.equal(chestSlots(CHEST_MAX_LEVEL), 1000);
     assert.equal(SWAP_PRICE_RATIO, 0.65);

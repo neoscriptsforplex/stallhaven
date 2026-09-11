@@ -13,19 +13,25 @@ import {
   recipesForTab,
   unlockNeed,
   CRAFT_TABS,
+  ANVIL_SUBTABS,
+  nearestShelfSlot,
+  SHELF_SLOT_COUNT,
 } from './catalog.js';
 import {
   applyState,
   buyCauldron,
   buyExpansion,
   buyFromCustomer,
+  buyFurniture,
   canBuyCauldron,
+  canBuyFurniture,
   canCraft,
   CAULDRON_COST,
   chestCapacity,
   chestCount,
   chestTotal,
   completeCrafts,
+  craftBlockReason,
   createState,
   decideAfterWait,
   decidePurchase,
@@ -34,6 +40,7 @@ import {
   offerChoices,
   ownsCauldron,
   placeFromChest,
+  placeOnDisplay,
   restock,
   sellToCustomer,
   serializeState,
@@ -64,9 +71,11 @@ describe('stall economy', () => {
     assert.equal(state.materials.flour, 10);
     assert.equal(state.materials.logs, 8);
     assert.equal(state.materials.hide, 8);
+    assert.equal(state.materials.herbs, 8);
+    assert.equal(state.materials.water, 12);
   });
 
-  it('crafts from materials into the chest and showcases an empty stall', () => {
+  it('crafts from materials into the chest without auto-placing on stalls', () => {
     const state = createState();
     assert.equal(canCraft(state, 'bread'), true);
     assert.equal(startCraft(state, 'bread', 0), true);
@@ -75,7 +84,7 @@ describe('stall economy', () => {
     assert.deepEqual(completeCrafts(state, 3), ['bread']);
     assert.equal(state.chest.bread, 1);
     assert.equal(state.craftCounts.bread, 1);
-    assert.ok(state.displays.some((d) => d.ware?.recipeId === 'bread'));
+    assert.equal(state.displays.every((d) => !d.ware), true);
   });
 
   it('sells at the recipe gold price and restocks materials for gold', () => {
@@ -101,13 +110,14 @@ describe('stall economy', () => {
     assert.equal(hasStock(state, 'staff'), true);
   });
 
-  it('places a chest ware on the selected stall', () => {
+  it('places a chest ware on the selected stall and takes it from the chest', () => {
     const state = createState();
     finishCraft(state, 'bronze_sword');
     state.selectedDisplay = 1;
     assert.equal(placeFromChest(state, 'bronze_sword', 1), true);
     assert.equal(state.displays[1].ware.recipeId, 'bronze_sword');
-    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.chest.bronze_sword, undefined);
+    assert.equal(hasStock(state, 'bronze_sword'), true);
   });
 
   it('puts a matching armour set on a stand', () => {
@@ -124,12 +134,43 @@ describe('stall economy', () => {
     assert.equal(state.displays[standIndex].slots.legs, 'bronze_platelegs');
   });
 
-  it('prefers food on wall shelves', () => {
+  it('places food onto a chosen shelf slot and swaps the previous ware back to the chest', () => {
     const state = createState();
     finishCraft(state, 'bread');
+    finishCraft(state, 'bronze_sword');
     const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
     assert.ok(shelfIndex >= 0);
-    assert.equal(state.displays[shelfIndex].ware?.recipeId, 'bread');
+    assert.equal(placeOnDisplay(state, 'bread', shelfIndex, 0), true);
+    assert.equal(state.displays[shelfIndex].shelfSlots[0], 'bread');
+    assert.equal(state.chest.bread, undefined);
+    assert.equal(placeOnDisplay(state, 'bronze_sword', shelfIndex, 0), true);
+    assert.equal(state.displays[shelfIndex].shelfSlots[0], 'bronze_sword');
+    assert.equal(state.chest.bread, 1);
+    assert.equal(state.chest.bronze_sword, undefined);
+    assert.equal(placeOnDisplay(state, 'bread', shelfIndex, 3), true);
+    assert.equal(state.displays[shelfIndex].shelfSlots[0], 'bronze_sword');
+    assert.equal(state.displays[shelfIndex].shelfSlots[3], 'bread');
+    assert.equal(SHELF_SLOT_COUNT, 4);
+    assert.equal(nearestShelfSlot(-0.4, 0.02), 0);
+    assert.equal(nearestShelfSlot(0.4, 0.02), 1);
+    assert.equal(nearestShelfSlot(-0.4, -0.44), 2);
+    assert.equal(nearestShelfSlot(0.4, -0.44), 3);
+  });
+
+  it('places a chest ware on a table and returns the previous ware to the chest', () => {
+    const state = createState();
+    finishCraft(state, 'bronze_sword');
+    finishCraft(state, 'staff');
+    const tableIndex = SHOP.displays.findIndex((d) => d.kind === 'table');
+    assert.ok(tableIndex >= 0);
+    assert.equal(placeOnDisplay(state, 'bronze_sword', tableIndex), true);
+    assert.equal(state.displays[tableIndex].ware.recipeId, 'bronze_sword');
+    assert.equal(state.chest.bronze_sword, undefined);
+    assert.equal(placeOnDisplay(state, 'staff', tableIndex), true);
+    assert.equal(state.displays[tableIndex].ware.recipeId, 'staff');
+    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.chest.staff, undefined);
+    assert.equal(placeOnDisplay(state, 'bread', tableIndex), false);
   });
 });
 
@@ -197,7 +238,27 @@ describe('save and load', () => {
     assert.deepEqual(other.expansions, ['left']);
     assert.equal(other.furniture.anvil.x, -2.4);
     assert.equal(other.materialAcc.bronze, 0.4);
-    assert.equal(other.displays[2].ware?.recipeId ?? other.displays.find((d) => d.ware?.recipeId === 'bronze_scimitar')?.ware.recipeId, 'bronze_scimitar');
+    assert.equal(other.chest.bronze_scimitar, 1);
+    assert.equal(other.music.volume, state.music.volume);
+  });
+
+  it('loads older save JSON that is missing new fields', () => {
+    const state = createState();
+    assert.equal(applyState(state, {
+      gold: 12,
+      materials: { bronze: 4, flour: 2 },
+      chest: { bread: 2 },
+    }), true);
+    assert.equal(state.gold, 12);
+    assert.equal(state.materials.bronze, 4);
+    assert.equal(state.materials.herbs, 8);
+    assert.equal(state.materials.water, 12);
+    assert.equal(state.chest.bread, 2);
+    assert.equal(state.fullscreen, false);
+    assert.ok(state.music.volume > 0);
+    const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
+    assert.equal(state.displays[shelfIndex].shelfSlots.length, 4);
+    assert.equal(state.displays[shelfIndex].shelfSlots.every((id) => id == null), true);
   });
 });
 
@@ -326,6 +387,7 @@ describe('catalog', () => {
     assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 35);
     assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 16);
     assert.equal(recipes.filter((r) => r.category === 'food').length, 5);
+    assert.equal(recipes.filter((r) => r.category === 'potion').length, 8);
     assert.equal(RECIPES.bronze_scimitar.name, 'Bronze Scimitar');
     assert.equal(RECIPES.iron_platebody.name, 'Iron Platebody');
     assert.equal(RECIPES.magic_hat.name, 'Magic Hat');
@@ -394,24 +456,33 @@ describe('catalog', () => {
     assert.equal(SHOP.clutter?.length ?? 0, 0);
   });
 
-  it('groups anvil recipes by melee, magic, ranged, and an empty potions tab', () => {
-    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged', 'Potions']);
+  it('groups anvil recipes by melee, magic, and ranged with weapons and armour subtabs', () => {
+    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged']);
+    assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour']);
     const melee = recipesForTab('melee');
+    const meleeWeapons = recipesForTab('melee', 'weapon');
+    const meleeArmour = recipesForTab('melee', 'armour');
     const magic = recipesForTab('magic');
     const ranged = recipesForTab('ranged');
     const food = recipesForTab('food');
+    const potions = recipesForTab('potion');
     assert.ok(melee.length > 0);
     assert.ok(melee.every((r) => r.combatClass === 'melee'));
+    assert.ok(meleeWeapons.every((r) => r.category === 'weapon'));
+    assert.ok(meleeArmour.every((r) => r.category === 'armour'));
+    assert.equal(meleeWeapons.length + meleeArmour.length, melee.length);
     assert.ok(magic.every((r) => r.combatClass === 'magic'));
     assert.ok(ranged.every((r) => r.combatClass === 'range'));
     assert.ok(food.every((r) => r.category === 'food'));
-    assert.equal(recipesForTab('potion').length, 0);
+    assert.equal(potions.length, 8);
     assert.ok(melee.some((r) => r.id === 'bronze_sword'));
     assert.ok(!melee.some((r) => r.id === 'staff'));
     assert.ok(magic.some((r) => r.id === 'staff'));
     assert.ok(ranged.some((r) => r.id === 'bronze_shortbow'));
     assert.ok(food.some((r) => r.id === 'bread'));
     assert.ok(!melee.some((r) => r.category === 'food'));
+    assert.equal(RECIPES.strength_potion.name, 'Strength Potion');
+    assert.equal(RECIPES.anti_poison_potion.name, 'Anti Poison Potion');
   });
 
   it('groups matching helm, body, and legs for a stand', () => {
@@ -520,5 +591,79 @@ describe('cauldron unlock', () => {
     state.gold = CAULDRON_COST - 1;
     assert.equal(buyCauldron(state, { x: 0, z: 0, rot: 0 }), false);
     assert.equal(ownsCauldron(state), false);
+  });
+
+  it('brews potions only after a cauldron is placed, using herbs and water', () => {
+    const state = createState();
+    assert.match(craftBlockReason(state, 'strength_potion'), /cauldron/i);
+    assert.equal(canCraft(state, 'strength_potion'), false);
+    assert.equal(isUnlocked(state, 'prayer_potion'), false);
+    state.gold = CAULDRON_COST;
+    buyCauldron(state, { x: 0, z: 0.8, rot: 0 });
+    assert.equal(isUnlocked(state, 'strength_potion'), true);
+    assert.equal(isUnlocked(state, 'prayer_potion'), false);
+    assert.equal(canCraft(state, 'strength_potion'), true);
+    finishCraft(state, 'strength_potion');
+    assert.equal(state.chest.strength_potion, 1);
+    assert.equal(state.materials.herbs, 7);
+    assert.equal(state.materials.water, 11);
+    state.craftCounts.strength_potion = 5;
+    assert.equal(isUnlocked(state, 'prayer_potion'), true);
+  });
+});
+
+describe('build furniture', () => {
+  it('sells extra tables and mannequins on separate 500 then ×3 curves', () => {
+    const state = createState();
+    const starterTables = SHOP.displays.filter((d) => d.kind === 'table').length;
+    const starterStands = SHOP.displays.filter((d) => d.kind === 'stand').length;
+    assert.equal(canBuyFurniture(state, 'table'), false);
+    state.gold = 500;
+    assert.equal(canBuyFurniture(state, 'table'), true);
+    assert.equal(buyFurniture(state, 'table', { x: 0.4, z: 0.2, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.table, 1);
+    assert.equal(state.boughtFurniture.mannequin, 0);
+    assert.equal(state.displays.length, SHOP.displays.length + 1);
+    assert.equal(state.displays.at(-1).kind, 'table');
+    assert.equal(state.displays.at(-1).bought, true);
+    assert.equal(state.furniture.displays.at(-1).x, 0.4);
+    assert.equal(state.displays.filter((d) => d.kind === 'table').length, starterTables + 1);
+    assert.equal(state.displays.filter((d) => d.kind === 'stand').length, starterStands);
+    state.gold = 1500;
+    assert.equal(buyFurniture(state, 'table', { x: 1, z: 1, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.table, 2);
+    state.gold = 500;
+    assert.equal(buyFurniture(state, 'table', { x: 2, z: 2, rot: 0 }), false);
+    assert.equal(buyFurniture(state, 'mannequin', { x: -1, z: 1.2, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.mannequin, 1);
+    assert.equal(state.displays.at(-1).kind, 'stand');
+    state.gold = 1500;
+    assert.equal(buyFurniture(state, 'mannequin', { x: -1.4, z: 1.4, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.boughtFurniture.table, 2);
+    assert.equal(next.boughtFurniture.mannequin, 2);
+    assert.equal(next.displays.length, SHOP.displays.length + 4);
+    assert.equal(next.displays.at(-1).kind, 'stand');
+    assert.equal(next.furniture.displays.at(-1).z, 1.4);
+  });
+
+  it('does not count starter tables or mannequins as paid extras in an old save', () => {
+    const state = createState();
+    assert.equal(applyState(state, {
+      gold: 500,
+      displays: SHOP.displays.map(() => ({ ware: null })),
+    }), true);
+    assert.equal(state.boughtFurniture.table, 0);
+    assert.equal(state.boughtFurniture.mannequin, 0);
+    assert.equal(state.displays.length, SHOP.displays.length);
+    assert.equal(buyFurniture(state, 'table', { x: 0, z: 0.8, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.table, 1);
   });
 });

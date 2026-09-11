@@ -48,10 +48,14 @@ export function shopObstacles(shop = SHOP, furniture = null) {
   ];
   if (poses.cauldron) blocks.push(blockFromPose(poses.cauldron, 0.32, 0.32));
   const displayPoses = poses.displays ?? [];
-  for (const [index, spot] of shop.displays.entries()) {
-    const pose = displayPoses[index] ?? { x: spot.x, z: spot.z, rot: spot.rot ?? 0 };
-    if (spot.kind === 'shelf') blocks.push(blockFromPose(pose, 0.75, 0.25));
-    else if (spot.kind === 'stand') blocks.push(blockFromPose(pose, 0.36, 0.36));
+  const kinds = furniture?.displayKinds;
+  const count = Math.max(shop.displays.length, displayPoses.length);
+  for (let index = 0; index < count; index += 1) {
+    const spot = shop.displays[index];
+    const pose = displayPoses[index] ?? { x: spot?.x ?? 0, z: spot?.z ?? 0, rot: spot?.rot ?? 0 };
+    const kind = kinds?.[index] ?? spot?.kind ?? 'table';
+    if (kind === 'shelf') blocks.push(blockFromPose(pose, 0.75, 0.25));
+    else if (kind === 'stand') blocks.push(blockFromPose(pose, 0.36, 0.36));
     else blocks.push(blockFromPose(pose, 0.76, 0.51));
   }
   for (const item of shop.clutter ?? []) {
@@ -65,7 +69,11 @@ export function floorsForState(state) {
 }
 
 export function liveObstacles(state, shop = SHOP) {
-  return shopObstacles(shop, state?.furniture ?? defaultFurniture());
+  const furniture = { ...(state?.furniture ?? defaultFurniture()) };
+  furniture.displayKinds = (state?.displays ?? []).map((display, index) => (
+    display?.kind ?? shop.displays[index]?.kind ?? 'table'
+  ));
+  return shopObstacles(shop, furniture);
 }
 
 export function pointInRect(x, z, rect, pad = 0) {

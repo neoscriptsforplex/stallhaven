@@ -11,6 +11,10 @@ import {
   emptyShelfSlots,
   emptySlots,
   matchingArmourIds,
+  masteryNeed,
+  MASTERY_SPEED,
+  offerClassLabel,
+  offerClassOf,
   recipeCost,
   recipeList,
 } from './catalog.js';
@@ -26,6 +30,7 @@ import {
   defaultFurniture,
   emptyMaterialAcc,
   expansionCost,
+  MAX_EXPANSIONS,
   furnitureBuyCost,
   furnitureKindForType,
   furnitureLabelForType,
@@ -33,10 +38,10 @@ import {
   padConnects,
 } from './layout.js';
 
-export { CAULDRON_COST, furnitureBuyCost };
+export { CAULDRON_COST, furnitureBuyCost, masteryNeed, MASTERY_SPEED };
 
-export const SAVE_VERSION = 4;
-export const DEFAULT_MUSIC_VOLUME = 0.45;
+export const SAVE_VERSION = 5;
+export const DEFAULT_MUSIC_VOLUME = 0.75;
 
 function emptyBoughtFurniture() {
   return { table: 0, mannequin: 0 };
@@ -145,7 +150,7 @@ export function craftBlockReason(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 'Unknown recipe.';
   if (recipe.category === 'potion' && !ownsCauldron(state)) {
-    return 'Place a cauldron from Build to brew potions.';
+    return 'Place a cauldron from Upgrade to brew potions.';
   }
   if (!isUnlocked(state, recipeId)) {
     const remain = unlockRemaining(state, recipeId);
@@ -167,6 +172,24 @@ export function craftBlockReason(state, recipeId) {
   return null;
 }
 
+export function isMastered(state, recipeId) {
+  const recipe = RECIPES[recipeId];
+  if (!recipe) return false;
+  return craftCount(state, recipeId) >= masteryNeed(recipe);
+}
+
+export function craftDuration(state, recipeId) {
+  const recipe = RECIPES[recipeId];
+  if (!recipe) return 0;
+  return isMastered(state, recipeId) ? recipe.time * MASTERY_SPEED : recipe.time;
+}
+
+export function masteredIds(state) {
+  return recipeList()
+    .filter((recipe) => isMastered(state, recipe.id))
+    .map((recipe) => recipe.id);
+}
+
 export function canCraft(state, recipeId) {
   return craftBlockReason(state, recipeId) == null;
 }
@@ -179,7 +202,7 @@ export function startCraft(state, recipeId, nowSeconds) {
   for (const [materialId, need] of Object.entries(cost.materials)) {
     state.materials[materialId] -= need;
   }
-  state.crafts[recipeId] = { startedAt: nowSeconds, duration: recipe.time };
+  state.crafts[recipeId] = { startedAt: nowSeconds, duration: craftDuration(state, recipeId) };
   return true;
 }
 
@@ -232,6 +255,7 @@ export function canBuyExpansion(state, padId) {
   const pad = padById(padId);
   if (!pad) return false;
   if ((state.expansions ?? []).includes(padId)) return false;
+  if ((state.expansions ?? []).length >= MAX_EXPANSIONS) return false;
   if (!padConnects(pad, state.expansions ?? [])) return false;
   return state.gold >= expansionCost((state.expansions ?? []).length);
 }
@@ -313,30 +337,34 @@ export function reducedSalePrice(listPrice) {
 }
 
 export function offerChoices(state, requestRecipeId) {
+  const want = RECIPES[requestRecipeId];
+  const cls = offerClassOf(want);
   return chestList(state)
     .filter((item) => item.recipe && item.recipeId !== requestRecipeId)
+    .filter((item) => offerClassOf(item.recipe) === cls)
     .map(({ recipe, recipeId, count }) => ({
       recipeId,
       name: recipe.name,
       count,
       gold: reducedSalePrice(recipe.price),
       listPrice: recipe.price,
+      offerClass: cls,
     }));
 }
 
 export function swapOffer(state, customerId, requestRecipeId) {
   const customer = CUSTOMERS[customerId];
   if (!customer) return null;
+  const want = RECIPES[requestRecipeId];
+  const cls = offerClassOf(want);
   const owned = recipeList().filter((recipe) => (
-    recipe.id !== requestRecipeId && hasStock(state, recipe.id)
+    recipe.id !== requestRecipeId
+    && hasStock(state, recipe.id)
+    && offerClassOf(recipe) === cls
   ));
   const preferred = owned.filter((recipe) => customer.prefers.includes(recipe.id));
-  const sameClass = owned.filter((recipe) => (
-    customer.combatClass && recipe.combatClass === customer.combatClass
-  ));
-  const pool = preferred.length ? preferred : sameClass;
+  const pool = preferred.length ? preferred : owned;
   if (!pool.length) return null;
-  const want = RECIPES[requestRecipeId];
   pool.sort((a, b) => {
     const da = Math.abs((a.price ?? 0) - (want?.price ?? 0));
     const db = Math.abs((b.price ?? 0) - (want?.price ?? 0));
@@ -560,6 +588,7 @@ export function serializeState(state) {
     chest: { ...state.chest },
     chestLevel: state.chestLevel ?? 1,
     craftCounts: { ...state.craftCounts },
+    mastery: Object.fromEntries(masteredIds(state).map((id) => [id, true])),
     selectedDisplay: state.selectedDisplay,
     expansions: [...(state.expansions ?? [])],
     furniture,
@@ -719,6 +748,30 @@ export function autoStock(state) {
   refreshShowcases(state);
 }
 
+export function assignStandPiece(state, displayIndex, recipeId) {
+  if (chestCount(state, recipeId) < 1) return false;
+  const display = state.displays[displayIndex];
+  if (!display || displayKind(displayIndex, state) !== 'stand') return false;
+  const recipe = RECIPES[recipeId];
+  if (recipe?.category !== 'armour' || !ARMOUR_SLOTS.includes(recipe.slot)) return false;
+  if (!display.slots) display.slots = emptySlots();
+  display.slots[recipe.slot] = recipeId;
+  display.ware = { recipeId };
+  return true;
+}
+
+export function fillStandFromRecipe(state, displayIndex, recipeId) {
+  if (chestCount(state, recipeId) < 1) return false;
+  const display = state.displays[displayIndex];
+  if (!display || displayKind(displayIndex, state) !== 'stand') return false;
+  const recipe = RECIPES[recipeId];
+  if (recipe?.category !== 'armour') return false;
+  if (!display.slots) display.slots = emptySlots();
+  const owned = Object.keys(state.chest).filter((id) => chestCount(state, id) > 0);
+  fillStandSet(display, recipeId, owned);
+  return Boolean(display.ware);
+}
+
 export function placeFromChest(state, recipeId, displayIndex = state.selectedDisplay, slotIndex = 0) {
   if (chestCount(state, recipeId) < 1) return false;
   const display = state.displays[displayIndex];
@@ -726,9 +779,7 @@ export function placeFromChest(state, recipeId, displayIndex = state.selectedDis
   if (!display.slots) display.slots = emptySlots();
   const recipe = RECIPES[recipeId];
   if (displayKind(displayIndex, state) === 'stand' && recipe?.category === 'armour') {
-    const owned = Object.keys(state.chest).filter((id) => chestCount(state, id) > 0);
-    fillStandSet(display, recipeId, owned);
-    return true;
+    return fillStandFromRecipe(state, displayIndex, recipeId);
   }
   if (displayKind(displayIndex, state) === 'stand') {
     display.ware = { recipeId };

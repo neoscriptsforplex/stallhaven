@@ -15,6 +15,10 @@ export const REQUEST_WAIT = 58;
 /** First higher tier unlocks at 20 crafts of the previous item, then 30, 40, … */
 export const UNLOCK_START = 20;
 export const UNLOCK_STEP = 10;
+/** Mastery at 2× the crafts needed to unlock the next tier in that line. */
+export const MASTERY_MULT = 2;
+/** Mastered recipes finish in half the usual time. */
+export const MASTERY_SPEED = 0.5;
 
 export const ANVIL_TABS = [
   { id: 'melee', label: 'Melee' },
@@ -100,6 +104,11 @@ export const RECIPES = {};
 export function unlockNeed(lineIndex) {
   if (lineIndex <= 0) return 0;
   return UNLOCK_START + UNLOCK_STEP * (lineIndex - 1);
+}
+
+/** Crafts of this piece needed for mastery (2× the next-tier unlock). */
+export function masteryNeed(recipe) {
+  return MASTERY_MULT * unlockNeed((recipe?.lineIndex ?? 0) + 1);
 }
 
 function addRecipe(recipe) {
@@ -526,13 +535,40 @@ export function recipesInLine(lineId) {
     .sort((a, b) => a.lineIndex - b.lineIndex);
 }
 
-export function costLabel(recipe) {
+export function recipeMatsLabel(recipe) {
   const cost = recipeCost(recipe);
-  const mats = Object.entries(cost.materials)
-    .map(([id, n]) => `${n} ${MATERIALS[id]?.name ?? id}`)
-    .join(' + ');
+  return Object.entries(cost.materials)
+    .map(([id, n]) => `${MATERIALS[id]?.name ?? id} ×${n}`)
+    .join(' · ');
+}
+
+export function costLabel(recipe, duration = recipe?.time) {
+  const cost = recipeCost(recipe);
+  const mats = recipeMatsLabel(recipe);
   const gold = cost.gold ? ` + ${cost.gold}g` : '';
-  return `${mats}${gold} · ${recipe.time}s · sells ${recipe.price}g`;
+  const time = Number.isFinite(duration) ? duration : recipe.time;
+  const timeText = Number.isInteger(time) ? `${time}s` : `${time.toFixed(1)}s`;
+  return `${mats}${gold} · ${timeText} · sells ${recipe.price}g`;
+}
+
+/** Offer/trade class: melee, ranged, magic, food, or potion. */
+export function offerClassOf(recipe) {
+  if (!recipe) return null;
+  if (recipe.category === 'food') return 'food';
+  if (recipe.category === 'potion') return 'potion';
+  if (recipe.combatClass === 'melee') return 'melee';
+  if (recipe.combatClass === 'range') return 'ranged';
+  if (recipe.combatClass === 'magic') return 'magic';
+  return null;
+}
+
+export function offerClassLabel(cls) {
+  if (cls === 'melee') return 'Melee';
+  if (cls === 'ranged') return 'Ranged';
+  if (cls === 'magic') return 'Magic';
+  if (cls === 'food') return 'Food';
+  if (cls === 'potion') return 'Potion';
+  return 'matching';
 }
 
 export function classLabel(combatClass, category = null) {

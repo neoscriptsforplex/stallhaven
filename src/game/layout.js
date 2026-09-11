@@ -13,8 +13,9 @@ export const EXPANSION_PADS = [
   { id: 'right', gx: 1, gz: 0, label: 'Right' },
 ];
 
-export const FIRST_EXPANSION_COST = 500;
-export const EXPANSION_COST_MULT = 5;
+export const FIRST_EXPANSION_COST = 10000;
+export const EXPANSION_COST_MULT = 3;
+export const MAX_EXPANSIONS = 5;
 
 export const CHEST_SLOTS_START = 100;
 export const CHEST_SLOTS_PER_LEVEL = 100;
@@ -28,7 +29,7 @@ export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
 export const SWAP_PRICE_RATIO = 0.65;
-export const CAULDRON_COST = 20000;
+export const CAULDRON_COST = 10000;
 export const FURNITURE_BUY_BASE = 500;
 export const FURNITURE_BUY_MULT = 3;
 export const FURNITURE_SHOP = [

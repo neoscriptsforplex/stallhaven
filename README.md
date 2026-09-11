@@ -22,11 +22,11 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 
 1. **Click the floor** to walk, including **behind the counter**. The camera follows you — scroll or `-` / `=` to zoom (zoom far out to see the **roof** and garden), arrow keys to change the angle. Customers still line up on the customer side of the counter.
 2. Click the **anvil** (left, behind the counter). Craft under **Melee**, **Magic**, or **Ranged**, then **Weapons** or **Armour**. Click the compact **cooking range** for **Food**. Click a placed **cauldron** for **Potions**. Higher tiers stay locked until you craft enough of the previous item in that same line. A progress bar fills while a piece is working. Restock materials from inside the craft window.
-3. Finished gear goes in the wooden **chest** (100 slots to start). Click the chest to see it. **Right-click** the chest for **Upgrade**, **Move**, or **Rotate**. **Right-click a table or wall shelf** and choose **Display item…** to place a chest ware (four slots per shelf: top and bottom, left and right). The previous ware returns to the chest. Food and potions are small shelf items.
+3. Finished gear goes in the wooden **chest** (100 slots to start). Click the chest to see it. **Right-click** the chest for **Upgrade**, **Move**, or **Rotate**. **Right-click a table or wall shelf** and choose **Display item…** to place a chest ware. On a **shelf**, pick the item, then **Top Left**, **Top Right**, **Bottom Left**, or **Bottom Right**. If that slot is full, the old ware returns to the chest. Food and potions are small shelf items.
 4. Adventurers come through the **front door** and **line up at the counter**. The traveler at the front is who you trade with.
 5. **Click the traveler at the front** to open trade: **Sell** if you have the item, **Offer** a different chest item at a reduced price (click the item, then Confirm), **Craft** what they asked for on the anvil, range, or cauldron, **Refuse** to send them off, or **Buy their goods** for a scrap of material.
 6. Basic materials refill slowly on their own up to 250; higher-tier metals refill slower. Restock with gold from a craft window (anvil, range, or cauldron). Clicks make a short sound.
-7. **Save** and **Load** in the top right write or read a JSON file on your computer. The fullscreen button fills the window. **Build** unlocks extra rooms (500g, then ×5: click a pad, then Confirm), extra **tables** and **mannequins** (500g, then ×3 per type; starting pieces do not count), and a **cauldron** for 20,000 gp. Side rooms clear the trees on that side of the shop. The music-note button (right of Load) plays a looping track you upload.
+7. **Save** and **Load** in the top right write or read a JSON file on your computer. The fullscreen button fills the window. **Upgrade** unlocks extra rooms (10,000g, then ×3, up to 5: click a pad, then Confirm), extra **tables** and **mannequins** (500g, then ×3 per type; starting pieces do not count), and a **cauldron** for 10,000 gp. Side rooms clear the trees on that side of the shop. The music-note button (right of Load) plays uploaded MP3, WAV, or OGG tracks as a playlist.
 8. Optional: tap **Upload** beside Coins to add a `.glb` or `.gltf`. Tag it **Furniture** to replace the selected table, or **Ware** to change how a recipe looks. Models stay in this browser only.
 
 You start with 40 gold. Bronze gear, a Staff, Blue D'hide, and Bread are unlocked.
@@ -74,9 +74,9 @@ Brew on a placed **cauldron** from **Herbs** and **Water**: Strength (yellow), P
 ## Shop upgrades
 
 - **Chest:** 100 slots at level 1, +100 per level, max level 10 (1000). First upgrade 500g, then ×3. Right-click the chest to upgrade, move, or rotate.
-- **Rooms:** from **Build**. Five pads around the starting shop (three behind, one either side). First room 500g, then ×5. Side expansions clear the exterior trees on that side so they do not clip through the new room.
-- **Build / Cauldron:** 20,000 gp. Place with the floor snap grid, then Confirm. Click the cauldron to brew potions. Right-click to move or rotate.
-- **Build / Table and Mannequin:** first extra of each type is 500g, then ×3 (1500, 4500, …). Starting shop tables and mannequins do not count. Place on the floor snap grid, then Confirm. Right-click to move, rotate, or (tables) Display item….
+- **Rooms:** from **Upgrade**. Five pads around the starting shop (three behind, one either side). First room 10,000g, then ×3, up to 5 extra spaces. Side expansions clear the exterior trees on that side so they do not clip through the new room.
+- **Upgrade / Cauldron:** 10,000 gp. Place with the floor snap grid, then Confirm. Click the cauldron to brew potions. Right-click to move or rotate.
+- **Upgrade / Table and Mannequin:** first extra of each type is 500g, then ×3 (1500, 4500, …). Starting shop tables and mannequins do not count. Place on the floor snap grid, then Confirm. Right-click to move, rotate, or (tables) Display item….
 - **Furniture:** Move and Rotate only from a **right-click** context menu (not craft windows). The counter ignores left-click. Wares sit on the piece and travel with it.
 
 ## For tinkerers

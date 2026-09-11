@@ -14,6 +14,33 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #e3b34a #3e2616;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #3e2616;
+  border-radius: 8px;
+  border: 1px solid #8a6238;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(#e3b34a, #8a6238);
+  border-radius: 8px;
+  border: 1px solid #4a301c;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(#f0d27a, #c45a32);
+}
+
+*::-webkit-scrollbar-corner {
+  background: #3e2616;
 }
 
 [hidden] {
@@ -122,6 +149,8 @@ body {
   max-height: min(40vh, 320px);
   overflow: auto;
   margin: 8px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #e3b34a #3e2616;
 }
 
 .offer-row {
@@ -154,6 +183,26 @@ body {
 
 .offer-sheet {
   width: min(460px, calc(100vw - 32px));
+}
+
+.shelf-slot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.shelf-slot-grid button {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  min-height: 3.4rem;
+  padding: 8px 10px;
+}
+
+.shelf-slot-grid button:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
 }
 
 #mat-strip {
@@ -458,9 +507,27 @@ body.modal-open #view {
   width: min(460px, calc(100vw - 32px));
 }
 
+.chest-sheet {
+  max-height: min(82vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#chest-items {
+  flex: 1 1 auto;
+  min-height: 8rem;
+  max-height: min(52vh, 440px);
+  overflow-y: auto;
+  margin: 6px 0 10px;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #e3b34a #3e2616;
+}
+
 .craft-sheet {
-  width: min(520px, calc(100vw - 32px));
-  max-height: min(88vh, 760px);
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(90vh, 860px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -470,13 +537,19 @@ body.modal-open #view {
 
 .craft-sheet::-webkit-scrollbar,
 .craft-sheet #crafts::-webkit-scrollbar,
-[data-recipes]::-webkit-scrollbar {
+.craft-sheet #potion-crafts::-webkit-scrollbar,
+#chest-items::-webkit-scrollbar,
+[data-recipes]::-webkit-scrollbar,
+[data-playlist]::-webkit-scrollbar {
   width: 10px;
 }
 
 .craft-sheet::-webkit-scrollbar-track,
 .craft-sheet #crafts::-webkit-scrollbar-track,
-[data-recipes]::-webkit-scrollbar-track {
+.craft-sheet #potion-crafts::-webkit-scrollbar-track,
+#chest-items::-webkit-scrollbar-track,
+[data-recipes]::-webkit-scrollbar-track,
+[data-playlist]::-webkit-scrollbar-track {
   background: #3e2616;
   border-radius: 8px;
   border: 1px solid #8a6238;
@@ -484,7 +557,10 @@ body.modal-open #view {
 
 .craft-sheet::-webkit-scrollbar-thumb,
 .craft-sheet #crafts::-webkit-scrollbar-thumb,
-[data-recipes]::-webkit-scrollbar-thumb {
+.craft-sheet #potion-crafts::-webkit-scrollbar-thumb,
+#chest-items::-webkit-scrollbar-thumb,
+[data-recipes]::-webkit-scrollbar-thumb,
+[data-playlist]::-webkit-scrollbar-thumb {
   background: linear-gradient(#e3b34a, #8a6238);
   border-radius: 8px;
   border: 1px solid #4a301c;
@@ -493,7 +569,8 @@ body.modal-open #view {
 .craft-sheet #crafts,
 .craft-sheet #potion-crafts {
   flex: 1 1 auto;
-  min-height: 7rem;
+  min-height: 14rem;
+  max-height: min(48vh, 460px);
   overflow: auto;
   margin-bottom: 8px;
   scrollbar-width: thin;
@@ -523,10 +600,26 @@ body.modal-open #view {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-height: 7.5rem;
+  max-height: 4.6rem;
   overflow: auto;
   margin: 0 0 8px;
   padding: 4px 0;
+}
+
+.craft-mats-line {
+  display: block;
+  font-size: 0.76rem;
+  color: #e3b34a;
+  position: relative;
+}
+
+.mastery-star {
+  color: var(--gold);
+  margin-right: 0.35em;
+}
+
+.craft.is-mastered {
+  border-color: rgba(227, 179, 74, 0.7);
 }
 
 #offer-modal,
@@ -540,7 +633,9 @@ body.modal-open #view {
 #offer-modal .offer-row,
 #display-modal .sheet,
 #display-modal .offer-list,
-#display-modal .offer-row {
+#display-modal .offer-row,
+#display-modal .shelf-slot-grid,
+#display-modal .shelf-slot-grid button {
   pointer-events: auto;
   position: relative;
   z-index: 1;
@@ -568,6 +663,38 @@ body.modal-open #view {
   width: 100%;
 }
 
+.playlist {
+  max-height: min(36vh, 280px);
+  overflow: auto;
+  margin: 8px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #e3b34a #3e2616;
+}
+
+.playlist-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.playlist-row.is-on .playlist-name {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.playlist-name {
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#fill-modal {
+  z-index: 32;
+}
+
 #expand-btn.is-on {
   border-color: var(--gold);
   background: linear-gradient(#8a5a30, #5a3518);
@@ -592,7 +719,7 @@ body.modal-open #view {
 }
 
 #build-btn {
-  min-width: 4.2rem;
+  min-width: 5.6rem;
 }
 
 #help-btn {
@@ -695,6 +822,8 @@ body.modal-open #view {
   padding: 22px 22px 18px;
   border-radius: 10px;
   color: var(--parchment);
+  max-height: min(88vh, 820px);
+  overflow: auto;
 }
 
 .sheet h2 {

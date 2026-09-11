@@ -12,14 +12,16 @@
     <canvas id="view" aria-label="Rune Craft shop floor"></canvas>
 
     <aside id="save-bar" aria-label="Save and load">
-      <button type="button" id="expand-btn" title="Expand the shop" aria-label="Expand the shop">
-        <span class="expand-icon" aria-hidden="true">⤢</span>
+      <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+        <span class="expand-icon" aria-hidden="true">⛶</span>
       </button>
       <button type="button" id="build-btn" title="Build" aria-label="Build">Build</button>
       <button type="button" id="help-btn" title="Help" aria-label="Help">?</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
+      <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
+      <input id="music-file" type="file" accept="audio/*" hidden />
     </aside>
 
     <aside id="hud">
@@ -34,22 +36,17 @@
         </div>
       </header>
 
-      <section class="panel" id="stock" hidden aria-label="Chest wares"></section>
-    </aside>
-
-    <aside id="mat-strip" aria-label="Materials">
-      <div id="materials"></div>
     </aside>
 
     <div id="help-modal" class="modal" hidden>
       <div class="sheet">
         <h2>Help</h2>
-        <p class="help-tip">Click the floor to walk. Click the anvil to smith, the range to cook. Right-click the chest to upgrade it. Scroll to zoom out for the roof and garden.</p>
+        <p class="help-tip">Click the floor to walk. Click the anvil to smith, the range to cook, the cauldron to brew. Right-click furniture to move or rotate it. Scroll to zoom out for the roof and garden.</p>
         <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden.</p>
-        <p>Click the anvil to smith Melee, Magic, Ranged, or Potions. Click the cooking range for Food. Finished pieces land in the chest. Right-click the chest to upgrade its space.</p>
-        <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, refuse, or buy a scrap they offer.</p>
-        <p>Click a table, shelf, or armour stand, then place a ware from the chest. Food sits on the wall shelves. Click furniture for Move or Rotate — wares travel with the piece.</p>
-        <p>The expand button buys extra rooms. Build (beside Expand) unlocks a cauldron for potion crafting later. Save and Load write a JSON file on your computer.</p>
+        <p>Click the anvil to smith Melee, Magic, or Ranged (Weapons and Armour). Click the cooking range for Food. Click a placed cauldron for Potions. Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
+        <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
+        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware on it (four slots per shelf). Food and potions sit on wall shelves. Right-click furniture for Move or Rotate — wares travel with the piece. The counter only moves from a right-click.</p>
+        <p>Build unlocks extra rooms, tables, mannequins, and a cauldron. Extra tables and mannequins start at 500g, then ×3 for each further purchase of that type. The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a looping track you upload.</p>
         <button type="button" data-dismiss>Close</button>
       </div>
     </div>
@@ -59,11 +56,9 @@
         <h2>Shop Chest</h2>
         <p class="chest-tally" id="chest-count">0 pieces waiting</p>
         <p id="chest-cap" class="meta">Level 1 · 100 slots</p>
-        <p>Crafted gear waits here. Place a piece on the selected table, shelf, or armour stand, or sell it when an adventurer asks.</p>
+        <p>Crafted gear waits here. Right-click a table or shelf and choose Display item… to put a ware out. Armour stands still take a matching set from Place on Stand.</p>
         <div id="chest-items"></div>
-        <div class="row furn-row">
-          <button type="button" data-chest-move>Move Furniture</button>
-          <button type="button" data-chest-rotate>Rotate 15°</button>
+        <div class="row">
           <button type="button" data-chest-upgrade>Upgrade</button>
         </div>
         <button type="button" class="ghost" data-chest-close>Close</button>
@@ -75,11 +70,10 @@
         <h2 data-craft-title>Anvil</h2>
         <p data-craft-blurb>Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
         <div id="craft-tabs" class="tabs"></div>
+        <div id="craft-subtabs" class="tabs subtabs" hidden></div>
+        <p data-craft-note class="craft-note" hidden></p>
         <div id="crafts"></div>
-        <div class="row furn-row">
-          <button type="button" data-craft-move>Move Furniture</button>
-          <button type="button" data-craft-rotate>Rotate 15°</button>
-        </div>
+        <div id="materials" class="craft-mats" aria-label="Materials"></div>
         <button type="button" class="ghost" data-craft-close>Close</button>
       </div>
     </div>
@@ -92,9 +86,11 @@
         <p data-trade-have></p>
         <p data-trade-buy hidden></p>
         <p data-trade-offer-hint hidden></p>
+        <p data-trade-craft-note class="craft-note" hidden></p>
         <div class="row">
           <button type="button" data-trade-sell>Sell</button>
           <button type="button" data-trade-offer-btn>Offer</button>
+          <button type="button" data-trade-craft-btn>Craft</button>
           <button type="button" data-trade-buy-btn>Buy Their Goods</button>
           <button type="button" data-trade-refuse>Refuse</button>
         </div>
@@ -159,10 +155,28 @@
 
     <aside id="build-dock" class="expand-dock" hidden>
       <h2>Build</h2>
-      <p>Unlockables for the shop. Potion recipes come later.</p>
+      <p>Unlockables for the shop. Rooms use the same gold pads as before. Potion brewing needs a cauldron. Extra tables and mannequins sit on the floor snap grid.</p>
+      <article class="build-item">
+        <h3>Shop Room</h3>
+        <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
+        <p data-expand-status class="meta">Next room costs 500g.</p>
+        <button type="button" data-expand-buy>Place Room</button>
+      </article>
+      <article class="build-item">
+        <h3>Table</h3>
+        <p>Buy another display table. The first extra costs 500g; each further table costs three times the last. Starting tables do not count.</p>
+        <p data-table-status class="meta">First extra table costs 500g.</p>
+        <button type="button" data-table-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Mannequin</h3>
+        <p>Buy another armour mannequin. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count.</p>
+        <p data-mannequin-status class="meta">First extra mannequin costs 500g.</p>
+        <button type="button" data-mannequin-buy>Buy · 500 gp</button>
+      </article>
       <article class="build-item">
         <h3>Cauldron</h3>
-        <p>Unlocks potion crafting later. No potion recipes yet — this is the station they will use.</p>
+        <p>Unlocks potion crafting. Place it on the floor snap grid, then confirm. Click it afterward to brew.</p>
         <p data-cauldron-status class="meta">Costs 20,000 gp.</p>
         <button type="button" data-cauldron-buy>Buy · 20,000 gp</button>
       </article>
@@ -170,9 +184,10 @@
     </aside>
 
     <aside id="place-dock" class="expand-dock" hidden>
-      <h2>Place Cauldron</h2>
-      <p>Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement.</p>
+      <h2 data-place-title>Place Cauldron</h2>
+      <p data-place-blurb>Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement.</p>
       <p data-place-cost class="meta">Cost: 20,000 gp.</p>
+      <p data-place-note class="craft-note" hidden></p>
       <div class="row furn-row">
         <button type="button" data-place-confirm>Confirm Placement</button>
         <button type="button" class="ghost" data-place-cancel>Cancel</button>
@@ -180,21 +195,49 @@
     </aside>
 
     <div id="potion-modal" class="modal" hidden>
-      <div class="sheet">
+      <div class="sheet craft-sheet">
         <h2>Cauldron</h2>
-        <p>Potions coming soon.</p>
-        <p class="meta">This cauldron unlocks potion crafting later. No potion recipes yet.</p>
-        <div class="row furn-row">
-          <button type="button" data-potion-move>Move Furniture</button>
-          <button type="button" data-potion-rotate>Rotate 15°</button>
-        </div>
+        <p>Brew potions from herbs and water. Finished vials land in the chest and sit on wall shelves.</p>
+        <p data-potion-note class="craft-note" hidden></p>
+        <div id="potion-crafts"></div>
+        <div id="potion-materials" class="craft-mats" aria-label="Materials"></div>
         <button type="button" class="ghost" data-potion-close>Close</button>
       </div>
     </div>
 
+    <aside id="music-dock" class="expand-dock" hidden>
+      <h2>Music</h2>
+      <p>Upload an audio file to play as looping background music.</p>
+      <p data-music-name class="meta">No track loaded.</p>
+      <label class="music-vol">
+        Volume
+        <input type="range" data-music-volume min="0" max="100" value="45" />
+      </label>
+      <div class="row furn-row">
+        <button type="button" data-music-upload>Upload</button>
+        <button type="button" data-music-play>Play</button>
+        <button type="button" data-music-stop>Stop</button>
+      </div>
+      <button type="button" class="ghost" data-music-close>Close</button>
+    </aside>
+
+    <div id="display-modal" class="modal" hidden>
+      <div class="sheet offer-sheet">
+        <h2>Display an Item</h2>
+        <p data-display-slot>Choose a chest item to place here.</p>
+        <p data-display-pick class="meta">No item selected yet.</p>
+        <div id="display-items" class="offer-list"></div>
+        <div class="row furn-row">
+          <button type="button" data-display-confirm disabled>Place</button>
+          <button type="button" class="ghost" data-display-cancel>Cancel</button>
+        </div>
+      </div>
+    </div>
     <div id="furn-menu" class="furn-menu" hidden>
       <p data-furn-name>Furniture</p>
       <button type="button" data-furn-use hidden>Use</button>
+      <button type="button" data-furn-upgrade hidden>Upgrade Chest</button>
+      <button type="button" data-furn-display hidden>Display item…</button>
       <button type="button" data-furn-move>Move Furniture</button>
       <button type="button" data-furn-rotate>Rotate 15°</button>
       <button type="button" class="ghost" data-furn-close>Close</button>

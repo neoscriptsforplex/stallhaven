@@ -515,6 +515,7 @@ export function buildWallShelf() {
   back.position.set(0, 1.15, -0.18);
   group.add(back);
   group.userData.wareY = 1.46;
+  group.userData.shelfSlots = true;
   return group;
 }
 
@@ -620,6 +621,7 @@ export function buildWare(recipeId) {
     cake: () => addCake(group, tint),
     pie: () => addPie(group, tint, 0xb45a4a),
     fish_pie: () => addPie(group, tint, 0x7a9aaa),
+    potion: () => addPotion(group, tint),
   };
   if (builders[shape]) builders[shape]();
   else {
@@ -630,7 +632,7 @@ export function buildWare(recipeId) {
     lump.position.y = 0.1;
     group.add(lump);
   }
-  if (recipe?.category === 'food') group.scale.setScalar(0.55);
+  if (recipe?.category === 'food' || recipe?.category === 'potion') group.scale.setScalar(0.55);
   group.userData.recipeId = recipeId;
   return group;
 }
@@ -1016,6 +1018,44 @@ function addCake(group, tint) {
   const icing = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.12, 0.03, 12), cloth(0xf4e8d0)));
   icing.position.y = 0.12;
   group.add(icing);
+}
+
+function addPotion(group, tint) {
+  const glass = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.055, 0.068, 0.16, 10),
+    new THREE.MeshStandardMaterial({
+      color: 0xd8ece8,
+      transparent: true,
+      opacity: 0.38,
+      roughness: 0.12,
+      metalness: 0.08,
+    }),
+  ));
+  glass.position.y = 0.1;
+  group.add(glass);
+  const liquid = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.042, 0.052, 0.1, 10),
+    glow(tint),
+  ));
+  liquid.position.y = 0.08;
+  group.add(liquid);
+  const neck = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.026, 0.03, 0.055, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0xd8ece8,
+      transparent: true,
+      opacity: 0.42,
+      roughness: 0.12,
+    }),
+  ));
+  neck.position.y = 0.2;
+  group.add(neck);
+  const cork = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.028, 0.026, 0.028, 8),
+    wood(0x8a5a32),
+  ));
+  cork.position.y = 0.24;
+  group.add(cork);
 }
 
 function addPie(group, tint, filling) {

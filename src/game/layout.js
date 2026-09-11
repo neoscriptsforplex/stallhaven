@@ -29,6 +29,26 @@ export const FURNITURE_ROT_STEP = Math.PI / 12;
 export const FURNITURE_FORWARD = 0;
 export const SWAP_PRICE_RATIO = 0.65;
 export const CAULDRON_COST = 20000;
+export const FURNITURE_BUY_BASE = 500;
+export const FURNITURE_BUY_MULT = 3;
+export const FURNITURE_SHOP = [
+  { type: 'table', kind: 'table', label: 'Table' },
+  { type: 'mannequin', kind: 'stand', label: 'Mannequin' },
+];
+
+export function furnitureBuyCost(boughtCount = 0) {
+  const n = Math.max(0, Math.round(Number(boughtCount) || 0));
+  return FURNITURE_BUY_BASE * (FURNITURE_BUY_MULT ** n);
+}
+
+export function furnitureKindForType(type) {
+  return FURNITURE_SHOP.find((item) => item.type === type)?.kind ?? 'table';
+}
+
+export function furnitureLabelForType(type) {
+  return FURNITURE_SHOP.find((item) => item.type === type)?.label
+    ?? (type === 'mannequin' ? 'Mannequin' : 'Table');
+}
 
 export function padById(id) {
   return EXPANSION_PADS.find((pad) => pad.id === id) ?? null;

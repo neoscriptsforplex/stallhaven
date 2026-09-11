@@ -12,6 +12,10 @@ import {
   decideRequest,
   displayKind,
   emptySlots,
+  emptyShelfSlots,
+  nearestShelfSlot,
+  shelfSlotPoses,
+  SHELF_SLOT_COUNT,
 } from './catalog.js';
 import { hasStock, pushLog } from './economy.js';
 import {
@@ -247,8 +251,7 @@ export function createWorld(canvas, state) {
     slot.glow.position.set(pose.x, 0.08, pose.z);
   }
 
-  const displays = SHOP.displays.map((spot, index) => {
-    const pose = state.furniture.displays[index] ?? { x: spot.x, z: spot.z, rot: FURNITURE_FORWARD };
+  function makeDisplaySlot(spot, index, pose) {
     const anchor = new THREE.Group();
     anchor.position.set(pose.x, 0, pose.z);
     const furniture = buildFurniture(spot.kind);
@@ -261,13 +264,13 @@ export function createWorld(canvas, state) {
     const pickSize = spot.kind === 'stand'
       ? [1.15, 2.05, 1.05]
       : spot.kind === 'shelf'
-        ? [1.28, 0.95, 0.42]
+        ? [1.42, 1.15, 0.46]
         : [1.45, 1.15, 1.0];
     const pick = new THREE.Mesh(
       new THREE.BoxGeometry(...pickSize),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    pick.position.y = spot.kind === 'shelf' ? 1.18 : spot.kind === 'stand' ? 0.95 : 0.6;
+    pick.position.y = spot.kind === 'shelf' ? 1.16 : spot.kind === 'stand' ? 0.95 : 0.6;
     pick.userData.kind = 'display';
     pick.userData.displayIndex = index;
     anchor.add(pick);
@@ -288,20 +291,34 @@ export function createWorld(canvas, state) {
       outline: null,
       wareMesh: null,
       slotMeshes: emptySlots(),
+      shelfMeshes: emptyShelfSlots(),
     };
+  }
+
+  const displays = SHOP.displays.map((spot, index) => {
+    const pose = state.furniture.displays[index] ?? { x: spot.x, z: spot.z, rot: FURNITURE_FORWARD };
+    return makeDisplaySlot(spot, index, pose);
   });
+
+  function poseForDisplay(index) {
+    if (placeDraft?.id === 'display' && placeDraft.index === index) return placeDraft;
+    return state.furniture.displays[index];
+  }
 
   function applyDisplayPose(index) {
     const slot = displays[index];
-    const pose = state.furniture.displays[index];
+    const pose = poseForDisplay(index);
     if (!slot || !pose) return;
     slot.anchor.position.set(pose.x, 0, pose.z);
     slot.anchor.rotation.y = pose.rot ?? FURNITURE_FORWARD;
+    slot.pick.visible = !(placeDraft?.id === 'display' && placeDraft.index === index);
   }
 
   function poseOf(target) {
     if (!target) return null;
-    if (placeDraft && target.id === placeDraft.id) return placeDraft;
+    if (placeDraft && target.id === placeDraft.id) {
+      if (target.id !== 'display' || target.index === placeDraft.index) return placeDraft;
+    }
     return target.id === 'display'
       ? state.furniture.displays[target.index]
       : state.furniture[target.id];
@@ -403,6 +420,26 @@ export function createWorld(canvas, state) {
     placeNeedsConfirm = false;
     placeDraft = null;
     setSnapGridVisible(false);
+  }
+
+  function discardPlaceDisplay() {
+    if (placeDraft?.id !== 'display') return;
+    const index = placeDraft.index;
+    if (index == null || index < state.displays.length) return;
+    const slot = displays[index];
+    if (!slot) return;
+    if (slot.outline) slot.anchor.remove(slot.outline);
+    scene.remove(slot.anchor);
+    displays.splice(index, 1);
+  }
+
+  function cancelPlaceOrMove() {
+    if (!moveTarget) return;
+    if (!placeNeedsConfirm) restoreMoveOrigin();
+    const id = placeNeedsConfirm ? moveTarget.id : null;
+    discardPlaceDisplay();
+    clearMoveMode();
+    if (id && id !== 'display') applyFixturePose(id);
   }
 
   function floorPointFromEvent(event) {
@@ -622,15 +659,20 @@ export function createWorld(canvas, state) {
   }
 
   function rotateFurniturePose(target) {
-    const pose = target.id === 'display'
-      ? state.furniture.displays[target.index]
-      : state.furniture[target.id];
+    const pose = poseOf(target);
     if (!pose) return false;
     pose.rot = (pose.rot ?? FURNITURE_FORWARD) + FURNITURE_ROT_STEP;
     if (target.id === 'display') applyDisplayPose(target.index);
     else applyFixturePose(target.id);
     rebuildNav();
     return true;
+  }
+
+  function nearestShelfSlotFromPoint(index, point) {
+    const slot = displays[index];
+    if (!slot || slot.spot.kind !== 'shelf' || !point) return 0;
+    const local = slot.wareAnchor.worldToLocal(point.clone());
+    return nearestShelfSlot(local.x, local.y, local.z);
   }
 
   function hitFurniture(hits) {
@@ -723,15 +765,13 @@ export function createWorld(canvas, state) {
         return;
       }
       if (data.kind === 'counter') {
-        playClick('ui');
-        pickHandler?.({ type: 'counter', furniture: { id: 'counter' }, clientX: event.clientX, clientY: event.clientY });
         return;
       }
       if (data.kind === 'display') {
         playClick('ui');
         state.selectedDisplay = data.displayIndex;
         refreshSelection();
-        pickHandler?.({ type: 'display', index: data.displayIndex, furniture: { id: 'display', index: data.displayIndex }, clientX: event.clientX, clientY: event.clientY });
+        pickHandler?.({ type: 'display-select', index: data.displayIndex, furniture: { id: 'display', index: data.displayIndex } });
         return;
       }
     }
@@ -776,27 +816,35 @@ export function createWorld(canvas, state) {
     raycaster.setFromCamera(pointer, camera);
     const hits = raycaster.intersectObjects([...allPicks(), ...groundMeshes()], false);
     if (moveTarget) {
-      if (placeNeedsConfirm) {
-        const id = moveTarget.id;
-        clearMoveMode();
-        applyFixturePose(id);
-      } else {
-        restoreMoveOrigin();
-        clearMoveMode();
-      }
+      cancelPlaceOrMove();
       pickHandler?.({ type: 'furniture-cancel' });
       return;
     }
     const picked = hitFurniture(hits);
     if (!picked) return;
     const data = picked.object.userData;
+    const furn = furnitureIdFromKind(data.kind, data.displayIndex);
+    if (!furn) return;
     playClick('ui');
-    if (data.kind === 'chest') {
-      pickHandler?.({ type: 'chest-upgrade' });
+    if (data.kind === 'display') {
+      state.selectedDisplay = data.displayIndex;
+      refreshSelection();
+      const slotIndex = displayKind(data.displayIndex, state) === 'shelf'
+        ? nearestShelfSlotFromPoint(data.displayIndex, picked.point)
+        : 0;
+      pickHandler?.({
+        type: 'furn-menu',
+        furniture: {
+          ...furn,
+          kind: displayKind(data.displayIndex, state),
+          slotIndex,
+        },
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
       return;
     }
-    const furn = furnitureIdFromKind(data.kind, data.displayIndex);
-    if (furn) pickHandler?.({ type: 'furn-menu', furniture: furn, clientX: event.clientX, clientY: event.clientY });
+    pickHandler?.({ type: 'furn-menu', furniture: furn, clientX: event.clientX, clientY: event.clientY });
   });
 
   renderer.domElement.addEventListener('wheel', (event) => {
@@ -820,14 +868,7 @@ export function createWorld(canvas, state) {
       camHeld.down = true;
     } else if (event.key === 'Escape') {
       if (moveTarget) {
-        if (placeNeedsConfirm) {
-          const id = moveTarget.id;
-          clearMoveMode();
-          applyFixturePose(id);
-        } else {
-          restoreMoveOrigin();
-          clearMoveMode();
-        }
+        cancelPlaceOrMove();
         pickHandler?.({ type: 'furniture-cancel' });
       }
     } else if (event.key === '-' || event.key === '_') {
@@ -919,6 +960,7 @@ export function createWorld(canvas, state) {
         selected.furniture?.uuid ?? '',
         selected.wareMesh?.userData.recipeId ?? '',
         ...ARMOUR_SLOTS.map((name) => selected.slotMeshes[name]?.userData.recipeId ?? ''),
+        ...(selected.shelfMeshes ?? []).map((mesh) => mesh?.userData.recipeId ?? ''),
       ].join(':')
       : '';
     const key = `${state.selectedDisplay}:${wareIds}`;
@@ -950,6 +992,14 @@ export function createWorld(canvas, state) {
       slot.wareAnchor.remove(slot.wareMesh);
       slot.wareMesh = null;
     }
+    if (slot.shelfMeshes) {
+      for (let i = 0; i < slot.shelfMeshes.length; i += 1) {
+        if (slot.shelfMeshes[i]) {
+          slot.wareAnchor.remove(slot.shelfMeshes[i]);
+          slot.shelfMeshes[i] = null;
+        }
+      }
+    }
   }
 
   function setDisplayWare(index, recipeId) {
@@ -960,6 +1010,29 @@ export function createWorld(canvas, state) {
     mesh.position.set(0, 0, 0);
     slot.wareAnchor.add(mesh);
     slot.wareMesh = mesh;
+  }
+
+  function setShelfWares(index, ids) {
+    const slot = displays[index];
+    if (!slot.shelfMeshes) slot.shelfMeshes = emptyShelfSlots();
+    const want = Array.isArray(ids) ? ids : emptyShelfSlots();
+    let dirty = slot.shelfMeshes.length !== SHELF_SLOT_COUNT;
+    for (let i = 0; i < SHELF_SLOT_COUNT; i += 1) {
+      const have = slot.shelfMeshes[i]?.userData.recipeId ?? null;
+      if (have !== (want[i] ?? null)) dirty = true;
+    }
+    if (!dirty && !slot.wareMesh) return;
+    clearSlotMeshes(slot);
+    const poses = shelfSlotPoses();
+    for (let i = 0; i < SHELF_SLOT_COUNT; i += 1) {
+      const recipeId = want[i];
+      if (!recipeId) continue;
+      const mesh = makeWareMesh(recipeId);
+      const pose = poses[i];
+      mesh.position.set(pose.x, pose.y, pose.z);
+      slot.wareAnchor.add(mesh);
+      slot.shelfMeshes[i] = mesh;
+    }
   }
 
   function setStandWares(index, slots, fallbackId) {
@@ -996,14 +1069,52 @@ export function createWorld(canvas, state) {
   }
 
   function syncDisplays() {
+    syncDisplaySlots();
     state.displays.forEach((d, i) => {
-      if (displayKind(i) === 'stand') {
+      if (!displays[i]) return;
+      if (displayKind(i, state) === 'stand') {
         setStandWares(i, d.slots ?? emptySlots(), d.ware?.recipeId ?? null);
+        return;
+      }
+      if (displayKind(i, state) === 'shelf') {
+        setShelfWares(i, d.shelfSlots ?? emptyShelfSlots());
         return;
       }
       const want = d.ware?.recipeId ?? null;
       const haveId = displays[i].wareMesh?.userData.recipeId ?? null;
       if (want !== haveId) setDisplayWare(i, want);
+    });
+  }
+
+  function syncDisplaySlots() {
+    if (placeDraft?.id === 'display') return;
+    while (displays.length > state.displays.length) {
+      const slot = displays.pop();
+      if (slot?.outline) slot.anchor.remove(slot.outline);
+      if (slot) scene.remove(slot.anchor);
+    }
+    for (let i = displays.length; i < state.displays.length; i += 1) {
+      const d = state.displays[i];
+      const pose = state.furniture.displays[i] ?? { x: 0, z: 0.8, rot: FURNITURE_FORWARD };
+      const spot = SHOP.displays[i] ?? {
+        id: `bought-${d.kind}-${i}`,
+        name: d.name ?? (d.kind === 'stand' ? 'Mannequin' : 'Table'),
+        kind: d.kind ?? 'table',
+        x: pose.x,
+        z: pose.z,
+      };
+      displays.push(makeDisplaySlot(spot, i, pose));
+    }
+    displays.forEach((slot, i) => {
+      slot.pick.userData.displayIndex = i;
+      const d = state.displays[i];
+      if (d) {
+        slot.spot = {
+          ...slot.spot,
+          kind: d.kind ?? slot.spot.kind,
+          name: d.name ?? slot.spot.name,
+        };
+      }
     });
   }
 
@@ -1031,7 +1142,9 @@ export function createWorld(canvas, state) {
 
   function takeWareMesh(recipeId) {
     const index = state.displays.findIndex((d) => (
-      d.ware?.recipeId === recipeId || ARMOUR_SLOTS.some((name) => d.slots?.[name] === recipeId)
+      d.ware?.recipeId === recipeId
+      || ARMOUR_SLOTS.some((name) => d.slots?.[name] === recipeId)
+      || (d.shelfSlots ?? []).includes(recipeId)
     ));
     if (index < 0) {
       const mesh = makeWareMesh(recipeId);
@@ -1040,11 +1153,20 @@ export function createWorld(canvas, state) {
     }
     const slot = displays[index];
     const recipe = RECIPES[recipeId];
-    if (displayKind(index) === 'stand' && recipe?.slot && slot.slotMeshes[recipe.slot]) {
+    if (displayKind(index, state) === 'stand' && recipe?.slot && slot.slotMeshes[recipe.slot]) {
       const mesh = slot.slotMeshes[recipe.slot];
       slot.slotMeshes[recipe.slot] = null;
       if (mesh) slot.wareAnchor.remove(mesh);
       return mesh;
+    }
+    if (displayKind(index, state) === 'shelf' && slot.shelfMeshes) {
+      const slotIndex = slot.shelfMeshes.findIndex((mesh) => mesh?.userData.recipeId === recipeId);
+      if (slotIndex >= 0) {
+        const mesh = slot.shelfMeshes[slotIndex];
+        slot.shelfMeshes[slotIndex] = null;
+        if (mesh) slot.wareAnchor.remove(mesh);
+        return mesh;
+      }
     }
     const mesh = slot.wareMesh;
     slot.wareMesh = null;
@@ -1226,8 +1348,13 @@ export function createWorld(canvas, state) {
     refreshSelection,
     replaceFurniture,
     bindWareLook,
-    getSelectedName: () => SHOP.displays[state.selectedDisplay].name,
+    getSelectedName: () => (
+      state.displays[state.selectedDisplay]?.name
+      ?? SHOP.displays[state.selectedDisplay]?.name
+      ?? 'Display'
+    ),
     applyLayout() {
+      syncDisplaySlots();
       applyAllPoses();
       rebuildArchitecture();
       applyAllPoses();
@@ -1300,13 +1427,36 @@ export function createWorld(canvas, state) {
       highlightSnapCell(start.x, start.z);
       pickHandler?.({ type: 'furniture-place-start', furniture: { id } });
     },
+    beginPlaceFurniture(kind) {
+      const start = snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, floors);
+      const index = displays.length;
+      const spot = {
+        id: `new-${kind}-${index}`,
+        name: kind === 'stand' ? 'Mannequin' : 'Table',
+        x: start.x,
+        z: start.z,
+        kind,
+      };
+      displays.push(makeDisplaySlot(spot, index, start));
+      placeDraft = { id: 'display', index, x: start.x, z: start.z, rot: FURNITURE_FORWARD };
+      moveTarget = { id: 'display', index, kind };
+      placeNeedsConfirm = true;
+      expandMode = false;
+      if (padGroup) padGroup.visible = false;
+      moveOrigin = null;
+      applyDisplayPose(index);
+      setSnapGridVisible(true);
+      highlightSnapCell(start.x, start.z);
+      pickHandler?.({ type: 'furniture-place-start', furniture: { id: 'display', index } });
+    },
     confirmPlaceUnlock() {
       if (!moveTarget || !placeNeedsConfirm) return null;
       const pose = placeDraft ? { x: placeDraft.x, z: placeDraft.z, rot: placeDraft.rot } : null;
-      const id = moveTarget.id;
+      const target = { id: moveTarget.id, index: moveTarget.index };
       rebuildNav();
       clearMoveMode();
-      applyFixturePose(id);
+      if (target.id === 'display') applyDisplayPose(target.index);
+      else applyFixturePose(target.id);
       return pose;
     },
     getPlacePose() {
@@ -1322,10 +1472,7 @@ export function createWorld(canvas, state) {
       return Boolean(moveTarget);
     },
     cancelMoveFurniture() {
-      const id = placeNeedsConfirm ? moveTarget?.id : null;
-      if (!placeNeedsConfirm) restoreMoveOrigin();
-      clearMoveMode();
-      if (id) applyFixturePose(id);
+      cancelPlaceOrMove();
     },
     setExpandMode(on) {
       expandMode = Boolean(on);

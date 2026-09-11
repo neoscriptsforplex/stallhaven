@@ -46,16 +46,12 @@ body {
 
 #hud .panel,
 #hud .ledger,
-#hud .drop,
-#hud .log,
 #hud button {
   pointer-events: auto;
 }
 
 .ledger,
 .panel,
-.drop,
-.log,
 .sheet {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -68,16 +64,8 @@ body {
   border-radius: 6px 18px 6px 6px;
 }
 
-.place {
-  margin: 0;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  font-size: 0.68rem;
-  color: #cbb48a;
-}
-
 h1 {
-  margin: 2px 0 8px;
+  margin: 0 0 8px;
   font-size: 1.42rem;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -89,6 +77,14 @@ h1 {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: space-between;
+}
+
+#upload-btn {
+  min-width: auto;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .gold {
@@ -196,7 +192,6 @@ h1 {
 
 .panel:focus-within,
 .ledger:focus-within,
-.drop:focus-within,
 .modal:not([hidden]) .sheet {
   border-color: var(--gold);
   box-shadow: 0 0 0 1px rgba(227, 179, 74, 0.45), 0 12px 30px rgba(0, 0, 0, 0.28);
@@ -348,32 +343,32 @@ button:disabled {
   font-weight: 700;
 }
 
-.drop {
-  padding: 12px;
-  border-radius: 6px;
-  border-style: dashed;
-  text-align: center;
-  cursor: pointer;
+.upload-sheet {
+  width: min(380px, calc(100vw - 32px));
 }
 
-.drop span {
-  display: block;
-  margin-top: 4px;
+.upload-drop {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  text-align: center;
   font-size: 0.8rem;
   color: #d7c09a;
 }
 
-.drop.is-hot {
+.upload-drop.is-hot {
   border-color: var(--gold);
   background: rgba(70, 42, 18, 0.9);
 }
 
-.log {
-  margin: 0;
-  padding: 8px 14px;
-  border-radius: 6px;
-  font-size: 0.82rem;
-  color: #e6d3b2;
+[data-upload-pick] {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.error {
+  color: #f0a07a;
 }
 
 .modal {

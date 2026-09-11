@@ -25,6 +25,8 @@ export const CHEST_UPGRADE_MULT = 3;
 export const MATERIAL_CAP = 250;
 export const FURNITURE_SNAP = 0.2;
 export const FURNITURE_ROT_STEP = Math.PI / 12;
+/** Shared default facing: +Z, toward the shop door / customer side. */
+export const FURNITURE_FORWARD = 0;
 export const SWAP_PRICE_RATIO = 0.65;
 
 export function padById(id) {
@@ -123,14 +125,14 @@ export function neighborsOf(gx, gz, expansionIds = []) {
 
 export function defaultFurniture() {
   return {
-    counter: { x: SHOP.counter.x, z: SHOP.counter.z, rot: 0 },
-    anvil: { x: SHOP.anvil.x, z: SHOP.anvil.z, rot: 0.35 },
-    chest: { x: SHOP.chest.x, z: SHOP.chest.z, rot: -0.45 },
-    range: { x: SHOP.range.x, z: SHOP.range.z, rot: 0.12 },
+    counter: { x: SHOP.counter.x, z: SHOP.counter.z, rot: FURNITURE_FORWARD },
+    anvil: { x: SHOP.anvil.x, z: SHOP.anvil.z, rot: FURNITURE_FORWARD },
+    chest: { x: SHOP.chest.x, z: SHOP.chest.z, rot: FURNITURE_FORWARD },
+    range: { x: SHOP.range.x, z: SHOP.range.z, rot: FURNITURE_FORWARD },
     displays: SHOP.displays.map((spot) => ({
       x: spot.x,
       z: spot.z,
-      rot: spot.rot ?? 0,
+      rot: FURNITURE_FORWARD,
     })),
   };
 }

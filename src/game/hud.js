@@ -46,8 +46,8 @@ export function bindHud(root, state, world) {
   const craftsEl = document.querySelector('#crafts');
   const tabsEl = document.querySelector('#craft-tabs');
   const stockEl = root.querySelector('#stock');
-  const logEl = root.querySelector('#log');
   const chestCountEl = document.querySelector('#chest-count');
+  const importModal = document.querySelector('#import-modal');
   const tooltip = document.querySelector('#tooltip');
   const dismiss = tooltip.querySelector('[data-dismiss]');
   const chestModal = document.querySelector('#chest-modal');
@@ -189,7 +189,7 @@ export function bindHud(root, state, world) {
 
   function setModalOpen() {
     const open = !chestModal.hidden || !tradeModal.hidden || !tooltip.hidden || !craftModal.hidden
-      || !upgradeModal.hidden;
+      || !upgradeModal.hidden || (importModal && !importModal.hidden);
     document.body.classList.toggle('modal-open', open);
   }
 
@@ -436,7 +436,6 @@ export function bindHud(root, state, world) {
     closeUpgrade();
     hideFurnMenu();
     world.beginMoveFurniture(target);
-    pushLog(state, 'Click the floor to place that furniture. Right-click cancels.');
     render(performance.now() / 1000);
   }
 
@@ -587,8 +586,6 @@ export function bindHud(root, state, world) {
     if (event.type === 'chest-upgrade') openUpgrade();
     if (event.type === 'furn-menu') showFurnMenu(event.furniture, event.clientX, event.clientY);
     if (event.type === 'expand-pad') paintExpand();
-    if (event.type === 'furniture-moved') pushLog(state, 'Furniture placed.');
-    if (event.type === 'furniture-cancel') pushLog(state, 'Move cancelled.');
     if (event.type === 'customer' && event.actor?.state === 'request') openTrade(event.actor);
   });
 
@@ -637,7 +634,6 @@ export function bindHud(root, state, world) {
   });
 
   let lastStockKey = null;
-  let lastLogKey = null;
   let lastUnlockKey = null;
 
   function render(now) {
@@ -700,11 +696,6 @@ export function bindHud(root, state, world) {
         stockEl.innerHTML = '';
       }
       if (!chestModal.hidden) paintChest();
-    }
-    const logKey = state.log.join('|');
-    if (logKey !== lastLogKey) {
-      lastLogKey = logKey;
-      logEl.innerHTML = state.log.map((line) => `<li>${line}</li>`).join('');
     }
     if (!tradeModal.hidden && tradeActor) {
       const live = world.getCustomer(tradeActor.id);

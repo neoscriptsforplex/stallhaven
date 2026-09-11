@@ -15,7 +15,9 @@ import {
 } from './catalog.js';
 import { hasStock, pushLog } from './economy.js';
 import {
+  FURNITURE_FORWARD,
   FURNITURE_ROT_STEP,
+  FURNITURE_SNAP,
   cloneFurniture,
   snapToFloor,
   walkFloors,
@@ -106,6 +108,8 @@ export function createWorld(canvas, state) {
   let expandMode = false;
   let selectedPad = null;
   let moveTarget = null;
+  let moveOrigin = null;
+  let snapGrid = null;
 
   function disposeGroup(group) {
     if (!group) return;
@@ -132,6 +136,7 @@ export function createWorld(canvas, state) {
     scene.add(padGroup);
     floors = floorsForState(state);
     rebuildNav();
+    rebuildSnapGrid();
   }
 
   function rebuildNav() {
@@ -222,18 +227,18 @@ export function createWorld(canvas, state) {
     const slot = fixtureMeshes[id];
     if (!pose || !slot) return;
     slot.mesh.position.set(pose.x, 0, pose.z);
-    slot.mesh.rotation.y = pose.rot ?? 0;
+    slot.mesh.rotation.y = pose.rot ?? FURNITURE_FORWARD;
     slot.pick.position.set(pose.x, slot.pickY, pose.z);
-    slot.pick.rotation.y = pose.rot ?? 0;
+    slot.pick.rotation.y = pose.rot ?? FURNITURE_FORWARD;
     slot.glow.position.set(pose.x, 0.08, pose.z);
   }
 
   const displays = SHOP.displays.map((spot, index) => {
-    const pose = state.furniture.displays[index] ?? { x: spot.x, z: spot.z, rot: spot.rot ?? 0 };
+    const pose = state.furniture.displays[index] ?? { x: spot.x, z: spot.z, rot: FURNITURE_FORWARD };
     const anchor = new THREE.Group();
     anchor.position.set(pose.x, 0, pose.z);
     const furniture = buildFurniture(spot.kind);
-    anchor.rotation.y = pose.rot ?? 0;
+    anchor.rotation.y = pose.rot ?? FURNITURE_FORWARD;
     scene.add(anchor);
     anchor.add(furniture);
     const wareAnchor = new THREE.Group();
@@ -277,7 +282,117 @@ export function createWorld(canvas, state) {
     const pose = state.furniture.displays[index];
     if (!slot || !pose) return;
     slot.anchor.position.set(pose.x, 0, pose.z);
-    slot.anchor.rotation.y = pose.rot ?? 0;
+    slot.anchor.rotation.y = pose.rot ?? FURNITURE_FORWARD;
+  }
+
+  function poseOf(target) {
+    if (!target) return null;
+    return target.id === 'display'
+      ? state.furniture.displays[target.index]
+      : state.furniture[target.id];
+  }
+
+  function applyMovePose(target) {
+    if (!target) return;
+    if (target.id === 'display') applyDisplayPose(target.index);
+    else applyFixturePose(target.id);
+  }
+
+  function rebuildSnapGrid() {
+    disposeGroup(snapGrid);
+    const group = new THREE.Group();
+    group.name = 'snap-grid';
+    group.visible = false;
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0xe8c56a,
+      transparent: true,
+      opacity: 0.48,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const positions = [];
+    const y = 0.108;
+    for (const rect of floors) {
+      const minX = Math.ceil((rect.minX + 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
+      const maxX = Math.floor((rect.maxX - 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
+      const minZ = Math.ceil((rect.minZ + 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
+      const maxZ = Math.floor((rect.maxZ - 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
+      for (let x = minX; x <= maxX + 1e-6; x += FURNITURE_SNAP) {
+        positions.push(x, y, minZ, x, y, maxZ);
+      }
+      for (let z = minZ; z <= maxZ + 1e-6; z += FURNITURE_SNAP) {
+        positions.push(minX, y, z, maxX, y, z);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    group.add(new THREE.LineSegments(geo, lineMat));
+    const cell = new THREE.Mesh(
+      new THREE.PlaneGeometry(FURNITURE_SNAP * 0.9, FURNITURE_SNAP * 0.9),
+      new THREE.MeshBasicMaterial({
+        color: 0xf0d27a,
+        transparent: true,
+        opacity: 0.58,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    cell.rotation.x = -Math.PI / 2;
+    cell.position.y = 0.12;
+    cell.visible = false;
+    group.add(cell);
+    group.userData.cell = cell;
+    snapGrid = group;
+    scene.add(group);
+  }
+
+  function setSnapGridVisible(on) {
+    if (!snapGrid) return;
+    snapGrid.visible = Boolean(on);
+    if (!on && snapGrid.userData.cell) snapGrid.userData.cell.visible = false;
+  }
+
+  function highlightSnapCell(x, z) {
+    const cell = snapGrid?.userData.cell;
+    if (!cell) return;
+    cell.visible = true;
+    cell.position.set(x, 0.12, z);
+  }
+
+  function previewFurnitureAt(x, z) {
+    if (!moveTarget) return null;
+    const snapped = snapToFloor(x, z, floors);
+    const pose = poseOf(moveTarget);
+    if (!pose) return snapped;
+    pose.x = snapped.x;
+    pose.z = snapped.z;
+    applyMovePose(moveTarget);
+    highlightSnapCell(snapped.x, snapped.z);
+    return snapped;
+  }
+
+  function restoreMoveOrigin() {
+    if (!moveTarget || !moveOrigin) return;
+    const pose = poseOf(moveTarget);
+    if (!pose) return;
+    pose.x = moveOrigin.x;
+    pose.z = moveOrigin.z;
+    pose.rot = moveOrigin.rot;
+    applyMovePose(moveTarget);
+  }
+
+  function clearMoveMode() {
+    moveTarget = null;
+    moveOrigin = null;
+    setSnapGridVisible(false);
+  }
+
+  function floorPointFromEvent(event) {
+    setPointer(event);
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(groundMeshes(), false);
+    return hits[0]?.point ?? null;
   }
 
   function applyAllPoses() {
@@ -481,21 +596,9 @@ export function createWorld(canvas, state) {
 
   function placeMovingFurniture(x, z) {
     if (!moveTarget) return false;
-    const snapped = snapToFloor(x, z, floors);
-    if (moveTarget.id === 'display') {
-      const pose = state.furniture.displays[moveTarget.index];
-      pose.x = snapped.x;
-      pose.z = snapped.z;
-      applyDisplayPose(moveTarget.index);
-    } else {
-      const pose = state.furniture[moveTarget.id];
-      pose.x = snapped.x;
-      pose.z = snapped.z;
-      applyFixturePose(moveTarget.id);
-    }
+    previewFurnitureAt(x, z);
     rebuildNav();
-    moveTarget = null;
-    moveMarker.visible = false;
+    clearMoveMode();
     return true;
   }
 
@@ -504,7 +607,7 @@ export function createWorld(canvas, state) {
       ? state.furniture.displays[target.index]
       : state.furniture[target.id];
     if (!pose) return false;
-    pose.rot = (pose.rot ?? 0) + FURNITURE_ROT_STEP;
+    pose.rot = (pose.rot ?? FURNITURE_FORWARD) + FURNITURE_ROT_STEP;
     if (target.id === 'display') applyDisplayPose(target.index);
     else applyFixturePose(target.id);
     rebuildNav();
@@ -531,6 +634,15 @@ export function createWorld(canvas, state) {
     if (modalBlocksWorld() && !moveTarget && !expandMode) return;
     const held = performance.now() - pointerDown.t;
     const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+    if (moveTarget) {
+      const point = floorPointFromEvent(event);
+      if (point) {
+        placeMovingFurniture(point.x, point.z);
+        playClick('ui');
+        pickHandler?.({ type: 'furniture-moved' });
+      }
+      return;
+    }
     if (moved > 8) return;
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
@@ -549,16 +661,6 @@ export function createWorld(canvas, state) {
         });
         playClick('ui');
         pickHandler?.({ type: 'expand-pad', padId: selectedPad });
-      }
-      return;
-    }
-
-    if (moveTarget) {
-      const groundHit = hits.find((h) => h.object.userData.kind === 'ground');
-      if (groundHit) {
-        placeMovingFurniture(groundHit.point.x, groundHit.point.z);
-        playClick('ui');
-        pickHandler?.({ type: 'furniture-moved' });
       }
       return;
     }
@@ -632,6 +734,12 @@ export function createWorld(canvas, state) {
     }
   });
 
+  renderer.domElement.addEventListener('pointermove', (event) => {
+    if (!moveTarget) return;
+    const point = floorPointFromEvent(event);
+    if (point) previewFurnitureAt(point.x, point.z);
+  });
+
   renderer.domElement.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     if (modalBlocksWorld() && !moveTarget) return;
@@ -639,7 +747,8 @@ export function createWorld(canvas, state) {
     raycaster.setFromCamera(pointer, camera);
     const hits = raycaster.intersectObjects([...allPicks(), ...groundMeshes()], false);
     if (moveTarget) {
-      moveTarget = null;
+      restoreMoveOrigin();
+      clearMoveMode();
       pickHandler?.({ type: 'furniture-cancel' });
       return;
     }
@@ -676,7 +785,8 @@ export function createWorld(canvas, state) {
       camHeld.down = true;
     } else if (event.key === 'Escape') {
       if (moveTarget) {
-        moveTarget = null;
+        restoreMoveOrigin();
+        clearMoveMode();
         pickHandler?.({ type: 'furniture-cancel' });
       }
     } else if (event.key === '-' || event.key === '_') {
@@ -1127,6 +1237,10 @@ export function createWorld(canvas, state) {
       moveTarget = target;
       expandMode = false;
       if (padGroup) padGroup.visible = false;
+      const pose = poseOf(target);
+      moveOrigin = pose ? { x: pose.x, z: pose.z, rot: pose.rot ?? FURNITURE_FORWARD } : null;
+      setSnapGridVisible(true);
+      if (pose) highlightSnapCell(pose.x, pose.z);
       pickHandler?.({ type: 'furniture-move-start', furniture: target });
     },
     rotateFurniture(target) {
@@ -1136,7 +1250,8 @@ export function createWorld(canvas, state) {
       return Boolean(moveTarget);
     },
     cancelMoveFurniture() {
-      moveTarget = null;
+      restoreMoveOrigin();
+      clearMoveMode();
     },
     setExpandMode(on) {
       expandMode = Boolean(on);

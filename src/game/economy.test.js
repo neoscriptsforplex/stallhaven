@@ -47,6 +47,11 @@ function finishCraft(state, recipeId, at = 0) {
   assert.ok(done.includes(recipeId), `did not finish ${recipeId}`);
 }
 
+function sequentialRng(...values) {
+  let i = 0;
+  return () => values[Math.min(i++, values.length - 1)];
+}
+
 describe('stall economy', () => {
   it('starts with gold and a little of each starter material', () => {
     const state = createState();
@@ -225,6 +230,24 @@ describe('customer trade', () => {
     assert.equal(RECIPES[mage.recipeId].combatClass, 'magic');
   });
 
+  it('usually asks for an unlocked recipe the player can already craft', () => {
+    const state = createState();
+    const rng = sequentialRng(0.9, 0);
+    const melee = decideRequest('mercenary', rng, state);
+    assert.equal(isUnlocked(state, melee.recipeId), true);
+    assert.equal(RECIPES[melee.recipeId].combatClass, 'melee');
+    const food = decideRequest('pilgrim', sequentialRng(0.9, 0), state);
+    assert.equal(food.recipeId, 'bread');
+  });
+
+  it('sometimes asks for a higher-tier item that is still locked', () => {
+    const state = createState();
+    const melee = decideRequest('mercenary', sequentialRng(0, 0), state);
+    assert.equal(isUnlocked(state, melee.recipeId), false);
+    assert.ok((RECIPES[melee.recipeId].tier ?? 1) > 1);
+    assert.ok(RECIPES[melee.recipeId].price > RECIPES.bronze_scimitar.price);
+  });
+
   it('lists chest items as offer choices at a reduced sale price', () => {
     const state = createState();
     finishCraft(state, 'bread');
@@ -297,19 +320,32 @@ describe('catalog', () => {
     assert.equal(recipes.filter((r) => r.shape?.startsWith('staff')).length, 5);
     assert.equal(recipes.filter((r) => r.combatClass === 'magic' && r.category === 'armour').length, 25);
     assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 35);
-    assert.equal(recipes.filter((r) => r.name.includes("d'hide")).length, 16);
+    assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 16);
     assert.equal(recipes.filter((r) => r.category === 'food').length, 5);
     assert.equal(RECIPES.bronze_scimitar.name, 'Bronze Scimitar');
     assert.equal(RECIPES.iron_platebody.name, 'Iron Platebody');
-    assert.equal(RECIPES.magic_hat.name, 'Magic hat');
-    assert.equal(RECIPES.mystic_robe_top.name, 'Mystic robe top');
-    assert.equal(RECIPES.blue_dhide_body.name, "Blue d'hide body");
-    assert.equal(RECIPES.green_dhide_chaps.name, "Green d'hide chaps");
+    assert.equal(RECIPES.magic_hat.name, 'Magic Hat');
+    assert.equal(RECIPES.mystic_robe_top.name, 'Mystic Robe Top');
+    assert.equal(RECIPES.blue_dhide_body.name, "Blue D'hide Body");
+    assert.equal(RECIPES.green_dhide_chaps.name, "Green D'hide Chaps");
     assert.equal(RECIPES.staff.name, 'Staff');
     assert.equal(RECIPES.mystic_staff.name, 'Mystic Staff');
     assert.equal(RECIPES.battle_staff.name, 'Battle Staff');
     assert.equal(RECIPES.lunar_staff.name, 'Lunar Staff');
     assert.equal(RECIPES.ancient_staff.name, 'Ancient Staff');
+    assert.equal(RECIPES.fish_pie.name, 'Fish Pie');
+    assert.equal(RECIPES.bronze_2h_sword.name, 'Bronze 2H Sword');
+    assert.equal(RECIPES.bronze_thrownaxe.name, 'Bronze Thrown Axe');
+  });
+
+  it('title-cases every recipe name', () => {
+    for (const recipe of recipeList()) {
+      for (const word of recipe.name.split(/\s+/)) {
+        const letter = word.replace(/^[^A-Za-z]+/, '')[0];
+        if (!letter) continue;
+        assert.equal(letter, letter.toUpperCase(), recipe.name);
+      }
+    }
   });
 
   it('keeps at least four display spots plus shelves and armour stands', () => {

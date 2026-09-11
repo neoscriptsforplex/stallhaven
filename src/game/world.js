@@ -1022,7 +1022,7 @@ export function createWorld(canvas, state) {
     const types = Object.keys(CUSTOMERS);
     const typeId = firstSpawn ? 'pilgrim' : types[Math.floor(Math.random() * types.length)];
     firstSpawn = false;
-    const request = decideRequest(typeId);
+    const request = decideRequest(typeId, Math.random, state);
     const mesh = buildAdventurer(typeId);
     mesh.userData.pick.userData.customerId = customerSerial;
     mesh.position.set(SHOP.outside.x, 0, SHOP.outside.z + 0.15);

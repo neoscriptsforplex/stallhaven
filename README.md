@@ -29,7 +29,7 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 7. **Save** and **Load** in the top right write or read a JSON file on your computer. The expand-arrow button buys extra rooms (500g, then ×5): click a pad, then Confirm.
 8. Optional: tap **Upload** beside Coins to add a `.glb` or `.gltf`. Tag it **Furniture** to replace the selected table, or **Ware** to change how a recipe looks. Models stay in this browser only.
 
-You start with 40 gold. Bronze gear, a Staff, Blue d'hide, and Bread are unlocked.
+You start with 40 gold. Bronze gear, a Staff, Blue D'hide, and Bread are unlocked.
 
 The **?** button beside Expand opens Help (click-to-walk, anvil, range, chest, and the rest of How to play).
 
@@ -45,7 +45,7 @@ Example: 20 Bronze Swords unlock Iron Sword; 30 Iron Swords unlock Steel Sword.
 
 Bronze (brown), Iron (grey), Steel (silver), Mithril (blue), Adamant (green), Runite (aqua), Dragon (red).
 
-Weapons: Scimitar, Dagger, Sword, Mace, Spear, 2h Sword, Defender.
+Weapons: Scimitar, Dagger, Sword, Mace, Spear, 2H Sword, Defender.
 
 Armour: Full Helm, Med Helm, Platebody, Platelegs, Boots, Gloves, Chainbody, Plateskirt.
 
@@ -53,17 +53,17 @@ Armour: Full Helm, Med Helm, Platebody, Platelegs, Boots, Gloves, Chainbody, Pla
 
 Staff (plain) → Mystic Staff (orb) → Battle Staff (fancy orb) → Lunar Staff (moon) → Ancient Staff (church-window top).
 
-Robes: Magic, Mystic, Battlemage, Lunar, Ancient. Each set has hat, robe top, robe bottom, boots, gloves.
+Robes: Magic, Mystic, Battlemage, Lunar, Ancient. Each set has Hat, Robe Top, Robe Bottom, Boots, Gloves.
 
 ### Range
 
-Same seven metals for Shortbow, Longbow, Crossbow, Knives, Thrownaxe.
+Same seven metals for Shortbow, Longbow, Crossbow, Knives, Thrown Axe.
 
-Dragonhide armour in Blue, Green, Red, Black: body, chaps, vambraces, boots.
+Dragonhide armour in Blue, Green, Red, Black: Body, Chaps, Vambraces, Boots.
 
 ### Food
 
-Bread → Pizza → Cake → Pie → Fish pie, using flour, pineapple, egg, raspberry, and fish. Cook these on the **range**, not the anvil. Food displays on wall shelves.
+Bread → Pizza → Cake → Pie → Fish Pie, using flour, pineapple, egg, raspberry, and fish. Cook these on the **range**, not the anvil. Food displays on wall shelves.
 
 ### Potions
 

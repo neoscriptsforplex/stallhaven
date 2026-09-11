@@ -6,9 +6,9 @@ export const ROOM_D = 7.1;
 export const ORIGIN_FLOOR = { minX: -3.72, maxX: 3.72, minZ: -3.18, maxZ: 3.28 };
 
 export const EXPANSION_PADS = [
-  { id: 'back-left', gx: -1, gz: -1, label: 'Behind left' },
+  { id: 'back-left', gx: -1, gz: -1, label: 'Behind Left' },
   { id: 'back', gx: 0, gz: -1, label: 'Behind' },
-  { id: 'back-right', gx: 1, gz: -1, label: 'Behind right' },
+  { id: 'back-right', gx: 1, gz: -1, label: 'Behind Right' },
   { id: 'left', gx: -1, gz: 0, label: 'Left' },
   { id: 'right', gx: 1, gz: 0, label: 'Right' },
 ];

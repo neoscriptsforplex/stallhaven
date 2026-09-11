@@ -84,7 +84,7 @@ export function bindHud(root, state, world) {
     tabsEl.hidden = rangeMode;
     const title = craftModal.querySelector('[data-craft-title]');
     const blurb = craftModal.querySelector('[data-craft-blurb]');
-    if (title) title.textContent = rangeMode ? 'Cooking range' : 'Anvil';
+    if (title) title.textContent = rangeMode ? 'Cooking Range' : 'Anvil';
     if (blurb) {
       blurb.textContent = rangeMode
         ? 'Bake food here. Finished plates land in the chest or on a wall shelf.'
@@ -291,7 +291,7 @@ export function bindHud(root, state, world) {
           <strong>${recipe.name}</strong>
           <span class="meta">×${count} · ${classLabel(recipe.combatClass)} · sells ${recipe.price}g</span>
         </div>
-        <button type="button" data-place="${recipe.id}">Place on stall</button>
+        <button type="button" data-place="${recipe.id}">Place on Stall</button>
       </div>
     `).join('');
   }
@@ -547,14 +547,14 @@ export function bindHud(root, state, world) {
     furnMenu.querySelector('[data-furn-name]').textContent = (
       target.id === 'chest' ? 'Chest'
         : target.id === 'anvil' ? 'Anvil'
-          : target.id === 'range' ? 'Cooking range'
+          : target.id === 'range' ? 'Cooking Range'
             : target.id === 'counter' ? 'Counter'
               : 'Display'
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
     if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range') {
       useBtn.hidden = false;
-      useBtn.textContent = target.id === 'chest' ? 'Open chest' : target.id === 'range' ? 'Cook' : 'Craft';
+      useBtn.textContent = target.id === 'chest' ? 'Open Chest' : target.id === 'range' ? 'Cook' : 'Craft';
     } else {
       useBtn.hidden = true;
     }
@@ -802,7 +802,7 @@ export function bindHud(root, state, world) {
       const items = chestList(state);
       if (items.length) {
         stockEl.hidden = false;
-        stockEl.innerHTML = '<p>Chest — click to show on the selected stall</p>' + items.map((item) => (
+        stockEl.innerHTML = '<p>Chest — Click to Show on the Selected Stall</p>' + items.map((item) => (
           `<button type="button" data-stock="${item.recipeId}">${item.recipe.name} ×${item.count}</button>`
         )).join('');
       } else {

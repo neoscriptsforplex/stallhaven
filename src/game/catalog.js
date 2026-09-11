@@ -3,6 +3,7 @@
 export const START_GOLD = 40;
 
 export const OTHER_CHANCE = 0.18;
+export const ASPIRE_CHANCE = 0.25;
 export const MAX_CUSTOMERS = 3;
 export const FIRST_CUSTOMER_DELAY = 4;
 export const SPAWN_GAP_MIN = 6;
@@ -132,7 +133,7 @@ const MELEE_WEAPONS = [
   { id: 'sword', name: 'Sword', slot: 'sword', shape: 'sword' },
   { id: 'mace', name: 'Mace', slot: 'mace', shape: 'mace' },
   { id: 'spear', name: 'Spear', slot: 'spear', shape: 'spear' },
-  { id: '2h_sword', name: '2h Sword', slot: '2h', shape: '2h' },
+  { id: '2h_sword', name: '2H Sword', slot: '2h', shape: '2h' },
   { id: 'defender', name: 'Defender', slot: 'offhand', shape: 'defender' },
 ];
 
@@ -159,7 +160,7 @@ const RANGE_WEAPONS = [
   { id: 'longbow', name: 'Longbow', slot: 'bow', shape: 'longbow', extra: { logs: 1, string: 1 } },
   { id: 'crossbow', name: 'Crossbow', slot: 'bow', shape: 'crossbow', extra: { logs: 1 } },
   { id: 'knives', name: 'Knives', slot: 'thrown', shape: 'knives' },
-  { id: 'thrownaxe', name: 'Thrownaxe', slot: 'thrown', shape: 'thrownaxe' },
+  { id: 'thrownaxe', name: 'Thrown Axe', slot: 'thrown', shape: 'thrownaxe' },
 ];
 
 for (const piece of RANGE_WEAPONS) {
@@ -173,10 +174,10 @@ for (const piece of RANGE_WEAPONS) {
 }
 
 const DHIDE_PIECES = [
-  { id: 'body', name: 'body', slot: 'body', shape: 'dhide_body' },
-  { id: 'chaps', name: 'chaps', slot: 'legs', shape: 'dhide_chaps' },
-  { id: 'vambraces', name: 'vambraces', slot: 'gloves', shape: 'dhide_vambraces' },
-  { id: 'boots', name: 'boots', slot: 'boots', shape: 'dhide_boots' },
+  { id: 'body', name: 'Body', slot: 'body', shape: 'dhide_body' },
+  { id: 'chaps', name: 'Chaps', slot: 'legs', shape: 'dhide_chaps' },
+  { id: 'vambraces', name: 'Vambraces', slot: 'gloves', shape: 'dhide_vambraces' },
+  { id: 'boots', name: 'Boots', slot: 'boots', shape: 'dhide_boots' },
 ];
 
 DHIDE.forEach((color, index) => {
@@ -185,14 +186,14 @@ DHIDE.forEach((color, index) => {
     const previousId = index === 0 ? null : `${DHIDE[index - 1].id}_dhide_${piece.id}`;
     addRecipe({
       id,
-      name: `${color.name} d'hide ${piece.name}`,
+      name: `${color.name} D'hide ${piece.name}`,
       category: 'armour',
       combatClass: 'range',
       slot: piece.slot,
       shape: piece.shape,
       setKey: `${color.id}-dhide`,
       lineId: `range-dhide-${piece.id}`,
-      lineName: `d'hide ${piece.name}`,
+      lineName: `D'hide ${piece.name}`,
       lineIndex: index,
       previousId,
       unlockNeed: unlockNeed(index),
@@ -234,11 +235,11 @@ MAGIC_STAVES.forEach((staff, index) => {
 });
 
 const MAGIC_ARMOUR = [
-  { id: 'hat', name: 'hat', slot: 'helm', shape: 'wizard_hat' },
-  { id: 'robe_top', name: 'robe top', slot: 'body', shape: 'robe_top' },
-  { id: 'robe_bottom', name: 'robe bottom', slot: 'legs', shape: 'robe_bottom' },
-  { id: 'boots', name: 'boots', slot: 'boots', shape: 'magic_boots' },
-  { id: 'gloves', name: 'gloves', slot: 'gloves', shape: 'magic_gloves' },
+  { id: 'hat', name: 'Hat', slot: 'helm', shape: 'wizard_hat' },
+  { id: 'robe_top', name: 'Robe Top', slot: 'body', shape: 'robe_top' },
+  { id: 'robe_bottom', name: 'Robe Bottom', slot: 'legs', shape: 'robe_bottom' },
+  { id: 'boots', name: 'Boots', slot: 'boots', shape: 'magic_boots' },
+  { id: 'gloves', name: 'Gloves', slot: 'gloves', shape: 'magic_gloves' },
 ];
 
 MAGIC_SETS.forEach((set, index) => {
@@ -274,7 +275,7 @@ const FOOD_LINE = [
   { id: 'pizza', name: 'Pizza', mats: { flour: 1, pineapple: 1 }, tint: 0xd4a04a },
   { id: 'cake', name: 'Cake', mats: { flour: 1, egg: 1 }, tint: 0xe8c8a0 },
   { id: 'pie', name: 'Pie', mats: { flour: 1, raspberry: 1 }, tint: 0xb45a4a },
-  { id: 'fish_pie', name: 'Fish pie', mats: { flour: 1, fish: 1 }, tint: 0xc8b07a },
+  { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, fish: 1 }, tint: 0xc8b07a },
 ];
 
 // Food is small and sits on wall shelves. Potions will share these shelves later; do not build potions now.
@@ -343,7 +344,7 @@ export const CUSTOMERS = {
   },
   hedgemage: {
     id: 'hedgemage',
-    name: 'Hedge mage',
+    name: 'Hedge Mage',
     combatClass: 'magic',
     prefers: Object.values(RECIPES)
       .filter((recipe) => recipe.combatClass === 'magic')
@@ -366,14 +367,14 @@ export const SHOP = {
   chest: { x: 2.98, z: -2.42 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [
-    { id: 'left-front', name: 'Left front table', x: -2.95, z: 1.85, kind: 'table' },
-    { id: 'right-front', name: 'Right front table', x: 2.95, z: 1.85, kind: 'table' },
-    { id: 'left-mid', name: 'Left table', x: -2.95, z: 0.35, kind: 'table' },
-    { id: 'right-mid', name: 'Right table', x: 2.95, z: 0.35, kind: 'table' },
-    { id: 'shelf-left', name: 'Left wall shelf', x: -2.48, z: -3.22, kind: 'shelf' },
-    { id: 'shelf-right', name: 'Right wall shelf', x: 2.48, z: -3.22, kind: 'shelf' },
-    { id: 'stand-left', name: 'Left armour stand', x: -1.58, z: 2.68, kind: 'stand' },
-    { id: 'stand-right', name: 'Right armour stand', x: 1.58, z: 2.68, kind: 'stand' },
+    { id: 'left-front', name: 'Left Front Table', x: -2.95, z: 1.85, kind: 'table' },
+    { id: 'right-front', name: 'Right Front Table', x: 2.95, z: 1.85, kind: 'table' },
+    { id: 'left-mid', name: 'Left Table', x: -2.95, z: 0.35, kind: 'table' },
+    { id: 'right-mid', name: 'Right Table', x: 2.95, z: 0.35, kind: 'table' },
+    { id: 'shelf-left', name: 'Left Wall Shelf', x: -2.48, z: -3.22, kind: 'shelf' },
+    { id: 'shelf-right', name: 'Right Wall Shelf', x: 2.48, z: -3.22, kind: 'shelf' },
+    { id: 'stand-left', name: 'Left Armour Stand', x: -1.58, z: 2.68, kind: 'stand' },
+    { id: 'stand-right', name: 'Right Armour Stand', x: 1.58, z: 2.68, kind: 'stand' },
   ],
   cameraStart: { x: -0.15, y: 3.35, z: 2.85 },
   cameraTarget: { x: -0.85, y: 0.95, z: -1.35 },
@@ -463,18 +464,47 @@ export function matchingArmourIds(recipeId, ownedIds) {
   return slots;
 }
 
-export function decideRequest(customerId, rng = Math.random) {
-  const customer = CUSTOMERS[customerId];
+function recipeUnlocked(state, recipe) {
+  if (!recipe) return false;
+  if (!recipe.previousId) return true;
+  if (!state) return true;
+  const count = state.craftCounts?.[recipe.previousId] ?? 0;
+  return count >= (recipe.unlockNeed ?? 0);
+}
+
+function pickWeighted(recipes, rng) {
   const weighted = [];
-  for (const id of customer.prefers) {
-    const tier = RECIPES[id]?.tier ?? 1;
+  for (const recipe of recipes) {
+    const tier = recipe.tier ?? 1;
     const copies = tier === 1 ? 5 : tier === 2 ? 3 : tier === 3 ? 2 : 1;
-    for (let i = 0; i < copies; i += 1) weighted.push(id);
+    for (let i = 0; i < copies; i += 1) weighted.push(recipe);
   }
-  const recipeId = weighted[Math.floor(rng() * weighted.length)];
+  if (!weighted.length) return recipes[0] ?? null;
+  return weighted[Math.floor(rng() * weighted.length)] ?? recipes[0];
+}
+
+export function decideRequest(customerId, rng = Math.random, state = null) {
+  const customer = CUSTOMERS[customerId];
+  const preferred = customer.prefers
+    .map((id) => RECIPES[id])
+    .filter(Boolean);
+  const unlocked = preferred.filter((recipe) => recipeUnlocked(state, recipe));
+  const maxUnlockedPrice = unlocked.reduce((max, recipe) => Math.max(max, recipe.price ?? 0), 0);
+  const maxUnlockedTier = unlocked.reduce((max, recipe) => Math.max(max, recipe.tier ?? 1), 0);
+  const aspirational = preferred.filter((recipe) => {
+    const locked = state ? !recipeUnlocked(state, recipe) : (recipe.tier ?? 1) > 1;
+    const pricier = (recipe.price ?? 0) > maxUnlockedPrice;
+    const higherTier = (recipe.tier ?? 1) > maxUnlockedTier;
+    return locked || pricier || higherTier;
+  });
+  const nearby = aspirational.filter((recipe) => (recipe.tier ?? 1) <= Math.max(1, maxUnlockedTier) + 2);
+  const aspirePool = nearby.length ? nearby : aspirational;
+  const aspire = rng() < ASPIRE_CHANCE && aspirePool.length;
+  const pool = aspire ? aspirePool : (unlocked.length ? unlocked : preferred);
+  const recipe = pickWeighted(pool, rng);
   return {
-    recipeId,
-    gold: RECIPES[recipeId].price,
+    recipeId: recipe.id,
+    gold: recipe.price,
     offer: customer.offer ?? null,
   };
 }

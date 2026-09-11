@@ -28,6 +28,7 @@ export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
 export const SWAP_PRICE_RATIO = 0.65;
+export const CAULDRON_COST = 20000;
 
 export function padById(id) {
   return EXPANSION_PADS.find((pad) => pad.id === id) ?? null;
@@ -129,6 +130,7 @@ export function defaultFurniture() {
     anvil: { x: SHOP.anvil.x, z: SHOP.anvil.z, rot: FURNITURE_FORWARD },
     chest: { x: SHOP.chest.x, z: SHOP.chest.z, rot: FURNITURE_FORWARD },
     range: { x: SHOP.range.x, z: SHOP.range.z, rot: FURNITURE_FORWARD },
+    cauldron: null,
     displays: SHOP.displays.map((spot) => ({
       x: spot.x,
       z: spot.z,
@@ -137,14 +139,94 @@ export function defaultFurniture() {
   };
 }
 
+function clonePose(pose) {
+  return pose ? { ...pose } : null;
+}
+
 export function cloneFurniture(furniture = defaultFurniture()) {
+  const defaults = defaultFurniture();
   return {
     counter: { ...furniture.counter },
     anvil: { ...furniture.anvil },
     chest: { ...furniture.chest },
     range: { ...furniture.range },
-    displays: (furniture.displays ?? defaultFurniture().displays).map((pose) => ({ ...pose })),
+    cauldron: clonePose(furniture.cauldron),
+    displays: (furniture.displays ?? defaults.displays).map((pose) => ({ ...pose })),
   };
+}
+
+export function footprintBox(expansionIds = []) {
+  const cells = occupiedCells(expansionIds);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const cell of cells) {
+    const c = roomCenter(cell.gx, cell.gz);
+    minX = Math.min(minX, c.x - ROOM_W / 2);
+    maxX = Math.max(maxX, c.x + ROOM_W / 2);
+    minZ = Math.min(minZ, c.z - ROOM_D / 2);
+    maxZ = Math.max(maxZ, c.z + ROOM_D / 2);
+  }
+  return { minX, maxX, minZ, maxZ };
+}
+
+/**
+ * Exterior tree plan. Side trees must clear for side expansions: a left or
+ * right room occupies the strip beside the origin shop, and trees there clip
+ * through the new walls. Rear trees can stay unless they collide with a
+ * back room.
+ */
+export function gardenTreeSpots(expansionIds = []) {
+  const box = footprintBox(expansionIds);
+  const cx = (box.minX + box.maxX) / 2;
+  const cz = (box.minZ + box.maxZ) / 2;
+  const hasLeft = expansionIds.includes('left');
+  const hasRight = expansionIds.includes('right');
+  const spots = [
+    { x: box.minX - 2.2, z: box.minZ + 1.4, side: 'left' },
+    { x: box.minX - 2.8, z: cz, side: 'left' },
+    { x: box.minX - 1.8, z: box.maxZ - 1.2, side: 'left' },
+    { x: box.maxX + 2.2, z: box.minZ + 1.4, side: 'right' },
+    { x: box.maxX + 2.6, z: cz, side: 'right' },
+    { x: box.maxX + 1.9, z: box.maxZ - 1.4, side: 'right' },
+    { x: cx - 3.2, z: box.minZ - 2.4, side: 'rear' },
+    { x: cx + 3.2, z: box.minZ - 2.4, side: 'rear' },
+    { x: cx, z: box.minZ - 2.8, side: 'rear' },
+    { x: box.minX - 1.6, z: box.maxZ + 2.4, side: 'front-left' },
+    { x: box.maxX + 1.6, z: box.maxZ + 2.4, side: 'front-right' },
+  ];
+  return spots.filter((spot) => {
+    if (Math.abs(spot.x) < 2.4 && spot.z > 4.2) return false;
+    if (spot.side === 'left' && hasLeft) return false;
+    if (spot.side === 'right' && hasRight) return false;
+    if (spot.side === 'front-left' && hasLeft) return false;
+    if (spot.side === 'front-right' && hasRight) return false;
+    const rooms = occupiedCells(expansionIds);
+    const pad = 1.15;
+    return !rooms.some((cell) => {
+      const c = roomCenter(cell.gx, cell.gz);
+      return spot.x >= c.x - ROOM_W / 2 - pad
+        && spot.x <= c.x + ROOM_W / 2 + pad
+        && spot.z >= c.z - ROOM_D / 2 - pad
+        && spot.z <= c.z + ROOM_D / 2 + pad;
+    });
+  });
+}
+
+/** Wall vines that stay off food/potion display shelves on the back wall. */
+export function wallVineMounts(center = roomCenter(0, 0)) {
+  const leftX = center.x - ROOM_W / 2 + 0.14;
+  const rightX = center.x + ROOM_W / 2 - 0.14;
+  const frontZ = center.z + ROOM_D / 2 - 0.14;
+  return [
+    { x: leftX, y: 1.92, z: center.z - 2.42, rotY: Math.PI / 2, wall: 'left' },
+    { x: leftX, y: 1.78, z: center.z + 2.42, rotY: Math.PI / 2, wall: 'left' },
+    { x: rightX, y: 1.92, z: center.z - 2.42, rotY: -Math.PI / 2, wall: 'right' },
+    { x: rightX, y: 1.78, z: center.z + 2.42, rotY: -Math.PI / 2, wall: 'right' },
+    { x: center.x - 3.05, y: 1.84, z: frontZ, rotY: Math.PI, wall: 'front' },
+    { x: center.x + 3.05, y: 1.84, z: frontZ, rotY: Math.PI, wall: 'front' },
+  ];
 }
 
 export function rotatedFootprint(hw, hd, rot = 0) {

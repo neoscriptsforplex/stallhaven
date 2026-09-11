@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CAULDRON_COST,
   CHEST_MAX_LEVEL,
   EXPANSION_PADS,
   FURNITURE_FORWARD,
@@ -10,12 +11,14 @@ import {
   chestUpgradeCost,
   defaultFurniture,
   expansionCost,
+  gardenTreeSpots,
   occupiedCells,
   padConnects,
   padById,
   rotatePose,
   snapToFloor,
   walkFloors,
+  wallVineMounts,
 } from './layout.js';
 import { FLOOR, isWalkable, shopObstacles } from './nav.js';
 import { SHOP } from './catalog.js';
@@ -69,6 +72,43 @@ describe('layout numbers', () => {
     }
     const turned = rotatePose(furniture.range, 1);
     assert.ok(Math.abs(turned.rot - FURNITURE_ROT_STEP) < 1e-9);
+    assert.equal(furniture.cauldron, null);
+  });
+
+  it('puts the cooking range on the floor right of the counter, between counter and chest', () => {
+    const counterRight = SHOP.counter.x + 1.3;
+    const chestLeft = SHOP.chest.x - 0.46;
+    assert.ok(SHOP.range.x > counterRight, 'range should sit past the counter’s right edge');
+    assert.ok(SHOP.range.x < chestLeft, 'range should sit left of the chest');
+    assert.ok(SHOP.range.x > 0, 'range should be on the right, not the back-left corner');
+    assert.ok(SHOP.range.z < SHOP.counter.z + 0.2);
+    assert.ok(SHOP.range.z > -3.0);
+  });
+
+  it('keeps wall vines off the food and potion display shelves', () => {
+    const vines = wallVineMounts();
+    const shelves = SHOP.displays.filter((spot) => spot.kind === 'shelf');
+    assert.ok(vines.length >= 4);
+    for (const vine of vines) {
+      for (const shelf of shelves) {
+        const onShelf = Math.abs(vine.x - shelf.x) < 0.85 && Math.abs(vine.z - shelf.z) < 0.55;
+        assert.equal(onShelf, false, `vine at ${vine.x},${vine.z} covers ${shelf.id}`);
+      }
+    }
+  });
+
+  it('clears side trees when a left or right expansion is placed', () => {
+    const origin = gardenTreeSpots([]);
+    assert.ok(origin.some((spot) => spot.side === 'left'));
+    assert.ok(origin.some((spot) => spot.side === 'right'));
+    const left = gardenTreeSpots(['left']);
+    assert.equal(left.some((spot) => spot.side === 'left' || spot.side === 'front-left'), false);
+    assert.ok(left.some((spot) => spot.side === 'right'));
+    assert.ok(left.some((spot) => spot.side === 'rear'));
+    const right = gardenTreeSpots(['right']);
+    assert.equal(right.some((spot) => spot.side === 'right' || spot.side === 'front-right'), false);
+    assert.ok(right.some((spot) => spot.side === 'left'));
+    assert.equal(CAULDRON_COST, 20000);
   });
 
   it('snaps furniture on both floor axes, not only sideways', () => {

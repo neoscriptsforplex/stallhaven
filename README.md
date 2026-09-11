@@ -26,7 +26,7 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 4. Adventurers come through the **front door** and **line up at the counter**. The traveler at the front is who you trade with.
 5. **Click the traveler at the front** to open trade: **Sell** if you have the item, **Offer** a different chest item at a reduced price (you choose which), **Refuse** to send them off, or **Buy their goods** for a scrap of material.
 6. Restock materials with gold when the bins run low — they sit along the bottom of the screen. Basic materials also refill slowly on their own up to 250; higher-tier metals refill slower. Clicks make a short sound.
-7. **Save** and **Load** in the top right write or read a JSON file on your computer. The expand-arrow button buys extra rooms (500g, then ×5): click a pad, then Confirm.
+7. **Save** and **Load** in the top right write or read a JSON file on your computer. The expand-arrow button buys extra rooms (500g, then ×5): click a pad, then Confirm. **Build** (to the right of Expand) unlocks a **cauldron** for 20,000 gp; place it on the floor snap grid and confirm. Side rooms clear the trees on that side of the shop.
 8. Optional: tap **Upload** beside Coins to add a `.glb` or `.gltf`. Tag it **Furniture** to replace the selected table, or **Ware** to change how a recipe looks. Models stay in this browser only.
 
 You start with 40 gold. Bronze gear, a Staff, Blue D'hide, and Bread are unlocked.
@@ -67,12 +67,13 @@ Bread → Pizza → Cake → Pie → Fish Pie, using flour, pineapple, egg, rasp
 
 ### Potions
 
-Coming later. The anvil tab is ready; recipes are not in yet.
+Coming later. Buy a **cauldron** from Build to unlock the station; recipes are not in yet.
 
 ## Shop upgrades
 
 - **Chest:** 100 slots at level 1, +100 per level, max level 10 (1000). First upgrade 500g, then ×3.
-- **Rooms:** five pads around the starting shop (three behind, one either side). First room 500g, then ×5.
+- **Rooms:** five pads around the starting shop (three behind, one either side). First room 500g, then ×5. Side expansions clear the exterior trees on that side so they do not clip through the new room.
+- **Build / Cauldron:** 20,000 gp. Unlocks potion crafting later (no recipes yet). Place with the floor snap grid, then Confirm. Click the cauldron afterward to move or rotate it.
 - **Furniture:** move (snaps to the floor) and rotate in 15° steps. Wares sit on the piece and travel with it.
 
 ## For tinkerers

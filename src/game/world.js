@@ -41,7 +41,7 @@ import {
   slotPose,
   wareTopY,
 } from './models.js';
-import { buildRange, buildShop } from './shopbuild.js';
+import { buildCauldron, buildRange, buildShop } from './shopbuild.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
@@ -109,6 +109,8 @@ export function createWorld(canvas, state) {
   let selectedPad = null;
   let moveTarget = null;
   let moveOrigin = null;
+  let placeNeedsConfirm = false;
+  let placeDraft = null;
   let snapGrid = null;
 
   function disposeGroup(group) {
@@ -215,17 +217,29 @@ export function createWorld(canvas, state) {
   const rangePick = makePick(0.78, 1.35, 0.62, 'range');
   const rangeGlow = makeGlow(0.4, 0.54);
 
+  const cauldronMesh = buildCauldron();
+  scene.add(cauldronMesh);
+  const cauldronPick = makePick(0.72, 1.15, 0.72, 'cauldron');
+  const cauldronGlow = makeGlow(0.38, 0.52);
+
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
     anvil: { mesh: anvil, pick: anvilPick, glow: anvilGlow, pickY: 0.72 },
     chest: { mesh: chest, pick: chestPick, glow: chestGlow, pickY: 0.72 },
     range: { mesh: rangeMesh, pick: rangePick, glow: rangeGlow, pickY: 0.68 },
+    cauldron: { mesh: cauldronMesh, pick: cauldronPick, glow: cauldronGlow, pickY: 0.58 },
   };
 
   function applyFixturePose(id) {
-    const pose = state.furniture[id];
+    const draft = placeDraft && placeDraft.id === id ? placeDraft : null;
+    const pose = draft ?? state.furniture[id];
     const slot = fixtureMeshes[id];
-    if (!pose || !slot) return;
+    if (!slot) return;
+    const owned = Boolean(pose);
+    slot.mesh.visible = owned;
+    slot.pick.visible = owned && !draft;
+    slot.glow.visible = owned;
+    if (!pose) return;
     slot.mesh.position.set(pose.x, 0, pose.z);
     slot.mesh.rotation.y = pose.rot ?? FURNITURE_FORWARD;
     slot.pick.position.set(pose.x, slot.pickY, pose.z);
@@ -287,6 +301,7 @@ export function createWorld(canvas, state) {
 
   function poseOf(target) {
     if (!target) return null;
+    if (placeDraft && target.id === placeDraft.id) return placeDraft;
     return target.id === 'display'
       ? state.furniture.displays[target.index]
       : state.furniture[target.id];
@@ -385,6 +400,8 @@ export function createWorld(canvas, state) {
   function clearMoveMode() {
     moveTarget = null;
     moveOrigin = null;
+    placeNeedsConfirm = false;
+    placeDraft = null;
     setSnapGridVisible(false);
   }
 
@@ -460,6 +477,7 @@ export function createWorld(canvas, state) {
       chestPick,
       anvilPick,
       rangePick,
+      ...(state.furniture.cauldron ? [cauldronPick] : []),
       counterPick,
       ...extra,
       ...customers
@@ -588,7 +606,7 @@ export function createWorld(canvas, state) {
 
   function furnitureIdFromKind(kind, displayIndex) {
     if (kind === 'display') return { id: 'display', index: displayIndex };
-    if (kind === 'chest' || kind === 'anvil' || kind === 'range' || kind === 'counter') {
+    if (kind === 'chest' || kind === 'anvil' || kind === 'range' || kind === 'counter' || kind === 'cauldron') {
       return { id: kind };
     }
     return null;
@@ -597,6 +615,7 @@ export function createWorld(canvas, state) {
   function placeMovingFurniture(x, z) {
     if (!moveTarget) return false;
     previewFurnitureAt(x, z);
+    if (placeNeedsConfirm) return true;
     rebuildNav();
     clearMoveMode();
     return true;
@@ -639,7 +658,7 @@ export function createWorld(canvas, state) {
       if (point) {
         placeMovingFurniture(point.x, point.z);
         playClick('ui');
-        pickHandler?.({ type: 'furniture-moved' });
+        pickHandler?.({ type: placeNeedsConfirm ? 'furniture-place-preview' : 'furniture-moved' });
       }
       return;
     }
@@ -698,6 +717,11 @@ export function createWorld(canvas, state) {
         pickHandler?.({ type: 'range', furniture: { id: 'range' } });
         return;
       }
+      if (data.kind === 'cauldron') {
+        playClick('ui');
+        pickHandler?.({ type: 'cauldron', furniture: { id: 'cauldron' } });
+        return;
+      }
       if (data.kind === 'counter') {
         playClick('ui');
         pickHandler?.({ type: 'counter', furniture: { id: 'counter' }, clientX: event.clientX, clientY: event.clientY });
@@ -717,6 +741,7 @@ export function createWorld(canvas, state) {
       const chestPos = state.furniture.chest;
       const anvilPos = state.furniture.anvil;
       const rangePos = state.furniture.range;
+      const cauldronPos = state.furniture.cauldron;
       if (Math.hypot(point.x - chestPos.x, point.z - chestPos.z) < 0.72) {
         pickHandler?.({ type: 'chest', furniture: { id: 'chest' } });
         return;
@@ -727,6 +752,10 @@ export function createWorld(canvas, state) {
       }
       if (Math.hypot(point.x - rangePos.x, point.z - rangePos.z) < 0.5) {
         pickHandler?.({ type: 'range', furniture: { id: 'range' } });
+        return;
+      }
+      if (cauldronPos && Math.hypot(point.x - cauldronPos.x, point.z - cauldronPos.z) < 0.5) {
+        pickHandler?.({ type: 'cauldron', furniture: { id: 'cauldron' } });
         return;
       }
       setMoveTarget(point.x, point.z);
@@ -747,8 +776,14 @@ export function createWorld(canvas, state) {
     raycaster.setFromCamera(pointer, camera);
     const hits = raycaster.intersectObjects([...allPicks(), ...groundMeshes()], false);
     if (moveTarget) {
-      restoreMoveOrigin();
-      clearMoveMode();
+      if (placeNeedsConfirm) {
+        const id = moveTarget.id;
+        clearMoveMode();
+        applyFixturePose(id);
+      } else {
+        restoreMoveOrigin();
+        clearMoveMode();
+      }
       pickHandler?.({ type: 'furniture-cancel' });
       return;
     }
@@ -785,8 +820,14 @@ export function createWorld(canvas, state) {
       camHeld.down = true;
     } else if (event.key === 'Escape') {
       if (moveTarget) {
-        restoreMoveOrigin();
-        clearMoveMode();
+        if (placeNeedsConfirm) {
+          const id = moveTarget.id;
+          clearMoveMode();
+          applyFixturePose(id);
+        } else {
+          restoreMoveOrigin();
+          clearMoveMode();
+        }
         pickHandler?.({ type: 'furniture-cancel' });
       }
     } else if (event.key === '-' || event.key === '_') {
@@ -1164,6 +1205,7 @@ export function createWorld(canvas, state) {
     chestGlow.material.opacity = 0.28 + Math.sin(now * 2.2) * 0.08;
     anvilGlow.material.opacity = 0.26 + Math.sin(now * 2.4) * 0.1;
     rangeGlow.material.opacity = 0.24 + Math.sin(now * 2.1) * 0.1;
+    cauldronGlow.material.opacity = state.furniture.cauldron ? 0.22 + Math.sin(now * 1.9) * 0.1 : 0;
     counterGlow.material.opacity = moveTarget?.id === 'counter' ? 0.7 : 0.0;
     setDoorOpen(shopDoor, true, dt);
     syncDisplays();
@@ -1235,6 +1277,8 @@ export function createWorld(canvas, state) {
     },
     beginMoveFurniture(target) {
       moveTarget = target;
+      placeNeedsConfirm = false;
+      placeDraft = null;
       expandMode = false;
       if (padGroup) padGroup.visible = false;
       const pose = poseOf(target);
@@ -1243,6 +1287,34 @@ export function createWorld(canvas, state) {
       if (pose) highlightSnapCell(pose.x, pose.z);
       pickHandler?.({ type: 'furniture-move-start', furniture: target });
     },
+    beginPlaceUnlock(id) {
+      const start = snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, floors);
+      placeDraft = { id, x: start.x, z: start.z, rot: FURNITURE_FORWARD };
+      moveTarget = { id };
+      placeNeedsConfirm = true;
+      expandMode = false;
+      if (padGroup) padGroup.visible = false;
+      moveOrigin = null;
+      applyFixturePose(id);
+      setSnapGridVisible(true);
+      highlightSnapCell(start.x, start.z);
+      pickHandler?.({ type: 'furniture-place-start', furniture: { id } });
+    },
+    confirmPlaceUnlock() {
+      if (!moveTarget || !placeNeedsConfirm) return null;
+      const pose = placeDraft ? { x: placeDraft.x, z: placeDraft.z, rot: placeDraft.rot } : null;
+      const id = moveTarget.id;
+      rebuildNav();
+      clearMoveMode();
+      applyFixturePose(id);
+      return pose;
+    },
+    getPlacePose() {
+      return moveTarget && placeNeedsConfirm ? poseOf(moveTarget) : null;
+    },
+    isPlacingUnlock() {
+      return Boolean(placeNeedsConfirm);
+    },
     rotateFurniture(target) {
       return rotateFurniturePose(target);
     },
@@ -1250,8 +1322,10 @@ export function createWorld(canvas, state) {
       return Boolean(moveTarget);
     },
     cancelMoveFurniture() {
-      restoreMoveOrigin();
+      const id = placeNeedsConfirm ? moveTarget?.id : null;
+      if (!placeNeedsConfirm) restoreMoveOrigin();
       clearMoveMode();
+      if (id) applyFixturePose(id);
     },
     setExpandMode(on) {
       expandMode = Boolean(on);

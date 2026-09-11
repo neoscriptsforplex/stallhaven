@@ -1,11 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHOP } from './catalog.js';
+import { createState } from './economy.js';
+import { gardenTrapdoorSpot } from './layout.js';
 import {
   FLOOR,
   isWalkable,
   nearestWalkable,
   placementBlocked,
+  planPlayerWalk,
   planWalk,
   queueSlot,
   shopObstacles,
@@ -70,5 +73,26 @@ describe('shop navigation', () => {
     assert.equal(overlap, 'That spot overlaps other furniture.');
     const clear = placementBlocked({ x: -2.2, z: 0.4, rot: 0 }, 'table', [], floors, { checkAisle: false });
     assert.equal(clear, null);
+  });
+
+  it('walks from behind the counter onto the outdoor path and to the trapdoor', () => {
+    const state = createState();
+    const path = planPlayerWalk(
+      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+      { x: 0, z: 6.2 },
+      state,
+    );
+    assert.ok(path.length >= 1, 'should path onto the front grass');
+    assert.ok(path.some((point) => point.z > FLOOR.maxZ + 0.4));
+    const hatch = gardenTrapdoorSpot([]);
+    assert.ok(hatch);
+    const hatchPath = planPlayerWalk(
+      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+      { x: hatch.x, z: hatch.z },
+      state,
+    );
+    assert.ok(hatchPath.length >= 1, 'should path to the outdoor trapdoor');
+    const end = hatchPath[hatchPath.length - 1];
+    assert.ok(Math.hypot(end.x - hatch.x, end.z - hatch.z) < 1.2);
   });
 });

@@ -684,7 +684,13 @@ export function createWorld(canvas, state) {
 
   function groundMeshes() {
     if (sceneMode === 'dungeon') return dungeon?.grounds?.children ?? [];
-    return groundGroup ? groundGroup.children : [];
+    const list = [];
+    const add = (obj) => {
+      if (obj?.isMesh && obj.userData?.kind === 'ground') list.push(obj);
+    };
+    groundGroup?.children.forEach(add);
+    architecture?.traverse((child) => add(child));
+    return list;
   }
 
   function counterPose() {
@@ -746,14 +752,19 @@ export function createWorld(canvas, state) {
   }
 
   function queueUse(type, pose) {
-    if (isNearPose(pose)) {
+    if (!pose) return;
+    const arrive = type === 'trapdoor' || type === 'ladder' ? 1.25 : 1.15;
+    if (isNearPose(pose, arrive)) {
       pendingUse = null;
       pickHandler?.({ type });
       return;
     }
-    pendingUse = { type, x: pose.x, z: pose.z };
-    setMoveTarget(pose.x, pose.z + 0.7);
-    playClick('move');
+    pendingUse = { type, x: pose.x, z: pose.z, arrive };
+    const walkTo = type === 'trapdoor' || type === 'ladder'
+      ? { x: pose.x, z: pose.z }
+      : { x: pose.x, z: pose.z + 0.7 };
+    const walked = setMoveTarget(walkTo.x, walkTo.z) || setMoveTarget(pose.x, pose.z);
+    playClick(walked ? 'move' : 'ui');
   }
 
   function updatePlayer(dt, now) {
@@ -762,7 +773,7 @@ export function createWorld(canvas, state) {
         playerPath.shift();
         if (!playerPath.length) {
           moveMarker.visible = false;
-          if (pendingUse && isNearPose(pendingUse, 1.35)) {
+          if (pendingUse && isNearPose(pendingUse, pendingUse.arrive ?? 1.35)) {
             const type = pendingUse.type;
             pendingUse = null;
             pickHandler?.({ type });
@@ -772,7 +783,7 @@ export function createWorld(canvas, state) {
       return;
     }
     updateWalkPose(shopkeeper, false, dt, now);
-    if (pendingUse && isNearPose(pendingUse, 1.35)) {
+    if (pendingUse && isNearPose(pendingUse, pendingUse.arrive ?? 1.35)) {
       const type = pendingUse.type;
       pendingUse = null;
       pickHandler?.({ type });
@@ -1061,7 +1072,7 @@ export function createWorld(canvas, state) {
         return;
       }
       const hatch = gardenTrapdoorSpot(state.expansions ?? []);
-      if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 0.7) {
+      if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 1.7) {
         queueUse('trapdoor', hatch);
         return;
       }

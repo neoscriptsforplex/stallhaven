@@ -35,6 +35,15 @@ function metal(color) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.72 });
 }
 
+function pickMat() {
+  return new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+}
+
 function addShadow(mesh) {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -941,6 +950,7 @@ function addGarden(root, cells, expansionIds = []) {
   ));
   grassMesh.rotation.x = -Math.PI / 2;
   grassMesh.position.set((grass.minX + grass.maxX) / 2, -0.02, (grass.minZ + grass.maxZ) / 2);
+  grassMesh.userData.kind = 'ground';
   root.add(grassMesh);
 
   addCobblePath(root, expansionIds);
@@ -1006,6 +1016,7 @@ function addPathRect(root, minX, maxX, minZ, maxZ) {
   ));
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set((minX + maxX) / 2, -0.008, (minZ + maxZ) / 2);
+  mesh.userData.kind = 'ground';
   root.add(mesh);
 }
 
@@ -1025,6 +1036,7 @@ function addCobblePath(root, expansionIds = []) {
     ));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(FOUNTAIN.x, -0.006, FOUNTAIN.z);
+    ring.userData.kind = 'ground';
     root.add(ring);
   } else {
     addPathRect(root, span.minX, span.maxX, span.minZ, span.maxZ);
@@ -1044,28 +1056,32 @@ function buildBoulder(scale = 1) {
   return group;
 }
 
+function markTrapdoorMesh(mesh) {
+  mesh.userData.kind = 'trapdoor';
+  return mesh;
+}
+
 function buildTrapdoor() {
   const group = new THREE.Group();
   group.name = 'trapdoor';
   const frame = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.95), wood(0x3f2716)));
   frame.position.y = 0.04;
-  group.add(frame);
+  group.add(markTrapdoorMesh(frame));
   const door = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.04, 0.72), wood(0x6a4324)));
   door.position.set(0, 0.08, 0.08);
   door.rotation.x = -0.28;
-  group.add(door);
+  group.add(markTrapdoorMesh(door));
   const hinge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.03, 0.06), metal(0xb08a3c)));
   hinge.position.set(0, 0.09, -0.34);
   group.add(hinge);
   const ring = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 10), metal(0xb08a3c)));
   ring.position.set(0, 0.12, 0.22);
   group.add(ring);
-  const pick = new THREE.Mesh(
-    new THREE.BoxGeometry(1.05, 0.45, 1.05),
-    new THREE.MeshBasicMaterial({ visible: false }),
-  );
-  pick.position.y = 0.2;
-  pick.userData.kind = 'trapdoor';
+  const pick = markTrapdoorMesh(new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 1.2, 2.2),
+    pickMat(),
+  ));
+  pick.position.y = 0.55;
   group.add(pick);
   return group;
 }
@@ -1151,7 +1167,7 @@ export function buildShop(expansionIds = []) {
 
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(ROOM_W - 0.15, ROOM_D - 0.15),
-      new THREE.MeshBasicMaterial({ visible: false }),
+      pickMat(),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(c.x, 0.09, c.z);
@@ -1162,7 +1178,7 @@ export function buildShop(expansionIds = []) {
   const grass = gardenBox(expansionIds);
   const yard = new THREE.Mesh(
     new THREE.PlaneGeometry(grass.maxX - grass.minX, grass.maxZ - grass.minZ),
-    new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
+    pickMat(),
   );
   yard.rotation.x = -Math.PI / 2;
   yard.position.set((grass.minX + grass.maxX) / 2, 0.02, (grass.minZ + grass.maxZ) / 2);
@@ -1221,7 +1237,7 @@ export function buildDungeon() {
   root.add(floor);
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(W - 0.2, D - 0.2),
-    new THREE.MeshBasicMaterial({ visible: false }),
+    pickMat(),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = 0.04;
@@ -1329,22 +1345,25 @@ function buildDungeonLadder() {
   const group = new THREE.Group();
   group.name = 'ladder';
   const rail = wood(0x5a3a22);
+  const mark = (mesh) => {
+    mesh.userData.kind = 'ladder';
+    return mesh;
+  };
   for (const x of [-0.18, 0.18]) {
     const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.05), rail));
     post.position.set(x, 1.3, 0);
-    group.add(post);
+    group.add(mark(post));
   }
   for (let i = 0; i < 8; i += 1) {
     const rung = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.04, 0.05), rail));
     rung.position.set(0, 0.28 + i * 0.3, 0.02);
-    group.add(rung);
+    group.add(mark(rung));
   }
-  const pick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 2.6, 0.4),
-    new THREE.MeshBasicMaterial({ visible: false }),
-  );
-  pick.position.set(0, 1.3, 0.1);
-  pick.userData.kind = 'ladder';
+  const pick = mark(new THREE.Mesh(
+    new THREE.BoxGeometry(1.1, 2.8, 0.7),
+    pickMat(),
+  ));
+  pick.position.set(0, 1.3, 0.12);
   group.add(pick);
   return group;
 }

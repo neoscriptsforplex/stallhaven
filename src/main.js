@@ -2,9 +2,9 @@ import { RECIPES } from './game/catalog.js';
 import { completeCrafts, createState, pushLog, tickMaterials } from './game/economy.js';
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
-import { bindUploadUI, parseModelBuffer } from './game/upload.js';
+import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledLooks } from './game/upload.js';
 import { createWorld } from './game/world.js';
-import { normalizeImported } from './game/models.js';
+import { normalizeImported, setBundledLooks } from './game/models.js';
 
 const canvas = document.querySelector('#view');
 const hudRoot = document.querySelector('#hud');
@@ -22,9 +22,18 @@ function hasWebGL() {
 if (!hasWebGL()) {
   fallback.hidden = false;
 } else {
+  bootGame();
+}
+
+async function bootGame() {
   const state = createState();
     pushLog(state, 'Rune Craft is open. Craft into the chest, then trade at the counter.');
-  const world = createWorld(canvas, state);
+  const [bundledPlayer, bundledLooks] = await Promise.all([
+    loadBundledPlayerScene().catch(() => null),
+    loadBundledLooks(),
+  ]);
+  setBundledLooks(bundledLooks);
+  const world = createWorld(canvas, state, { bundledPlayer });
   window.stallhaven = { world, state };
   const hud = bindHud(hudRoot, state, world);
   window.stallhaven.hud = hud;

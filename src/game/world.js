@@ -77,6 +77,9 @@ import {
   updateWalkPose,
   wareTopY,
   wrapImportedCharacter,
+  wrapShopPlayer,
+  PLAYER_WORLD_SCALE,
+  UPLOADED_PLAYER_HEIGHT,
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
@@ -137,7 +140,7 @@ function buildClouds() {
   return group;
 }
 
-export function createWorld(canvas, state) {
+export function createWorld(canvas, state, opts = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -236,16 +239,28 @@ export function createWorld(canvas, state) {
   const dust = buildDust();
   scene.add(dust);
 
-  let shopkeeper = buildShopkeeper({
-    chefHat: Boolean(state.chefHat),
-    appearance: state.appearance,
-  });
-  shopkeeper.position.set(SHOP.keeper.x, 0, SHOP.keeper.z);
-  shopkeeper.rotation.y = 0.35;
-  shopkeeper.scale.setScalar(1.16);
-  scene.add(shopkeeper);
+  let bundledPlayerSource = opts.bundledPlayer ?? null;
   let customPlayerSource = null;
   let customCustomerSource = null;
+
+  function makeDefaultKeeper() {
+    if (bundledPlayerSource) {
+      return wrapShopPlayer(bundledPlayerSource, {
+        chefHatOn: Boolean(state.chefHat),
+      });
+    }
+    const next = buildShopkeeper({
+      chefHat: Boolean(state.chefHat),
+      appearance: state.appearance,
+    });
+    next.scale.setScalar(PLAYER_WORLD_SCALE);
+    return next;
+  }
+
+  let shopkeeper = makeDefaultKeeper();
+  shopkeeper.position.set(SHOP.keeper.x, 0, SHOP.keeper.z);
+  shopkeeper.rotation.y = 0.35;
+  scene.add(shopkeeper);
   const clouds = buildClouds();
   scene.add(clouds);
   let sceneMode = 'shop';
@@ -1956,12 +1971,7 @@ export function createWorld(canvas, state) {
       applyAllPoses();
       spawnGoblins();
       if (!customPlayerSource) {
-        const next = buildShopkeeper({
-          chefHat: Boolean(state.chefHat),
-          appearance: state.appearance,
-        });
-        next.scale.setScalar(1.16);
-        replaceShopkeeperMesh(next);
+        replaceShopkeeperMesh(makeDefaultKeeper());
       } else {
         setChefHatVisible(shopkeeper, Boolean(state.chefHat));
       }
@@ -2121,38 +2131,32 @@ export function createWorld(canvas, state) {
     },
     setAppearance(look) {
       state.appearance = look;
-      if (customPlayerSource) return false;
+      if (customPlayerSource || bundledPlayerSource) return false;
       const next = buildShopkeeper({
         chefHat: Boolean(state.chefHat),
         appearance: state.appearance,
       });
-      next.scale.setScalar(1.16);
+      next.scale.setScalar(PLAYER_WORLD_SCALE);
       replaceShopkeeperMesh(next);
       return true;
     },
     hasCustomPlayer() {
       return Boolean(customPlayerSource);
     },
+    usesBundledPlayer() {
+      return Boolean(bundledPlayerSource) && !customPlayerSource;
+    },
     setPlayerLook(model) {
       try {
         if (!model) {
           customPlayerSource = null;
-          const next = buildShopkeeper({
-            chefHat: Boolean(state.chefHat),
-            appearance: state.appearance,
-          });
-          next.scale.setScalar(1.16);
-          replaceShopkeeperMesh(next);
+          replaceShopkeeperMesh(makeDefaultKeeper());
           return { ok: true };
         }
-        const wrapped = wrapImportedCharacter(model, {
-          name: 'shopkeeper',
-          label: 'You',
-          height: 1.72,
-          chefHat: true,
+        const wrapped = wrapShopPlayer(model, {
+          height: UPLOADED_PLAYER_HEIGHT,
           chefHatOn: Boolean(state.chefHat),
         });
-        wrapped.scale.setScalar(1.16);
         customPlayerSource = model;
         replaceShopkeeperMesh(wrapped);
         return { ok: true };
@@ -2238,12 +2242,7 @@ export function createWorld(canvas, state) {
         slot.anchor.add(slot.wareAnchor);
         void i;
       });
-      const next = buildShopkeeper({
-        chefHat: Boolean(state.chefHat),
-        appearance: state.appearance,
-      });
-      next.scale.setScalar(1.16);
-      replaceShopkeeperMesh(next);
+      replaceShopkeeperMesh(makeDefaultKeeper());
       rebuildCustomerMeshes();
       syncDisplays();
       refreshSelection(true);

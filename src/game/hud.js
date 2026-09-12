@@ -1909,7 +1909,9 @@ export function bindHud(root, state, world) {
     if (note) {
       note.textContent = world.hasCustomPlayer?.()
         ? 'A custom player mesh is active. Walking still works; hair and colour customizer may not apply until you clear the upload.'
-        : 'Hair, shirt, legs, boots, and face hair save with the shop.';
+        : world.usesBundledPlayer?.()
+          ? 'The default adventurer is a baked mesh; hair and colour customizer does not change it.'
+          : 'Hair, shirt, legs, boots, and face hair save with the shop.';
     }
   }
 

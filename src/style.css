@@ -896,8 +896,8 @@ body.modal-open #view {
 }
 
 #help-btn {
-  font-size: 1.15rem;
-  line-height: 1;
+  min-width: 4.4rem;
+  font-weight: 700;
 }
 
 .expand-dock {

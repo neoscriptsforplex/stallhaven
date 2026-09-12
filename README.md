@@ -31,7 +31,7 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 
 You start with 40 gold. Bronze gear, a Staff, Blue D'hide, and Bread are unlocked.
 
-The **?** button opens Help (click-to-walk, anvil, range, chest, and the rest of How to play).
+The **Help** button opens the how-to-play panel (click-to-walk, anvil, range, chest, and the rest of How to play).
 
 ## Unlock lines
 

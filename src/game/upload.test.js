@@ -1,6 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import './canvas-mock.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
+import { bundledModelBases, parseModelBuffer } from './upload.js';
 import { UPLOADS_CLEARED } from './storage.js';
 
 function file(name) {
@@ -42,5 +47,28 @@ describe('clear uploads copy', () => {
   it('tells the player default looks are back', () => {
     assert.match(UPLOADS_CLEARED, /cleared uploaded models/i);
     assert.match(UPLOADS_CLEARED, /default looks/i);
+  });
+});
+
+describe('bundled model paths', () => {
+  it('looks under models/ and public/models/ so githack source trees can load dumps', () => {
+    const bases = bundledModelBases('player');
+    assert.ok(bases.some((base) => base.endsWith('models/player/')));
+    assert.ok(bases.some((base) => base.includes('public/models/player/')));
+  });
+
+  it('still parses an OBJ when its MTL sidecar is garbage', async () => {
+    const objPath = join(dirname(fileURLToPath(import.meta.url)), '../../public/models/rock/rock.obj');
+    const obj = readFileSync(objPath);
+    const scene = await parseModelBuffer(
+      obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength),
+      'rock.obj',
+      { 'rock.mtl': new TextEncoder().encode('%%% not a material file \0\0').buffer },
+    );
+    let meshes = 0;
+    scene.traverse((child) => {
+      if (child.isMesh) meshes += 1;
+    });
+    assert.ok(meshes > 0);
   });
 });

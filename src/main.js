@@ -28,18 +28,14 @@ if (!hasWebGL()) {
 async function bootGame() {
   const state = createState();
     pushLog(state, 'Rune Craft is open. Craft into the chest, then trade at the counter.');
-  const [bundledPlayer, bundledLooks] = await Promise.all([
-    loadBundledPlayerScene().catch(() => null),
-    loadBundledLooks(),
-  ]);
-  setBundledLooks(bundledLooks);
-  const world = createWorld(canvas, state, { bundledPlayer });
+  // Build the procedural shop first so a dumped OBJ/MTL cannot blank the canvas.
+  const world = createWorld(canvas, state, { bundledPlayer: null });
   window.stallhaven = {
     world,
     state,
     bundled: {
-      player: Boolean(bundledPlayer),
-      looks: Object.keys(bundledLooks),
+      player: false,
+      looks: [],
     },
   };
   const hud = bindHud(hudRoot, state, world);
@@ -50,6 +46,28 @@ async function bootGame() {
     state,
     world,
     onChange: () => hud.render(performance.now() / 1000),
+  });
+
+  Promise.all([
+    loadBundledPlayerScene().catch((err) => {
+      console.warn('Bundled player skipped:', err?.message || err);
+      return null;
+    }),
+    loadBundledLooks(),
+  ]).then(([bundledPlayer, bundledLooks]) => {
+    try {
+      setBundledLooks(bundledLooks);
+      world.applyBundledDefaults?.(bundledPlayer);
+      window.stallhaven.bundled = {
+        player: Boolean(bundledPlayer),
+        looks: Object.keys(bundledLooks ?? {}),
+      };
+    } catch (err) {
+      console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
+    }
+    hud.render(performance.now() / 1000);
+  }).catch((err) => {
+    console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
   });
 
   loadModels().then(async (records) => {

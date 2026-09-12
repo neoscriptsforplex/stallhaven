@@ -58,10 +58,14 @@ function parseObjBuffer(buffer, sidecars = {}) {
   const objLoader = new OBJLoader(manager);
   const mtlEntry = Object.entries(sidecars).find(([name]) => name.toLowerCase().endsWith('.mtl'));
   if (mtlEntry) {
-    const mtlLoader = new MTLLoader(manager);
-    const materials = mtlLoader.parse(decodeText(mtlEntry[1]), '');
-    materials.preload();
-    objLoader.setMaterials(materials);
+    try {
+      const mtlLoader = new MTLLoader(manager);
+      const materials = mtlLoader.parse(decodeText(mtlEntry[1]), '');
+      materials.preload();
+      objLoader.setMaterials(materials);
+    } catch (err) {
+      console.warn('MTL parse failed; loading OBJ without materials.', err?.message || err);
+    }
   }
   const group = objLoader.parse(objText);
   if (!hasMesh(group)) throw new Error('That .obj has no mesh.');
@@ -141,27 +145,67 @@ function assertObjPayload(buffer, label) {
   return buffer;
 }
 
-async function fetchObjMtl(folder, objFile, mtlFile) {
-  const base = `${import.meta.env.BASE_URL}models/${folder}/`;
-  const objRes = await fetch(`${base}${objFile}`);
-  if (!objRes.ok) {
-    const err = new Error(`Missing models/${folder}/${objFile}`);
-    err.code = 'MISSING_MODEL';
-    throw err;
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function envBaseUrl() {
+  try {
+    return import.meta.env.BASE_URL || './';
+  } catch {
+    return './';
   }
-  const objBuffer = assertObjPayload(await objRes.arrayBuffer(), `models/${folder}/${objFile}`);
-  const mtlRes = mtlFile ? await fetch(`${base}${mtlFile}`) : { ok: false };
-  const sidecars = {};
-  if (mtlRes.ok) {
-    const mtlBuffer = await mtlRes.arrayBuffer();
+}
+
+export function bundledModelBases(folder) {
+  const raw = envBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const bases = [
+    `${envBase}models/${folder}/`,
+    `${envBase}public/models/${folder}/`,
+  ];
+  if (envBase !== './') {
+    bases.push(`./models/${folder}/`, `./public/models/${folder}/`);
+  }
+  return [...new Set(bases)];
+}
+
+function missingModel(label) {
+  const err = new Error(`Missing ${label}`);
+  err.code = 'MISSING_MODEL';
+  return err;
+}
+
+async function fetchObjMtl(folder, objFile, mtlFile) {
+  let lastMissing = missingModel(`models/${folder}/${objFile}`);
+  for (const base of bundledModelBases(folder)) {
     try {
-      assertObjPayload(mtlBuffer, `models/${folder}/${mtlFile}`);
-      sidecars[mtlFile] = mtlBuffer;
-    } catch {
-      // Ignore an HTML fallback for a missing .mtl; the OBJ can still load.
+      const objRes = await fetch(`${base}${objFile}`);
+      if (!objRes.ok) {
+        lastMissing = missingModel(`models/${folder}/${objFile}`);
+        continue;
+      }
+      const objBuffer = assertObjPayload(await objRes.arrayBuffer(), `models/${folder}/${objFile}`);
+      const sidecars = {};
+      if (mtlFile) {
+        const mtlRes = await fetch(`${base}${mtlFile}`);
+        if (mtlRes.ok) {
+          const mtlBuffer = await mtlRes.arrayBuffer();
+          try {
+            assertObjPayload(mtlBuffer, `models/${folder}/${mtlFile}`);
+            sidecars[mtlFile] = mtlBuffer;
+          } catch {
+            // Ignore an HTML fallback for a missing .mtl; the OBJ can still load.
+          }
+        }
+      }
+      return parseModelBuffer(objBuffer, objFile, sidecars);
+    } catch (err) {
+      if (err?.code === 'MISSING_MODEL') {
+        lastMissing = err;
+        continue;
+      }
+      throw err;
     }
   }
-  return parseModelBuffer(objBuffer, objFile, sidecars);
+  throw lastMissing;
 }
 
 /** Fetch the shipped LilRunnerBoi OBJ+MTL from the static /models/player/ folder. */
@@ -185,15 +229,19 @@ export async function loadBundledPropScene(folder) {
 }
 
 export async function loadBundledLooks() {
-  const looks = {};
-  for (const { id, folder } of BUNDLED_PROP_FOLDERS) {
+  const entries = await Promise.all(BUNDLED_PROP_FOLDERS.map(async ({ id, folder }) => {
     try {
-      looks[id] = await loadBundledPropScene(folder);
+      return [id, await loadBundledPropScene(folder)];
     } catch (err) {
       if (err?.code !== 'MISSING_MODEL') {
         console.warn(`Bundled ${id} model skipped:`, err?.message || err);
       }
+      return [id, null];
     }
+  }));
+  const looks = {};
+  for (const [id, scene] of entries) {
+    if (scene) looks[id] = scene;
   }
   return looks;
 }

@@ -1039,6 +1039,7 @@ export function buildWare(recipeId) {
     summer_pie: () => addPie(group, tint, 0xe8a04a),
     anglerfish: () => addFish(group, tint, 1.22, true),
     potion: () => addPotion(group, tint),
+    bar: () => addMetalBar(group, tint),
   };
   if (builders[shape]) builders[shape]();
   else {
@@ -1060,6 +1061,54 @@ function metal(color) {
     roughness: 0.35,
     metalness: 0.72,
   });
+}
+
+/** Loft rectangular rings into a solid (flat-shaded). Rings are { y, w, d }. */
+function rectLoftGeometry(rings) {
+  const pos = [];
+  const quad = (a, b, c, d) => {
+    pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    pos.push(a[0], a[1], a[2], c[0], c[1], c[2], d[0], d[1], d[2]);
+  };
+  const ring = (r) => {
+    const hw = r.w * 0.5;
+    const hd = r.d * 0.5;
+    return [
+      [-hw, r.y, -hd],
+      [hw, r.y, -hd],
+      [hw, r.y, hd],
+      [-hw, r.y, hd],
+    ];
+  };
+  const pts = rings.map(ring);
+  const bottom = pts[0];
+  quad(bottom[0], bottom[3], bottom[2], bottom[1]);
+  for (let i = 0; i < pts.length - 1; i += 1) {
+    const lo = pts[i];
+    const hi = pts[i + 1];
+    for (let k = 0; k < 4; k += 1) {
+      const n = (k + 1) % 4;
+      quad(lo[k], lo[n], hi[n], hi[k]);
+    }
+  }
+  const top = pts[pts.length - 1];
+  quad(top[0], top[1], top[2], top[3]);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Cast ingot: rectangular base, mid shoulder, tapered frustum top. Tint only changes per metal. */
+function addMetalBar(group, tint) {
+  const iron = metal(tint);
+  const mesh = addShadow(new THREE.Mesh(rectLoftGeometry([
+    { y: 0, w: 0.38, d: 0.2 },
+    { y: 0.052, w: 0.38, d: 0.2 },
+    { y: 0.06, w: 0.35, d: 0.185 },
+    { y: 0.132, w: 0.22, d: 0.115 },
+  ]), iron));
+  group.add(mesh);
 }
 
 function glow(color) {

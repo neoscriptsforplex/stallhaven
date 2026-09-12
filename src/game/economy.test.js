@@ -745,6 +745,15 @@ describe('cauldron unlock', () => {
 });
 
 describe('furnace and spinning wheel', () => {
+  it('uses one ingot shape for every metal bar, tinted per tier', () => {
+    for (const metal of METALS) {
+      const recipe = RECIPES[`smelt_${metal.id}`];
+      assert.equal(recipe.shape, 'bar', metal.id);
+      assert.equal(recipe.tint, metal.tint, metal.id);
+      assert.equal(recipe.outputMaterial, `${metal.id}_bar`);
+    }
+  });
+
   it('starts with a free furnace beside the anvil and smelts ore into a bar', () => {
     const state = createState();
     assert.equal(ownsFurnace(state), true);

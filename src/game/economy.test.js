@@ -69,7 +69,9 @@ import {
   sellToCustomer,
   serializeState,
   shopProgress,
+  maxCraftActions,
   startCraft,
+  startCraftBatch,
   swapOffer,
   tickMaterials,
   unlockRemaining,
@@ -1194,6 +1196,41 @@ describe('potion sell prices', () => {
     assert.equal(offer.recipeId, 'strength_potion');
     assert.equal(offer.listPrice, 1000);
     assert.equal(offer.gold, 650);
+  });
+});
+
+describe('craft batches', () => {
+  it('queues five affordable crafts and finishes them in sequence', () => {
+    const state = createState();
+    state.materials.bronze_bar = 8;
+    assert.equal(maxCraftActions(state, 'bronze_sword'), 8);
+    assert.equal(startCraftBatch(state, 'bronze_sword', 5, 0), 5);
+    assert.equal(state.materials.bronze_bar, 3);
+    assert.equal(state.crafts.bronze_sword.left, 5);
+    assert.equal(state.chest.bronze_sword, undefined);
+    assert.deepEqual(completeCrafts(state, 2.9), []);
+    assert.deepEqual(completeCrafts(state, 3), ['bronze_sword']);
+    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.crafts.bronze_sword.left, 4);
+    assert.deepEqual(completeCrafts(state, 3 + RECIPES.bronze_sword.time * 4), [
+      'bronze_sword', 'bronze_sword', 'bronze_sword', 'bronze_sword',
+    ]);
+    assert.equal(state.chest.bronze_sword, 5);
+    assert.equal(state.crafts.bronze_sword, undefined);
+    assert.equal(state.craftCounts.bronze_sword, 5);
+  });
+
+  it('caps Max by materials and does not craft locked tiers', () => {
+    const state = createState();
+    state.materials.bronze_bar = 2;
+    state.materials.logs = 40;
+    assert.equal(maxCraftActions(state, 'bronze_arrows'), 2);
+    assert.equal(startCraftBatch(state, 'bronze_arrows', 'max', 0), 2);
+    assert.equal(completeCrafts(state, 100).length, 2);
+    assert.equal(state.chest.bronze_arrows, 40);
+    assert.equal(state.craftCounts.bronze_arrows, 2);
+    assert.equal(maxCraftActions(state, 'iron_arrows'), 0);
+    assert.equal(startCraftBatch(state, 'iron_arrows', 5, 0), 0);
   });
 });
 

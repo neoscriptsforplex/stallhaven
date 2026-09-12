@@ -295,6 +295,15 @@ export function buildStall() {
 }
 
 export function buildCounter() {
+  const bundled = getBundledLook('counter');
+  if (bundled) {
+    const target = buildProceduralCounter();
+    return wrapBundledProp(bundled, target, { name: 'counter', fit: 'xz' });
+  }
+  return buildProceduralCounter();
+}
+
+function buildProceduralCounter() {
   const group = new THREE.Group();
   group.name = 'counter';
   const top = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 0.85), woodSurface(0x7a5230, 0.84, 1.6, 0.7, 4211)));
@@ -316,6 +325,15 @@ export function buildCounter() {
 }
 
 export function buildDefaultTable() {
+  const bundled = getBundledLook('table');
+  if (bundled) {
+    const target = buildProceduralTable();
+    return wrapBundledProp(bundled, target, { name: 'table', fit: 'xz', wareY: 'top' });
+  }
+  return buildProceduralTable();
+}
+
+function buildProceduralTable() {
   const group = new THREE.Group();
   group.name = 'table';
   const oak = woodSurface(0x8a5a32, 0.86, 1.1, 0.7, 4211);
@@ -1947,6 +1965,17 @@ function addPie(group, tint, filling) {
 }
 
 export function buildChest() {
+  const bundled = getBundledLook('chest');
+  if (bundled) {
+    const target = buildProceduralChest();
+    const fitted = wrapBundledProp(bundled, target, { name: 'chest', fit: 'height', label: 'Chest' });
+    fitted.userData.lid = fitted.userData.lid ?? null;
+    return fitted;
+  }
+  return buildProceduralChest();
+}
+
+function buildProceduralChest() {
   const root = new THREE.Group();
   root.name = 'chest';
   const oak = woodSurface(0xc49a62, 0.88, 1, 1, 4211);
@@ -2669,6 +2698,22 @@ export function buildAdventurer(typeId, opts = {}) {
 }
 
 export function buildGoblin() {
+  const bundled = getBundledLook('goblin');
+  if (bundled) {
+    const target = buildProceduralGoblin();
+    const height = Math.max(0.55, measureVisibleMeshHeight(target));
+    const wrapped = wrapImportedCharacter(bundled, {
+      name: 'goblin',
+      label: false,
+      height,
+      pickKind: 'goblin',
+    });
+    return wrapped;
+  }
+  return buildProceduralGoblin();
+}
+
+function buildProceduralGoblin() {
   const group = new THREE.Group();
   group.name = 'goblin';
   const body = new THREE.Group();
@@ -2886,6 +2931,130 @@ export function buildDust() {
   return points;
 }
 
+/** World scale applied to the stock keeper and imported player stand-ins. */
+export const PLAYER_WORLD_SCALE = 1.16;
+/** Height used when wrapping a user-uploaded player mesh. */
+export const UPLOADED_PLAYER_HEIGHT = 1.72;
+
+function ancestorHidden(obj) {
+  for (let node = obj; node; node = node.parent) {
+    if (node.visible === false) return true;
+  }
+  return false;
+}
+
+/** Axis-aligned mesh height, skipping tools, labels, and hidden helpers. */
+export function measureVisibleMeshHeight(root) {
+  if (!root) return 0;
+  let top = root;
+  while (top.parent) top = top.parent;
+  top.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  let any = false;
+  root.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    if (ancestorHidden(child)) return;
+    if (child.userData?.skipWalk) return;
+    if (child.material && child.material.visible === false) return;
+    const name = child.name || '';
+    if (/pickaxe|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
+    box.expandByObject(child);
+    any = true;
+  });
+  if (!any || box.isEmpty()) return 0;
+  return Math.max(0, box.max.y - box.min.y);
+}
+
+let cachedProceduralHeight = 0;
+
+/** Unscaled stock humanoid height used to fit imported default players. */
+export function proceduralPlayerFitHeight() {
+  if (cachedProceduralHeight) return cachedProceduralHeight;
+  const keeper = buildShopkeeper({ chefHat: false });
+  if (keeper.userData.pickaxe) keeper.userData.pickaxe.visible = false;
+  for (const hammer of keeper.userData.hammers ?? []) hammer.visible = false;
+  if (keeper.userData.chefHat) keeper.userData.chefHat.visible = false;
+  cachedProceduralHeight = Math.max(0.9, measureVisibleMeshHeight(keeper));
+  return cachedProceduralHeight;
+}
+
+/** Wrap an imported mesh as the shop player: height-fit, feet on floor, shared walk. */
+export function wrapShopPlayer(source, opts = {}) {
+  const wrapped = wrapImportedCharacter(source, {
+    name: opts.name ?? 'shopkeeper',
+    label: opts.label ?? 'You',
+    height: opts.height ?? proceduralPlayerFitHeight(),
+    chefHat: opts.chefHat !== false,
+    chefHatOn: Boolean(opts.chefHatOn),
+  });
+  wrapped.scale.setScalar(PLAYER_WORLD_SCALE);
+  return wrapped;
+}
+
+const bundledLooks = Object.create(null);
+
+export function setBundledLook(id, scene) {
+  if (scene) bundledLooks[id] = scene;
+  else delete bundledLooks[id];
+}
+
+export function getBundledLook(id) {
+  return bundledLooks[id] ?? null;
+}
+
+export function setBundledLooks(map = {}) {
+  for (const [id, scene] of Object.entries(map)) setBundledLook(id, scene);
+}
+
+export function measureVisibleBox(root) {
+  if (!root) return new THREE.Box3();
+  let top = root;
+  while (top.parent) top = top.parent;
+  top.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  let any = false;
+  root.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    if (ancestorHidden(child)) return;
+    if (child.userData?.skipWalk) return;
+    if (child.material && child.material.visible === false) return;
+    const name = child.name || '';
+    if (/pickaxe|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
+    box.expandByObject(child);
+    any = true;
+  });
+  return any && !box.isEmpty() ? box : new THREE.Box3();
+}
+
+/** Uniform-scale an imported mesh to a target bbox; sit on the floor; no stretch. */
+export function wrapBundledProp(source, target, opts = {}) {
+  if (!source) return null;
+  const mesh = source.clone(true);
+  const tbox = opts.targetBox ?? measureVisibleBox(target);
+  const tsize = tbox.getSize(new THREE.Vector3());
+  const targetSize = opts.fit === 'xz'
+    ? Math.max(tsize.x, tsize.z, 0.0001)
+    : opts.fit === 'max'
+      ? Math.max(tsize.x, tsize.y, tsize.z, 0.0001)
+      : Math.max(tsize.y, 0.0001);
+  const fit = opts.fit === 'xz' ? 'xz' : opts.fit === 'max' ? 'max' : 'height';
+  normalizeImported(mesh, targetSize, true, { fit });
+  mesh.name = opts.name ?? mesh.name ?? 'prop';
+  if (opts.wareY === 'top') {
+    const box = measureVisibleBox(mesh);
+    mesh.userData.wareY = box.max.y + 0.02;
+  } else if (opts.wareY != null) {
+    mesh.userData.wareY = opts.wareY;
+  }
+  if (opts.label) {
+    const tag = makeNameSprite(opts.label);
+    const box = measureVisibleBox(mesh);
+    tag.position.y = box.max.y + 0.18;
+    mesh.add(tag);
+  }
+  return mesh;
+}
+
 export function normalizeImported(root, targetSize, sitOnFloor = true, opts = {}) {
   root.updateMatrixWorld(true);
   const rs = root.scale;
@@ -2898,7 +3067,9 @@ export function normalizeImported(root, targetSize, sitOnFloor = true, opts = {}
   const size = box.getSize(new THREE.Vector3());
   const dim = opts.fit === 'height'
     ? Math.max(size.y, 0.0001)
-    : Math.max(size.x, size.y, size.z, 0.0001);
+    : opts.fit === 'xz'
+      ? Math.max(size.x, size.z, 0.0001)
+      : Math.max(size.x, size.y, size.z, 0.0001);
   root.scale.multiplyScalar(targetSize / dim);
   root.updateMatrixWorld(true);
   const box2 = new THREE.Box3().setFromObject(root);
@@ -3095,9 +3266,11 @@ export function wrapImportedCharacter(source, opts = {}) {
     throw new Error('That file has no visible mesh.');
   }
   const height = Math.max(0.9, box.max.y - Math.min(0, box.min.y));
-  const label = makeNameSprite(opts.label ?? 'You');
-  label.position.y = height + 0.18;
-  group.add(label);
+  if (opts.label !== false) {
+    const label = makeNameSprite(opts.label ?? 'You');
+    label.position.y = height + 0.18;
+    group.add(label);
+  }
 
   if (opts.speech) {
     const speech = makeSpeechSprite('…');

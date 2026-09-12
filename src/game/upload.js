@@ -107,6 +107,97 @@ export function parseModelBuffer(buffer, name, sidecars = {}) {
   });
 }
 
+export const BUNDLED_PLAYER_DIR = 'models/player';
+
+export const BUNDLED_PROP_FOLDERS = [
+  { id: 'chest', folder: 'chest' },
+  { id: 'furnace', folder: 'furnace' },
+  { id: 'range', folder: 'range' },
+  { id: 'goblin', folder: 'goblin' },
+  { id: 'rat', folder: 'rat' },
+  { id: 'table', folder: 'table' },
+  { id: 'counter', folder: 'counter' },
+  { id: 'tree', folder: 'tree' },
+  { id: 'flowers', folder: 'flowers' },
+  { id: 'rock', folder: 'rock' },
+  { id: 'fountain', folder: 'fountain' },
+  { id: 'skeleton', folder: 'skeleton' },
+];
+
+export async function parseBundledPlayerBuffers(objBuffer, mtlBuffer) {
+  const sidecars = {};
+  if (mtlBuffer) sidecars['player.mtl'] = mtlBuffer;
+  return parseModelBuffer(objBuffer, 'player.obj', sidecars);
+}
+
+function assertObjPayload(buffer, label) {
+  const text = decodeText(buffer);
+  const start = text.trimStart();
+  if (!start || start.startsWith('<!') || /^<html/i.test(start)) {
+    const err = new Error(`Missing ${label}`);
+    err.code = 'MISSING_MODEL';
+    throw err;
+  }
+  return buffer;
+}
+
+async function fetchObjMtl(folder, objFile, mtlFile) {
+  const base = `${import.meta.env.BASE_URL}models/${folder}/`;
+  const objRes = await fetch(`${base}${objFile}`);
+  if (!objRes.ok) {
+    const err = new Error(`Missing models/${folder}/${objFile}`);
+    err.code = 'MISSING_MODEL';
+    throw err;
+  }
+  const objBuffer = assertObjPayload(await objRes.arrayBuffer(), `models/${folder}/${objFile}`);
+  const mtlRes = mtlFile ? await fetch(`${base}${mtlFile}`) : { ok: false };
+  const sidecars = {};
+  if (mtlRes.ok) {
+    const mtlBuffer = await mtlRes.arrayBuffer();
+    try {
+      assertObjPayload(mtlBuffer, `models/${folder}/${mtlFile}`);
+      sidecars[mtlFile] = mtlBuffer;
+    } catch {
+      // Ignore an HTML fallback for a missing .mtl; the OBJ can still load.
+    }
+  }
+  return parseModelBuffer(objBuffer, objFile, sidecars);
+}
+
+/** Fetch the shipped LilRunnerBoi OBJ+MTL from the static /models/player/ folder. */
+export async function loadBundledPlayerScene() {
+  return fetchObjMtl('player', 'player.obj', 'player.mtl');
+}
+
+export async function loadBundledPropScene(folder) {
+  const names = [`${folder}.obj`, 'model.obj', 'player.obj'];
+  let lastErr = null;
+  for (const objFile of names) {
+    const mtlFile = objFile.replace(/\.obj$/i, '.mtl');
+    try {
+      return await fetchObjMtl(folder, objFile, mtlFile);
+    } catch (err) {
+      lastErr = err;
+      if (err?.code === 'MISSING_MODEL') break;
+    }
+  }
+  throw lastErr ?? new Error(`Missing bundled ${folder} model.`);
+}
+
+export async function loadBundledLooks() {
+  const looks = {};
+  for (const { id, folder } of BUNDLED_PROP_FOLDERS) {
+    try {
+      looks[id] = await loadBundledPropScene(folder);
+    } catch (err) {
+      if (err?.code !== 'MISSING_MODEL') {
+        console.warn(`Bundled ${id} model skipped:`, err?.message || err);
+      }
+    }
+  }
+  return looks;
+}
+
 export async function parseModelFiles(files) {
   const classified = classifyModelFiles(files);
   if (classified.error) throw new Error(classified.error);

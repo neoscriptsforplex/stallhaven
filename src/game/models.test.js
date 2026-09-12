@@ -1,22 +1,33 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
 import * as THREE from 'three';
 import {
   CUSTOMER_LOOKS,
+  PLAYER_WORLD_SCALE,
   buildAdventurer,
   buildAnvil,
   buildChest,
+  buildCounter,
   buildGoblin,
   buildPickaxe,
   buildShopkeeper,
+  measureVisibleBox,
+  measureVisibleMeshHeight,
+  proceduralPlayerFitHeight,
   setHeldTool,
   updateMinePose,
   updateWalkPose,
+  wrapBundledProp,
   wrapImportedCharacter,
+  wrapShopPlayer,
 } from './models.js';
+import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { pointHitsShop } from './layout.js';
-import { buildFurnace, buildRat, buildShop, buildTree } from './shopbuild.js';
+import { buildFountain, buildFurnace, buildRat, buildShop, buildTree, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -232,6 +243,146 @@ describe('uploaded player walk', () => {
     updateWalkPose(wrapped, true, 0.2, 1);
     assert.ok(Math.abs(body.scale.y - restY) < restY * 0.08);
     assert.ok(Math.abs(body.scale.x - body.scale.z) < 1e-6);
+  });
+});
+
+describe('bundled default player', () => {
+  const playerDir = join(dirname(fileURLToPath(import.meta.url)), '../../public/models/player');
+
+  async function loadBundled() {
+    const obj = readFileSync(join(playerDir, 'player.obj'));
+    const mtl = readFileSync(join(playerDir, 'player.mtl'));
+    return parseBundledPlayerBuffers(obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength), mtl.buffer.slice(mtl.byteOffset, mtl.byteOffset + mtl.byteLength));
+  }
+
+  it('fits LilRunnerBoi to the stock humanoid height without stretch', async () => {
+    const scene = await loadBundled();
+    const wrapped = wrapShopPlayer(scene, { chefHat: false });
+    const keeper = buildShopkeeper({ chefHat: false });
+    keeper.scale.setScalar(PLAYER_WORLD_SCALE);
+    if (keeper.userData.pickaxe) keeper.userData.pickaxe.visible = false;
+    for (const hammer of keeper.userData.hammers ?? []) hammer.visible = false;
+    if (keeper.userData.chefHat) keeper.userData.chefHat.visible = false;
+
+    const body = wrapped.userData.walkBody;
+    assert.ok(body);
+    assert.ok(Math.abs(body.scale.x - body.scale.y) < 1e-6);
+    assert.ok(Math.abs(body.scale.y - body.scale.z) < 1e-6);
+    const got = measureVisibleMeshHeight(body);
+    const want = measureVisibleMeshHeight(keeper);
+    assert.ok(Math.abs(got - want) < 0.08, `height ${got} vs procedural ${want}`);
+    const box = new THREE.Box3().setFromObject(body);
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `feet should sit on the floor, minY=${box.min.y}`);
+    assert.ok(Math.abs(proceduralPlayerFitHeight() - want / PLAYER_WORLD_SCALE) < 0.08);
+  });
+
+  it('uses the shared walk and mining poses on the bundled mesh', async () => {
+    const scene = await loadBundled();
+    const wrapped = wrapShopPlayer(scene, { chefHat: false });
+    assert.ok(wrapped.userData.rig?.legL);
+    assert.ok(wrapped.userData.walkMode);
+    assert.ok(wrapped.userData.pickaxe);
+    assert.equal(wrapped.userData.pickaxe.parent, wrapped.userData.hand);
+    const restLeg = wrapped.userData.rig.legL.rotation.x;
+    updateWalkPose(wrapped, true, 0.2, 1);
+    assert.notEqual(wrapped.userData.rig.legL.rotation.x, restLeg);
+    setHeldTool(wrapped, 'pickaxe');
+    assert.equal(wrapped.userData.pickaxe.visible, true);
+    const restArm = wrapped.userData.rig.armR.rotation.x;
+    updateMinePose(wrapped, 0.2, 0.4);
+    assert.notEqual(wrapped.userData.rig.armR.rotation.x, restArm);
+  });
+});
+
+describe('bundled prop swaps', () => {
+  const modelsRoot = join(dirname(fileURLToPath(import.meta.url)), '../../public/models');
+
+  async function loadFolder(folder) {
+    const obj = readFileSync(join(modelsRoot, folder, `${folder}.obj`));
+    const mtl = readFileSync(join(modelsRoot, folder, `${folder}.mtl`));
+    return parseModelBuffer(
+      obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength),
+      `${folder}.obj`,
+      { [`${folder}.mtl`]: mtl.buffer.slice(mtl.byteOffset, mtl.byteOffset + mtl.byteLength) },
+    );
+  }
+
+  function assertUniform(mesh) {
+    assert.ok(Math.abs(mesh.scale.x - mesh.scale.y) < 1e-6);
+    assert.ok(Math.abs(mesh.scale.y - mesh.scale.z) < 1e-6);
+  }
+
+  function assertGrounded(mesh) {
+    const box = measureVisibleBox(mesh);
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `feet should sit on the floor, minY=${box.min.y}`);
+  }
+
+  it('lists the shipped prop folders and skips a missing goblin dump', () => {
+    const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
+    for (const id of ['chest', 'furnace', 'range', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
+      assert.ok(ids.includes(id), id);
+    }
+    assert.ok(ids.includes('goblin'));
+  });
+
+  it('fits bundled trees, counters, flowers, rocks, and skeletons without stretch', async () => {
+    const tree = wrapBundledProp(await loadFolder('tree'), buildTree(1), { name: 'pine', fit: 'height' });
+    assert.equal(tree.name, 'pine');
+    assertUniform(tree);
+    assertGrounded(tree);
+    const treeBox = measureVisibleBox(tree);
+    const pineBox = measureVisibleBox(buildTree(1));
+    assert.ok(Math.abs(treeBox.max.y - pineBox.max.y) < 0.08, `tree height ${treeBox.max.y} vs ${pineBox.max.y}`);
+
+    const counter = wrapBundledProp(await loadFolder('counter'), buildCounter(), { name: 'counter', fit: 'xz' });
+    assertUniform(counter);
+    assertGrounded(counter);
+    const cGot = measureVisibleBox(counter).getSize(new THREE.Vector3());
+    const cWant = measureVisibleBox(buildCounter()).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(cGot.x, cGot.z) - Math.max(cWant.x, cWant.z)) < 0.12);
+
+    const flowers = wrapBundledProp(await loadFolder('flowers'), new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.22, 0.55)), { name: 'flowers', fit: 'max' });
+    assertUniform(flowers);
+    assertGrounded(flowers);
+
+    const rock = wrapBundledProp(await loadFolder('rock'), new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.28, 0.45)), { name: 'rock', fit: 'max' });
+    assertUniform(rock);
+    assertGrounded(rock);
+
+    const slump = new THREE.Group();
+    const slumpMesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.3));
+    slumpMesh.position.y = 0.25;
+    slump.add(slumpMesh);
+    const skeleton = wrapBundledProp(await loadFolder('skeleton'), slump, { name: 'skeleton', fit: 'height' });
+    assert.equal(skeleton.name, 'skeleton');
+    assertUniform(skeleton);
+    assertGrounded(skeleton);
+    const skBox = measureVisibleBox(skeleton);
+    assert.ok(Math.abs(skBox.max.y - 0.5) < 0.08, `skeleton height ${skBox.max.y}`);
+  });
+
+  it('keeps fountain water pouring from the top of a bundled body', async () => {
+    const target = buildFountain();
+    if (target.userData.fountainWater) {
+      for (const child of [...target.children]) {
+        if (child.name?.startsWith('fountain-')) target.remove(child);
+      }
+      delete target.userData.fountainWater;
+    }
+    const body = wrapBundledProp(await loadFolder('fountain'), target, { name: 'fountain-body', fit: 'height' });
+    assertUniform(body);
+    assertGrounded(body);
+    const group = new THREE.Group();
+    group.name = 'fountain';
+    group.add(body);
+    mountFountainWater(group);
+    assert.ok(group.userData.fountainWater);
+    assert.ok(group.getObjectByName('fountain-stream'));
+    assert.ok(group.getObjectByName('fountain-drops'));
+    const stone = measureVisibleBox(body);
+    const fx = group.userData.fountainWater;
+    assert.ok(Math.abs(fx.fallStart - stone.max.y) < 0.02, `stream should start at the spout, ${fx.fallStart} vs ${stone.max.y}`);
+    assert.ok(fx.fallStart > fx.fallEnd);
   });
 });
 

@@ -23,6 +23,7 @@ import {
 import { METALS } from './catalog.js';
 import { initRatWander } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
+import { getBundledLook, measureVisibleBox, wrapBundledProp } from './models.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.04 });
@@ -760,6 +761,15 @@ function addWallVines(root, center) {
 }
 
 export function buildRange() {
+  const bundled = getBundledLook('range');
+  if (bundled) {
+    const target = buildProceduralRange();
+    return wrapBundledProp(bundled, target, { name: 'range', fit: 'height', label: 'Range', wareY: 'top' });
+  }
+  return buildProceduralRange();
+}
+
+function buildProceduralRange() {
   const group = new THREE.Group();
   group.name = 'range';
   const iron = sootMetal(0x4a4e54, 0.5, 0.6);
@@ -849,6 +859,15 @@ export function buildCauldron() {
 }
 
 export function buildFurnace() {
+  const bundled = getBundledLook('furnace');
+  if (bundled) {
+    const target = buildProceduralFurnace();
+    return wrapBundledProp(bundled, target, { name: 'furnace', fit: 'height', label: 'Furnace', wareY: 'top' });
+  }
+  return buildProceduralFurnace();
+}
+
+function buildProceduralFurnace() {
   const group = new THREE.Group();
   group.name = 'furnace';
   const brick = brickSurface(0x8a9098, 0.9);
@@ -941,6 +960,15 @@ function makeNameSprite(text) {
 }
 
 export function buildTree(scale = 1) {
+  const target = buildProceduralTree(scale);
+  const bundled = getBundledLook('tree');
+  if (bundled) {
+    return wrapBundledProp(bundled, target, { name: 'pine', fit: 'height' });
+  }
+  return target;
+}
+
+function buildProceduralTree(scale = 1) {
   const group = new THREE.Group();
   group.name = 'pine';
   const bark = wood(0x6a4a28);
@@ -985,7 +1013,7 @@ export function buildTree(scale = 1) {
   return group;
 }
 
-function addFountainWater(group) {
+function addFountainWater(group, opts = {}) {
   const waterMat = new THREE.MeshStandardMaterial({
     color: 0x7ec8e8,
     roughness: 0.08,
@@ -995,9 +1023,12 @@ function addFountainWater(group) {
     emissive: 0x1a4a68,
     emissiveIntensity: 0.16,
   });
-  const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.04, 0.56, 10), waterMat);
+  const topY = opts.topY ?? 0.9;
+  const basinY = opts.basinY ?? 0.31;
+  const streamH = Math.max(0.18, topY - basinY);
+  const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.04, streamH, 10), waterMat);
   stream.name = 'fountain-stream';
-  stream.position.y = 0.63;
+  stream.position.y = basinY + streamH / 2;
   group.add(stream);
 
   const count = 40;
@@ -1026,7 +1057,7 @@ function addFountainWater(group) {
   );
   splash.name = 'fountain-splash';
   splash.rotation.x = -Math.PI / 2;
-  splash.position.y = 0.315;
+  splash.position.y = basinY + 0.005;
   group.add(splash);
 
   const dummy = new THREE.Object3D();
@@ -1035,7 +1066,9 @@ function addFountainWater(group) {
     spin: (i * 2.399) % (Math.PI * 2),
     spread: 0.035 + (i % 7) * 0.016,
   }));
-  group.userData.fountainWater = { stream, drops, splash, dummy, seeds };
+  group.userData.fountainWater = {
+    stream, drops, splash, dummy, seeds, fallStart: topY, fallEnd: basinY,
+  };
 }
 
 function stepFountainWater(fx, now) {
@@ -1045,8 +1078,8 @@ function stepFountainWater(fx, now) {
   stream.material.opacity = 0.42 + Math.sin(now * 11) * 0.1;
   splash.scale.setScalar(1 + Math.sin(now * 9) * 0.18);
   splash.material.opacity = 0.2 + Math.sin(now * 9) * 0.1;
-  const fallStart = 0.93;
-  const fallEnd = 0.32;
+  const fallStart = fx.fallStart ?? 0.93;
+  const fallEnd = fx.fallEnd ?? 0.32;
   const fall = fallStart - fallEnd;
   for (let i = 0; i < seeds.length; i += 1) {
     const seed = seeds[i];
@@ -1073,10 +1106,34 @@ export function tickFountainWater(root, now) {
   });
 }
 
-function addFountain(root, x, z) {
+export function buildFountain() {
   const group = new THREE.Group();
   group.name = 'fountain';
-  group.position.set(x, 0, z);
+  const bundled = getBundledLook('fountain');
+  if (bundled) {
+    const target = buildProceduralFountain();
+    group.add(wrapBundledProp(bundled, target, { name: 'fountain-body', fit: 'height' }));
+  } else {
+    for (const child of buildProceduralFountain().children.slice()) {
+      group.add(child);
+    }
+  }
+  mountFountainWater(group);
+  return group;
+}
+
+export function mountFountainWater(group) {
+  const box = measureVisibleBox(group);
+  const height = Math.max(0.2, box.max.y - box.min.y);
+  addFountainWater(group, {
+    topY: box.max.y,
+    basinY: box.min.y + height * 0.3,
+  });
+}
+
+function buildProceduralFountain() {
+  const group = new THREE.Group();
+  group.name = 'fountain';
   const stone = cobbleMat(1.1, 0.7);
   const basin = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.7, 0.28, 14), stone));
   basin.position.y = 0.16;
@@ -1106,7 +1163,12 @@ function addFountain(root, x, z) {
   );
   spout.position.y = 0.9;
   group.add(spout);
-  addFountainWater(group);
+  return group;
+}
+
+function addFountain(root, x, z) {
+  const group = buildFountain();
+  group.position.set(x, 0, z);
   root.add(group);
   return group;
 }
@@ -1130,7 +1192,19 @@ function addGardenBed(root, x, z, rand) {
 }
 
 function buildFlowerCluster(rand) {
+  const target = buildProceduralFlowerCluster(rand);
+  const bundled = getBundledLook('flowers');
+  if (bundled) {
+    const mesh = wrapBundledProp(bundled, target, { name: 'flowers', fit: 'max' });
+    mesh.rotation.y = rand() * Math.PI * 2;
+    return mesh;
+  }
+  return target;
+}
+
+function buildProceduralFlowerCluster(rand) {
   const group = new THREE.Group();
+  group.name = 'flowers';
   const colors = [0xc45a32, 0xe3b34a, 0xd7c09a, 0x8a3a6a, 0xf0e2c4];
   const count = 4 + Math.floor(rand() * 4);
   for (let i = 0; i < count; i += 1) {
@@ -1262,7 +1336,17 @@ function addCobblePath(root, expansionIds = []) {
 }
 
 function buildBoulder(scale = 1) {
+  const target = buildProceduralGardenRock(scale);
+  const bundled = getBundledLook('rock');
+  if (bundled) {
+    return wrapBundledProp(bundled, target, { name: 'rock', fit: 'max' });
+  }
+  return target;
+}
+
+function buildProceduralGardenRock(scale = 1) {
   const group = new THREE.Group();
+  group.name = 'rock';
   const stone = new THREE.MeshStandardMaterial({ color: 0x6a6560, roughness: 0.94 });
   const body = addShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.28 * scale, 0), stone));
   body.scale.set(1.15, 0.72, 1);
@@ -1616,10 +1700,24 @@ function addBonePile(root, x, z, rot = 0) {
 }
 
 function addSlumpedSkeleton(root, x, z, rot = 0) {
-  const bone = boneMat();
-  const body = new THREE.Group();
+  const bundled = getBundledLook('skeleton');
+  if (bundled) {
+    const mesh = wrapBundledProp(bundled, buildProceduralSlump(), { name: 'skeleton', fit: 'height' });
+    mesh.position.set(x, 0, z);
+    mesh.rotation.y = rot;
+    root.add(mesh);
+    return;
+  }
+  const body = buildProceduralSlump();
   body.position.set(x, 0, z);
   body.rotation.y = rot;
+  root.add(body);
+}
+
+function buildProceduralSlump() {
+  const bone = boneMat();
+  const body = new THREE.Group();
+  body.name = 'skeleton';
   const skull = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), bone));
   skull.position.set(0.02, 0.42, 0.08);
   skull.scale.set(1, 0.88, 1.1);
@@ -1635,7 +1733,7 @@ function addSlumpedSkeleton(root, x, z, rot = 0) {
     bonePiece.rotation.set(1.05, 0, r);
     body.add(bonePiece);
   }
-  root.add(body);
+  return body;
 }
 
 function addScatteredBones(root, x, z, rot = 0) {
@@ -1758,6 +1856,15 @@ export function buildDungeon() {
 }
 
 export function buildRat() {
+  const bundled = getBundledLook('rat');
+  if (bundled) {
+    const target = buildProceduralRat();
+    return wrapBundledProp(bundled, target, { name: 'rat', fit: 'max' });
+  }
+  return buildProceduralRat();
+}
+
+function buildProceduralRat() {
   const group = new THREE.Group();
   group.name = 'rat';
   const fur = new THREE.MeshStandardMaterial({ color: 0x3a3a3c, roughness: 0.92 });

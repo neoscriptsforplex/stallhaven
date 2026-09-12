@@ -34,7 +34,14 @@ async function bootGame() {
   ]);
   setBundledLooks(bundledLooks);
   const world = createWorld(canvas, state, { bundledPlayer });
-  window.stallhaven = { world, state };
+  window.stallhaven = {
+    world,
+    state,
+    bundled: {
+      player: Boolean(bundledPlayer),
+      looks: Object.keys(bundledLooks),
+    },
+  };
   const hud = bindHud(hudRoot, state, world);
   window.stallhaven.hud = hud;
   bindUploadUI({

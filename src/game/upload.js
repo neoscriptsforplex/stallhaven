@@ -130,14 +130,38 @@ export async function parseBundledPlayerBuffers(objBuffer, mtlBuffer) {
   return parseModelBuffer(objBuffer, 'player.obj', sidecars);
 }
 
+function assertObjPayload(buffer, label) {
+  const text = decodeText(buffer);
+  const start = text.trimStart();
+  if (!start || start.startsWith('<!') || /^<html/i.test(start)) {
+    const err = new Error(`Missing ${label}`);
+    err.code = 'MISSING_MODEL';
+    throw err;
+  }
+  return buffer;
+}
+
 async function fetchObjMtl(folder, objFile, mtlFile) {
   const base = `${import.meta.env.BASE_URL}models/${folder}/`;
   const objRes = await fetch(`${base}${objFile}`);
-  if (!objRes.ok) throw new Error(`Missing models/${folder}/${objFile}`);
+  if (!objRes.ok) {
+    const err = new Error(`Missing models/${folder}/${objFile}`);
+    err.code = 'MISSING_MODEL';
+    throw err;
+  }
+  const objBuffer = assertObjPayload(await objRes.arrayBuffer(), `models/${folder}/${objFile}`);
   const mtlRes = mtlFile ? await fetch(`${base}${mtlFile}`) : { ok: false };
   const sidecars = {};
-  if (mtlRes.ok) sidecars[mtlFile] = await mtlRes.arrayBuffer();
-  return parseModelBuffer(await objRes.arrayBuffer(), objFile, sidecars);
+  if (mtlRes.ok) {
+    const mtlBuffer = await mtlRes.arrayBuffer();
+    try {
+      assertObjPayload(mtlBuffer, `models/${folder}/${mtlFile}`);
+      sidecars[mtlFile] = mtlBuffer;
+    } catch {
+      // Ignore an HTML fallback for a missing .mtl; the OBJ can still load.
+    }
+  }
+  return parseModelBuffer(objBuffer, objFile, sidecars);
 }
 
 /** Fetch the shipped LilRunnerBoi OBJ+MTL from the static /models/player/ folder. */
@@ -154,6 +178,7 @@ export async function loadBundledPropScene(folder) {
       return await fetchObjMtl(folder, objFile, mtlFile);
     } catch (err) {
       lastErr = err;
+      if (err?.code === 'MISSING_MODEL') break;
     }
   }
   throw lastErr ?? new Error(`Missing bundled ${folder} model.`);
@@ -161,14 +186,15 @@ export async function loadBundledPropScene(folder) {
 
 export async function loadBundledLooks() {
   const looks = {};
-  const jobs = BUNDLED_PROP_FOLDERS.map(async ({ id, folder }) => {
+  for (const { id, folder } of BUNDLED_PROP_FOLDERS) {
     try {
       looks[id] = await loadBundledPropScene(folder);
-    } catch {
-      // Procedural fallback stays in place if a dump is missing.
+    } catch (err) {
+      if (err?.code !== 'MISSING_MODEL') {
+        console.warn(`Bundled ${id} model skipped:`, err?.message || err);
+      }
     }
-  });
-  await Promise.all(jobs);
+  }
   return looks;
 }
 

@@ -37,6 +37,7 @@ class FakeCtx {
   bezierCurveTo() {}
   quadraticCurveTo() {}
   arc() {}
+  arcTo() {}
   ellipse() {}
   fill() {}
   stroke() {}

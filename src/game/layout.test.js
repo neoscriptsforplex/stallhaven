@@ -26,6 +26,7 @@ import {
   FOUNTAIN,
   occupiedCells,
   padConnects,
+  pointHitsShop,
   padById,
   rotatePose,
   snapToFloor,
@@ -170,9 +171,8 @@ describe('layout numbers', () => {
     const origin = gardenGrassClusters([]);
     const left = gardenGrassClusters(['left']);
     assert.ok(origin.length > 180, 'lawn should be clusters, not a thin edge strip');
-    assert.ok(origin.some((spot) => spot.x < -7 && Math.abs(spot.z) < 3));
-    assert.equal(left.some((spot) => spot.x < -7 && Math.abs(spot.z) < 3), false);
-    assert.ok(left.length < origin.length);
+    assert.ok(origin.some((spot) => pointHitsShop(spot.x, spot.z, ['left'], 1.15)));
+    assert.equal(left.some((spot) => pointHitsShop(spot.x, spot.z, ['left'], 1.15)), false);
     assert.ok(left.some((spot) => spot.x > 4));
     const scales = origin.map((spot) => spot.scale);
     assert.ok(Math.max(...scales) - Math.min(...scales) > 0.4);

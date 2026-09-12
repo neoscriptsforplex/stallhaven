@@ -753,11 +753,15 @@ export function updateMinePose(mesh, dt = 0.016, now = 0) {
 }
 
 function hashStyle(seed) {
-  let s = Math.abs(Math.floor(seed * 9973) || 1);
-  return () => {
+  const raw = Number(seed);
+  let s = Math.abs(Math.floor((Number.isFinite(raw) ? raw : Math.random()) * 2147483646)) % 2147483646;
+  if (s < 1) s = 1;
+  const rand = () => {
     s = (s * 16807) % 2147483647;
     return (s - 1) / 2147483646;
   };
+  rand();
+  return rand;
 }
 
 function addHeldPole(group, { x, y, z, length, woodColor, orb, name }) {

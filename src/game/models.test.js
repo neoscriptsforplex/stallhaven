@@ -11,6 +11,7 @@ import {
   updateWalkPose,
   wrapImportedCharacter,
 } from './models.js';
+import { pointHitsShop } from './layout.js';
 import { buildRat, buildShop, buildTree } from './shopbuild.js';
 
 function cueNames(root) {
@@ -23,8 +24,8 @@ function cueNames(root) {
 
 function sampleLooks(typeId) {
   const bags = [];
-  for (let i = 0; i < 24; i += 1) {
-    bags.push(cueNames(buildAdventurer(typeId, { seed: (i + 1) * 0.041 })));
+  for (let i = 0; i < 36; i += 1) {
+    bags.push(cueNames(buildAdventurer(typeId, { seed: (i + 1) * 0.028 })));
   }
   return bags;
 }
@@ -120,8 +121,8 @@ describe('outdoor and dungeon extras', () => {
   });
 
   it('instances many grass blades and clears them inside a left expansion', () => {
-    const origin = buildShop([]);
-    const left = buildShop(['left']);
+    const origin = buildShop([]).root;
+    const left = buildShop(['left']).root;
     let originCount = 0;
     let leftCount = 0;
     let leftInRoom = 0;
@@ -136,7 +137,7 @@ describe('outdoor and dungeon extras', () => {
       for (let i = 0; i < child.count; i += 1) {
         child.getMatrixAt(i, scratch);
         pos.setFromMatrixPosition(scratch);
-        if (pos.x < -7 && Math.abs(pos.z) < 3) leftInRoom += 1;
+        if (pointHitsShop(pos.x, pos.z, ['left'], 1.15)) leftInRoom += 1;
       }
     });
     assert.ok(originCount > 800, `expected a lush lawn, got ${originCount} blades`);

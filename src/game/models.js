@@ -953,6 +953,8 @@ export function buildWare(recipeId) {
     knives: () => addKnives(group, tint),
     thrownaxe: () => addThrownaxe(group, tint),
     arrows: () => addArrows(group, tint),
+    cannonballs: () => addCannonballs(group, tint),
+    rune: () => addRune(group, recipe?.runeMark ?? 'air', tint),
     dhide_coif: () => addDhideCoif(group, tint),
     dhide_body: () => addDhideBody(group, tint),
     dhide_chaps: () => addChaps(group, tint),
@@ -982,7 +984,7 @@ export function buildWare(recipeId) {
     lump.position.y = 0.1;
     group.add(lump);
   }
-  if (recipe?.category === 'food' || recipe?.category === 'potion') group.scale.setScalar(0.55);
+  if (recipe?.category === 'food' || recipe?.category === 'potion' || recipe?.category === 'rune') group.scale.setScalar(0.55);
   group.userData.recipeId = recipeId;
   return group;
 }
@@ -1363,6 +1365,64 @@ function addHeldBow(parent, tint, scale = 0.85) {
   bow.position.set(0.02, 0.08, 0.04);
   parent.add(bow);
   return bow;
+}
+
+function addCannonballs(group, tint) {
+  const steel = metal(tint);
+  for (const [x, z, y, s] of [
+    [-0.05, 0.02, 0.07, 1],
+    [0.05, -0.01, 0.07, 0.92],
+    [0.0, 0.06, 0.07, 0.88],
+    [0.0, 0.0, 0.14, 0.78],
+  ]) {
+    const ball = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055 * s, 10, 8), steel));
+    ball.position.set(x, y, z);
+    group.add(ball);
+  }
+}
+
+function addRune(group, mark, tint) {
+  const stone = new THREE.MeshStandardMaterial({
+    color: 0x8a8a90,
+    roughness: 0.55,
+    metalness: 0.18,
+  });
+  const disc = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.028, 20), stone));
+  disc.position.y = 0.05;
+  group.add(disc);
+  const ink = glow(tint);
+  const y = 0.068;
+  if (mark === 'air') {
+    for (const [sx, rot] of [[0.055, 0.4], [0.038, 1.8], [0.07, -1.1]]) {
+      const swirl = addShadow(new THREE.Mesh(new THREE.TorusGeometry(sx, 0.008, 6, 14, Math.PI * 1.15), ink));
+      swirl.rotation.x = Math.PI / 2;
+      swirl.rotation.z = rot;
+      swirl.position.y = y;
+      group.add(swirl);
+    }
+  } else if (mark === 'earth') {
+    for (const [x, w, rot] of [[-0.02, 0.11, 0.35], [0.015, 0.1, -0.2], [0.0, 0.08, 0.7]]) {
+      const wave = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w, 0.012, 0.018), ink));
+      wave.position.set(x, y, rot * 0.04);
+      wave.rotation.y = rot;
+      group.add(wave);
+    }
+  } else if (mark === 'water') {
+    const drop = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.038, 10, 8), ink));
+    drop.scale.set(0.85, 1.15, 0.85);
+    drop.position.set(0, y + 0.01, 0.01);
+    group.add(drop);
+    const tip = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.05, 8), ink));
+    tip.position.set(0, y + 0.04, 0.01);
+    group.add(tip);
+  } else {
+    for (const [x, h, lean] of [[0, 0.08, 0], [-0.03, 0.06, 0.35], [0.028, 0.055, -0.28]]) {
+      const flame = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.018, h, 6), ink));
+      flame.position.set(x, y + h * 0.35, 0);
+      flame.rotation.z = lean;
+      group.add(flame);
+    }
+  }
 }
 
 function addArrows(group, tint) {

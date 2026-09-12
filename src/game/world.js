@@ -4,6 +4,7 @@ import {
   CUSTOMERS,
   DEFAULT_SKYBOX,
   FIRST_CUSTOMER_DELAY,
+  skyIdForScene,
   MAX_CUSTOMERS,
   RECIPES,
   REQUEST_WAIT,
@@ -1818,6 +1819,7 @@ export function createWorld(canvas, state) {
     setShopLayerVisible(false);
     dungeon.root.visible = true;
     dungeon.grounds.visible = true;
+    applySkyColor(scene, skyIdForScene('dungeon', state.skybox));
     shopkeeper.position.set(-4.15, 0, 0.4);
     shopkeeper.rotation.y = Math.PI / 2;
   }
@@ -1832,6 +1834,7 @@ export function createWorld(canvas, state) {
       dungeon.grounds.visible = false;
     }
     setShopLayerVisible(true);
+    applySkyColor(scene, skyIdForScene('shop', state.skybox));
     shopkeeper.position.set(shopReturnPos.x, 0, shopReturnPos.z);
     shopkeeper.rotation.y = Math.PI;
   }
@@ -2012,7 +2015,7 @@ export function createWorld(canvas, state) {
     },
     setSkybox(id) {
       state.skybox = id;
-      applySkyColor(scene, id);
+      applySkyColor(scene, skyIdForScene(sceneMode, id));
     },
     setChefHat(on) {
       state.chefHat = Boolean(on);

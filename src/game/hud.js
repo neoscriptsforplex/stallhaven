@@ -241,15 +241,20 @@ export function bindHud(root, state, world) {
         : cauldronMode
           ? 'Brew potions from herbs and water. Finished vials land in the chest and sit on wall shelves.'
           : furnaceMode
-            ? 'Smelt ores into metal bars. Bars are used at the anvil for weapons and armour — they are not restocked for free.'
+            ? 'Smelt ores into metal bars. Bronze starts unlocked; higher bars need enough smelts of the previous tier. Bars are used at the anvil — they are not restocked for free.'
             : wheelMode
               ? 'Spin flax into bow string. Bows and crossbows need bow string; it is not restocked for free.'
-              : 'Work a ware here. Finished pieces land in the chest. Weapons and armour use metal bars. Bows and crossbows also need bow string.';
+              : 'Work a ware here. Finished pieces land in the chest. Weapons, armour, and ammo use metal bars. Bows and crossbows also need bow string. Arrow and cannonball crafts make 20. Magic Runes use Essence.';
     }
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
       btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
     }
+    const showAmmo = !simpleStation && craftTab === 'ranged';
+    const showRunes = !simpleStation && craftTab === 'magic';
+    subtabsEl.classList.toggle('has-extra', showAmmo || showRunes);
     for (const btn of subtabsEl.querySelectorAll('[data-subtab]')) {
+      if (btn.dataset.subtab === 'ammo') btn.hidden = !showAmmo;
+      if (btn.dataset.subtab === 'rune') btn.hidden = !showRunes;
       btn.classList.toggle('is-on', btn.dataset.subtab === craftSubtab);
     }
     paintRecipeButtons(craftsEl, currentRecipes());
@@ -420,7 +425,11 @@ export function bindHud(root, state, world) {
     else if (craftStation === 'wheel') craftTab = 'spin';
     else {
       craftTab = recipe ? anvilTabForRecipe(recipe) : (craftTab === 'food' || craftTab === 'potion' ? 'melee' : craftTab);
-      craftSubtab = recipe ? anvilSubtabForRecipe(recipe) : (craftSubtab === 'armour' ? craftSubtab : 'weapon');
+      craftSubtab = recipe
+        ? anvilSubtabForRecipe(recipe)
+        : (craftSubtab === 'armour' || craftSubtab === 'ammo' || craftSubtab === 'rune' ? craftSubtab : 'weapon');
+      if (craftTab !== 'ranged' && craftSubtab === 'ammo') craftSubtab = 'weapon';
+      if (craftTab !== 'magic' && craftSubtab === 'rune') craftSubtab = 'weapon';
     }
     if (craftStation === 'cauldron') {
       craftModal.hidden = true;

@@ -288,6 +288,11 @@ body {
   margin-top: -2px;
 }
 
+.tabs.subtabs.has-ammo,
+.tabs.subtabs.has-extra {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .tabs[hidden] {
   display: none;
 }

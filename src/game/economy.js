@@ -304,7 +304,7 @@ export function craftBlockReason(state, recipeId) {
     return `Locked. Craft ${remain} more ${prev?.name ?? 'item'} first.`;
   }
   if (state.crafts[recipeId]) return `${recipe.name} is already in progress.`;
-  if (!isMaterialCraft(recipe) && !chestHasSpace(state)) return 'The chest is full.';
+  if (!isMaterialCraft(recipe) && !chestHasSpace(state, recipe.outputCount ?? 1)) return 'The chest is full.';
   const cost = recipeCost(recipe);
   if ((cost.gold || 0) > state.gold) return `Need ${formatGold(cost.gold)}g more.`;
   for (const [materialId, need] of Object.entries(cost.materials)) {
@@ -375,9 +375,10 @@ export function chestList(state) {
     .sort((a, b) => a.recipe.name.localeCompare(b.recipe.name));
 }
 
-export function addToChest(state, recipeId) {
+export function addToChest(state, recipeId, amount = 1) {
   if (!RECIPES[recipeId]) return false;
-  state.chest[recipeId] = chestCount(state, recipeId) + 1;
+  const n = Math.max(1, Math.round(Number(amount) || 1));
+  state.chest[recipeId] = chestCount(state, recipeId) + n;
   if (state.ready) state.ready = chestReadyIds(state);
   return true;
 }
@@ -670,7 +671,7 @@ export function completeCrafts(state, nowSeconds) {
         const n = recipe.outputCount ?? 1;
         state.materials[recipe.outputMaterial] = (state.materials[recipe.outputMaterial] ?? 0) + n;
       } else {
-        addToChest(state, recipeId);
+        addToChest(state, recipeId, recipe.outputCount ?? 1);
       }
       if (!state.craftCounts) state.craftCounts = {};
       state.craftCounts[recipeId] = craftCount(state, recipeId) + 1;

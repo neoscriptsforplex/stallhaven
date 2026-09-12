@@ -2,6 +2,36 @@ import * as THREE from 'three';
 import { RECIPES } from './catalog.js';
 import { buildWare } from './models.js';
 
+const _box = new THREE.Box3();
+const _center = new THREE.Vector3();
+const _sphere = new THREE.Sphere();
+
+/** Frame a craft-preview camera so the full item sits in view with margin. */
+export function frameCraftPreview(object, camera, margin = 1.42, cached = null) {
+  if (!camera) return null;
+  let center = cached?.center;
+  let radius = cached?.radius;
+  if (!center || !Number.isFinite(radius)) {
+    if (!object) return null;
+    object.updateMatrixWorld(true);
+    _box.setFromObject(object);
+    if (_box.isEmpty()) return null;
+    center = _box.getCenter(_center).clone();
+    const sphere = _box.getBoundingSphere(_sphere);
+    radius = Math.max(sphere.radius, 0.08);
+  }
+  const vFov = camera.fov * (Math.PI / 180);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * Math.max(camera.aspect, 0.25));
+  const limit = Math.min(vFov, hFov);
+  const dist = (radius * margin) / Math.tan(limit / 2);
+  camera.position.set(center.x + dist * 0.42, center.y + dist * 0.02, center.z + dist * 0.88);
+  camera.near = Math.max(0.02, dist / 50);
+  camera.far = Math.max(12, dist * 8);
+  camera.lookAt(center);
+  camera.updateProjectionMatrix();
+  return { center, radius, dist };
+}
+
 export function createCraftPreview(canvas) {
   if (!canvas) return null;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -18,6 +48,7 @@ export function createCraftPreview(canvas) {
   scene.add(key);
   let mesh = null;
   let recipeId = null;
+  let frame = null;
 
   function fit() {
     const w = Math.max(1, canvas.clientWidth || canvas.width || 180);
@@ -25,6 +56,7 @@ export function createCraftPreview(canvas) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    if (frame) frameCraftPreview(mesh, camera, 1.42, frame);
   }
 
   function show(id) {
@@ -38,10 +70,12 @@ export function createCraftPreview(canvas) {
       });
       mesh = null;
     }
+    frame = null;
     if (!next) return;
     mesh = buildWare(next);
     mesh.position.set(0, 0, 0);
     scene.add(mesh);
+    frame = frameCraftPreview(mesh, camera);
   }
 
   function tick(dt) {

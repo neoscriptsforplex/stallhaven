@@ -201,7 +201,7 @@ export function furnitureHalfSize(kind) {
   if (kind === 'furnace') return { hw: 0.4, hd: 0.36 };
   if (kind === 'wheel') return { hw: 0.36, hd: 0.32 };
   if (kind === 'anvil') return { hw: 0.44, hd: 0.35 };
-  if (kind === 'chest') return { hw: 0.49, hd: 0.36 };
+  if (kind === 'chest') return { hw: 0.3, hd: 0.22 };
   if (kind === 'range') return { hw: 0.34, hd: 0.28 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };

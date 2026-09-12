@@ -5,14 +5,18 @@ import * as THREE from 'three';
 import {
   CUSTOMER_LOOKS,
   buildAdventurer,
+  buildAnvil,
+  buildChest,
   buildGoblin,
+  buildPickaxe,
+  buildShopkeeper,
   setHeldTool,
   updateMinePose,
   updateWalkPose,
   wrapImportedCharacter,
 } from './models.js';
 import { pointHitsShop } from './layout.js';
-import { buildRat, buildShop, buildTree } from './shopbuild.js';
+import { buildFurnace, buildRat, buildShop, buildTree } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -144,6 +148,32 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(leftCount < originCount);
     assert.equal(leftInRoom, 0);
   });
+
+  it('lights expansion rooms with extra wall torches', () => {
+    const countTorches = (root) => {
+      let n = 0;
+      root.traverse((child) => {
+        if (child.name === 'torch') n += 1;
+      });
+      return n;
+    };
+    const origin = countTorches(buildShop([]).root);
+    const expanded = countTorches(buildShop(['left', 'right']).root);
+    assert.ok(origin >= 4);
+    assert.ok(expanded > origin);
+  });
+
+  it('pours water from the fountain spout', () => {
+    const shop = buildShop([]).root;
+    let fountain = null;
+    shop.traverse((child) => {
+      if (child.name === 'fountain') fountain = child;
+    });
+    assert.ok(fountain);
+    assert.ok(fountain.userData.fountainWater);
+    assert.ok(fountain.getObjectByName('fountain-stream'));
+    assert.ok(fountain.getObjectByName('fountain-drops'));
+  });
 });
 
 describe('uploaded player walk', () => {
@@ -183,5 +213,66 @@ describe('uploaded player walk', () => {
     const rest = wrapped.userData.rig.armR.rotation.x;
     updateMinePose(wrapped, 0.2, 0.4);
     assert.notEqual(wrapped.userData.rig.armR.rotation.x, rest);
+  });
+
+  it('keeps imported player scale while walking', () => {
+    const source = new THREE.Group();
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(8, 40, 8),
+      new THREE.MeshBasicMaterial({ color: 0x888888 }),
+    );
+    mesh.position.y = 20;
+    source.add(mesh);
+    source.scale.setScalar(0.05);
+    const wrapped = wrapImportedCharacter(source, { name: 'hero', label: 'You', height: 1.7 });
+    const body = wrapped.userData.walkBody;
+    const restY = body.scale.y;
+    assert.ok(Math.abs(body.scale.x - body.scale.y) < 1e-6);
+    assert.ok(Math.abs(body.scale.y - body.scale.z) < 1e-6);
+    updateWalkPose(wrapped, true, 0.2, 1);
+    assert.ok(Math.abs(body.scale.y - restY) < restY * 0.08);
+    assert.ok(Math.abs(body.scale.x - body.scale.z) < 1e-6);
+  });
+});
+
+describe('shop props', () => {
+  it('seats the pickaxe head on the wooden haft and holds it in the right hand', () => {
+    const pick = buildPickaxe();
+    const haft = pick.getObjectByName('pickaxe-haft');
+    const head = pick.getObjectByName('pickaxe-head');
+    assert.ok(haft && head);
+    const tip = new THREE.Vector3(0, 0.2, 0).applyEuler(haft.rotation).add(haft.position);
+    const gap = tip.distanceTo(head.position);
+    assert.ok(gap < 0.04, `head should sit on the shaft tip, gap=${gap}`);
+    const keeper = buildShopkeeper();
+    assert.equal(keeper.userData.pickaxe.parent, keeper.userData.hand);
+  });
+
+  it('builds a clean anvil without a resting hammer', () => {
+    const anvil = buildAnvil();
+    let highBoxes = 0;
+    anvil.traverse((child) => {
+      if (child.isMesh && child.geometry?.type === 'BoxGeometry' && child.position.y >= 0.95) highBoxes += 1;
+    });
+    assert.equal(highBoxes, 0);
+  });
+
+  it('scales the chest to 60% and keeps it on the floor', () => {
+    const chest = buildChest();
+    assert.ok(Math.abs(chest.scale.x - 0.6) < 1e-6);
+    chest.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(chest);
+    assert.ok(box.min.y > -0.02 && box.min.y < 0.08);
+  });
+
+  it('gives the furnace a grey brick body like the range', () => {
+    const furnace = buildFurnace();
+    let brick = null;
+    furnace.traverse((child) => {
+      if (child.isMesh && child.material?.map && child.material?.color && !brick) {
+        brick = child.material.color.getHex();
+      }
+    });
+    assert.equal(brick, 0x8a9098);
   });
 });

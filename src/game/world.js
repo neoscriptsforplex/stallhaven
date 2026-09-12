@@ -78,7 +78,7 @@ import {
   wareTopY,
   wrapImportedCharacter,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 
 const CUSTOMER_SPEED = 1.35;
@@ -1817,6 +1817,7 @@ export function createWorld(canvas, state) {
     if (sceneMode === 'shop') {
       updateCustomers(dt, now);
       updateGoblins(dt, now);
+      tickFountainWater(architecture, now);
     } else if (dungeon?.rats) {
       dungeon.rats.forEach((rat) => stepRatWander(rat, dt, now));
     }

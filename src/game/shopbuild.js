@@ -22,7 +22,7 @@ import {
 } from './layout.js';
 import { METALS } from './catalog.js';
 import { initRatWander } from './rats.js';
-import { brickSurface, sootMetal, stoneSoot, wornMetal, woodSurface } from './surfaces.js';
+import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.04 });
@@ -528,6 +528,27 @@ function addOriginFront(root, center) {
   }
 }
 
+function addRoomTorches(root, center, neigh) {
+  const y = 1.62;
+  const inset = 0.18;
+  if (!neigh?.left) {
+    addWallTorch(root, center.x - ROOM_W / 2 + inset, y, center.z - 1.85, Math.PI / 2);
+    addWallTorch(root, center.x - ROOM_W / 2 + inset, y, center.z + 1.85, Math.PI / 2);
+  }
+  if (!neigh?.right) {
+    addWallTorch(root, center.x + ROOM_W / 2 - inset, y, center.z - 1.85, -Math.PI / 2);
+    addWallTorch(root, center.x + ROOM_W / 2 - inset, y, center.z + 1.85, -Math.PI / 2);
+  }
+  if (!neigh?.back) {
+    addWallTorch(root, center.x - 1.7, y, center.z - ROOM_D / 2 + inset, 0);
+    addWallTorch(root, center.x + 1.7, y, center.z - ROOM_D / 2 + inset, 0);
+  }
+  if (!neigh?.front) {
+    addWallTorch(root, center.x - 1.7, y, center.z + ROOM_D / 2 - inset, Math.PI);
+    addWallTorch(root, center.x + 1.7, y, center.z + ROOM_D / 2 - inset, Math.PI);
+  }
+}
+
 function addOriginDecor(root, center) {
   const rug = buildRug();
   rug.position.set(center.x, 0.11, center.z + 0.15);
@@ -830,9 +851,9 @@ export function buildCauldron() {
 export function buildFurnace() {
   const group = new THREE.Group();
   group.name = 'furnace';
-  const stone = stoneSoot(0xb4aea4, 0.92);
+  const brick = brickSurface(0x8a9098, 0.9);
   const dark = sootMetal(0x3a342e, 0.55, 0.22);
-  const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.78, 0.62), stone));
+  const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.78, 0.62), brick));
   body.position.y = 0.39;
   group.add(body);
   const hearth = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.32, 0.12), dark));
@@ -844,7 +865,7 @@ export function buildFurnace() {
   );
   glow.position.set(0, 0.28, 0.32);
   group.add(glow);
-  const chimney = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.22), stone));
+  const chimney = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.22), brick));
   chimney.position.set(-0.16, 0.98, -0.08);
   group.add(chimney);
   const lip = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.28), dark));
@@ -964,8 +985,97 @@ export function buildTree(scale = 1) {
   return group;
 }
 
+function addFountainWater(group) {
+  const waterMat = new THREE.MeshStandardMaterial({
+    color: 0x7ec8e8,
+    roughness: 0.08,
+    metalness: 0.18,
+    transparent: true,
+    opacity: 0.52,
+    emissive: 0x1a4a68,
+    emissiveIntensity: 0.16,
+  });
+  const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.04, 0.56, 10), waterMat);
+  stream.name = 'fountain-stream';
+  stream.position.y = 0.63;
+  group.add(stream);
+
+  const count = 40;
+  const dropGeo = new THREE.SphereGeometry(0.016, 6, 5);
+  const dropMat = new THREE.MeshStandardMaterial({
+    color: 0xb8e8f6,
+    roughness: 0.08,
+    metalness: 0.18,
+    transparent: true,
+    opacity: 0.72,
+  });
+  const drops = new THREE.InstancedMesh(dropGeo, dropMat, count);
+  drops.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  drops.name = 'fountain-drops';
+  group.add(drops);
+
+  const splash = new THREE.Mesh(
+    new THREE.RingGeometry(0.05, 0.15, 16),
+    new THREE.MeshStandardMaterial({
+      color: 0xa8d8ec,
+      roughness: 0.12,
+      transparent: true,
+      opacity: 0.32,
+      side: THREE.DoubleSide,
+    }),
+  );
+  splash.name = 'fountain-splash';
+  splash.rotation.x = -Math.PI / 2;
+  splash.position.y = 0.315;
+  group.add(splash);
+
+  const dummy = new THREE.Object3D();
+  const seeds = Array.from({ length: count }, (_, i) => ({
+    phase: i / count,
+    spin: (i * 2.399) % (Math.PI * 2),
+    spread: 0.035 + (i % 7) * 0.016,
+  }));
+  group.userData.fountainWater = { stream, drops, splash, dummy, seeds };
+}
+
+function stepFountainWater(fx, now) {
+  const { stream, drops, splash, dummy, seeds } = fx;
+  stream.scale.x = 0.86 + Math.sin(now * 14) * 0.12;
+  stream.scale.z = 0.86 + Math.cos(now * 16) * 0.12;
+  stream.material.opacity = 0.42 + Math.sin(now * 11) * 0.1;
+  splash.scale.setScalar(1 + Math.sin(now * 9) * 0.18);
+  splash.material.opacity = 0.2 + Math.sin(now * 9) * 0.1;
+  const fallStart = 0.93;
+  const fallEnd = 0.32;
+  const fall = fallStart - fallEnd;
+  for (let i = 0; i < seeds.length; i += 1) {
+    const seed = seeds[i];
+    const t = (seed.phase + now * 0.55) % 1;
+    const y = fallStart - t * fall;
+    const flare = t * t;
+    dummy.position.set(
+      Math.cos(seed.spin + now * 0.4) * seed.spread * flare,
+      y,
+      Math.sin(seed.spin + now * 0.4) * seed.spread * flare,
+    );
+    dummy.scale.setScalar(0.7 + (1 - t) * 0.55);
+    dummy.updateMatrix();
+    drops.setMatrixAt(i, dummy.matrix);
+  }
+  drops.instanceMatrix.needsUpdate = true;
+}
+
+export function tickFountainWater(root, now) {
+  if (!root) return;
+  root.traverse((child) => {
+    const fx = child.userData?.fountainWater;
+    if (fx) stepFountainWater(fx, now);
+  });
+}
+
 function addFountain(root, x, z) {
   const group = new THREE.Group();
+  group.name = 'fountain';
   group.position.set(x, 0, z);
   const stone = cobbleMat(1.1, 0.7);
   const basin = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.7, 0.28, 14), stone));
@@ -996,6 +1106,7 @@ function addFountain(root, x, z) {
   );
   spout.position.y = 0.9;
   group.add(spout);
+  addFountainWater(group);
   root.add(group);
   return group;
 }
@@ -1268,6 +1379,7 @@ export function buildShop(expansionIds = []) {
     addRoomWalls(root, cell, neigh, isOrigin);
     addRoofForRoom(roofs, root, c, neigh, isOrigin);
     if (isOrigin) addOriginDecor(root, c);
+    else addRoomTorches(root, c, neigh);
 
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(ROOM_W, ROOM_D),
@@ -1346,13 +1458,13 @@ export function buildShop(expansionIds = []) {
 
 const ORE_ROCK_BASE = 0x6e5a32;
 const ORE_VEIN_COLOR = {
-  bronze: 0x8a5a32,
-  iron: 0x8a8f96,
-  steel: 0xc5ccd4,
-  mithril: 0x3a6ec8,
+  bronze: 0xb56a28,
+  iron: 0x8d939a,
+  steel: 0xd4dbe2,
+  mithril: 0x2f6ad4,
   adamant: METALS.find((metal) => metal.id === 'adamant')?.tint ?? 0x3a8a45,
-  runite: 0x7ec8e8,
-  dragon: 0xb42a22,
+  runite: 0x8fd4f5,
+  dragon: 0xd41e1e,
 };
 
 /** Mineable rocks: olive-brown body; vein colour marks the tier. Essence glows separately. */
@@ -1404,8 +1516,8 @@ function buildMineBoulder(spot) {
     color: spot.vein,
     roughness: spot.essence ? 0.35 : 0.55,
     metalness: spot.essence ? 0.32 : 0.16,
-    emissive: spot.essence ? spot.vein : shadeHex(rockHex, 0.45),
-    emissiveIntensity: spot.essence ? 0.32 : 0.04,
+    emissive: spot.vein,
+    emissiveIntensity: spot.essence ? 0.32 : 0.22,
   });
   const body = addShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), rock));
   body.scale.set(1.35, 0.72, 1.15);

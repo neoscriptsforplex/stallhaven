@@ -1,6 +1,6 @@
 import {
-  ANVIL_SUBTABS,
   ANVIL_TABS,
+  anvilSubtabsForTab,
   CUSTOMERS,
   FACE_HAIR,
   HAIR_STYLES,
@@ -104,6 +104,8 @@ import {
   stationLabel,
   STATION_UNLOCKS,
 } from './layout.js';
+import { drawMinimap, mapToWorld, shopMapBounds } from './minimap.js';
+import { boulderInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
 
@@ -136,6 +138,8 @@ export function bindHud(root, state, world) {
   const settingsDock = document.querySelector('#settings-dock');
   const settingsBtn = document.querySelector('#settings-btn');
   const furnMenu = document.querySelector('#furn-menu');
+  const inspectPop = document.querySelector('#inspect-pop');
+  const minimap = document.querySelector('#minimap');
   const shopFade = document.querySelector('#shop-fade');
   const activeCraft = root.querySelector('#active-craft');
   const activeCraftName = activeCraft?.querySelector('[data-active-craft-name]');
@@ -170,9 +174,16 @@ export function bindHud(root, state, world) {
   tabsEl.innerHTML = ANVIL_TABS.map((tab) => (
     `<button type="button" class="tab" data-tab="${tab.id}">${tab.label}</button>`
   )).join('');
-  subtabsEl.innerHTML = ANVIL_SUBTABS.map((tab) => (
-    `<button type="button" class="tab" data-subtab="${tab.id}">${tab.label}</button>`
-  )).join('');
+  tabsEl.classList.add('has-tools');
+
+  function paintSubtabs() {
+    const tabs = anvilSubtabsForTab(craftTab);
+    subtabsEl.innerHTML = tabs.map((tab) => (
+      `<button type="button" class="tab" data-subtab="${tab.id}">${tab.label}</button>`
+    )).join('');
+    subtabsEl.classList.toggle('has-extra', tabs.length > 2);
+  }
+  paintSubtabs();
 
   function currentRecipes() {
     if (craftStation === 'range') return recipesForTab('food');
@@ -263,17 +274,13 @@ export function bindHud(root, state, world) {
             ? 'Smelt ores into metal bars. Bronze starts unlocked; higher bars need enough smelts of the previous tier. Bars are used at the anvil — they are not restocked for free.'
             : wheelMode
               ? 'Spin flax into bow string. Bows and crossbows need bow string; it is not restocked for free.'
-              : 'Work a ware here. 1× / 5× / Max are craft actions (ammo makes 20 per action). Finished pieces land in the chest. Weapons, armour, and ammo use metal bars. Bows and crossbows also need bow string. Magic Runes use Essence.';
+              : 'Work a ware here. 1× / 5× / Max are craft actions (ammo makes 20 per action). Finished pieces land in the chest. Weapons, armour, ammo, and tools use metal bars. Bows and crossbows also need bow string. Magic Runes use Essence.';
     }
+    if (!simpleStation) paintSubtabs();
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
       btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
     }
-    const showAmmo = !simpleStation && craftTab === 'ranged';
-    const showRunes = !simpleStation && craftTab === 'magic';
-    subtabsEl.classList.toggle('has-extra', showAmmo || showRunes);
     for (const btn of subtabsEl.querySelectorAll('[data-subtab]')) {
-      if (btn.dataset.subtab === 'ammo') btn.hidden = !showAmmo;
-      if (btn.dataset.subtab === 'rune') btn.hidden = !showRunes;
       btn.classList.toggle('is-on', btn.dataset.subtab === craftSubtab);
     }
     paintRecipeButtons(craftsEl, currentRecipes());
@@ -323,7 +330,7 @@ export function bindHud(root, state, world) {
     const btn = event.target.closest('[data-tab]');
     if (!btn) return;
     craftTab = btn.dataset.tab;
-    craftSubtab = 'weapon';
+    craftSubtab = craftTab === 'tools' ? 'hatchet' : 'weapon';
     craftFocusId = null;
     setCraftNote('');
     paintCrafts();
@@ -483,9 +490,30 @@ export function bindHud(root, state, world) {
     document.body.classList.toggle('modal-open', open);
   }
 
+  function hideInspect() {
+    if (inspectPop) inspectPop.hidden = true;
+  }
+
   function hideFurnMenu() {
     furnMenu.hidden = true;
     furnTarget = null;
+    hideInspect();
+  }
+
+  function showInspect(materialId, clientX, clientY) {
+    if (!inspectPop) return;
+    furnMenu.hidden = true;
+    furnTarget = null;
+    const info = boulderInspect(materialId);
+    const nameEl = inspectPop.querySelector('[data-inspect-name]');
+    const blurbEl = inspectPop.querySelector('[data-inspect-blurb]');
+    if (nameEl) nameEl.textContent = info.name;
+    if (blurbEl) blurbEl.textContent = info.blurb;
+    inspectPop.hidden = false;
+    const x = Math.min(window.innerWidth - 250, Math.max(8, clientX ?? 24));
+    const y = Math.min(window.innerHeight - 140, Math.max(8, clientY ?? 80));
+    inspectPop.style.left = `${x}px`;
+    inspectPop.style.top = `${y}px`;
   }
 
   function closeMusicDock() {
@@ -518,9 +546,11 @@ export function bindHud(root, state, world) {
       craftTab = recipe ? anvilTabForRecipe(recipe) : (craftTab === 'food' || craftTab === 'potion' ? 'melee' : craftTab);
       craftSubtab = recipe
         ? anvilSubtabForRecipe(recipe)
-        : (craftSubtab === 'armour' || craftSubtab === 'ammo' || craftSubtab === 'rune' ? craftSubtab : 'weapon');
+        : (craftSubtab === 'armour' || craftSubtab === 'ammo' || craftSubtab === 'rune' || craftSubtab === 'hatchet' || craftSubtab === 'pickaxe' ? craftSubtab : 'weapon');
       if (craftTab !== 'ranged' && craftSubtab === 'ammo') craftSubtab = 'weapon';
       if (craftTab !== 'magic' && craftSubtab === 'rune') craftSubtab = 'weapon';
+      if (craftTab !== 'tools' && (craftSubtab === 'hatchet' || craftSubtab === 'pickaxe')) craftSubtab = 'weapon';
+      if (craftTab === 'tools' && craftSubtab !== 'hatchet' && craftSubtab !== 'pickaxe') craftSubtab = 'hatchet';
     }
     potionModal.hidden = true;
     craftModal.hidden = false;
@@ -1544,6 +1574,10 @@ export function bindHud(root, state, world) {
     confirmPendingPlace();
   });
 
+  inspectPop?.querySelector('[data-inspect-close]')?.addEventListener('click', hideInspect);
+  inspectPop?.addEventListener('click', (event) => {
+    if (event.target === inspectPop) hideInspect();
+  });
   furnMenu.querySelector('[data-furn-close]').addEventListener('click', hideFurnMenu);
   furnMenu.querySelector('[data-furn-move]').addEventListener('click', () => startMove(furnTarget));
   furnMenu.querySelector('[data-furn-rotate]').addEventListener('click', () => doRotate(furnTarget));
@@ -1938,6 +1972,9 @@ export function bindHud(root, state, world) {
 
   world.onPick((event) => {
     if (event.type !== 'furn-menu') hideFurnMenu();
+    if (event.type === 'boulder-inspect') {
+      showInspect(event.materialId, event.clientX, event.clientY);
+    }
     if (event.type === 'chest') openChest();
     if (event.type === 'anvil') openCraft('anvil');
     if (event.type === 'range') openCraft('range');
@@ -2023,6 +2060,20 @@ export function bindHud(root, state, world) {
       pushLog(state, 'Could not read that save file.');
     }
     render(performance.now() / 1000);
+  });
+
+  minimap?.addEventListener('click', (event) => {
+    if (minimap.hidden) return;
+    const snap = world.getMinimapSnapshot?.();
+    if (!snap || snap.hidden) return;
+    const rect = minimap.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const size = minimap.width;
+    const px = (event.clientX - rect.left) * (size / rect.width);
+    const py = (event.clientY - rect.top) * (size / rect.height);
+    const bounds = shopMapBounds(snap.expansions ?? []);
+    const dest = mapToWorld(px, py, bounds, size, snap.yaw ?? 0);
+    world.walkTo?.(dest.x, dest.z);
   });
 
   document.addEventListener('click', (event) => {
@@ -2154,6 +2205,17 @@ export function bindHud(root, state, world) {
       else {
         if (!tradeModal.hidden) paintTrade();
         if (!offerModal.hidden) paintOfferPicker();
+      }
+    }
+    const mapSnap = world.getMinimapSnapshot?.();
+    if (minimap) {
+      minimap.hidden = Boolean(mapSnap?.hidden);
+      if (mapSnap && !mapSnap.hidden) {
+        const ctx = minimap.getContext('2d');
+        if (ctx) {
+          mapSnap.bounds = shopMapBounds(mapSnap.expansions);
+          drawMinimap(ctx, mapSnap);
+        }
       }
     }
   }

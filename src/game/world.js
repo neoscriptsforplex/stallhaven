@@ -737,7 +737,7 @@ export function createWorld(canvas, state) {
   function stopMining() {
     if (!mining) return;
     mining = null;
-    setHeldTool(shopkeeper, 'hammer');
+    setHeldTool(shopkeeper, null);
   }
 
   function startMining(materialId, pose) {
@@ -1206,6 +1206,17 @@ export function createWorld(canvas, state) {
     const picked = hitFurniture(hits);
     if (!picked) return;
     const data = picked.object.userData;
+    if (data.kind === 'boulder') {
+      playClick('ui');
+      pickHandler?.({
+        type: 'boulder-inspect',
+        materialId: data.materialId,
+        name: data.name,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      return;
+    }
     const furn = furnitureIdFromKind(data.kind, data.displayIndex);
     if (!furn) return;
     playClick('ui');
@@ -2188,6 +2199,54 @@ export function createWorld(canvas, state) {
         t,
         yield: MINE_YIELD,
       };
+    },
+    getMinimapSnapshot() {
+      if (sceneMode !== 'shop') return { hidden: true, sceneMode };
+      return {
+        hidden: false,
+        sceneMode,
+        yaw: cam.yaw,
+        expansions: state.expansions ?? [],
+        player: {
+          x: shopkeeper.position.x,
+          z: shopkeeper.position.z,
+          facing: shopkeeper.rotation.y,
+        },
+        customers: customers
+          .filter((actor) => actor.mesh.visible)
+          .map((actor) => ({ x: actor.mesh.position.x, z: actor.mesh.position.z })),
+        furniture: displays.map((slot, i) => {
+          const pose = state.furniture.displays[i] ?? slot.spot;
+          return { x: pose.x, z: pose.z, kind: slot.spot.kind };
+        }),
+      };
+    },
+    walkTo(x, z) {
+      return setMoveTarget(x, z);
+    },
+    clearUploads() {
+      customPlayerSource = null;
+      customCustomerSource = null;
+      state.wareLooks = {};
+      displays.forEach((slot, i) => {
+        slot.anchor.remove(slot.furniture);
+        const furniture = buildFurniture(slot.spot.kind);
+        slot.anchor.add(furniture);
+        slot.furniture = furniture;
+        slot.wareAnchor.position.y = furniture.userData.stand ? 0 : furniture.userData.wareY;
+        slot.anchor.add(slot.wareAnchor);
+        void i;
+      });
+      const next = buildShopkeeper({
+        chefHat: Boolean(state.chefHat),
+        appearance: state.appearance,
+      });
+      next.scale.setScalar(1.16);
+      replaceShopkeeperMesh(next);
+      rebuildCustomerMeshes();
+      syncDisplays();
+      refreshSelection(true);
+      pushLog(state, 'Cleared uploaded models. Default looks are back.');
     },
   };
 }

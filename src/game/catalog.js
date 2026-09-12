@@ -24,6 +24,7 @@ export const KING_ROALD_MIN = 10 * 60;
 export const KING_ROALD_MAX = 60 * 60;
 
 export const HAIR_STYLES = [
+  { id: 'bald', label: 'Bald' },
   { id: 'short', label: 'Short' },
   { id: 'long', label: 'Long' },
   { id: 'bun', label: 'Bun' },
@@ -49,7 +50,7 @@ export const PLAYER_COLORS = {
   legs: [
     { id: 'brown', label: 'Brown', color: 0x2e2418 },
     { id: 'grey', label: 'Grey', color: 0x4a4a50 },
-    { id: 'green', label: 'Green', color: 0x3a4a32 },
+    { id: 'green', label: 'Green', color: 0x3d8a3a },
     { id: 'navy', label: 'Navy', color: 0x24304a },
   ],
   boots: [
@@ -61,11 +62,11 @@ export const PLAYER_COLORS = {
 
 export function defaultAppearance() {
   return {
-    hair: 'short',
-    shirt: 'brown',
-    legs: 'brown',
-    boots: 'black',
-    faceHair: 'none',
+    hair: 'bald',
+    shirt: 'cream',
+    legs: 'green',
+    boots: 'brown',
+    faceHair: 'goatee',
   };
 }
 
@@ -107,6 +108,7 @@ export const ANVIL_TABS = [
   { id: 'melee', label: 'Melee' },
   { id: 'magic', label: 'Magic' },
   { id: 'ranged', label: 'Ranged' },
+  { id: 'tools', label: 'Tools' },
 ];
 
 export const ANVIL_SUBTABS = [
@@ -114,6 +116,13 @@ export const ANVIL_SUBTABS = [
   { id: 'armour', label: 'Armour' },
   { id: 'ammo', label: 'Ammo' },
   { id: 'rune', label: 'Runes' },
+  { id: 'hatchet', label: 'Hatchet' },
+  { id: 'pickaxe', label: 'Pickaxe' },
+];
+
+export const TOOL_SUBTABS = [
+  { id: 'hatchet', label: 'Hatchet' },
+  { id: 'pickaxe', label: 'Pickaxe' },
 ];
 
 /** One anvil ammo recipe action puts this many units in the chest. */
@@ -468,6 +477,22 @@ const RUNE_LINE = [
   { id: 'fire_rune', name: 'Fire Rune', mark: 'fire', tint: 0xc42a22 },
 ];
 
+const TOOL_PIECES = [
+  { id: 'hatchet', name: 'Hatchet', slot: 'hatchet', shape: 'hatchet' },
+  { id: 'pickaxe', name: 'Pickaxe', slot: 'pickaxe', shape: 'pickaxe' },
+];
+
+for (const piece of TOOL_PIECES) {
+  metalLine({
+    piece,
+    category: piece.id,
+    combatClass: 'tools',
+    buyers: ['mercenary', 'ranger'],
+    time0: 3,
+    price0: 10,
+  });
+}
+
 RUNE_LINE.forEach((rune, index) => {
   const previousId = index === 0 ? null : RUNE_LINE[index - 1].id;
   addRecipe({
@@ -634,6 +659,118 @@ addRecipe({
   outputCount: 1,
 });
 
+/** Low-poly robe sets for magic-class buyers. Original names — colour variants, not product lines. */
+export const MAGE_ROBE_SETS = [
+  { id: 'azure', robe: 0x6a8fd4, trim: 0xf4f4f0, hat: 0x5a7ec8, orb: 0x9ad4ff, style: 'hat' },
+  { id: 'verdant', robe: 0x3a8a45, trim: 0xd8e8c0, hat: 0x2d6a32, orb: 0x8ee53f, style: 'hat', beard: true },
+  { id: 'umbral', robe: 0x1c1820, trim: 0x4a4650, hat: 0x141218, orb: 0x8a4ec8, style: 'hat' },
+  { id: 'violet', robe: 0x5a3a88, trim: 0xc4a05a, hat: 0x4a2a72, orb: 0xb48cff, style: 'hat' },
+  { id: 'crimson', robe: 0x8a2424, trim: 0x5a1818, hat: 0x6a1c1c, orb: 0xe85a4a, style: 'hood' },
+  { id: 'ashen', robe: 0x4a4a52, trim: 0xd0d0d6, hat: 0x8a8a90, orb: 0xc8d2e4, style: 'bare' },
+];
+
+export function pickMageRobes(rand = Math.random) {
+  const i = Math.floor((typeof rand === 'function' ? rand() : Math.random()) * MAGE_ROBE_SETS.length);
+  return MAGE_ROBE_SETS[Math.max(0, Math.min(MAGE_ROBE_SETS.length - 1, i))];
+}
+
+/** Low-poly hide kits for range-class buyers. Colour variants, not product lines. */
+export const RANGER_HIDE_SETS = [
+  {
+    id: 'fern', hide: 0x2d8a3a, sleeve: 0xf0ece4, chaps: 0x2d8a3a, boots: 0x5a3a22,
+    belt: 0x1e5a22, fletch: 0x8a2424, hair: 0xe8e4dc, shoulder: 0x3a3a48,
+    style: 'hide', weapon: 'bow',
+  },
+  {
+    id: 'tide', hide: 0x3a4a78, sleeve: 0xf0ece4, chaps: 0x3a4a78, boots: 0x5a3a22,
+    belt: 0x1e5a22, fletch: 0x3a6ec8, hair: 0xe8e4dc, shoulder: 0x2a2a38,
+    style: 'hide', weapon: 'bow',
+  },
+  {
+    id: 'ink', hide: 0x1a1a1e, sleeve: 0xf0ece4, chaps: 0x1a1a1e, boots: 0x5a3a22,
+    belt: 0x1e5a22, fletch: 0x8a8a90, hair: 0xe8e4dc, shoulder: 0x2a3040,
+    style: 'hide', weapon: 'crossbow',
+  },
+  {
+    id: 'dusk', hide: 0x2a241c, sleeve: 0x2a241c, chaps: 0x6a2428, boots: 0x1c1410,
+    belt: 0x3a2a18, fletch: 0xc4a05a, hair: 0x1c1410, hood: 0x1c1814,
+    style: 'coif', weapon: 'bow', shield: true, mask: true,
+  },
+  {
+    id: 'pale', hide: 0xd8d0c0, sleeve: 0xd8d0c0, chaps: 0x8a8a72, boots: 0x5a3a22,
+    belt: 0x6b4e31, fletch: 0xc8b48a, hair: 0x3a2416, hood: 0xc8c0b0,
+    style: 'hood', weapon: 'blade',
+  },
+];
+
+export function pickRangerHide(rand = Math.random) {
+  const i = Math.floor((typeof rand === 'function' ? rand() : Math.random()) * RANGER_HIDE_SETS.length);
+  return RANGER_HIDE_SETS[Math.max(0, Math.min(RANGER_HIDE_SETS.length - 1, i))];
+}
+
+/** Low-poly plate kits for melee-class buyers. Metal tints, not product lines. */
+export const MERCENARY_PLATE_SETS = [
+  {
+    id: 'greyplate', plate: 0x8a8f96, trim: 0x6a6e74, legs: 0x2d6a32, legsStyle: 'hide',
+    gloves: 0xc4a05a, boots: 0x6a4a28, plume: 0x4a2a88, shield: 0x3a3a40, shieldRim: 0x5a3a22,
+    style: 'helm', plumeOn: true,
+  },
+  {
+    id: 'mossplate', plate: 0x4a6a52, trim: 0x3a5a42, legs: 0x4a6a52, legsStyle: 'plate',
+    gloves: 0xc4a05a, boots: 0xc4a05a, plume: 0x4a2a88, shield: 0x3a4a38, shieldRim: 0xa48a3a,
+    style: 'helm', plumeOn: true,
+  },
+  {
+    id: 'frostplate', plate: 0x7a8aa0, trim: 0x5a6a80, legs: 0x7a8aa0, legsStyle: 'plate',
+    gloves: 0xc4a05a, boots: 0xc4a05a, plume: 0x4a2a88, shield: 0x6a7a90, shieldRim: 0xc4a05a,
+    style: 'helm', plumeOn: true,
+  },
+  {
+    id: 'plainplate', plate: 0x9aa0a8, trim: 0x7a8088, legs: 0x9aa0a8, legsStyle: 'plate',
+    gloves: 0xc4a05a, boots: 0x6a4a28, plume: 0x4a2a88, shield: 0x5a6068, shieldRim: 0x8a6a3b,
+    style: 'helm', plumeOn: false,
+  },
+];
+
+export function pickMercenaryPlate(rand = Math.random) {
+  const i = Math.floor((typeof rand === 'function' ? rand() : Math.random()) * MERCENARY_PLATE_SETS.length);
+  return MERCENARY_PLATE_SETS[Math.max(0, Math.min(MERCENARY_PLATE_SETS.length - 1, i))];
+}
+
+/** Civilian kits for pilgrims and other non-combat buyers. */
+export const PILGRIM_CIVILIAN_SETS = [
+  {
+    id: 'wayfarer', shirt: 0x2a3560, sleeve: 0xf0ece4, pants: 0x8aa0c4, boots: 0x5a3a22,
+    gloves: 0xc4a05a, hair: 0xe8e4dc, hairStyle: 'short', style: 'tunic', weapon: 'sword',
+    female: false,
+  },
+  {
+    id: 'gentry', shirt: 0xb44a4a, sleeve: 0xf4f0e8, pants: 0x6a2458, boots: 0x2a1c12,
+    cape: 0x3a1c28, ruff: 0xf4f0e8, hair: 0x5a3a22, hairStyle: 'short', style: 'gentry',
+    weapon: 'bouquet', female: false,
+  },
+  {
+    id: 'skirted', shirt: 0x7a3a88, sleeve: 0x7a3a88, skirt: 0x3a3020, pants: 0x3a3020,
+    belt: 0x6a2428, boots: 0x2a1c12, hair: 0x5a3a22, hairStyle: 'long', style: 'skirt',
+    female: true,
+  },
+  {
+    id: 'cook', shirt: 0xf4f4f0, sleeve: 0xf4f4f0, pants: 0x2a3560, boots: 0x2a1c12,
+    apron: 0xf4f4f0, hair: 0x3a2416, hairStyle: 'short', faceHair: 'moustache',
+    style: 'cook', check: true, chefHat: true, female: false,
+  },
+  {
+    id: 'croft', shirt: 0x6a3a22, sleeve: 0x6a3a22, wrap: 0x6a6a70, pants: 0x6a6a70,
+    sash: 0x6a8a3a, boots: 0x4a3020, hair: 0x2a2018, hairStyle: 'mohawk', style: 'croft',
+    weapon: 'mallet', female: false,
+  },
+];
+
+export function pickPilgrimCiv(rand = Math.random) {
+  const i = Math.floor((typeof rand === 'function' ? rand() : Math.random()) * PILGRIM_CIVILIAN_SETS.length);
+  return PILGRIM_CIVILIAN_SETS[Math.max(0, Math.min(PILGRIM_CIVILIAN_SETS.length - 1, i))];
+}
+
 export const CUSTOMERS = {
   pilgrim: {
     id: 'pilgrim',
@@ -650,6 +787,7 @@ export const CUSTOMERS = {
     leaveIfEmpty: false,
     robe: 0xc8b48a,
     accent: 0x6b4e31,
+    look: 'pilgrim',
     offer: { materialId: 'flour', price: 3 },
   },
   mercenary: {
@@ -659,6 +797,7 @@ export const CUSTOMERS = {
     prefers: Object.values(RECIPES)
       .filter((recipe) => (
         recipe.combatClass === 'melee'
+        || recipe.combatClass === 'tools'
         || recipe.category === 'rune'
         || ['strength_potion', 'attack_potion', 'anti_poison_potion', 'antifire_potion'].includes(recipe.id)
       ))
@@ -667,6 +806,7 @@ export const CUSTOMERS = {
     leaveIfEmpty: true,
     robe: 0x4a463f,
     accent: 0x8a6a3b,
+    look: 'mercenary',
     offer: { materialId: 'bronze', price: 4 },
   },
   ranger: {
@@ -676,6 +816,7 @@ export const CUSTOMERS = {
     prefers: Object.values(RECIPES)
       .filter((recipe) => (
         recipe.combatClass === 'range'
+        || recipe.combatClass === 'tools'
         || recipe.category === 'rune'
         || ['ranging_potion', 'antifire_potion', 'energy_potion', 'anti_poison_potion'].includes(recipe.id)
       ))
@@ -684,6 +825,7 @@ export const CUSTOMERS = {
     leaveIfEmpty: false,
     robe: 0x3f4a32,
     accent: 0x7a5a32,
+    look: 'ranger',
     offer: { materialId: 'hide', price: 5 },
   },
   hedgemage: {
@@ -697,6 +839,7 @@ export const CUSTOMERS = {
     leaveIfEmpty: false,
     robe: 0x3d5a4c,
     accent: 0x7b4ea0,
+    look: 'mage',
     offer: { materialId: 'cloth', price: 5 },
   },
   kingroald: {
@@ -708,6 +851,7 @@ export const CUSTOMERS = {
     leaveIfEmpty: false,
     robe: 0x6a1c28,
     accent: 0xe3b34a,
+    look: 'king',
     offer: null,
     special: true,
   },
@@ -787,6 +931,10 @@ export function isAmmoRecipe(recipe) {
   return recipe?.category === 'ammo';
 }
 
+export function isToolRecipe(recipe) {
+  return recipe?.combatClass === 'tools' || recipe?.category === 'hatchet' || recipe?.category === 'pickaxe';
+}
+
 export function isShelfItem(recipe) {
   return Boolean(
     recipe?.shelfItem
@@ -803,7 +951,7 @@ export function isShelfItem(recipe) {
 export function canDisplayOn(kind, recipe) {
   if (!recipe || recipe.outputMaterial) return false;
   if (kind === 'stand') return recipe.category === 'armour' || recipe.category === 'weapon';
-  const gear = recipe.category === 'weapon' || recipe.category === 'armour';
+  const gear = recipe.category === 'weapon' || recipe.category === 'armour' || isToolRecipe(recipe);
   const ammoOrRune = recipe.category === 'rune' || recipe.category === 'ammo';
   const platter = recipe.category === 'food' || recipe.category === 'potion';
   if (kind === 'table') return gear || ammoOrRune;
@@ -825,6 +973,7 @@ export function isMaterialCraft(recipe) {
 }
 
 export function anvilTabForRecipe(recipe) {
+  if (isToolRecipe(recipe)) return 'tools';
   if (recipe?.combatClass === 'magic') return 'magic';
   if (recipe?.combatClass === 'range') return 'ranged';
   return 'melee';
@@ -834,7 +983,19 @@ export function anvilSubtabForRecipe(recipe) {
   if (recipe?.category === 'armour') return 'armour';
   if (recipe?.category === 'ammo') return 'ammo';
   if (recipe?.category === 'rune') return 'rune';
+  if (recipe?.category === 'hatchet') return 'hatchet';
+  if (recipe?.category === 'pickaxe') return 'pickaxe';
   return 'weapon';
+}
+
+export function anvilSubtabsForTab(tabId) {
+  if (tabId === 'tools') return TOOL_SUBTABS;
+  return ANVIL_SUBTABS.filter((tab) => {
+    if (tab.id === 'hatchet' || tab.id === 'pickaxe') return false;
+    if (tab.id === 'ammo') return tabId === 'ranged';
+    if (tab.id === 'rune') return tabId === 'magic';
+    return tab.id === 'weapon' || tab.id === 'armour';
+  });
 }
 
 export function recipeList() {
@@ -866,7 +1027,7 @@ export function recipesForTab(tabId, subtabId = null) {
   if (tabId === 'spin') return recipeList().filter((recipe) => recipe.category === 'spin');
   const combatClass = tabId === 'ranged' ? 'range' : tabId;
   const list = recipeList().filter((recipe) => recipe.combatClass === combatClass);
-  if (subtabId === 'weapon' || subtabId === 'armour' || subtabId === 'ammo' || subtabId === 'rune') {
+  if (subtabId === 'weapon' || subtabId === 'armour' || subtabId === 'ammo' || subtabId === 'rune' || subtabId === 'hatchet' || subtabId === 'pickaxe') {
     return list.filter((recipe) => recipe.category === subtabId);
   }
   return list;
@@ -913,6 +1074,7 @@ export function offerClassOf(recipe) {
   if (recipe.combatClass === 'melee') return 'melee';
   if (recipe.combatClass === 'range') return 'ranged';
   if (recipe.combatClass === 'magic') return 'magic';
+  if (isToolRecipe(recipe)) return 'tools';
   return null;
 }
 
@@ -920,6 +1082,7 @@ export function offerClassLabel(cls) {
   if (cls === 'melee') return 'Melee';
   if (cls === 'ranged') return 'Ranged';
   if (cls === 'magic') return 'Magic';
+  if (cls === 'tools') return 'Tools';
   if (cls === 'food') return 'Food';
   if (cls === 'potion') return 'Potion';
   return 'matching';
@@ -928,6 +1091,7 @@ export function offerClassLabel(cls) {
 export function classLabel(combatClass, category = null) {
   if (category === 'potion') return 'Potion';
   if (category === 'rune') return 'Magic';
+  if (category === 'hatchet' || category === 'pickaxe' || combatClass === 'tools') return 'Tools';
   if (category === 'food' || (!combatClass && category !== 'weapon' && category !== 'armour' && category !== 'ammo' && category !== 'rune')) return 'Food';
   if (combatClass === 'melee') return 'Melee';
   if (combatClass === 'range') return 'Ranged';

@@ -248,6 +248,67 @@ export function sootMetal(color, roughness = 0.48, metalness = 0.58) {
   });
 }
 
+function drawHideScale(ctx, w, h, seed) {
+  const rand = randFrom(seed);
+  ctx.fillStyle = '#6a6e62';
+  ctx.fillRect(0, 0, w, h);
+  const cell = 22;
+  for (let row = -1; row < h / cell + 2; row += 1) {
+    for (let col = -1; col < w / cell + 2; col += 1) {
+      const ox = (row % 2) * (cell / 2);
+      const x = col * cell + ox;
+      const y = row * cell;
+      ctx.beginPath();
+      ctx.moveTo(x + cell / 2, y);
+      ctx.lineTo(x + cell, y + cell / 2);
+      ctx.lineTo(x + cell / 2, y + cell);
+      ctx.lineTo(x, y + cell / 2);
+      ctx.closePath();
+      const light = 0.1 + rand() * 0.16;
+      ctx.fillStyle = `rgba(255, 255, 255, ${light})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(12, 10, 8, ${0.22 + rand() * 0.2})`;
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+    }
+  }
+}
+
+/** Diamond-scale hide for range-class buyers. Tint with the kit colour. */
+export function scaleHide(color, roughness = 0.86) {
+  const map = withRepeat(makeMap('hide-scale', 256, 256, (ctx, w, h) => drawHideScale(ctx, w, h, 4411)), 2.2, 3.0);
+  return new THREE.MeshStandardMaterial({
+    map,
+    color,
+    roughness,
+    metalness: 0.05,
+  });
+}
+
+function drawChecks(ctx, w, h) {
+  const cell = 16;
+  ctx.fillStyle = '#f4f4f0';
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#2a3560';
+  for (let y = 0; y < h; y += cell) {
+    for (let x = 0; x < w; x += cell) {
+      if (((x / cell) + (y / cell)) % 2 === 0) ctx.fillRect(x, y, cell, cell);
+    }
+  }
+}
+
+/** Kitchen-check cloth for cook travelers. */
+export function checkCloth(color, roughness = 0.9) {
+  const map = withRepeat(makeMap('cloth-check', 128, 128, (ctx, w, h) => drawChecks(ctx, w, h)), 2.4, 3.2);
+  return new THREE.MeshStandardMaterial({
+    map,
+    color,
+    roughness,
+    metalness: 0,
+    side: THREE.DoubleSide,
+  });
+}
+
 /** Tight fabric weave for counter and table cloths. */
 export function weaveCloth(color, roughness = 0.92) {
   const map = withRepeat(makeMap('cloth-weave', 128, 128, (ctx, w, h) => drawWeave(ctx, w, h, 3311)), 3.2, 2.4);

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
+import { UPLOADS_CLEARED } from './storage.js';
 
 function file(name) {
   return { name };
@@ -34,5 +35,12 @@ describe('model upload classify', () => {
     assert.match(classifyModelFiles([file('a.obj'), file('b.glb')]).error, /not both/i);
     assert.match(classifyModelFiles([file('a.obj'), file('b.obj')]).error, /one \.obj/i);
     assert.match(classifyModelFiles([file('notes.txt')]).error, /glb|obj/i);
+  });
+});
+
+describe('clear uploads copy', () => {
+  it('tells the player default looks are back', () => {
+    assert.match(UPLOADS_CLEARED, /cleared uploaded models/i);
+    assert.match(UPLOADS_CLEARED, /default looks/i);
   });
 });

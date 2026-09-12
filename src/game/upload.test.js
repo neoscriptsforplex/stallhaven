@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
-import { bundledModelBases, parseModelBuffer } from './upload.js';
+import { bundledModelBases, bundledModelRoots, parseModelBuffer } from './upload.js';
 import { UPLOADS_CLEARED } from './storage.js';
 
 function file(name) {
@@ -53,8 +53,11 @@ describe('clear uploads copy', () => {
 describe('bundled model paths', () => {
   it('looks under models/ and public/models/ so githack source trees can load dumps', () => {
     const bases = bundledModelBases('player');
+    const roots = bundledModelRoots();
     assert.ok(bases.some((base) => base.endsWith('models/player/')));
     assert.ok(bases.some((base) => base.includes('public/models/player/')));
+    assert.ok(roots.some((root) => root.endsWith('models/')));
+    assert.ok(roots.some((root) => root.includes('public/models/')));
   });
 
   it('still parses an OBJ when its MTL sidecar is garbage', async () => {

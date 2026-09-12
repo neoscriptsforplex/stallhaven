@@ -154,17 +154,48 @@ export function envBaseUrl() {
   }
 }
 
-export function bundledModelBases(folder) {
+export function bundledModelRoots() {
   const raw = envBaseUrl();
   const envBase = raw.endsWith('/') ? raw : `${raw}/`;
-  const bases = [
-    `${envBase}models/${folder}/`,
-    `${envBase}public/models/${folder}/`,
-  ];
+  const roots = [`${envBase}models/`, `${envBase}public/models/`];
   if (envBase !== './') {
-    bases.push(`./models/${folder}/`, `./public/models/${folder}/`);
+    roots.push('./models/', './public/models/');
   }
-  return [...new Set(bases)];
+  return [...new Set(roots)];
+}
+
+export function bundledModelBases(folder) {
+  return bundledModelRoots().map((root) => `${root}${folder}/`);
+}
+
+let cachedModelsRoot = null;
+let resolveRootPromise = null;
+
+export function resetBundledModelRoot() {
+  cachedModelsRoot = null;
+  resolveRootPromise = null;
+}
+
+export function resolveBundledModelRoot() {
+  if (cachedModelsRoot) return Promise.resolve(cachedModelsRoot);
+  if (!resolveRootPromise) {
+    resolveRootPromise = (async () => {
+      for (const root of bundledModelRoots()) {
+        try {
+          const res = await fetch(`${root}player/player.obj`);
+          if (!res.ok) continue;
+          assertObjPayload(await res.arrayBuffer(), `${root}player/player.obj`);
+          cachedModelsRoot = root;
+          return root;
+        } catch {
+          // HTML fallback or a missing tree — try the next root.
+        }
+      }
+      cachedModelsRoot = bundledModelRoots()[0];
+      return cachedModelsRoot;
+    })();
+  }
+  return resolveRootPromise;
 }
 
 function missingModel(label) {
@@ -174,8 +205,10 @@ function missingModel(label) {
 }
 
 async function fetchObjMtl(folder, objFile, mtlFile) {
+  const roots = cachedModelsRoot ? [cachedModelsRoot] : bundledModelRoots();
   let lastMissing = missingModel(`models/${folder}/${objFile}`);
-  for (const base of bundledModelBases(folder)) {
+  for (const root of roots) {
+    const base = `${root}${folder}/`;
     try {
       const objRes = await fetch(`${base}${objFile}`);
       if (!objRes.ok) {
@@ -183,6 +216,7 @@ async function fetchObjMtl(folder, objFile, mtlFile) {
         continue;
       }
       const objBuffer = assertObjPayload(await objRes.arrayBuffer(), `models/${folder}/${objFile}`);
+      cachedModelsRoot = root;
       const sidecars = {};
       if (mtlFile) {
         const mtlRes = await fetch(`${base}${mtlFile}`);
@@ -210,6 +244,7 @@ async function fetchObjMtl(folder, objFile, mtlFile) {
 
 /** Fetch the shipped LilRunnerBoi OBJ+MTL from the static /models/player/ folder. */
 export async function loadBundledPlayerScene() {
+  await resolveBundledModelRoot();
   return fetchObjMtl('player', 'player.obj', 'player.mtl');
 }
 
@@ -229,6 +264,7 @@ export async function loadBundledPropScene(folder) {
 }
 
 export async function loadBundledLooks() {
+  await resolveBundledModelRoot();
   const entries = await Promise.all(BUNDLED_PROP_FOLDERS.map(async ({ id, folder }) => {
     try {
       return [id, await loadBundledPropScene(folder)];

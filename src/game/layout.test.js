@@ -2,8 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CAULDRON_COST,
-  FURNACE_COST,
   WHEEL_COST,
+  furnaceBesideAnvil,
   CHEST_MAX_LEVEL,
   EXPANSION_PADS,
   FURNITURE_FORWARD,
@@ -87,8 +87,21 @@ describe('layout numbers', () => {
     const turned = rotatePose(furniture.range, 1);
     assert.ok(Math.abs(turned.rot - FURNITURE_ROT_STEP) < 1e-9);
     assert.equal(furniture.cauldron, null);
-    assert.equal(furniture.furnace, null);
+    assert.ok(furniture.furnace);
+    assert.equal(furniture.furnace.x, SHOP.furnace.x);
+    assert.equal(furniture.furnace.z, SHOP.furnace.z);
+    assert.equal(furniture.furnace.rot, FURNITURE_FORWARD);
     assert.equal(furniture.wheel, null);
+  });
+
+  it('sits the starter furnace beside the anvil with a small gap', () => {
+    assert.ok(SHOP.furnace.x > SHOP.anvil.x);
+    assert.ok(SHOP.furnace.x - SHOP.anvil.x > 0.9);
+    assert.ok(SHOP.furnace.x - SHOP.anvil.x < 1.3);
+    assert.equal(SHOP.furnace.z, SHOP.anvil.z);
+    const beside = furnaceBesideAnvil({ x: -2.98, z: -2.42, rot: 0 });
+    assert.ok(Math.abs(beside.x - (-2.98 + SHOP.furnace.x - SHOP.anvil.x)) < 1e-9);
+    assert.equal(beside.z, -2.42);
   });
 
   it('puts the cooking range on the floor right of the counter, between counter and chest', () => {
@@ -125,7 +138,6 @@ describe('layout numbers', () => {
     assert.equal(right.some((spot) => spot.side === 'right' || spot.side === 'front-right'), false);
     assert.ok(right.some((spot) => spot.side === 'left'));
     assert.equal(WHEEL_COST, 500);
-    assert.equal(FURNACE_COST, 3000);
     assert.equal(CAULDRON_COST, 10000);
   });
 

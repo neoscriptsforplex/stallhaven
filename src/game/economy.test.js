@@ -39,7 +39,6 @@ import {
   canBuyFurniture,
   canCraft,
   CAULDRON_COST,
-  FURNACE_COST,
   WHEEL_COST,
   chestCapacity,
   chestCount,
@@ -70,6 +69,7 @@ import {
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
+import { furnaceBesideAnvil } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 
 function finishCraft(state, recipeId, at = 0) {
@@ -224,6 +224,8 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'mystic_staff'), false);
     assert.equal(isUnlocked(state, 'green_dhide_body'), false);
     assert.equal(isUnlocked(state, 'pizza'), false);
+    assert.equal(isUnlocked(state, 'salmon'), false);
+    assert.equal(isUnlocked(state, 'cake'), false);
     assert.equal(unlockRemaining(state, 'iron_sword'), 20);
   });
 
@@ -294,6 +296,8 @@ describe('save and load', () => {
     assert.equal(state.materials.string, undefined);
     assert.equal(state.materials.herbs, 8);
     assert.equal(state.materials.water, 12);
+    assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
+    assert.equal(ownsFurnace(state), true);
     assert.equal(state.chest.bread, 2);
     assert.equal(state.fullscreen, false);
     assert.ok(state.music.volume > 0);
@@ -458,8 +462,22 @@ describe('catalog', () => {
     assert.equal(RECIPES.black_dhide_coif.slot, 'helm');
     assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
     assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
-    assert.equal(recipes.filter((r) => r.category === 'food').length, 5);
+    assert.equal(recipes.filter((r) => r.category === 'food').length, 13);
     assert.equal(recipes.filter((r) => r.category === 'potion').length, 8);
+    assert.equal(RECIPES.salmon.price, 16);
+    assert.ok(RECIPES.salmon.price < RECIPES.cake.price);
+    assert.ok(RECIPES.cake.price < RECIPES.lobster.price);
+    assert.ok(RECIPES.lobster.price < RECIPES.chocolate_cake.price);
+    assert.ok(RECIPES.chocolate_cake.price < RECIPES.monkfish.price);
+    assert.ok(RECIPES.monkfish.price < RECIPES.curry.price);
+    assert.ok(RECIPES.curry.price < RECIPES.shark.price);
+    assert.ok(RECIPES.shark.price < RECIPES.summer_pie.price);
+    assert.ok(RECIPES.summer_pie.price < RECIPES.anglerfish.price);
+    assert.equal(RECIPES.cake.previousId, 'pizza');
+    assert.equal(RECIPES.salmon.previousId, 'bread');
+    assert.equal(RECIPES.lobster.previousId, 'salmon');
+    assert.equal(RECIPES.chocolate_cake.previousId, 'lobster');
+    assert.equal(recipeCost(RECIPES.chocolate_cake).materials.chocolate, 1);
     assert.equal(RECIPES.bronze_scimitar.name, 'Bronze Scimitar');
     assert.equal(RECIPES.iron_platebody.name, 'Iron Platebody');
     assert.equal(RECIPES.magic_hat.name, 'Magic Hat');
@@ -501,6 +519,7 @@ describe('catalog', () => {
       assert.equal(rectHitsAisle(spot.x, spot.z, hw, hd, QUEUE_AISLE), false, spot.name);
     }
     assert.equal(rectHitsAisle(SHOP.anvil.x, SHOP.anvil.z, 0.48, 0.4, QUEUE_AISLE), false);
+    assert.equal(rectHitsAisle(SHOP.furnace.x, SHOP.furnace.z, 0.4, 0.36, QUEUE_AISLE), false);
     assert.equal(rectHitsAisle(SHOP.chest.x, SHOP.chest.z, 0.54, 0.41, QUEUE_AISLE), false);
     assert.equal(rectHitsAisle(SHOP.range.x, SHOP.range.z, 0.34, 0.28, QUEUE_AISLE), false);
   });
@@ -558,6 +577,9 @@ describe('catalog', () => {
     assert.ok(ranged.some((r) => r.id === 'bronze_arrows'));
     assert.ok(ranged.some((r) => r.id === 'blue_dhide_coif'));
     assert.ok(food.some((r) => r.id === 'bread'));
+    assert.ok(food.some((r) => r.id === 'salmon'));
+    assert.ok(food.some((r) => r.id === 'anglerfish'));
+    assert.equal(food.length, 13);
     assert.ok(!melee.some((r) => r.category === 'food'));
     assert.equal(RECIPES.strength_potion.name, 'Strength Potion');
     assert.equal(RECIPES.anti_poison_potion.name, 'Anti Poison Potion');
@@ -707,15 +729,13 @@ describe('cauldron unlock', () => {
 });
 
 describe('furnace and spinning wheel', () => {
-  it('sells a furnace for 3000 gp and smelts ore into a bar', () => {
+  it('starts with a free furnace beside the anvil and smelts ore into a bar', () => {
     const state = createState();
-    assert.equal(ownsFurnace(state), false);
-    assert.match(craftBlockReason(state, 'smelt_bronze'), /furnace/i);
-    state.gold = FURNACE_COST;
-    assert.equal(canBuyFurnace(state), true);
-    assert.equal(buyFurnace(state, { x: -1, z: 0.6, rot: 0 }), true);
-    assert.equal(state.gold, 0);
     assert.equal(ownsFurnace(state), true);
+    assert.equal(canBuyFurnace(state), false);
+    assert.equal(buyFurnace(state, { x: -1, z: 0.6, rot: 0 }), false);
+    assert.equal(state.furniture.furnace.x, SHOP.furnace.x);
+    assert.equal(state.furniture.furnace.z, SHOP.furnace.z);
     const ore = state.materials.bronze;
     assert.equal(canCraft(state, 'smelt_bronze'), true);
     finishCraft(state, 'smelt_bronze');
@@ -726,8 +746,53 @@ describe('furnace and spinning wheel', () => {
     const next = createState();
     assert.equal(applyState(next, saved), true);
     assert.equal(ownsFurnace(next), true);
-    assert.equal(next.furniture.furnace.x, -1);
+    assert.equal(next.furniture.furnace.x, SHOP.furnace.x);
     assert.equal(next.materials.bronze_bar, 1);
+  });
+
+  it('keeps a furnace the player already placed and auto-places one if a save never had one', () => {
+    const kept = createState();
+    assert.equal(applyState(kept, {
+      version: 8,
+      gold: 40,
+      furniture: {
+        anvil: { x: -2.98, z: -2.42, rot: 0 },
+        furnace: { x: -1, z: 0.6, rot: 0 },
+      },
+    }), true);
+    assert.equal(kept.furniture.furnace.x, -1);
+    assert.equal(kept.furniture.furnace.z, 0.6);
+
+    const missing = createState();
+    assert.equal(applyState(missing, {
+      version: 8,
+      gold: 40,
+      furniture: {
+        anvil: { x: -2.98, z: -2.42, rot: 0 },
+      },
+    }), true);
+    const expected = furnaceBesideAnvil({ x: -2.98, z: -2.42, rot: 0 });
+    assert.equal(missing.furniture.furnace.x, expected.x);
+    assert.equal(missing.furniture.furnace.z, expected.z);
+    assert.equal(ownsFurnace(missing), true);
+  });
+
+  it('unlocks feast foods after bread without changing the kitchen cake line', () => {
+    const state = createState();
+    assert.equal(isUnlocked(state, 'salmon'), false);
+    assert.equal(isUnlocked(state, 'pizza'), false);
+    state.craftCounts.bread = 20;
+    assert.equal(isUnlocked(state, 'salmon'), true);
+    assert.equal(isUnlocked(state, 'pizza'), true);
+    assert.equal(isUnlocked(state, 'cake'), false);
+    assert.equal(isUnlocked(state, 'lobster'), false);
+    state.craftCounts.pizza = 30;
+    assert.equal(isUnlocked(state, 'cake'), true);
+    state.craftCounts.salmon = 20;
+    assert.equal(isUnlocked(state, 'lobster'), true);
+    assert.ok(CUSTOMERS.pilgrim.prefers.includes('salmon'));
+    assert.ok(CUSTOMERS.pilgrim.prefers.includes('anglerfish'));
+    assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
   });
 
   it('sells a spinning wheel for 500 gp and spins flax into bow string', () => {
@@ -939,6 +1004,7 @@ describe('ores, appearance, king, and chest bin', () => {
     assert.equal(MATERIALS.dragon_bar.name, 'Dragon Bar');
     assert.equal(MATERIALS.bow_string.name, 'Bow String');
     assert.equal(MATERIALS.flax.name, 'Flax');
+    assert.equal(MATERIALS.chocolate.name, 'Chocolate');
     assert.equal(MATERIALS.string, undefined);
   });
 

@@ -963,6 +963,14 @@ export function buildWare(recipeId) {
     cake: () => addCake(group, tint),
     pie: () => addPie(group, tint, 0xb45a4a),
     fish_pie: () => addPie(group, tint, 0x7a9aaa),
+    salmon: () => addFish(group, tint, 1),
+    lobster: () => addLobster(group, tint),
+    chocolate_cake: () => addCake(group, tint, 0x3a2218),
+    monkfish: () => addFish(group, tint, 1.12),
+    curry: () => addCurry(group, tint),
+    shark: () => addFish(group, tint, 1.35),
+    summer_pie: () => addPie(group, tint, 0xe8a04a),
+    anglerfish: () => addFish(group, tint, 1.22, true),
     potion: () => addPotion(group, tint),
   };
   if (builders[shape]) builders[shape]();
@@ -1487,16 +1495,72 @@ function addPizza(group, tint) {
   group.add(topping);
 }
 
-function addCake(group, tint) {
+function addCake(group, tint, icingColor = 0xf4e8d0) {
   const cake = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.1, 12), new THREE.MeshStandardMaterial({
     color: tint,
     roughness: 0.86,
   })));
   cake.position.y = 0.06;
   group.add(cake);
-  const icing = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.12, 0.03, 12), cloth(0xf4e8d0)));
+  const icing = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.12, 0.03, 12), cloth(icingColor)));
   icing.position.y = 0.12;
   group.add(icing);
+}
+
+function addFish(group, tint, scale = 1, lantern = false) {
+  const body = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.1 * scale, 10, 8), new THREE.MeshStandardMaterial({
+    color: tint,
+    roughness: 0.55,
+  })));
+  body.scale.set(1.7, 0.7, 0.85);
+  body.position.y = 0.05 * scale;
+  group.add(body);
+  const tail = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.055 * scale, 0.1 * scale, 6), new THREE.MeshStandardMaterial({
+    color: tint,
+    roughness: 0.6,
+  })));
+  tail.rotation.z = Math.PI / 2;
+  tail.position.set(-0.16 * scale, 0.05 * scale, 0);
+  group.add(tail);
+  if (lantern) {
+    const lamp = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.028 * scale, 8, 6), glow(0xf0d27a)));
+    lamp.position.set(0.16 * scale, 0.1 * scale, 0);
+    group.add(lamp);
+  }
+}
+
+function addLobster(group, tint) {
+  const body = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshStandardMaterial({
+    color: tint,
+    roughness: 0.7,
+  })));
+  body.scale.set(1.35, 0.55, 0.8);
+  body.position.y = 0.05;
+  group.add(body);
+  for (const side of [-1, 1]) {
+    const claw = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshStandardMaterial({
+      color: tint,
+      roughness: 0.65,
+    })));
+    claw.scale.set(1.4, 0.7, 0.8);
+    claw.position.set(0.1, 0.05, side * 0.08);
+    group.add(claw);
+  }
+}
+
+function addCurry(group, tint) {
+  const bowl = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.07, 12), new THREE.MeshStandardMaterial({
+    color: 0xc8b48a,
+    roughness: 0.55,
+  })));
+  bowl.position.y = 0.04;
+  group.add(bowl);
+  const stew = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 12), new THREE.MeshStandardMaterial({
+    color: tint,
+    roughness: 0.45,
+  })));
+  stew.position.y = 0.075;
+  group.add(stew);
 }
 
 function addPotion(group, tint) {

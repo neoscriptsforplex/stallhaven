@@ -14,6 +14,9 @@ import {
   SPAWN_GAP_MIN,
   decideRequest,
   displayKind,
+  MATERIALS,
+  MINE_DURATION,
+  MINE_YIELD,
   emptySlots,
   emptyShelfSlots,
   mostExpensiveChestId,
@@ -21,7 +24,7 @@ import {
   shelfSlotPoses,
   SHELF_SLOT_COUNT,
 } from './catalog.js';
-import { hasStock, pushLog } from './economy.js';
+import { grantMinedMaterial, hasStock, pushLog } from './economy.js';
 import {
   FURNITURE_FORWARD,
   FURNITURE_ROT_STEP,
@@ -69,11 +72,13 @@ import {
   setDoorOpen,
   setSpeechText,
   slotPose,
+  setHeldTool,
+  updateMinePose,
   updateWalkPose,
   wareTopY,
   wrapImportedCharacter,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 
 const CUSTOMER_SPEED = 1.35;
@@ -246,6 +251,7 @@ export function createWorld(canvas, state) {
   let sceneMode = 'shop';
   let dungeon = null;
   let pendingUse = null;
+  let mining = null;
   let lastPlaceClickAt = 0;
   const DUNGEON_FLOOR = { minX: -5.2, maxX: 5.2, minZ: -4.2, maxZ: 4.2 };
   const shopReturnPos = { x: SHOP.keeper.x, z: SHOP.keeper.z };
@@ -671,19 +677,24 @@ export function createWorld(canvas, state) {
   }
   window.addEventListener('resize', resize);
 
-  function trapdoorPicks() {
+  function shopUsePicks() {
     const found = [];
     architecture?.traverse((child) => {
       if (child.userData?.kind === 'trapdoor') found.push(child);
     });
+    return found;
+  }
+
+  function dungeonUsePicks() {
+    const found = [];
     dungeon?.root?.traverse((child) => {
-      if (child.userData?.kind === 'ladder') found.push(child);
+      if (child.userData?.kind === 'ladder' || child.userData?.kind === 'boulder') found.push(child);
     });
     return found;
   }
 
   function allPicks() {
-    if (sceneMode === 'dungeon') return trapdoorPicks();
+    if (sceneMode === 'dungeon') return dungeonUsePicks();
     const extra = expandMode && padGroup
       ? padGroup.children.filter((child) => child.userData.kind === 'expand-pad')
       : [];
@@ -695,7 +706,7 @@ export function createWorld(canvas, state) {
       ...UNLOCK_STATIONS.filter((id) => state.furniture[id]).map((id) => fixtureMeshes[id].pick),
       counterPick,
       ...extra,
-      ...trapdoorPicks(),
+      ...shopUsePicks(),
       ...customers
         .filter((actor) => actor.state === 'request')
         .map((actor) => actor.mesh.userData.pick)
@@ -723,8 +734,43 @@ export function createWorld(canvas, state) {
     cam.distance = Math.min(CAM_MAX_DISTANCE, Math.max(CAM_MIN_DISTANCE, cam.distance));
   }
 
+  function stopMining() {
+    if (!mining) return;
+    mining = null;
+    setHeldTool(shopkeeper, 'hammer');
+  }
+
+  function startMining(materialId, pose) {
+    const mat = MATERIALS[materialId];
+    if (!mat) return;
+    mining = {
+      materialId,
+      name: mat.name,
+      startedAt: performance.now() / 1000,
+      duration: MINE_DURATION,
+      x: pose?.x ?? shopkeeper.position.x,
+      z: pose?.z ?? shopkeeper.position.z,
+    };
+    setHeldTool(shopkeeper, 'pickaxe');
+    if (pose) {
+      shopkeeper.rotation.y = Math.atan2(pose.x - shopkeeper.position.x, pose.z - shopkeeper.position.z);
+    }
+  }
+
+  function tickMining(now) {
+    if (!mining) return;
+    if (now - mining.startedAt < mining.duration) return;
+    const got = grantMinedMaterial(state, mining.materialId, MINE_YIELD);
+    if (got > 0) {
+      pushLog(state, `Mined ${got} ${mining.name}.`);
+      pickHandler?.({ type: 'mined', materialId: mining.materialId, amount: got });
+    }
+    mining.startedAt = now;
+  }
+
   function applyWalkPath(path) {
     if (!path?.length) return false;
+    stopMining();
     playerPath.length = 0;
     playerPath.push(...path);
     const goal = path[path.length - 1];
@@ -791,12 +837,18 @@ export function createWorld(canvas, state) {
       pendingUse = null;
       playerPath.length = 0;
       moveMarker.visible = false;
+      if (type === 'boulder') {
+        startMining(pose.materialId, pose);
+        playClick('ui');
+        return;
+      }
+      stopMining();
       pickHandler?.({ type });
       playClick('ui');
       return;
     }
     if (plan.action === 'walk' && applyWalkPath(plan.path)) {
-      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true };
+      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true, materialId: pose.materialId };
       playClick('move');
       return;
     }
@@ -804,12 +856,20 @@ export function createWorld(canvas, state) {
       ? planWalk(from, { x: pose.x, z: pose.z }, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
       : planPlayerWalk(from, { x: pose.x, z: pose.z }, state, PLAYER_RADIUS);
     if (applyWalkPath(fallback)) {
-      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true };
+      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true, materialId: pose.materialId };
       playClick('move');
       return;
     }
-    pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: false };
+    pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: false, materialId: pose.materialId };
     playClick('ui');
+  }
+
+  function finishPendingUse() {
+    if (!pendingUse) return;
+    const { type, materialId, x, z } = pendingUse;
+    pendingUse = null;
+    if (type === 'boulder') startMining(materialId, { x, z, materialId });
+    else pickHandler?.({ type });
   }
 
   function updatePlayer(dt, now) {
@@ -819,19 +879,21 @@ export function createWorld(canvas, state) {
         if (!playerPath.length) {
           moveMarker.visible = false;
           if (pendingUse && (pendingUse.openOnArrive || isNearPose(pendingUse, pendingUse.arrive ?? STATION_ARRIVE))) {
-            const type = pendingUse.type;
-            pendingUse = null;
-            pickHandler?.({ type });
+            finishPendingUse();
           }
         }
       }
       return;
     }
+    if (mining) {
+      shopkeeper.rotation.y = Math.atan2(mining.x - shopkeeper.position.x, mining.z - shopkeeper.position.z);
+      updateMinePose(shopkeeper, dt, now);
+      tickMining(now);
+      return;
+    }
     updateWalkPose(shopkeeper, false, dt, now);
     if (pendingUse && isNearPose(pendingUse, pendingUse.arrive ?? 1.35)) {
-      const type = pendingUse.type;
-      pendingUse = null;
-      pickHandler?.({ type });
+      finishPendingUse();
       return;
     }
     const front = customers.find((actor) => actor.state === 'request');
@@ -1056,6 +1118,10 @@ export function createWorld(canvas, state) {
         queueUse('ladder', { x: -4.2, z: 0.4 });
         return;
       }
+      if (data.kind === 'boulder') {
+        queueUse('boulder', { x: data.x, z: data.z, materialId: data.materialId });
+        return;
+      }
       if (data.kind === 'chest' && held >= 500) {
         playClick('ui');
         pickHandler?.({ type: 'chest-upgrade' });
@@ -1100,6 +1166,15 @@ export function createWorld(canvas, state) {
       if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 1.7) {
         queueUse('trapdoor', hatch);
         return;
+      }
+      if (sceneMode === 'dungeon') {
+        const spot = DUNGEON_BOULDERS.find((item) => (
+          Math.hypot(point.x - item.x, point.z - item.z) <= (STATION_HIT.boulder.floorR ?? 1.15)
+        ));
+        if (spot) {
+          queueUse('boulder', { x: spot.x, z: spot.z, materialId: spot.materialId });
+          return;
+        }
       }
       pendingUse = null;
       setMoveTarget(point.x, point.z);
@@ -1824,6 +1899,7 @@ export function createWorld(canvas, state) {
     sceneMode = 'dungeon';
     playerPath.length = 0;
     pendingUse = null;
+    stopMining();
     moveMarker.visible = false;
     setShopLayerVisible(false);
     dungeon.root.visible = true;
@@ -1838,6 +1914,7 @@ export function createWorld(canvas, state) {
     sceneMode = 'shop';
     playerPath.length = 0;
     pendingUse = null;
+    stopMining();
     if (dungeon) {
       dungeon.root.visible = false;
       dungeon.grounds.visible = false;
@@ -2101,6 +2178,16 @@ export function createWorld(canvas, state) {
     },
     isInDungeon() {
       return sceneMode === 'dungeon';
+    },
+    getMining(now = performance.now() / 1000) {
+      if (!mining) return null;
+      const t = Math.min(1, Math.max(0, (now - mining.startedAt) / mining.duration));
+      return {
+        materialId: mining.materialId,
+        name: mining.name,
+        t,
+        yield: MINE_YIELD,
+      };
     },
   };
 }

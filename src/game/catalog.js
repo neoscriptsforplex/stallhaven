@@ -165,13 +165,13 @@ function regenEvery(tier) {
 }
 
 export const MATERIALS = {
-  bronze: { id: 'bronze', name: 'Bronze Ore', restock: 3, start: 12, tier: 1, regenEvery: regenEvery(1) },
-  iron: { id: 'iron', name: 'Iron Ore', restock: 5, start: 2, tier: 2, regenEvery: regenEvery(2) },
-  steel: { id: 'steel', name: 'Steel Ore', restock: 7, start: 1, tier: 3, regenEvery: regenEvery(3) },
-  mithril: { id: 'mithril', name: 'Mithril Ore', restock: 10, start: 1, tier: 4, regenEvery: regenEvery(4) },
-  adamant: { id: 'adamant', name: 'Adamant Ore', restock: 13, start: 0, tier: 5, regenEvery: regenEvery(5) },
-  runite: { id: 'runite', name: 'Runite Ore', restock: 16, start: 0, tier: 6, regenEvery: regenEvery(6) },
-  dragon: { id: 'dragon', name: 'Dragon Ore', restock: 22, start: 0, tier: 7, regenEvery: regenEvery(7) },
+  bronze: { id: 'bronze', name: 'Bronze Ore', restock: 0, start: 12, tier: 1, regenEvery: 0 },
+  iron: { id: 'iron', name: 'Iron Ore', restock: 0, start: 2, tier: 2, regenEvery: 0 },
+  steel: { id: 'steel', name: 'Steel Ore', restock: 0, start: 1, tier: 3, regenEvery: 0 },
+  mithril: { id: 'mithril', name: 'Mithril Ore', restock: 0, start: 1, tier: 4, regenEvery: 0 },
+  adamant: { id: 'adamant', name: 'Adamant Ore', restock: 0, start: 0, tier: 5, regenEvery: 0 },
+  runite: { id: 'runite', name: 'Runite Ore', restock: 0, start: 0, tier: 6, regenEvery: 0 },
+  dragon: { id: 'dragon', name: 'Dragon Ore', restock: 0, start: 0, tier: 7, regenEvery: 0 },
   logs: { id: 'logs', name: 'Logs', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
   flax: { id: 'flax', name: 'Flax', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
   bow_string: {
@@ -193,7 +193,7 @@ export const MATERIALS = {
   fish: { id: 'fish', name: 'Fish', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   herbs: { id: 'herbs', name: 'Herbs', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   water: { id: 'water', name: 'Water', restock: 2, start: 12, tier: 1, regenEvery: regenEvery(1) },
-  essence: { id: 'essence', name: 'Essence', restock: 3, start: 10, tier: 1, regenEvery: regenEvery(1) },
+  essence: { id: 'essence', name: 'Essence', restock: 0, start: 10, tier: 1, regenEvery: 0 },
 };
 
 METALS.forEach((metal, index) => {
@@ -487,7 +487,7 @@ RUNE_LINE.forEach((rune, index) => {
     tier: index + 1,
     cost: { materials: { essence: 1 }, gold: 0 },
     time: 3 + index,
-    price: 6 + index * 2,
+    price: [20, 28, 36, 48][index],
     buyers: ['hedgemage', 'pilgrim', 'mercenary', 'ranger'],
     tint: rune.tint,
     shelfItem: true,
@@ -776,8 +776,39 @@ export function nearestShelfSlot(localX, localY, localZ = 0) {
   return best;
 }
 
+export const MINE_YIELD = 5;
+export const MINE_DURATION = 3.2;
+
+export function isMinedMaterial(materialId) {
+  return materialId === 'essence' || METALS.some((metal) => metal.id === materialId);
+}
+
+export function isAmmoRecipe(recipe) {
+  return recipe?.category === 'ammo';
+}
+
 export function isShelfItem(recipe) {
-  return Boolean(recipe?.shelfItem || recipe?.category === 'food' || recipe?.category === 'potion' || recipe?.category === 'rune');
+  return Boolean(
+    recipe?.shelfItem
+    || recipe?.category === 'food'
+    || recipe?.category === 'potion'
+    || recipe?.category === 'rune'
+    || recipe?.category === 'ammo'
+    || recipe?.shape === 'bow_string'
+    || recipe?.shape === 'bar',
+  );
+}
+
+/** Wares that can sit on a table or 4-slot wall shelf (not armour stands). */
+export function canDisplayOn(kind, recipe) {
+  if (!recipe || recipe.outputMaterial) return false;
+  if (kind === 'stand') return recipe.category === 'armour' || recipe.category === 'weapon';
+  const gear = recipe.category === 'weapon' || recipe.category === 'armour';
+  const ammoOrRune = recipe.category === 'rune' || recipe.category === 'ammo';
+  const platter = recipe.category === 'food' || recipe.category === 'potion';
+  if (kind === 'table') return gear || ammoOrRune;
+  if (kind === 'shelf') return gear || ammoOrRune || platter;
+  return false;
 }
 
 export function stationForRecipe(recipe) {

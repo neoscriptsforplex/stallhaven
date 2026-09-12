@@ -1,28 +1,128 @@
+import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { recipeList } from './catalog.js';
+import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
 import { saveModel } from './storage.js';
 import { normalizeImported } from './models.js';
 
-const loader = new GLTFLoader();
+export { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
+
+const gltfLoader = new GLTFLoader();
+
+const MODEL_ACCEPT = '.glb,.gltf,.obj,.mtl,.png,.jpg,.jpeg,.webp,model/gltf-binary,model/gltf+json';
+
+function decodeText(buffer) {
+  return new TextDecoder().decode(buffer);
+}
+
+function basename(path) {
+  return String(path ?? '').split(/[\\/]/).pop().split('?')[0].toLowerCase();
+}
+
+function sidecarMap(sidecars = {}) {
+  const urls = new Map();
+  const revoke = [];
+  for (const [name, data] of Object.entries(sidecars)) {
+    if (!data) continue;
+    const blob = new Blob([data]);
+    const url = URL.createObjectURL(blob);
+    revoke.push(url);
+    urls.set(name.toLowerCase(), url);
+    urls.set(basename(name), url);
+  }
+  return { urls, revoke };
+}
+
+function hasMesh(root) {
+  let found = false;
+  root?.traverse?.((child) => {
+    if (child.isMesh) found = true;
+  });
+  return found;
+}
+
+function parseObjBuffer(buffer, sidecars = {}) {
+  const objText = decodeText(buffer);
+  if (!objText.trim()) throw new Error('That .obj file is empty.');
+  const { urls, revoke } = sidecarMap(sidecars);
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier((url) => urls.get(basename(url)) || url);
+  const finish = () => {
+    for (const url of revoke) URL.revokeObjectURL(url);
+  };
+  manager.onLoad = finish;
+  setTimeout(finish, 60000);
+
+  const objLoader = new OBJLoader(manager);
+  const mtlEntry = Object.entries(sidecars).find(([name]) => name.toLowerCase().endsWith('.mtl'));
+  if (mtlEntry) {
+    const mtlLoader = new MTLLoader(manager);
+    const materials = mtlLoader.parse(decodeText(mtlEntry[1]), '');
+    materials.preload();
+    objLoader.setMaterials(materials);
+  }
+  const group = objLoader.parse(objText);
+  if (!hasMesh(group)) throw new Error('That .obj has no mesh.');
+  return group;
+}
+
+function friendlyParseError(err, kind) {
+  const raw = err?.message || String(err || '');
+  if (kind === 'obj') return raw || 'Could not parse that .obj file.';
+  return raw || 'Could not parse that model.';
+}
 
 export function parseModelFile(file) {
   return file.arrayBuffer().then((buffer) => parseModelBuffer(buffer, file.name));
 }
 
-export function parseModelBuffer(buffer, name) {
+export function parseModelBuffer(buffer, name, sidecars = {}) {
   return new Promise((resolve, reject) => {
-    const ext = name.toLowerCase();
+    const ext = (name || '').toLowerCase();
+    if (ext.endsWith('.obj')) {
+      try {
+        resolve(parseObjBuffer(buffer, sidecars));
+      } catch (err) {
+        reject(new Error(friendlyParseError(err, 'obj')));
+      }
+      return;
+    }
+    if (ext.endsWith('.mtl')) {
+      reject(new Error('That .mtl needs its .obj. Select both files together.'));
+      return;
+    }
+    const onError = (err) => reject(new Error(friendlyParseError(err, 'gltf')));
     if (ext.endsWith('.gltf')) {
-      const text = new TextDecoder().decode(buffer);
+      const text = decodeText(buffer);
       if (/"uri"\s*:\s*"[^d]/.test(text) && !text.includes('data:')) {
         reject(new Error('That .gltf needs extra files. Use a single .glb instead.'));
         return;
       }
-      loader.parse(text, '', (gltf) => resolve(gltf.scene), reject);
+      gltfLoader.parse(text, '', (gltf) => resolve(gltf.scene), onError);
       return;
     }
-    loader.parse(buffer, '', (gltf) => resolve(gltf.scene), reject);
+    gltfLoader.parse(buffer, '', (gltf) => resolve(gltf.scene), onError);
   });
+}
+
+export async function parseModelFiles(files) {
+  const classified = classifyModelFiles(files);
+  if (classified.error) throw new Error(classified.error);
+  const buffer = await classified.primary.arrayBuffer();
+  const sidecars = {};
+  for (const file of classified.sidecars ?? []) {
+    sidecars[file.name] = await file.arrayBuffer();
+  }
+  const scene = await parseModelBuffer(buffer, classified.primary.name, sidecars);
+  return {
+    scene,
+    name: classified.primary.name,
+    label: formatUploadLabel(classified),
+    buffer,
+    sidecars,
+  };
 }
 
 function syncModalClass() {
@@ -49,6 +149,11 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
   const recipeRow = modal.querySelector('[data-recipes]');
   const cancelBtn = modal.querySelector('[data-cancel]');
   const errorEl = modal.querySelector('[data-error]');
+
+  if (fileInput) {
+    fileInput.accept = MODEL_ACCEPT;
+    fileInput.multiple = true;
+  }
 
   recipeRow.innerHTML = recipeList().map((r) => (
     `<button type="button" class="recipe-bind" data-recipe="${r.id}">${r.name}</button>`
@@ -84,33 +189,25 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
     syncModalClass();
   }
 
-  async function receiveFile(file) {
-    const lower = file.name.toLowerCase();
-    if (!lower.endsWith('.glb') && !lower.endsWith('.gltf')) {
-      showError('Choose a .glb or .gltf file.');
-      title.textContent = file.name;
-      pending = null;
-      showTags(false);
-      modal.hidden = false;
-      syncModalClass();
-      return;
-    }
+  async function receiveFiles(fileList) {
+    const files = [...(fileList ?? [])];
+    const names = files.map((file) => file.name).join(' + ');
     try {
-      const scene = await parseModelFile(file);
-      const buffer = await file.arrayBuffer();
+      const loaded = await parseModelFiles(files);
       pending = {
         id: `up-${Date.now()}`,
-        name: file.name,
-        buffer,
-        scene,
+        name: loaded.name,
+        buffer: loaded.buffer,
+        sidecars: loaded.sidecars,
+        scene: loaded.scene,
       };
-      title.textContent = file.name;
+      title.textContent = loaded.label;
       showError('');
       showTags(true);
       modal.hidden = false;
       syncModalClass();
     } catch (err) {
-      title.textContent = file.name;
+      title.textContent = names;
       pending = null;
       showTags(false);
       showError(err.message || 'Could not read that model. The default look is unchanged.');
@@ -136,6 +233,7 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
       recipeId: recipeId ?? null,
       displayIndex: kind === 'furniture' ? state.selectedDisplay : null,
       buffer: pending.buffer,
+      sidecars: pending.sidecars ?? {},
     };
 
     if (kind === 'furniture') {
@@ -190,12 +288,11 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
   dropTarget.addEventListener('drop', (event) => {
     event.preventDefault();
     dropHint?.classList.remove('is-hot');
-    const file = event.dataTransfer?.files?.[0];
-    if (file) receiveFile(file);
+    const files = event.dataTransfer?.files;
+    if (files?.length) receiveFiles(files);
   });
   fileInput.addEventListener('change', () => {
-    const file = fileInput.files?.[0];
-    if (file) receiveFile(file);
+    if (fileInput.files?.length) receiveFiles(fileInput.files);
     fileInput.value = '';
   });
 

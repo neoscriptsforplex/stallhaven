@@ -6,7 +6,9 @@ import {
   appearanceColor,
   defaultAppearance,
   normalizeAppearance,
+  isShelfItem,
 } from './catalog.js';
+import { wornMetal, weaveCloth, woodSurface } from './surfaces.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({
@@ -77,77 +79,6 @@ function cobbleMap() {
   tex.anisotropy = 4;
   tex.needsUpdate = true;
   return tex;
-}
-
-function woodPlankMap(seed = 4211) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#8a5a30';
-  ctx.fillRect(0, 0, 256, 256);
-  let s = seed;
-  const rand = () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-  const boards = 5;
-  const boardH = 256 / boards;
-  for (let i = 0; i < boards; i += 1) {
-    const y = i * boardH;
-    const warm = 118 + Math.floor(rand() * 46);
-    ctx.fillStyle = `rgb(${warm + 18}, ${Math.floor(warm * 0.62)}, ${Math.floor(warm * 0.28)})`;
-    ctx.fillRect(0, y, 256, boardH);
-    for (let g = 0; g < 10; g += 1) {
-      const gy = y + 5 + rand() * (boardH - 10);
-      ctx.strokeStyle = `rgba(42, 22, 10, ${0.16 + rand() * 0.28})`;
-      ctx.lineWidth = 0.7 + rand() * 1.6;
-      ctx.beginPath();
-      ctx.moveTo(0, gy);
-      ctx.bezierCurveTo(
-        70,
-        gy + (rand() - 0.5) * 7,
-        170,
-        gy + (rand() - 0.5) * 7,
-        256,
-        gy,
-      );
-      ctx.stroke();
-    }
-    if (rand() > 0.4) {
-      const kx = 18 + rand() * 220;
-      const ky = y + boardH * (0.28 + rand() * 0.44);
-      ctx.fillStyle = 'rgba(48, 26, 12, 0.5)';
-      ctx.beginPath();
-      ctx.ellipse(kx, ky, 3.5 + rand() * 4, 2.2 + rand() * 2, rand() * Math.PI, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(30, 16, 8, 0.45)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-    ctx.fillStyle = 'rgba(22, 12, 6, 0.78)';
-    ctx.fillRect(0, y, 256, 4);
-    ctx.fillStyle = 'rgba(210, 160, 90, 0.22)';
-    ctx.fillRect(0, y + 4, 256, 2);
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-function plankWood(color, roughness = 0.86, repeatX = 1, repeatY = 1, seed = 4211) {
-  const map = woodPlankMap(seed);
-  map.repeat.set(repeatX, repeatY);
-  return new THREE.MeshStandardMaterial({
-    map,
-    color,
-    roughness,
-    metalness: 0.03,
-  });
 }
 
 function cobbleMat(repeatX, repeatY) {
@@ -362,25 +293,19 @@ export function buildStall() {
 export function buildCounter() {
   const group = new THREE.Group();
   group.name = 'counter';
-  const top = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 0.85), wood(0x7a5230)));
+  const top = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 0.85), woodSurface(0x7a5230, 0.84, 1.6, 0.7, 4211)));
   top.position.y = 0.92;
   group.add(top);
-  const clothMesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.03, 0.92), cloth(0x7a3d32)));
+  const clothMesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.03, 0.92), weaveCloth(0x7a3d32)));
   clothMesh.position.y = 0.98;
   group.add(clothMesh);
-  const drape = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.38, 0.16, 0.04), cloth(0x6a332a)));
+  const drape = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.38, 0.16, 0.04), weaveCloth(0x6a332a, 0.94)));
   drape.position.set(0, 0.89, 0.46);
   group.add(drape);
-  const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.82, 0.7), wood(0x4e301c)));
+  const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.82, 0.7), woodSurface(0x4e301c, 0.9, 1.2, 1.1, 5029)));
   body.position.y = 0.46;
   group.add(body);
-  const dish = addShadow(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 16), new THREE.MeshStandardMaterial({
-      color: 0xb08a3c,
-      metalness: 0.55,
-      roughness: 0.35,
-    })),
-  );
+  const dish = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 16), wornMetal(0xb08a3c, 0.32, 0.62)));
   dish.position.set(0.7, 1.03, 0.1);
   group.add(dish);
   return group;
@@ -389,10 +314,12 @@ export function buildCounter() {
 export function buildDefaultTable() {
   const group = new THREE.Group();
   group.name = 'table';
-  const top = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.08, 0.85), wood(0x8a5a32)));
+  const oak = woodSurface(0x8a5a32, 0.86, 1.1, 0.7, 4211);
+  const legWood = woodSurface(0x3f2716, 0.9, 0.35, 1.3, 6113);
+  const top = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.08, 0.85), oak));
   top.position.y = 0.82;
   group.add(top);
-  const clothMesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.02, 0.7), cloth(0x7a3d32)));
+  const clothMesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.02, 0.7), weaveCloth(0x7a3d32)));
   clothMesh.position.y = 0.87;
   group.add(clothMesh);
   for (const [x, z] of [
@@ -401,7 +328,7 @@ export function buildDefaultTable() {
     [-0.52, 0.3],
     [0.52, 0.3],
   ]) {
-    const leg = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.8, 0.08), wood(0x3f2716)));
+    const leg = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.8, 0.08), legWood));
     leg.position.set(x, 0.4, z);
     group.add(leg);
   }
@@ -744,6 +671,43 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
   if (Math.abs(mesh.position.y) < 0.002) mesh.position.y = 0;
 }
 
+export function buildPickaxe() {
+  const group = new THREE.Group();
+  group.name = 'pickaxe';
+  const haft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.4, 6), wood(0x5a3a22)));
+  haft.position.set(0, 0.16, 0.03);
+  haft.rotation.z = 0.55;
+  group.add(haft);
+  const head = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.045, 0.045), metal(0x6a7078)));
+  head.position.set(0.13, 0.31, 0.03);
+  group.add(head);
+  const spike = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.12, 6), metal(0x7a8088)));
+  spike.position.set(0.21, 0.27, 0.03);
+  spike.rotation.z = 1.15;
+  group.add(spike);
+  const spike2 = spike.clone();
+  spike2.position.set(0.05, 0.35, 0.03);
+  spike2.rotation.z = -0.95;
+  group.add(spike2);
+  return group;
+}
+
+export function setHeldTool(mesh, tool) {
+  const hammers = mesh?.userData?.hammers ?? [];
+  for (const part of hammers) {
+    if (part) part.visible = tool !== 'pickaxe';
+  }
+  if (mesh?.userData?.pickaxe) mesh.userData.pickaxe.visible = tool === 'pickaxe';
+}
+
+export function updateMinePose(mesh, dt = 0.016, now = 0) {
+  const rig = mesh?.userData?.rig;
+  const swing = Math.sin(now * 8.2) * 0.72 - 0.32;
+  if (rig?.armR) rig.armR.rotation.x = swing;
+  if (rig?.armL) rig.armL.rotation.x = -0.18;
+  mesh.position.y = Math.abs(Math.sin(now * 16.4)) * 0.014;
+}
+
 function hashStyle(seed) {
   let s = Math.abs(Math.floor(seed * 9973) || 1);
   return () => {
@@ -817,16 +781,23 @@ export function buildShopkeeper(opts = {}) {
   hammerHaft.rotation.z = 0.55;
   const hammerHead = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.07), metal(0x6a7078)));
   hammerHead.position.set(0.12, 0.3, 0.04);
+  const pickaxe = buildPickaxe();
+  pickaxe.visible = false;
   const hand = group.userData.hand;
   if (hand) {
     hand.add(hammerHaft);
     hand.add(hammerHead);
+    hand.add(pickaxe);
   } else {
     hammerHaft.position.set(pose.handR.x, pose.handR.y + 0.08, pose.handR.z + 0.04);
     group.add(hammerHaft);
     hammerHead.position.set(pose.handR.x + 0.12, pose.handR.y + 0.22, pose.handR.z + 0.04);
     group.add(hammerHead);
+    pickaxe.position.set(pose.handR.x, pose.handR.y, pose.handR.z);
+    group.add(pickaxe);
   }
+  group.userData.hammers = [hammerHaft, hammerHead];
+  group.userData.pickaxe = pickaxe;
 
   const chefHat = buildChefHat();
   chefHat.position.y = pose.headTop + 0.02;
@@ -866,9 +837,10 @@ export function setChefHatVisible(keeper, on) {
 export function buildAnvil() {
   const group = new THREE.Group();
   group.name = 'anvil';
-  const iron = metal(0x5a6068);
-  const dark = metal(0x2a2c30);
-  const stump = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.26, 10), wood(0x4a301c)));
+  const iron = wornMetal(0x5a6068, 0.4, 0.78);
+  const dark = wornMetal(0x2a2c30, 0.48, 0.7);
+  const faceSteel = wornMetal(0xc4ccd4, 0.26, 0.86);
+  const stump = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.26, 10), woodSurface(0x4a301c, 0.9, 1.2, 0.8, 5029)));
   stump.position.y = 0.14;
   group.add(stump);
   const waist = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.24, 0.22), dark));
@@ -884,10 +856,10 @@ export function buildAnvil() {
   const heel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.26), iron));
   heel.position.set(0.4, 0.55, 0);
   group.add(heel);
-  const face = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.05, 0.28), metal(0xb0b8c0)));
+  const face = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.05, 0.28), faceSteel));
   face.position.y = 0.7;
   group.add(face);
-  const hammer = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.42, 6), wood(0x5a3a22)));
+  const hammer = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.42, 6), woodSurface(0x5a3a22, 0.88, 0.4, 1.2, 6113)));
   hammer.position.set(0.26, 0.86, 0.18);
   hammer.rotation.z = 0.7;
   group.add(hammer);
@@ -904,19 +876,22 @@ export function buildAnvil() {
 export function buildWallShelf() {
   const group = new THREE.Group();
   group.name = 'shelf';
-  const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.07, 0.38), wood(0x7a5230)));
+  const boardWood = woodSurface(0x7a5230, 0.86, 1.15, 0.45, 4211);
+  const railWood = woodSurface(0x3f2716, 0.9, 0.35, 1.2, 6113);
+  const backWood = woodSurface(0x4e301c, 0.9, 1.2, 0.9, 5029);
+  const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.07, 0.38), boardWood));
   board.position.y = 1.56;
   group.add(board);
   const board2 = board.clone();
   board2.position.y = 1.1;
   group.add(board2);
-  const bracket = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.7, 0.08), wood(0x3f2716)));
+  const bracket = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.7, 0.08), railWood));
   bracket.position.set(-0.55, 1.3, -0.12);
   group.add(bracket);
   const bracket2 = bracket.clone();
   bracket2.position.x = 0.55;
   group.add(bracket2);
-  const back = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.82, 0.05), wood(0x4e301c)));
+  const back = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.82, 0.05), backWood));
   back.position.set(0, 1.33, -0.18);
   group.add(back);
   group.userData.wareY = 1.64;
@@ -927,31 +902,34 @@ export function buildWallShelf() {
 export function buildArmourStand() {
   const group = new THREE.Group();
   group.name = 'armour-stand';
-  const pole = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 1.48, 8), wood(0x3f2716)));
+  const post = woodSurface(0x3f2716, 0.88, 0.35, 1.6, 6113);
+  const oak = woodSurface(0x7a5230, 0.9, 0.7, 0.9, 4211);
+  const baseWood = woodSurface(0x4a301c, 0.9, 0.8, 0.8, 5029);
+  const pole = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 1.48, 8), post));
   pole.position.y = 0.76;
   group.add(pole);
-  const base = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.08, 12), wood(0x4a301c)));
+  const base = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.08, 12), baseWood));
   base.position.y = 0.04;
   group.add(base);
-  const hips = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.14), wood(0x5a3b22)));
+  const hips = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.14), oak));
   hips.position.y = 0.5;
   group.add(hips);
-  const torso = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 0.14), wood(0x7a5230, 0.9)));
+  const torso = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 0.14), oak));
   torso.position.y = 0.92;
   group.add(torso);
-  const shoulders = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.12), wood(0x5a3b22)));
+  const shoulders = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.12), oak));
   shoulders.position.y = 1.16;
   group.add(shoulders);
-  const armL = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.38, 8), wood(0x3f2716)));
+  const armL = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.38, 8), post));
   armL.position.set(-0.24, 0.92, 0);
   group.add(armL);
   const armR = armL.clone();
   armR.position.x = 0.24;
   group.add(armR);
-  const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), wood(0x3f2716)));
+  const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), post));
   neck.position.y = 1.28;
   group.add(neck);
-  const knob = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), wood(0x6a4324)));
+  const knob = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), oak));
   knob.position.y = 1.4;
   group.add(knob);
   group.userData.wareY = 0;
@@ -1040,6 +1018,7 @@ export function buildWare(recipeId) {
     anglerfish: () => addFish(group, tint, 1.22, true),
     potion: () => addPotion(group, tint),
     bar: () => addMetalBar(group, tint),
+    bow_string: () => addBowStringCoil(group, tint),
   };
   if (builders[shape]) builders[shape]();
   else {
@@ -1050,7 +1029,7 @@ export function buildWare(recipeId) {
     lump.position.y = 0.1;
     group.add(lump);
   }
-  if (recipe?.category === 'food' || recipe?.category === 'potion' || recipe?.category === 'rune') group.scale.setScalar(0.55);
+  if (isShelfItem(recipe)) group.scale.setScalar(0.55);
   group.userData.recipeId = recipeId;
   return group;
 }
@@ -1145,17 +1124,24 @@ function addSword(group, tint, scale = 1) {
 }
 
 function addScimitar(group, tint) {
-  const curve = new THREE.QuadraticBezierCurve3(
-    new THREE.Vector3(-0.02, 0.2, 0),
-    new THREE.Vector3(0.18, 0.42, 0),
-    new THREE.Vector3(0.08, 0.78, 0),
-  );
+  const hiltX = -0.05;
+  const hiltY = 0.16;
+  const hiltRot = -0.28;
+  addHilt(group, hiltX, hiltY, hiltRot, 0.2);
+  const start = new THREE.Vector3(hiltX, hiltY, 0);
+  const mid = new THREE.Vector3(0.2, 0.44, 0);
+  const end = new THREE.Vector3(0.08, 0.78, 0);
+  const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
   const blade = addShadow(new THREE.Mesh(
     new THREE.TubeGeometry(curve, 14, 0.028, 6, false),
     metal(tint),
   ));
   group.add(blade);
-  for (let i = 1; i < 8; i += 1) {
+  const ricasso = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.11, 0.02), metal(tint)));
+  ricasso.position.set(hiltX + 0.03, hiltY + 0.05, 0);
+  ricasso.rotation.z = hiltRot;
+  group.add(ricasso);
+  for (let i = 0; i < 8; i += 1) {
     const t = i / 8;
     const p = curve.getPoint(t);
     const belly = 0.034 + Math.sin(t * Math.PI) * 0.028;
@@ -1164,11 +1150,11 @@ function addScimitar(group, tint) {
     seg.rotation.z = -0.55 + t * 1.15;
     group.add(seg);
   }
+  const tipDir = curve.getTangent(1);
   const tip = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 6), metal(tint)));
-  tip.position.set(0.06, 0.84, 0);
-  tip.rotation.z = 0.55;
+  tip.position.copy(curve.getPoint(1)).addScaledVector(tipDir, 0.05);
+  tip.rotation.z = Math.atan2(tipDir.x, tipDir.y);
   group.add(tip);
-  addHilt(group, -0.05, 0.16, -0.28, 0.2);
 }
 
 function shaftTip(posY, rotZ, halfLen) {
@@ -1470,6 +1456,36 @@ function addBow(group, tint, scale = 1) {
     string.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
   }
   group.add(string);
+}
+
+function addBowStringCoil(group, tint) {
+  const fibre = new THREE.MeshStandardMaterial({
+    color: tint,
+    roughness: 0.86,
+    metalness: 0.02,
+  });
+  const points = [];
+  const turns = 5.2;
+  const steps = 72;
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const a = t * turns * Math.PI * 2;
+    const r = 0.072 * (1 + Math.sin(t * 14) * 0.04);
+    points.push(new THREE.Vector3(Math.cos(a) * r, 0.018 + t * 0.086, Math.sin(a) * r));
+  }
+  const tip = points[points.length - 1];
+  points.push(new THREE.Vector3(tip.x * 0.55 + 0.06, tip.y - 0.012, tip.z * 0.35));
+  points.push(new THREE.Vector3(0.14, 0.012, 0.03));
+  points.push(new THREE.Vector3(0.17, 0.008, 0.055));
+  const coil = addShadow(new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 80, 0.0085, 6, false),
+    fibre,
+  ));
+  group.add(coil);
+  const band = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.074, 0.007, 6, 14), cloth(0xb8a070)));
+  band.rotation.x = Math.PI / 2;
+  band.position.y = 0.055;
+  group.add(band);
 }
 
 function addHeldBow(parent, tint, scale = 0.85) {
@@ -1793,10 +1809,10 @@ function addPie(group, tint, filling) {
 export function buildChest() {
   const root = new THREE.Group();
   root.name = 'chest';
-  const oak = plankWood(0xc49a62, 0.88, 1, 1, 4211);
-  const dark = plankWood(0x7a4a28, 0.9, 1, 0.7, 5029);
-  const lidWood = plankWood(0xd2a86c, 0.86, 1, 1.15, 6113);
-  const band = metal(0xb08a3c);
+  const oak = woodSurface(0xc49a62, 0.88, 1, 1, 4211);
+  const dark = woodSurface(0x7a4a28, 0.9, 1, 0.7, 5029);
+  const lidWood = woodSurface(0xd2a86c, 0.86, 1, 1.15, 6113);
+  const band = wornMetal(0xb08a3c, 0.34, 0.64);
 
   const base = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.42, 0.62), oak));
   base.position.y = 0.27;
@@ -2293,7 +2309,12 @@ export function wrapImportedCharacter(source, opts = {}) {
   const hand = new THREE.Group();
   hand.position.set(0.22, Math.min(height * 0.58, 1.05), 0.08);
   group.add(hand);
+  const pickaxe = buildPickaxe();
+  pickaxe.visible = false;
+  hand.add(pickaxe);
   group.userData.hand = hand;
+  group.userData.pickaxe = pickaxe;
+  group.userData.hammers = [];
   group.userData.customMesh = true;
   group.userData.walkPhase = 0;
   return group;

@@ -16,7 +16,7 @@
         <span class="expand-icon" aria-hidden="true">⛶</span>
       </button>
       <button type="button" id="build-btn" title="Upgrade" aria-label="Upgrade">Upgrade</button>
-      <button type="button" id="help-btn" title="Help" aria-label="Help">?</button>
+      <button type="button" id="help-btn" title="Help" aria-label="Help">Help</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
       <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
@@ -33,7 +33,7 @@
         </div>
         <div class="ledger-row">
           <p id="gold" class="gold">Coins: 40</p>
-          <button type="button" id="upload-btn" title="Upload a .glb or .gltf">Upload</button>
+          <button type="button" id="upload-btn" title="Upload a .glb, .gltf, or .obj + .mtl">Upload</button>
         </div>
         <div id="active-craft" class="active-craft" hidden>
           <p data-active-craft-name>Crafting</p>
@@ -47,11 +47,11 @@
       <div class="sheet">
         <h2>Help</h2>
         <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the anvil, furnace, range, chest, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. Double-click a highlighted cell to confirm a new table, mannequin, spinning wheel, or cauldron. Scroll to zoom out for the roof and garden.</p>
-        <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back.</p>
-        <p>Click the anvil to smith Melee, Magic, or Ranged. Ranged has Weapons, Armour, and Ammo (arrows and cannonballs). Magic has Weapons, Armour, and Runes. Weapons and armour use metal bars. Each craft row has 1×, 5×, and Max — those count recipe actions (one arrow craft still makes 20). The starting shop already has a furnace beside the anvil — click it to smelt ores into bars. Higher bars unlock after enough smelts of the previous tier. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Click the cooking range for Food. Click a placed cauldron for Potions. Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
+        <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back. In the dungeon, click an Essence boulder or a veined ore rock to walk over, swing a pickaxe, and fill a Mining bar. Each fill grants 5 Essence or 5 ore of that tier (Bronze through Dragon). Ores and Essence do not restock for gold or refill on their own.</p>
+        <p>Click the anvil to smith Melee, Magic, or Ranged. Ranged has Weapons, Armour, and Ammo (arrows and cannonballs). Magic has Weapons, Armour, and Runes. Weapons and armour use metal bars. Each craft row has 1×, 5×, and Max — those count recipe actions (one arrow craft still makes 20). Cancel under the spinning preview stops a run and returns leftover actions (finished pieces stay). The starting shop already has a furnace beside the anvil — click it to smelt ores into bars. Higher bars unlock after enough smelts of the previous tier. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Click the cooking range for Food. Click a placed cauldron for Potions — the window matches the anvil (recipes on the left, preview on the right, materials along the bottom). Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
-        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Right-click furniture for Move or Rotate — wares travel with the piece. The counter only moves from a right-click.</p>
-        <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist you upload — Shuffle, Play, Pause, Skip, and Stop. The cog beside it opens Settings for the skybox, player look, and cheat codes. Upload a .glb as Furniture, Ware, Player, or Customer.</p>
+        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Runes and arrows (and cannonballs) can sit on tables or on any of the four shelf slots. Right-click furniture for Move or Rotate — wares travel with the piece. The counter only moves from a right-click.</p>
+        <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist you upload — Shuffle, Play, Pause, Skip, and Stop. The cog beside it opens Settings for the skybox, player look, and cheat codes. Upload a .glb/.gltf, or multi-select an .obj with its .mtl (and maps), as Furniture, Ware, Player, or Customer.</p>
         <button type="button" data-dismiss>Close</button>
       </div>
     </div>
@@ -89,7 +89,9 @@
           <aside class="craft-preview-pane">
             <canvas data-craft-preview width="220" height="220" aria-label="Item preview"></canvas>
             <p data-craft-preview-name class="meta">Select or hover a recipe.</p>
-            <p class="meta craft-qty-hint">1× / 5× / Max count craft actions. Ammo makes 20 per action.</p>
+            <p class="meta craft-qty-hint">1× / 5× / Max count craft actions.</p>
+            <p class="meta craft-qty-hint" data-ammo-hint hidden>Ammo makes 20 per action.</p>
+            <button type="button" class="ghost craft-cancel" data-craft-cancel disabled>Cancel</button>
           </aside>
         </div>
         <div id="materials" class="craft-mats" aria-label="Materials"></div>
@@ -133,10 +135,10 @@
     <div id="import-modal" class="modal" hidden>
       <div class="sheet upload-sheet">
         <h2>Upload a Model</h2>
-        <p class="meta">Prefer a single .glb (glTF). Tag it Furniture, Ware, Player, or Customer. Failed loads leave the default look in place. A custom player mesh keeps walking and click targets; hair and colour customizer may not apply to it. A customer mesh is shared by every traveler, with their usual colours and name labels.</p>
-        <div data-upload-drop class="upload-drop">Drop a file here, or choose one.</div>
-        <button type="button" data-upload-pick>Choose File</button>
-        <input type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
+        <p class="meta">Prefer a single .glb (glTF), or multi-select an .obj with its .mtl and texture maps. Tag it Furniture, Ware, Player, or Customer. Failed loads leave the default look in place. A custom player mesh keeps walking and click targets; hair and colour customizer may not apply to it. A customer mesh is shared by every traveler, with their usual colours and name labels.</p>
+        <div data-upload-drop class="upload-drop">Drop files here, or choose them.</div>
+        <button type="button" data-upload-pick>Choose Files</button>
+        <input type="file" accept=".glb,.gltf,.obj,.mtl,.png,.jpg,.jpeg,.webp,model/gltf-binary,model/gltf+json" multiple hidden />
         <p data-import-name></p>
         <p data-error class="error" hidden></p>
         <div class="row tag-grid" data-tags hidden>
@@ -232,6 +234,7 @@
             <canvas data-potion-preview width="220" height="220" aria-label="Potion preview"></canvas>
             <p data-potion-preview-name class="meta">Select or hover a potion.</p>
             <p class="meta craft-qty-hint">1× / 5× / Max brew as many vials as herbs and water allow.</p>
+            <button type="button" class="ghost craft-cancel" data-potion-cancel disabled>Cancel</button>
           </aside>
         </div>
         <div id="potion-materials" class="craft-mats" aria-label="Materials"></div>

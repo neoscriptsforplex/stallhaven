@@ -5,6 +5,7 @@ import { createState } from './economy.js';
 import {
   STATION_ARRIVE,
   STATION_HIT,
+  USE_KINDS,
   pickUseHit,
   resolveStationUse,
   stationAtFloor,
@@ -78,5 +79,16 @@ describe('station walk-then-open', () => {
     assert.equal(plan.action, 'walk');
     const end = plan.path[plan.path.length - 1];
     assert.ok(end.x > 5);
+  });
+
+  it('treats dungeon boulders as walk-then-use rocks', () => {
+    assert.equal(USE_KINDS.has('boulder'), true);
+    assert.ok(STATION_HIT.boulder.w >= 1.2);
+    assert.ok(STATION_HIT.boulder.floorR >= 1);
+    const picked = pickUseHit([
+      hit('ground', 3.2, 0.2, 3.15),
+      hit('boulder', 3.4, 0.2, 3.15),
+    ]);
+    assert.equal(picked.object.userData.kind, 'boulder');
   });
 });

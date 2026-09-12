@@ -6,8 +6,11 @@ import {
   METALS,
   OTHER_CHANCE,
   RECIPES,
+  canDisplayOn,
   isCraftedMaterial,
+  isMinedMaterial,
   isMaterialCraft,
+  MINE_YIELD,
   SHOP,
   SHELF_SLOT_COUNT,
   SHOP_MAX_LEVEL,
@@ -374,6 +377,38 @@ function payCraftCost(state, recipe, times) {
   for (const [materialId, need] of Object.entries(cost.materials ?? {})) {
     state.materials[materialId] = (state.materials[materialId] ?? 0) - need * n;
   }
+}
+
+function refundCraftCost(state, recipe, times) {
+  const cost = recipeCost(recipe);
+  const n = Math.max(0, Math.round(Number(times) || 0));
+  state.gold += (cost.gold || 0) * n;
+  for (const [materialId, need] of Object.entries(cost.materials ?? {})) {
+    state.materials[materialId] = (state.materials[materialId] ?? 0) + need * n;
+  }
+}
+
+/** Stop a running craft or leftover batch. Refunds remaining actions; finished items stay. */
+export function cancelCraft(state, recipeId) {
+  const craft = state.crafts?.[recipeId];
+  const recipe = RECIPES[recipeId];
+  if (!craft || !recipe) return 0;
+  const remaining = Math.max(0, craft.left ?? 1);
+  if (remaining > 0) refundCraftCost(state, recipe, remaining);
+  delete state.crafts[recipeId];
+  return remaining;
+}
+
+export function cancelCrafts(state) {
+  let refunded = 0;
+  for (const recipeId of Object.keys(state.crafts ?? {})) {
+    refunded += cancelCraft(state, recipeId);
+  }
+  return refunded;
+}
+
+export function busyCraftId(state) {
+  return Object.keys(state.crafts ?? {})[0] ?? null;
 }
 
 export function startCraft(state, recipeId, nowSeconds) {
@@ -869,12 +904,26 @@ function claimLoadedDisplays(state) {
   }
 }
 
+export function chestDisplayList(state, kind) {
+  return chestList(state).filter((item) => canDisplayOn(kind, item.recipe));
+}
+
+export function grantMinedMaterial(state, materialId, amount = MINE_YIELD) {
+  if (!isMinedMaterial(materialId)) return 0;
+  const cur = state.materials[materialId] ?? 0;
+  const add = Math.min(MATERIAL_CAP - cur, Math.max(0, Math.round(Number(amount) || 0)));
+  if (add <= 0) return 0;
+  state.materials[materialId] = cur + add;
+  return add;
+}
+
 export function placeOnDisplay(state, recipeId, displayIndex = state.selectedDisplay, slotIndex = 0) {
   if (chestCount(state, recipeId) < 1) return false;
   const display = state.displays[displayIndex];
   if (!display) return false;
   const kind = displayKind(displayIndex, state);
   if (kind === 'stand') return placeFromChest(state, recipeId, displayIndex);
+  if (!canDisplayOn(kind, RECIPES[recipeId])) return false;
   if (!takeFromChest(state, recipeId)) return false;
   if (kind === 'shelf') {
     migrateShelfSlots(display, displayIndex, state);

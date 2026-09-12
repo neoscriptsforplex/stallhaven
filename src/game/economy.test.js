@@ -22,7 +22,11 @@ import {
   DUNGEON_SKYBOX,
   skyIdForScene,
   anvilSubtabForRecipe,
+  canDisplayOn,
   costLabel,
+  isAmmoRecipe,
+  isMinedMaterial,
+  MINE_YIELD,
   nearestShelfSlot,
   SHELF_SLOT_COUNT,
   SHELF_SLOT_LABELS,
@@ -47,6 +51,8 @@ import {
   WHEEL_COST,
   chestCapacity,
   chestCount,
+  chestDisplayList,
+  grantMinedMaterial,
   chestTotal,
   completeCrafts,
   craftBlockReason,
@@ -70,6 +76,9 @@ import {
   serializeState,
   shopProgress,
   maxCraftActions,
+  busyCraftId,
+  cancelCraft,
+  cancelCrafts,
   startCraft,
   startCraftBatch,
   swapOffer,
@@ -79,7 +88,7 @@ import {
 } from './economy.js';
 import { furnaceBesideAnvil } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
-import { DUNGEON_REMAINS } from './shopbuild.js';
+import { DUNGEON_BOULDERS, DUNGEON_REMAINS } from './shopbuild.js';
 
 function finishCraft(state, recipeId, at = 0) {
   const recipe = RECIPES[recipeId];
@@ -644,20 +653,53 @@ describe('chest upgrades', () => {
 });
 
 describe('material regen', () => {
-  it('fills basic materials faster than high-tier metals, capped at 250', () => {
+  it('fills basic kitchen materials, capped at 250', () => {
+    const state = createState();
+    state.materials.flour = 0;
+    state.materials.logs = 0;
+    tickMaterials(state, 8);
+    assert.equal(state.materials.flour, 1);
+    tickMaterials(state, 8);
+    assert.ok(state.materials.logs >= 1);
+    state.materials.flour = 249;
+    state.materialAcc.flour = 0;
+    tickMaterials(state, 16);
+    assert.equal(state.materials.flour, 250);
+    tickMaterials(state, 80);
+    assert.equal(state.materials.flour, 250);
+  });
+
+  it('does not regenerate or restock ores or essence', () => {
     const state = createState();
     state.materials.bronze = 0;
     state.materials.dragon = 0;
-    tickMaterials(state, 8);
-    assert.equal(state.materials.bronze, 1);
-    tickMaterials(state, 8);
-    assert.ok(state.materials.dragon < state.materials.bronze);
-    state.materials.bronze = 249;
-    state.materialAcc.bronze = 0;
-    tickMaterials(state, 16);
-    assert.equal(state.materials.bronze, 250);
-    tickMaterials(state, 80);
-    assert.equal(state.materials.bronze, 250);
+    state.materials.essence = 0;
+    tickMaterials(state, 120);
+    assert.equal(state.materials.bronze, 0);
+    assert.equal(state.materials.dragon, 0);
+    assert.equal(state.materials.essence, 0);
+    state.gold = 1000;
+    assert.equal(canRestock(state, 'bronze'), false);
+    assert.equal(canRestock(state, 'essence'), false);
+    assert.equal(restock(state, 'bronze'), false);
+    assert.equal(restock(state, 'essence'), false);
+  });
+
+  it('grants five mined ores or essence per fill, capped at 250', () => {
+    const state = createState();
+    state.materials.essence = 0;
+    assert.equal(MINE_YIELD, 5);
+    assert.equal(isMinedMaterial('essence'), true);
+    assert.equal(isMinedMaterial('bronze'), true);
+    assert.equal(isMinedMaterial('flour'), false);
+    assert.equal(grantMinedMaterial(state, 'essence'), 5);
+    assert.equal(state.materials.essence, 5);
+    assert.equal(grantMinedMaterial(state, 'bronze'), 5);
+    assert.equal(state.materials.bronze, 17);
+    state.materials.runite = 248;
+    assert.equal(grantMinedMaterial(state, 'runite'), 2);
+    assert.equal(state.materials.runite, 250);
+    assert.equal(grantMinedMaterial(state, 'flour'), 0);
   });
 
   it('does not regenerate or restock metal bars or bow string', () => {
@@ -1172,6 +1214,48 @@ describe('magic runes', () => {
     assert.equal(next.craftCounts.air_rune, 20);
     assert.equal(isUnlocked(next, 'earth_rune'), true);
   });
+
+  it('sells Air at 20g and climbs Earth, Water, then Fire', () => {
+    assert.equal(RECIPES.air_rune.price, 20);
+    assert.equal(RECIPES.earth_rune.price, 28);
+    assert.equal(RECIPES.water_rune.price, 36);
+    assert.equal(RECIPES.fire_rune.price, 48);
+    assert.match(costLabel(RECIPES.air_rune), /sells 20g/);
+  });
+});
+
+describe('display runes and ammo', () => {
+  it('lets runes, arrows, and cannonballs sit on tables and 4-slot shelves', () => {
+    const state = createState();
+    finishCraft(state, 'air_rune');
+    finishCraft(state, 'bronze_arrows');
+    finishCraft(state, 'cannonballs');
+    const tableIndex = SHOP.displays.findIndex((d) => d.kind === 'table');
+    const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
+    assert.ok(tableIndex >= 0);
+    assert.ok(shelfIndex >= 0);
+    assert.equal(canDisplayOn('table', RECIPES.air_rune), true);
+    assert.equal(canDisplayOn('shelf', RECIPES.air_rune), true);
+    assert.equal(canDisplayOn('table', RECIPES.bronze_arrows), true);
+    assert.equal(canDisplayOn('shelf', RECIPES.bronze_arrows), true);
+    assert.equal(canDisplayOn('table', RECIPES.cannonballs), true);
+    assert.equal(canDisplayOn('stand', RECIPES.air_rune), false);
+    assert.equal(canDisplayOn('table', RECIPES.bread), false);
+    assert.equal(placeOnDisplay(state, 'air_rune', tableIndex), true);
+    assert.equal(state.displays[tableIndex].ware.recipeId, 'air_rune');
+    assert.equal(placeOnDisplay(state, 'bronze_arrows', shelfIndex, 0), true);
+    assert.equal(state.displays[shelfIndex].shelfSlots[0], 'bronze_arrows');
+    assert.equal(placeOnDisplay(state, 'cannonballs', shelfIndex, 1), true);
+    assert.equal(state.displays[shelfIndex].shelfSlots[1], 'cannonballs');
+    const listed = chestDisplayList(state, 'table').map((item) => item.recipeId);
+    assert.equal(listed.includes('bread'), false);
+    assert.equal(isAmmoRecipe(RECIPES.bronze_arrows), true);
+    assert.equal(isAmmoRecipe(RECIPES.cannonballs), true);
+    assert.equal(isAmmoRecipe(RECIPES.monkfish), false);
+    assert.equal(isAmmoRecipe(RECIPES.air_rune), false);
+    assert.equal(isAmmoRecipe(RECIPES.strength_potion), false);
+    assert.equal(isAmmoRecipe(RECIPES.smelt_bronze), false);
+  });
 });
 
 describe('potion sell prices', () => {
@@ -1241,6 +1325,24 @@ describe('craft batches', () => {
     assert.equal(maxCraftActions(state, 'iron_arrows'), 0);
     assert.equal(startCraftBatch(state, 'iron_arrows', 5, 0), 0);
   });
+
+  it('cancels a mid-batch craft, refunds leftover actions, and keeps finished items', () => {
+    const state = createState();
+    state.materials.bronze_bar = 5;
+    assert.equal(startCraftBatch(state, 'bronze_sword', 5, 0), 5);
+    assert.equal(state.materials.bronze_bar, 0);
+    assert.deepEqual(completeCrafts(state, RECIPES.bronze_sword.time), ['bronze_sword']);
+    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.crafts.bronze_sword.left, 4);
+    assert.equal(busyCraftId(state), 'bronze_sword');
+    assert.equal(cancelCraft(state, 'bronze_sword'), 4);
+    assert.equal(state.crafts.bronze_sword, undefined);
+    assert.equal(busyCraftId(state), null);
+    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.craftCounts.bronze_sword, 1);
+    assert.equal(state.materials.bronze_bar, 4);
+    assert.equal(cancelCrafts(state), 0);
+  });
 });
 
 describe('dungeon sky and remains', () => {
@@ -1252,6 +1354,10 @@ describe('dungeon sky and remains', () => {
     assert.ok(DUNGEON_REMAINS.length >= 8);
     assert.ok(DUNGEON_REMAINS.some((spot) => spot.kind === 'slump'));
     assert.ok(DUNGEON_REMAINS.some((spot) => spot.kind === 'pile'));
+    assert.equal(DUNGEON_BOULDERS.length, 8);
+    assert.deepEqual(DUNGEON_BOULDERS.map((spot) => spot.materialId), [
+      'essence', 'bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon',
+    ]);
   });
 });
 

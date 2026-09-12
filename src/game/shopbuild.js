@@ -19,6 +19,7 @@ import {
   wallVineMounts,
 } from './layout.js';
 import { initRatWander } from './rats.js';
+import { brickSurface, sootMetal, stoneSoot, wornMetal, woodSurface } from './surfaces.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.04 });
@@ -737,8 +738,8 @@ function addWallVines(root, center) {
 export function buildRange() {
   const group = new THREE.Group();
   group.name = 'range';
-  const iron = metal(0x4a4e54);
-  const brick = new THREE.MeshStandardMaterial({ color: 0x8a4a32, roughness: 0.88 });
+  const iron = sootMetal(0x4a4e54, 0.5, 0.6);
+  const brick = brickSurface(0xc8a090, 0.9);
   const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.52, 0.46), brick));
   body.position.y = 0.32;
   group.add(body);
@@ -748,7 +749,7 @@ export function buildRange() {
   const door = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.26, 0.04), iron));
   door.position.set(0, 0.3, 0.24);
   group.add(door);
-  const handle = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.03), metal(0xb08a3c)));
+  const handle = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.03), wornMetal(0xb08a3c, 0.32, 0.64)));
   handle.position.set(0.08, 0.3, 0.27);
   group.add(handle);
   for (const x of [-0.14, 0.14]) {
@@ -779,8 +780,8 @@ export function buildRange() {
 export function buildCauldron() {
   const group = new THREE.Group();
   group.name = 'cauldron';
-  const iron = metal(0x3a4248);
-  const dark = metal(0x1c2226);
+  const iron = sootMetal(0x3a4248, 0.5, 0.58);
+  const dark = sootMetal(0x1c2226, 0.55, 0.5);
   const ring = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.045, 8, 18), iron));
   ring.rotation.x = Math.PI / 2;
   ring.position.y = 0.52;
@@ -826,8 +827,8 @@ export function buildCauldron() {
 export function buildFurnace() {
   const group = new THREE.Group();
   group.name = 'furnace';
-  const stone = new THREE.MeshStandardMaterial({ color: 0x6a6258, roughness: 0.92, metalness: 0.08 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x3a342e, roughness: 0.88, metalness: 0.12 });
+  const stone = stoneSoot(0xb4aea4, 0.92);
+  const dark = sootMetal(0x3a342e, 0.55, 0.22);
   const body = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.78, 0.62), stone));
   body.position.y = 0.39;
   group.add(body);
@@ -859,8 +860,8 @@ export function buildFurnace() {
 export function buildSpinningWheel() {
   const group = new THREE.Group();
   group.name = 'wheel';
-  const oak = wood(0x6b4423);
-  const dark = wood(0x3e2616);
+  const oak = woodSurface(0x6b4423, 0.86, 0.8, 1.1, 4211);
+  const dark = woodSurface(0x3e2616, 0.88, 0.6, 0.8, 6113);
   const base = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.06, 0.28), oak));
   base.position.y = 0.03;
   group.add(base);
@@ -1318,6 +1319,59 @@ export function buildShop(expansionIds = []) {
   return { root, roofs, grounds, pads };
 }
 
+/** Mineable rocks: Essence plus one ore boulder per metal tier. */
+export const DUNGEON_BOULDERS = [
+  { id: 'essence', materialId: 'essence', name: 'Essence', x: 0.2, z: 3.15, rot: 0.25, vein: 0xe8d8ff, essence: true },
+  { id: 'bronze', materialId: 'bronze', name: 'Bronze Ore', x: -3.3, z: -3.15, rot: 0.5, vein: 0x8a5a32 },
+  { id: 'iron', materialId: 'iron', name: 'Iron Ore', x: 1.4, z: -3.15, rot: -0.3, vein: 0x8a8f96 },
+  { id: 'steel', materialId: 'steel', name: 'Steel Ore', x: 4.05, z: -1.5, rot: 0.8, vein: 0xc5ccd4 },
+  { id: 'mithril', materialId: 'mithril', name: 'Mithril Ore', x: 4.05, z: 2.15, rot: -0.6, vein: 0x3a6ec8 },
+  { id: 'adamant', materialId: 'adamant', name: 'Adamant Ore', x: -1.5, z: 3.15, rot: 1.1, vein: 0x3a8a45 },
+  { id: 'runite', materialId: 'runite', name: 'Runite Ore', x: -4.05, z: 1.7, rot: 0.2, vein: 0x3ec8c4 },
+  { id: 'dragon', materialId: 'dragon', name: 'Dragon Ore', x: -4.05, z: -1.35, rot: -0.9, vein: 0xb42a22 },
+];
+
+function buildMineBoulder(spot) {
+  const group = new THREE.Group();
+  group.name = `boulder-${spot.id}`;
+  group.position.set(spot.x, 0, spot.z);
+  group.rotation.y = spot.rot ?? 0;
+  const rock = new THREE.MeshStandardMaterial({ color: 0xb8babf, roughness: 0.94, metalness: 0.06 });
+  const vein = new THREE.MeshStandardMaterial({
+    color: spot.vein,
+    roughness: spot.essence ? 0.35 : 0.45,
+    metalness: spot.essence ? 0.32 : 0.2,
+    emissive: spot.essence ? spot.vein : 0x000000,
+    emissiveIntensity: spot.essence ? 0.28 : 0,
+  });
+  const body = addShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.4, 0), rock));
+  body.scale.set(1.2, 0.82, 1.05);
+  body.position.y = 0.3;
+  group.add(body);
+  const lump = addShadow(new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), rock));
+  lump.position.set(0.16, 0.22, 0.1);
+  lump.scale.set(1.1, 0.75, 0.9);
+  group.add(lump);
+  for (const [x, y, z, sx, sy, sz, rx, rz] of [
+    [0.02, 0.34, 0.02, 0.42, 0.04, 0.07, 0.4, 0.8],
+    [-0.06, 0.26, -0.04, 0.34, 0.035, 0.06, -0.5, 1.2],
+    [0.08, 0.2, 0.08, 0.28, 0.03, 0.05, 0.9, -0.4],
+  ]) {
+    const streak = addShadow(new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), vein));
+    streak.position.set(x, y, z);
+    streak.rotation.set(rx, 0, rz);
+    group.add(streak);
+  }
+  const pick = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.05, 1.35), pickMat());
+  pick.position.y = 0.48;
+  pick.userData.kind = 'boulder';
+  pick.userData.materialId = spot.materialId;
+  pick.userData.x = spot.x;
+  pick.userData.z = spot.z;
+  group.add(pick);
+  return group;
+}
+
 /** Extra skulls, slumped skeletons, and bone piles around the dungeon floor. */
 export const DUNGEON_REMAINS = [
   { kind: 'pile', x: 1.6, z: -1.4, rot: 0.1 },
@@ -1474,6 +1528,12 @@ export function buildDungeon() {
 
   addDungeonRemains(root);
 
+  const boulders = DUNGEON_BOULDERS.map((spot) => {
+    const boulder = buildMineBoulder(spot);
+    root.add(boulder);
+    return boulder;
+  });
+
   const rats = [];
   for (let i = 0; i < 4; i += 1) {
     const rat = buildRat();
@@ -1487,7 +1547,7 @@ export function buildDungeon() {
   ladder.position.set(-W / 2 + 0.22, 0, 0.4);
   root.add(ladder);
 
-  return { root, grounds, rats, ladder, size: { w: W, d: D } };
+  return { root, grounds, rats, ladder, boulders, size: { w: W, d: D } };
 }
 
 function buildRat() {

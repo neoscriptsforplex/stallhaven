@@ -39,7 +39,7 @@ if (!hasWebGL()) {
   loadModels().then(async (records) => {
     for (const record of records) {
       try {
-        const scene = await parseModelBuffer(record.buffer, record.name);
+        const scene = await parseModelBuffer(record.buffer, record.name, record.sidecars ?? {});
         if (record.kind === 'player') {
           const result = world.setPlayerLook(scene);
           if (!result?.ok) continue;

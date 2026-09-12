@@ -15,7 +15,9 @@ import {
   defaultAppearance,
   displayKind,
   formatGold,
+  isAmmoRecipe,
   isCraftedMaterial,
+  isMinedMaterial,
   materialList,
   normalizeAppearance,
   offerClassLabel,
@@ -59,6 +61,7 @@ import {
   canUpgradeChest,
   CAULDRON_COST,
   chestCapacity,
+  chestDisplayList,
   chestList,
   chestTotal,
   craftBlockReason,
@@ -82,6 +85,8 @@ import {
   sellToCustomer,
   shopProgress,
   maxCraftActions,
+  busyCraftId,
+  cancelCrafts,
   startCraft,
   startCraftBatch,
   stationCost,
@@ -272,13 +277,11 @@ export function bindHud(root, state, world) {
       btn.classList.toggle('is-on', btn.dataset.subtab === craftSubtab);
     }
     paintRecipeButtons(craftsEl, currentRecipes());
-    if (potionCraftsEl) paintRecipeButtons(potionCraftsEl, recipesForTab('potion'));
+    syncQtyHint(craftFocusId);
     if (craftFocusId) {
       showPreview(craftFocusId);
       requestAnimationFrame(() => {
-        const el = (cauldronMode ? potionCraftsEl : craftsEl)?.querySelector(`[data-craft-row="${craftFocusId}"]`)
-          ?? craftsEl.querySelector(`[data-craft-row="${craftFocusId}"]`);
-        el?.scrollIntoView({ block: 'center' });
+        craftsEl.querySelector(`[data-craft-row="${craftFocusId}"]`)?.scrollIntoView({ block: 'center' });
       });
     }
   }
@@ -292,7 +295,9 @@ export function bindHud(root, state, world) {
         <span class="mat-count" data-count="${mat.id}">0</span>
         ${isCraftedMaterial(mat.id)
           ? '<span class="mat-crafted">Crafted</span>'
-          : `<button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>`}
+          : isMinedMaterial(mat.id)
+            ? '<span class="mat-crafted">Mined</span>'
+            : `<button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>`}
       </div>
     `).join('');
     container.dataset.ready = '1';
@@ -303,7 +308,6 @@ export function bindHud(root, state, world) {
     });
   }
   fillMats(matsEl);
-  fillMats(potionMatsEl);
 
   function syncMats(container) {
     if (!container) return;
@@ -336,15 +340,22 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   });
 
+  function syncQtyHint(recipeId) {
+    const recipe = recipeId ? RECIPES[recipeId] : null;
+    const ammoHint = craftModal.querySelector('[data-ammo-hint]');
+    if (!ammoHint) return;
+    const showAmmo = isAmmoRecipe(recipe)
+      || (!recipe && craftStation === 'anvil' && craftSubtab === 'ammo');
+    ammoHint.hidden = !showAmmo;
+  }
+
   function showPreview(recipeId) {
     const recipe = RECIPES[recipeId];
     if (craftPreview) craftPreview.show(recipeId);
-    if (potionPreview) potionPreview.show(recipeId);
     const label = recipe?.name ?? 'Select or hover a recipe.';
     const craftName = craftModal.querySelector('[data-craft-preview-name]');
-    const potionName = potionModal.querySelector('[data-potion-preview-name]');
     if (craftName) craftName.textContent = label;
-    if (potionName) potionName.textContent = label;
+    syncQtyHint(recipeId);
   }
 
   function queueCraft(recipeId, want) {
@@ -399,6 +410,22 @@ export function bindHud(root, state, world) {
     if (!row) return;
     showPreview(row.dataset.craftRow);
   }
+
+  function onCancelCraft() {
+    const recipeId = busyCraftId(state);
+    const refunded = cancelCrafts(state);
+    if (!refunded) return;
+    const name = RECIPES[recipeId]?.name ?? 'craft';
+    const extra = refunded > 1 ? ` · ${refunded} actions returned` : '';
+    pushLog(state, `Cancelled ${name}${extra}.`);
+    playClick('ui');
+    setCraftNote('');
+    paintCrafts();
+    render(performance.now() / 1000);
+  }
+
+  craftModal.querySelector('[data-craft-cancel]')?.addEventListener('click', onCancelCraft);
+  potionModal.querySelector('[data-potion-cancel]')?.addEventListener('click', onCancelCraft);
 
   craftsEl.addEventListener('click', onCraftClick);
   potionCraftsEl?.addEventListener('click', onCraftClick);
@@ -495,30 +522,16 @@ export function bindHud(root, state, world) {
       if (craftTab !== 'ranged' && craftSubtab === 'ammo') craftSubtab = 'weapon';
       if (craftTab !== 'magic' && craftSubtab === 'rune') craftSubtab = 'weapon';
     }
-    if (craftStation === 'cauldron') {
-      craftModal.hidden = true;
-      potionModal.hidden = false;
-    } else {
-      potionModal.hidden = true;
-      craftModal.hidden = false;
-    }
+    potionModal.hidden = true;
+    craftModal.hidden = false;
     const reason = craftFocusId ? craftBlockReason(state, craftFocusId) : '';
     setCraftNote(options.note || (options.autoStart ? reason : ''));
-    const potionNote = potionModal.querySelector('[data-potion-note]');
-    if (potionNote) {
-      potionNote.hidden = !((craftStation === 'cauldron') && (options.note || (options.autoStart && reason)));
-      potionNote.textContent = options.note || reason || '';
-    }
     paintCrafts();
     setModalOpen();
     if (options.autoStart && craftFocusId && canCraft(state, craftFocusId)) {
       if (startCraft(state, craftFocusId, performance.now() / 1000)) {
         playClick('craft');
         setCraftNote('');
-        if (potionNote) {
-          potionNote.hidden = true;
-          potionNote.textContent = '';
-        }
         pushLog(state, `Crafting ${RECIPES[craftFocusId].name}…`);
       }
     } else if (options.autoStart && reason) {
@@ -657,12 +670,15 @@ export function bindHud(root, state, world) {
     } else {
       slotEl.textContent = 'Placing on this table. The current item, if any, returns to the chest.';
     }
-    const items = chestList(state);
+    const items = chestDisplayList(state, kind);
     if (!items.length) {
       lastDisplayListKey = 'empty';
       selectedDisplayId = null;
-      displayItems.innerHTML = '<p class="empty">The chest is empty. Craft a ware, then display it here.</p>';
-      pickEl.textContent = 'No chest item to display.';
+      const anyChest = chestList(state).length > 0;
+      displayItems.innerHTML = anyChest
+        ? '<p class="empty">Nothing in the chest can sit on this furniture. Runes and arrows go on tables and shelves.</p>'
+        : '<p class="empty">The chest is empty. Craft a ware, then display it here.</p>';
+      pickEl.textContent = anyChest ? 'No matching chest item for this furniture.' : 'No chest item to display.';
       if (confirm) confirm.disabled = true;
       paintShelfSlotButtons(index, false);
       return;
@@ -1551,7 +1567,7 @@ export function bindHud(root, state, world) {
     if (target?.id === 'chest') openChest();
     if (target?.id === 'anvil') openCraft('anvil');
     if (target?.id === 'range') openCraft('range');
-    if (target?.id === 'cauldron') openPotion();
+    if (target?.id === 'cauldron') openCraft('cauldron');
     if (target?.id === 'furnace') openCraft('furnace');
     if (target?.id === 'wheel') openCraft('wheel');
   });
@@ -1925,7 +1941,7 @@ export function bindHud(root, state, world) {
     if (event.type === 'chest') openChest();
     if (event.type === 'anvil') openCraft('anvil');
     if (event.type === 'range') openCraft('range');
-    if (event.type === 'cauldron') openPotion();
+    if (event.type === 'cauldron') openCraft('cauldron');
     if (event.type === 'furnace') openCraft('furnace');
     if (event.type === 'wheel') openCraft('wheel');
     if (event.type === 'display-select') render(performance.now() / 1000);
@@ -2092,8 +2108,20 @@ export function bindHud(root, state, world) {
     if (!craftModal.hidden) paintBusy(craftsEl, currentRecipes(), now);
     if (!potionModal.hidden) paintBusy(potionCraftsEl, recipesForTab('potion'), now);
     const busyId = Object.keys(state.crafts ?? {})[0];
+    const cancelBtns = [
+      craftModal.querySelector('[data-craft-cancel]'),
+      potionModal.querySelector('[data-potion-cancel]'),
+    ];
+    for (const btn of cancelBtns) {
+      if (btn) btn.disabled = !busyId;
+    }
     if (activeCraft) {
-      if (busyId) {
+      const mining = world.getMining?.(now);
+      if (mining) {
+        activeCraft.hidden = false;
+        if (activeCraftName) activeCraftName.textContent = `Mining ${mining.name}`;
+        activeCraft.style.setProperty('--t', String(mining.t ?? 0));
+      } else if (busyId) {
         const progress = craftProgress(state, busyId, now);
         activeCraft.hidden = false;
         if (activeCraftName) {

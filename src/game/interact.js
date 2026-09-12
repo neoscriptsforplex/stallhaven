@@ -1,7 +1,7 @@
 import { PLAYER_RADIUS, planPlayerWalk } from './nav.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel'];
-export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder']);
+export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder']);
 
 /** Invisible click boxes and floor-steal radii for walk-then-open stations. */
 export const STATION_HIT = {
@@ -11,6 +11,7 @@ export const STATION_HIT = {
   furnace: { w: 1.28, h: 1.7, d: 1.2, pickY: 0.8, floorR: 1.05 },
   cauldron: { w: 1.15, h: 1.55, d: 1.15, pickY: 0.74, floorR: 1.0 },
   wheel: { w: 1.2, h: 1.6, d: 1.15, pickY: 0.74, floorR: 1.0 },
+  boulder: { w: 1.4, h: 1.2, d: 1.4, pickY: 0.52, floorR: 1.15 },
 };
 
 export const STATION_ARRIVE = 1.45;

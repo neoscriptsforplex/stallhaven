@@ -2,15 +2,17 @@ import * as THREE from 'three';
 import {
   EXPANSION_PADS,
   FOUNTAIN,
-  PATH_START_Z,
   ROOM_D,
   ROOM_W,
   cobblePathSpan,
+  gardenBedSpots,
   gardenBox,
+  gardenGrassClusters,
   gardenRockSpots,
   gardenTrapdoorSpot,
   gardenTreeSpots,
   keepFountain,
+  keepGardenSpot,
   neighborsOf,
   occupiedCells,
   padConnects,
@@ -18,6 +20,7 @@ import {
   doorwayFloor,
   wallVineMounts,
 } from './layout.js';
+import { METALS } from './catalog.js';
 import { initRatWander } from './rats.js';
 import { brickSurface, sootMetal, stoneSoot, wornMetal, woodSurface } from './surfaces.js';
 
@@ -916,18 +919,48 @@ function makeNameSprite(text) {
   return sprite;
 }
 
-function buildTree(scale = 1) {
+export function buildTree(scale = 1) {
   const group = new THREE.Group();
-  const trunk = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12 * scale, 0.16 * scale, 1.15 * scale, 7), wood(0x5a3a22)));
-  trunk.position.y = 0.55 * scale;
+  group.name = 'pine';
+  const bark = wood(0x6a4a28);
+  const flare = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1 * scale, 0.2 * scale, 0.18 * scale, 7),
+    bark,
+  ));
+  flare.position.y = 0.08 * scale;
+  group.add(flare);
+  const trunk = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07 * scale, 0.11 * scale, 0.88 * scale, 7),
+    bark,
+  ));
+  trunk.position.y = 0.54 * scale;
   group.add(trunk);
-  const leaf = new THREE.MeshStandardMaterial({ color: 0x2f6a32, roughness: 0.9 });
-  const crown = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.55 * scale, 8, 6), leaf));
-  crown.position.y = 1.35 * scale;
-  group.add(crown);
-  const crown2 = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.42 * scale, 8, 6), leaf));
-  crown2.position.set(0.22 * scale, 1.55 * scale, -0.1 * scale);
-  group.add(crown2);
+  const stub = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.022 * scale, 0.03 * scale, 0.22 * scale, 5),
+    bark,
+  ));
+  stub.position.set(0.14 * scale, 0.64 * scale, 0.02 * scale);
+  stub.rotation.z = 1.2;
+  group.add(stub);
+  const leaf = new THREE.MeshStandardMaterial({
+    color: 0x3a8a3a,
+    roughness: 0.88,
+    flatShading: true,
+  });
+  const layers = [
+    { y: 0.98, r: 0.64, h: 0.5 },
+    { y: 1.26, r: 0.5, h: 0.44 },
+    { y: 1.52, r: 0.36, h: 0.4 },
+    { y: 1.76, r: 0.2, h: 0.36 },
+  ];
+  for (const layer of layers) {
+    const cone = addShadow(new THREE.Mesh(
+      new THREE.ConeGeometry(layer.r * scale, layer.h * scale, 7),
+      leaf,
+    ));
+    cone.position.y = layer.y * scale;
+    group.add(cone);
+  }
   return group;
 }
 
@@ -1035,14 +1068,11 @@ function addGarden(root, cells, expansionIds = []) {
   addCobblePath(root, expansionIds);
   if (keepFountain(expansionIds)) addFountain(root, FOUNTAIN.x, FOUNTAIN.z);
 
-  addGardenBed(root, 2.45, 6.2, randAt(2201));
-  addGardenBed(root, -2.7, 7.6, randAt(3311));
-  addGardenBed(root, -3.15, 10.6, randAt(4411));
-  addGardenBed(root, 3.2, 11.15, randAt(5511));
+  gardenBedSpots(expansionIds).forEach((spot, i) => {
+    addGardenBed(root, spot.x, spot.z, randAt(2201 + i * 1110));
+  });
 
   const rand = randAt(1337 + cells.length * 17);
-  const hasLeft = expansionIds.includes('left');
-  const hasRight = expansionIds.includes('right');
   for (const spot of gardenTreeSpots(expansionIds)) {
     const tree = buildTree((spot.side === 'edge' ? 1.15 : 0.85) + rand() * 0.45);
     tree.position.set(spot.x, 0, spot.z);
@@ -1062,25 +1092,23 @@ function addGarden(root, cells, expansionIds = []) {
     door.position.set(hatch.x, 0, hatch.z);
     root.add(door);
   }
-  addEdgeGrass(root, grass, expansionIds, rand);
+  addLushGrass(root, grass, expansionIds, rand);
   for (let i = 0; i < 14; i += 1) {
     const leftSide = i % 2 === 0;
-    if (leftSide && hasLeft) continue;
-    if (!leftSide && hasRight) continue;
     const side = leftSide ? box.minX - 1.1 : box.maxX + 1.1;
     const z = box.minZ - 1.2 + rand() * ((box.maxZ - box.minZ) + 3);
-    if (Math.abs(side) < 2.2 && z > 4) continue;
+    const x = side + (rand() - 0.5);
+    if (!keepGardenSpot({ x, z, side: leftSide ? 'left' : 'right' }, expansionIds)) continue;
     const flowers = buildFlowerCluster(rand);
-    flowers.position.set(side + (rand() - 0.5), 0, z);
+    flowers.position.set(x, 0, z);
     root.add(flowers);
   }
   for (let i = 0; i < 6; i += 1) {
+    const x = box.minX + rand() * (box.maxX - box.minX);
+    const z = box.minZ - 1.4 - rand() * 1.6;
+    if (!keepGardenSpot({ x, z, side: 'rear' }, expansionIds)) continue;
     const flowers = buildFlowerCluster(rand);
-    flowers.position.set(
-      box.minX + rand() * (box.maxX - box.minX),
-      0,
-      box.minZ - 1.4 - rand() * 1.6,
-    );
+    flowers.position.set(x, 0, z);
     root.add(flowers);
   }
 }
@@ -1165,60 +1193,57 @@ function buildTrapdoor() {
   return group;
 }
 
-function addEdgeGrass(root, grass, expansionIds, rand) {
-  const tufts = 22;
-  for (let i = 0; i < tufts; i += 1) {
-    const along = i / tufts;
-    const edge = i % 4;
-    let x;
-    let z;
-    if (edge === 0) {
-      x = grass.minX + 0.6 + rand() * 1.2;
-      z = grass.minZ + along * (grass.maxZ - grass.minZ);
-    } else if (edge === 1) {
-      x = grass.maxX - 0.6 - rand() * 1.2;
-      z = grass.minZ + along * (grass.maxZ - grass.minZ);
-    } else if (edge === 2) {
-      x = grass.minX + along * (grass.maxX - grass.minX);
-      z = grass.minZ + 0.6 + rand() * 1.2;
-    } else {
-      x = grass.minX + along * (grass.maxX - grass.minX);
-      z = grass.maxZ - 0.6 - rand() * 1.2;
+function addLushGrass(root, grass, expansionIds, rand) {
+  const clusters = gardenGrassClusters(expansionIds);
+  const bladeGeo = new THREE.ConeGeometry(0.016, 1, 4);
+  bladeGeo.translate(0, 0.5, 0);
+  const greens = [
+    new THREE.MeshStandardMaterial({
+      color: 0x3a7a30,
+      roughness: 0.92,
+      side: THREE.DoubleSide,
+    }),
+    new THREE.MeshStandardMaterial({
+      color: 0x4a8a38,
+      roughness: 0.9,
+      side: THREE.DoubleSide,
+    }),
+    new THREE.MeshStandardMaterial({
+      color: 0x2e6828,
+      roughness: 0.94,
+      side: THREE.DoubleSide,
+    }),
+  ];
+  const dummy = new THREE.Object3D();
+  const buckets = greens.map(() => []);
+  for (const cluster of clusters) {
+    const n = cluster.blades;
+    for (let i = 0; i < n; i += 1) {
+      const x = cluster.x + (rand() - 0.5) * 0.4;
+      const z = cluster.z + (rand() - 0.5) * 0.4;
+      if (!keepGardenSpot({ x, z, side: 'edge' }, expansionIds)) continue;
+      const h = (0.14 + rand() * 0.46) * cluster.scale;
+      dummy.position.set(x, 0, z);
+      dummy.rotation.set((rand() - 0.5) * 0.38, rand() * Math.PI * 2, (rand() - 0.5) * 0.48);
+      dummy.scale.set(0.65 + rand() * 0.55, h, 0.65 + rand() * 0.55);
+      dummy.updateMatrix();
+      buckets[Math.floor(rand() * buckets.length)].push(dummy.matrix.clone());
     }
-    if (pointHitsShopSafe(x, z, expansionIds) || Math.abs(x) < 1.4 && z > PATH_START_Z) continue;
-    const clump = buildGrassTuft(0.9 + rand() * 0.7, rand);
-    clump.position.set(x, 0, z);
-    clump.rotation.y = rand() * Math.PI * 2;
-    root.add(clump);
   }
-}
-
-function pointHitsShopSafe(x, z, expansionIds) {
-  return occupiedCells(expansionIds).some((cell) => {
-    const c = roomCenter(cell.gx, cell.gz);
-    return x >= c.x - ROOM_W / 2 - 0.8
-      && x <= c.x + ROOM_W / 2 + 0.8
-      && z >= c.z - ROOM_D / 2 - 0.8
-      && z <= c.z + ROOM_D / 2 + 0.8;
-  });
-}
-
-function buildGrassTuft(scale, rand) {
-  const group = new THREE.Group();
-  const green = new THREE.MeshStandardMaterial({
-    color: 0x3d7a32,
-    roughness: 0.92,
-    side: THREE.DoubleSide,
-  });
-  const count = 5 + Math.floor(rand() * 4);
-  for (let i = 0; i < count; i += 1) {
-    const blade = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.32 * scale, 5), green));
-    blade.position.set((rand() - 0.5) * 0.22, 0.14 * scale, (rand() - 0.5) * 0.22);
-    blade.rotation.z = (rand() - 0.5) * 0.45;
-    blade.rotation.x = (rand() - 0.5) * 0.3;
-    group.add(blade);
+  void grass;
+  for (let i = 0; i < buckets.length; i += 1) {
+    const mats = buckets[i];
+    if (!mats.length) continue;
+    const mesh = new THREE.InstancedMesh(bladeGeo, greens[i], mats.length);
+    mesh.name = 'grass';
+    mesh.userData.kind = 'grass';
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    for (let j = 0; j < mats.length; j += 1) mesh.setMatrixAt(j, mats[j]);
+    mesh.instanceMatrix.needsUpdate = true;
+    root.add(mesh);
   }
-  return group;
 }
 
 export function buildShop(expansionIds = []) {
@@ -1319,53 +1344,123 @@ export function buildShop(expansionIds = []) {
   return { root, roofs, grounds, pads };
 }
 
-/** Mineable rocks: Essence plus one ore boulder per metal tier. */
+const ORE_ROCK_BASE = 0x6e5a32;
+const ORE_VEIN_COLOR = {
+  bronze: 0x8a5a32,
+  iron: 0x8a8f96,
+  steel: 0xc5ccd4,
+  mithril: 0x3a6ec8,
+  adamant: METALS.find((metal) => metal.id === 'adamant')?.tint ?? 0x3a8a45,
+  runite: 0x7ec8e8,
+  dragon: 0xb42a22,
+};
+
+/** Mineable rocks: olive-brown body; vein colour marks the tier. Essence glows separately. */
 export const DUNGEON_BOULDERS = [
-  { id: 'essence', materialId: 'essence', name: 'Essence', x: 0.2, z: 3.15, rot: 0.25, vein: 0xe8d8ff, essence: true },
-  { id: 'bronze', materialId: 'bronze', name: 'Bronze Ore', x: -3.3, z: -3.15, rot: 0.5, vein: 0x8a5a32 },
-  { id: 'iron', materialId: 'iron', name: 'Iron Ore', x: 1.4, z: -3.15, rot: -0.3, vein: 0x8a8f96 },
-  { id: 'steel', materialId: 'steel', name: 'Steel Ore', x: 4.05, z: -1.5, rot: 0.8, vein: 0xc5ccd4 },
-  { id: 'mithril', materialId: 'mithril', name: 'Mithril Ore', x: 4.05, z: 2.15, rot: -0.6, vein: 0x3a6ec8 },
-  { id: 'adamant', materialId: 'adamant', name: 'Adamant Ore', x: -1.5, z: 3.15, rot: 1.1, vein: 0x3a8a45 },
-  { id: 'runite', materialId: 'runite', name: 'Runite Ore', x: -4.05, z: 1.7, rot: 0.2, vein: 0x3ec8c4 },
-  { id: 'dragon', materialId: 'dragon', name: 'Dragon Ore', x: -4.05, z: -1.35, rot: -0.9, vein: 0xb42a22 },
+  { id: 'essence', materialId: 'essence', name: 'Essence', x: 0.2, z: 3.15, rot: 0.25, rock: 0xb8babf, vein: 0xe8d8ff, essence: true },
+  { id: 'bronze', materialId: 'bronze', name: 'Bronze Ore', x: -3.3, z: -3.15, rot: 0.5, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.bronze },
+  { id: 'iron', materialId: 'iron', name: 'Iron Ore', x: 1.4, z: -3.15, rot: -0.3, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.iron },
+  { id: 'steel', materialId: 'steel', name: 'Steel Ore', x: 4.05, z: -1.5, rot: 0.8, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.steel },
+  { id: 'mithril', materialId: 'mithril', name: 'Mithril Ore', x: 4.05, z: 2.15, rot: -0.6, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.mithril },
+  { id: 'adamant', materialId: 'adamant', name: 'Adamant Ore', x: -1.5, z: 3.15, rot: 1.1, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.adamant },
+  { id: 'runite', materialId: 'runite', name: 'Runite Ore', x: -4.05, z: 1.7, rot: 0.2, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.runite },
+  { id: 'dragon', materialId: 'dragon', name: 'Dragon Ore', x: -4.05, z: -1.35, rot: -0.9, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.dragon },
 ];
+
+export function boulderInspect(materialId) {
+  const spot = DUNGEON_BOULDERS.find((item) => item.materialId === materialId);
+  if (!spot) return { name: 'Rock', blurb: 'A mineable rock.' };
+  if (spot.essence) {
+    return { name: 'Essence', blurb: 'A pale boulder. Mine it for Essence, used to craft runes.' };
+  }
+  return { name: spot.name, blurb: `A ${spot.name.toLowerCase()} boulder. Left-click to walk over and mine.` };
+}
+
+function shadeHex(hex, factor) {
+  const color = new THREE.Color(hex);
+  color.multiplyScalar(factor);
+  return color.getHex();
+}
 
 function buildMineBoulder(spot) {
   const group = new THREE.Group();
   group.name = `boulder-${spot.id}`;
   group.position.set(spot.x, 0, spot.z);
   group.rotation.y = spot.rot ?? 0;
-  const rock = new THREE.MeshStandardMaterial({ color: 0xb8babf, roughness: 0.94, metalness: 0.06 });
+  const rockHex = spot.rock ?? 0xb8babf;
+  const rock = new THREE.MeshStandardMaterial({
+    color: rockHex,
+    roughness: 0.94,
+    metalness: spot.essence ? 0.08 : 0.12,
+    emissive: spot.essence ? 0x6aa8d8 : 0x000000,
+    emissiveIntensity: spot.essence ? 0.12 : 0,
+  });
+  const mottled = new THREE.MeshStandardMaterial({
+    color: shadeHex(rockHex, 0.72),
+    roughness: 0.96,
+    metalness: 0.08,
+  });
   const vein = new THREE.MeshStandardMaterial({
     color: spot.vein,
-    roughness: spot.essence ? 0.35 : 0.45,
-    metalness: spot.essence ? 0.32 : 0.2,
-    emissive: spot.essence ? spot.vein : 0x000000,
-    emissiveIntensity: spot.essence ? 0.28 : 0,
+    roughness: spot.essence ? 0.35 : 0.55,
+    metalness: spot.essence ? 0.32 : 0.16,
+    emissive: spot.essence ? spot.vein : shadeHex(rockHex, 0.45),
+    emissiveIntensity: spot.essence ? 0.32 : 0.04,
   });
-  const body = addShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.4, 0), rock));
-  body.scale.set(1.2, 0.82, 1.05);
-  body.position.y = 0.3;
+  const body = addShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), rock));
+  body.scale.set(1.35, 0.72, 1.15);
+  body.position.y = 0.26;
   group.add(body);
-  const lump = addShadow(new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), rock));
-  lump.position.set(0.16, 0.22, 0.1);
-  lump.scale.set(1.1, 0.75, 0.9);
+  const peak = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.38, 6), rock));
+  peak.position.set(-0.08, 0.48, 0.04);
+  peak.rotation.z = -0.22;
+  group.add(peak);
+  const peak2 = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.28, 6), mottled));
+  peak2.position.set(0.18, 0.4, -0.06);
+  peak2.rotation.z = 0.28;
+  group.add(peak2);
+  const lump = addShadow(new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 0), mottled));
+  lump.position.set(0.22, 0.16, 0.14);
+  lump.scale.set(1.05, 0.7, 0.9);
   group.add(lump);
+  for (const [x, z, s] of [[-0.42, 0.18, 0.07], [0.4, -0.16, 0.055], [0.08, 0.38, 0.05]]) {
+    const pebble = addShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), mottled));
+    pebble.position.set(x, s * 0.7, z);
+    group.add(pebble);
+  }
   for (const [x, y, z, sx, sy, sz, rx, rz] of [
-    [0.02, 0.34, 0.02, 0.42, 0.04, 0.07, 0.4, 0.8],
-    [-0.06, 0.26, -0.04, 0.34, 0.035, 0.06, -0.5, 1.2],
-    [0.08, 0.2, 0.08, 0.28, 0.03, 0.05, 0.9, -0.4],
+    [-0.16, 0.36, 0.04, 0.22, 0.045, 0.07, 0.35, 0.7],
+    [0.02, 0.32, 0.02, 0.24, 0.04, 0.065, -0.55, 0.35],
+    [0.18, 0.28, -0.02, 0.2, 0.035, 0.055, 0.8, -0.45],
   ]) {
     const streak = addShadow(new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), vein));
     streak.position.set(x, y, z);
     streak.rotation.set(rx, 0, rz);
     group.add(streak);
   }
+  if (spot.essence) {
+    const aura = new THREE.Mesh(
+      new THREE.SphereGeometry(0.68, 18, 14),
+      new THREE.MeshBasicMaterial({
+        color: 0x9ad4ff,
+        transparent: true,
+        opacity: 0.14,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    aura.position.y = 0.34;
+    aura.scale.set(1.05, 0.86, 1.02);
+    group.add(aura);
+    const glow = new THREE.PointLight(0x9ad4ff, 0.62, 3.4, 2);
+    glow.position.set(0, 0.42, 0);
+    group.add(glow);
+  }
   const pick = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.05, 1.35), pickMat());
   pick.position.y = 0.48;
   pick.userData.kind = 'boulder';
   pick.userData.materialId = spot.materialId;
+  pick.userData.name = spot.name;
   pick.userData.x = spot.x;
   pick.userData.z = spot.z;
   group.add(pick);
@@ -1550,21 +1645,45 @@ export function buildDungeon() {
   return { root, grounds, rats, ladder, boulders, size: { w: W, d: D } };
 }
 
-function buildRat() {
+export function buildRat() {
   const group = new THREE.Group();
   group.name = 'rat';
-  const fur = new THREE.MeshStandardMaterial({ color: 0x4a3a32, roughness: 0.9 });
-  const body = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), fur));
-  body.scale.set(1.4, 0.8, 0.9);
-  body.position.y = 0.05;
+  const fur = new THREE.MeshStandardMaterial({ color: 0x3a3a3c, roughness: 0.92 });
+  const body = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), fur));
+  body.scale.set(1.55, 0.68, 0.92);
+  body.position.set(0, 0.055, 0.01);
+  body.rotation.x = 0.28;
   group.add(body);
-  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.045, 7, 6), fur));
-  head.position.set(0, 0.06, 0.08);
+  const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.048, 7, 6), fur));
+  head.position.set(0, 0.07, 0.1);
   group.add(head);
-  const tail = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.014, 0.16, 5), fur));
-  tail.rotation.x = 1.1;
-  tail.position.set(0, 0.04, -0.1);
-  group.add(tail);
+  const snout = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.04, 5), fur));
+  snout.rotation.x = Math.PI / 2;
+  snout.position.set(0, 0.062, 0.14);
+  group.add(snout);
+  const eyeMat = new THREE.MeshStandardMaterial({
+    color: 0xc42828,
+    emissive: 0x6a1010,
+    roughness: 0.35,
+  });
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.018, 3), eyeMat);
+    eye.name = 'cue-eye';
+    eye.rotation.x = Math.PI;
+    eye.position.set(side * 0.022, 0.082, 0.128);
+    group.add(eye);
+  }
+  const tan = new THREE.MeshStandardMaterial({ color: 0xc4a06a, roughness: 0.86 });
+  for (let i = 0; i < 4; i += 1) {
+    const seg = addShadow(new THREE.Mesh(
+      new THREE.CylinderGeometry(0.007 - i * 0.001, 0.011 - i * 0.0012, 0.045, 5),
+      tan,
+    ));
+    seg.name = 'cue-tail';
+    seg.rotation.x = 1.05;
+    seg.position.set(0, 0.04 - i * 0.006, -0.08 - i * 0.038);
+    group.add(seg);
+  }
   return group;
 }
 

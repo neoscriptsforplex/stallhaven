@@ -24,6 +24,19 @@ export async function saveModel(record) {
   db.close();
 }
 
+export async function clearModels() {
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore(STORE).clear();
+  });
+  db.close();
+}
+
+export const UPLOADS_CLEARED = 'Cleared uploaded models. Default looks are back.';
+
 export async function loadModels() {
   try {
     const db = await openDb();

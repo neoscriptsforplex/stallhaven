@@ -17,12 +17,16 @@ import {
   gardenTreeSpots,
   gardenRockSpots,
   gardenTrapdoorSpot,
+  gardenBedSpots,
+  gardenGrassClusters,
   gardenBox,
   cobblePathSpan,
   keepFountain,
+  keepGardenSpot,
   FOUNTAIN,
   occupiedCells,
   padConnects,
+  pointHitsShop,
   padById,
   rotatePose,
   snapToFloor,
@@ -161,6 +165,23 @@ describe('layout numbers', () => {
     assert.ok(FOUNTAIN.z - apron >= path.minZ);
     assert.ok(FOUNTAIN.z + apron <= path.maxZ);
     assert.ok(FOUNTAIN.z + apron <= grass.maxZ);
+  });
+
+  it('clears grass and garden beds in a side-expansion footprint like trees', () => {
+    const origin = gardenGrassClusters([]);
+    const left = gardenGrassClusters(['left']);
+    assert.ok(origin.length > 180, 'lawn should be clusters, not a thin edge strip');
+    assert.ok(origin.some((spot) => pointHitsShop(spot.x, spot.z, ['left'], 1.15)));
+    assert.equal(left.some((spot) => pointHitsShop(spot.x, spot.z, ['left'], 1.15)), false);
+    assert.ok(left.some((spot) => spot.x > 4));
+    const scales = origin.map((spot) => spot.scale);
+    assert.ok(Math.max(...scales) - Math.min(...scales) > 0.4);
+    assert.equal(keepGardenSpot({ x: -8.2, z: 0, side: 'left' }, ['left']), false);
+    assert.equal(keepGardenSpot({ x: -8.2, z: 0, side: 'left' }, []), true);
+    const originBeds = gardenBedSpots([]);
+    assert.ok(originBeds.length >= 3);
+    const leftBeds = gardenBedSpots(['left']);
+    assert.equal(leftBeds.every((spot) => keepGardenSpot(spot, ['left'])), true);
   });
 
   it('clears path-side rocks, trapdoor, and extra trees when they hit a room', () => {

@@ -329,12 +329,12 @@ export function footprintBox(expansionIds = []) {
 }
 
 /**
- * Exterior tree plan. Side trees must clear for side expansions: a left or
- * right room occupies the strip beside the origin shop, and trees there clip
- * through the new walls. Rear trees can stay unless they collide with a
- * back room.
+ * Exterior decor plan. Side trees, grass, beds, and rocks must clear for
+ * expansions: a left or right room occupies the strip beside the origin shop,
+ * and foliage there clips through the new walls. Rear pieces stay unless they
+ * collide with a back room, the path, or the fountain.
  */
-function keepGardenSpot(spot, expansionIds = []) {
+export function keepGardenSpot(spot, expansionIds = []) {
   const hasLeft = expansionIds.includes('left');
   const hasRight = expansionIds.includes('right');
   if (spot.side === 'left' && hasLeft) return false;
@@ -401,6 +401,67 @@ export function gardenRockSpots(expansionIds = []) {
 export function gardenTrapdoorSpot(expansionIds = []) {
   const spot = { ...TRAPDOOR, side: 'path' };
   return keepGardenSpot(spot, expansionIds) ? spot : null;
+}
+
+export const GARDEN_BED_SPOTS = [
+  { x: 2.45, z: 6.2, side: 'path' },
+  { x: -2.7, z: 7.6, side: 'path' },
+  { x: -3.15, z: 10.6, side: 'path' },
+  { x: 3.2, z: 11.15, side: 'path' },
+];
+
+export function gardenBedSpots(expansionIds = []) {
+  return GARDEN_BED_SPOTS.filter((spot) => keepGardenSpot(spot, expansionIds));
+}
+
+function gardenSeedRand(seed) {
+  let s = (Math.abs(Math.floor(seed)) % 2147483646) + 1;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+/** Cluster centers for instanced lawn blades. Filtered like trees when a room is built. */
+export function gardenGrassClusters(expansionIds = []) {
+  const grass = gardenBox(expansionIds);
+  const path = cobblePathSpan(expansionIds);
+  const rand = gardenSeedRand(424242 + expansionIds.join(':').length * 31);
+  const clusters = [];
+  const cols = 22;
+  const rows = 20;
+  const dx = (grass.maxX - grass.minX) / cols;
+  const dz = (grass.maxZ - grass.minZ) / rows;
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      const x = grass.minX + (c + 0.18 + rand() * 0.64) * dx;
+      const z = grass.minZ + (r + 0.18 + rand() * 0.64) * dz;
+      if (!keepGardenSpot({ x, z, side: 'edge' }, expansionIds)) continue;
+      clusters.push({
+        x,
+        z,
+        blades: 10 + Math.floor(rand() * 8),
+        scale: 0.68 + rand() * 1.05,
+      });
+    }
+  }
+  const edgeN = 32;
+  for (let i = 0; i < edgeN; i += 1) {
+    const t = i / Math.max(1, edgeN - 1);
+    const z = path.minZ + t * (path.maxZ - path.minZ);
+    for (const side of [-1, 1]) {
+      const x = (side < 0 ? path.minX : path.maxX) + side * (0.58 + rand() * 0.62);
+      const zz = z + (rand() - 0.5) * 0.32;
+      if (!keepGardenSpot({ x, z: zz, side: 'path' }, expansionIds)) continue;
+      clusters.push({
+        x,
+        z: zz,
+        blades: 12 + Math.floor(rand() * 9),
+        scale: 0.82 + rand() * 1.15,
+      });
+    }
+  }
+  return clusters;
 }
 
 export function keepFountain(expansionIds = []) {

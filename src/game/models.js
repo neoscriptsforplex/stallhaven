@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import {
   CUSTOMERS,
+  pickMageRobes,
+  pickMercenaryPlate,
+  pickPilgrimCiv,
+  pickRangerHide,
   RECIPES,
   SHOP,
   appearanceColor,
@@ -8,7 +12,7 @@ import {
   normalizeAppearance,
   isShelfItem,
 } from './catalog.js';
-import { wornMetal, weaveCloth, woodSurface } from './surfaces.js';
+import { wornMetal, weaveCloth, woodSurface, scaleHide, checkCloth } from './surfaces.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({
@@ -483,10 +487,11 @@ function addHumanoid(group, {
   const lip = new THREE.MeshStandardMaterial({ color: 0x8a4a40, roughness: 0.62 });
   for (const side of [-1, 1]) {
     const white = new THREE.Mesh(new THREE.SphereGeometry(0.022, 7, 6), eyeWhite);
-    white.scale.set(0.82, 0.7, 0.42);
+    white.scale.set(1.05, 0.48, 0.38);
     white.position.set(side * 0.038, 1.238, 0.092);
     group.add(white);
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.011, 6, 5), eyeMat);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.01, 6, 5), eyeMat);
+    pupil.scale.set(1.15, 0.7, 0.7);
     pupil.position.set(side * 0.038, 1.236, 0.105);
     group.add(pupil);
     const brow = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.008, 0.01), skin));
@@ -548,6 +553,7 @@ function addHumanoid(group, {
   group.userData.hand = hands.R;
   group.userData.handL = hands.L;
   group.userData.walkPhase = 0;
+  group.userData.walkRest = { legL: 0, legR: 0, armL: 0, armR: 0 };
 
   return {
     headY: 1.22,
@@ -563,6 +569,7 @@ function addHumanoid(group, {
 const HAIR_COLORS = [0x3a2416, 0x5a3a22, 0x1c1410, 0x8a6a3b, 0x2a2018, 0x4a3028];
 
 export function addHair(group, pose, style = 'short', color = 0x3a2416) {
+  if (!style || style === 'bald' || style === 'none') return null;
   const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.78 });
   const hair = new THREE.Group();
   hair.name = 'hair';
@@ -599,6 +606,12 @@ export function addHair(group, pose, style = 'short', color = 0x3a2416) {
   if (style === 'crop') {
     cap.scale.set(0.96, 0.72, 0.96);
   }
+  if (style === 'mohawk') {
+    cap.scale.set(0.55, 0.42, 0.88);
+    const ridge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.16), mat));
+    ridge.position.set(0, pose.headY + 0.14, 0.01);
+    hair.add(ridge);
+  }
   group.add(hair);
   return hair;
 }
@@ -634,39 +647,65 @@ export function addFaceHair(group, pose, style = 'none', color = 0x3a2416) {
   return face;
 }
 
+function restX(mesh, key) {
+  return mesh?.userData?.walkRest?.[key] ?? 0;
+}
+
 export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
   const rig = mesh?.userData?.rig;
-  const settle = (obj) => {
+  const body = mesh?.userData?.walkBody;
+  const settle = (obj, rest = 0) => {
     if (!obj) return;
     const k = 1 - Math.exp(-dt * 16);
-    obj.rotation.x += (0 - obj.rotation.x) * k;
-    if (Math.abs(obj.rotation.x) < 0.012) obj.rotation.x = 0;
+    obj.rotation.x += (rest - obj.rotation.x) * k;
+    if (Math.abs(obj.rotation.x - rest) < 0.012) obj.rotation.x = rest;
+  };
+  const settleBody = () => {
+    if (!body || body === mesh) return;
+    const k = 1 - Math.exp(-dt * 14);
+    body.rotation.x += (0 - body.rotation.x) * k;
+    body.rotation.z += (0 - body.rotation.z) * k;
+    body.scale.y += (1 - body.scale.y) * k;
   };
   if (!rig?.legL || !rig?.legR) {
     if (moving) {
-      mesh.position.y = Math.abs(Math.sin(now * 8)) * 0.03;
+      mesh.userData.walkPhase = (mesh.userData.walkPhase ?? 0) + dt * 9.2;
+      const phase = mesh.userData.walkPhase;
+      mesh.position.y = Math.abs(Math.sin(phase * 2)) * 0.046;
+      if (body) {
+        body.rotation.z = Math.sin(phase) * 0.07;
+        body.rotation.x = Math.abs(Math.sin(phase * 2)) * 0.035;
+        body.scale.y = 1 - Math.abs(Math.sin(phase * 2)) * 0.035;
+      }
       return;
     }
+    mesh.userData.walkPhase = 0;
     mesh.position.y += (0 - mesh.position.y) * (1 - Math.exp(-dt * 16));
     if (Math.abs(mesh.position.y) < 0.002) mesh.position.y = 0;
+    settleBody();
     return;
   }
   const phase = mesh.userData.walkPhase ?? 0;
   if (moving) {
     mesh.userData.walkPhase = phase + dt * 9.2;
     const swing = Math.sin(mesh.userData.walkPhase) * 0.62;
-    rig.legL.rotation.x = swing;
-    rig.legR.rotation.x = -swing;
-    if (rig.armL) rig.armL.rotation.x = -swing * 0.72;
-    if (rig.armR) rig.armR.rotation.x = swing * 0.72;
+    rig.legL.rotation.x = restX(mesh, 'legL') + swing;
+    rig.legR.rotation.x = restX(mesh, 'legR') - swing;
+    if (rig.armL) rig.armL.rotation.x = restX(mesh, 'armL') - swing * 0.72;
+    if (rig.armR) rig.armR.rotation.x = restX(mesh, 'armR') + swing * 0.72;
     mesh.position.y = Math.abs(Math.sin(mesh.userData.walkPhase * 2)) * 0.028;
+    if (body) {
+      body.rotation.z = Math.sin(mesh.userData.walkPhase) * 0.04;
+      body.scale.y = 1 - Math.abs(Math.sin(mesh.userData.walkPhase * 2)) * 0.02;
+    }
     return;
   }
   mesh.userData.walkPhase = 0;
-  settle(rig.legL);
-  settle(rig.legR);
-  settle(rig.armL);
-  settle(rig.armR);
+  settle(rig.legL, restX(mesh, 'legL'));
+  settle(rig.legR, restX(mesh, 'legR'));
+  settle(rig.armL, restX(mesh, 'armL'));
+  settle(rig.armR, restX(mesh, 'armR'));
+  settleBody();
   mesh.position.y += (0 - mesh.position.y) * (1 - Math.exp(-dt * 16));
   if (Math.abs(mesh.position.y) < 0.002) mesh.position.y = 0;
 }
@@ -695,35 +734,45 @@ export function buildPickaxe() {
 export function setHeldTool(mesh, tool) {
   const hammers = mesh?.userData?.hammers ?? [];
   for (const part of hammers) {
-    if (part) part.visible = tool !== 'pickaxe';
+    if (part) part.visible = tool === 'hammer';
   }
   if (mesh?.userData?.pickaxe) mesh.userData.pickaxe.visible = tool === 'pickaxe';
 }
 
 export function updateMinePose(mesh, dt = 0.016, now = 0) {
   const rig = mesh?.userData?.rig;
+  const body = mesh?.userData?.walkBody;
   const swing = Math.sin(now * 8.2) * 0.72 - 0.32;
-  if (rig?.armR) rig.armR.rotation.x = swing;
-  if (rig?.armL) rig.armL.rotation.x = -0.18;
+  if (rig?.armR) {
+    rig.armR.rotation.x = restX(mesh, 'armR') + swing;
+    if (rig.armL) rig.armL.rotation.x = restX(mesh, 'armL') - 0.18;
+  } else if (body && body !== mesh) {
+    body.rotation.x = swing * 0.35;
+  }
   mesh.position.y = Math.abs(Math.sin(now * 16.4)) * 0.014;
 }
 
 function hashStyle(seed) {
-  let s = Math.abs(Math.floor(seed * 9973) || 1);
-  return () => {
+  const raw = Number(seed);
+  let s = Math.abs(Math.floor((Number.isFinite(raw) ? raw : Math.random()) * 2147483646)) % 2147483646;
+  if (s < 1) s = 1;
+  const rand = () => {
     s = (s * 16807) % 2147483647;
     return (s - 1) / 2147483646;
   };
+  rand();
+  return rand;
 }
 
-function addHeldPole(group, { x, y, z, length, woodColor, orb }) {
+function addHeldPole(group, { x, y, z, length, woodColor, orb, name }) {
   const stave = addShadow(new THREE.Mesh(
     new THREE.CylinderGeometry(0.016, 0.02, length, 6),
     wood(woodColor),
   ));
   stave.position.set(x, y, z);
+  if (name) stave.name = name;
   group.add(stave);
-  if (!orb) return;
+  if (!orb) return stave;
   const tipY = y + length / 2;
   const ball = new THREE.Mesh(
     new THREE.SphereGeometry(orb.radius, 8, 8),
@@ -735,6 +784,7 @@ function addHeldPole(group, { x, y, z, length, woodColor, orb }) {
   );
   ball.position.set(x, tipY + orb.radius * 0.7, z);
   group.add(ball);
+  return stave;
 }
 
 export function buildShopkeeper(opts = {}) {
@@ -743,32 +793,41 @@ export function buildShopkeeper(opts = {}) {
   group.name = 'shopkeeper';
   const skin = new THREE.MeshStandardMaterial({ color: 0xe2c2a0, roughness: 0.68 });
   const shirt = new THREE.MeshStandardMaterial({ color: appearanceColor('shirt', look.shirt), roughness: 0.86 });
-  const apron = cloth(0x6a4a32, 0.9);
-  const leather = cloth(0x3a2418, 0.88);
+  const leather = cloth(0x5a3a22, 0.88);
   const hairColor = 0x3a2416;
   const pose = addHumanoid(group, {
     skin,
     shirt,
     pants: new THREE.MeshStandardMaterial({ color: appearanceColor('legs', look.legs), roughness: 0.88 }),
     boots: new THREE.MeshStandardMaterial({ color: appearanceColor('boots', look.boots), roughness: 0.86 }),
-    sleeves: shirt,
+    sleeves: skin,
   });
 
-  const bib = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.34, 8), apron));
-  bib.scale.z = 0.24;
-  bib.position.set(0, 0.9, 0.09);
-  group.add(bib);
-  const skirt = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, 0.26, 10), apron));
-  skirt.scale.z = 0.74;
-  skirt.position.set(0, 0.56, 0.02);
-  group.add(skirt);
-  const belt = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.018, 6, 12), leather));
+  const rig = group.userData.rig;
+  if (rig?.armL && rig?.armR) {
+    for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) {
+      const cuff = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.04, 0.1, 7), shirt));
+      cuff.position.set(side * 0.02, -0.08, 0.01);
+      cuff.rotation.z = side * 0.16;
+      arm.add(cuff);
+      const band = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.04, 7), leather));
+      band.position.set(side * 0.056, -0.38, 0.046);
+      arm.add(band);
+    }
+  }
+
+  const belt = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.118, 0.014, 6, 12), leather));
   belt.rotation.x = Math.PI / 2;
-  belt.position.y = 0.68;
+  belt.position.y = 0.66;
   group.add(belt);
-  const buckle = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.045, 0.03), metal(0xc4a05a)));
-  buckle.position.set(0, 0.68, 0.13);
-  group.add(buckle);
+
+  if (opts.chefHat) {
+    const apron = cloth(0x6a4a32, 0.9);
+    const bib = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.34, 8), apron));
+    bib.scale.z = 0.24;
+    bib.position.set(0, 0.9, 0.09);
+    group.add(bib);
+  }
 
   addHair(group, pose, look.hair, hairColor);
   addFaceHair(group, pose, look.faceHair, hairColor);
@@ -796,6 +855,8 @@ export function buildShopkeeper(opts = {}) {
     pickaxe.position.set(pose.handR.x, pose.handR.y, pose.handR.z);
     group.add(pickaxe);
   }
+  hammerHaft.visible = false;
+  hammerHead.visible = false;
   group.userData.hammers = [hammerHaft, hammerHead];
   group.userData.pickaxe = pickaxe;
 
@@ -995,6 +1056,8 @@ export function buildWare(recipeId) {
     crossbow: () => addCrossbow(group, tint),
     knives: () => addKnives(group, tint),
     thrownaxe: () => addThrownaxe(group, tint),
+    hatchet: () => addHatchet(group, tint),
+    pickaxe: () => addWarePickaxe(group, tint),
     arrows: () => addArrows(group, tint),
     cannonballs: () => addCannonballs(group, tint),
     rune: () => addRune(group, recipe?.runeMark ?? 'air', tint),
@@ -1607,6 +1670,56 @@ function addThrownaxe(group, tint) {
   group.add(blade);
 }
 
+function addHatchet(group, tint) {
+  const rotZ = 0.38;
+  const haft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.024, 0.52, 8), wood(0x5a3a22)));
+  haft.position.set(0, 0.28, 0);
+  haft.rotation.z = rotZ;
+  group.add(haft);
+  const tip = shaftTip(0.28, rotZ, 0.26);
+  const collar = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.06, 8), metal(tint)));
+  collar.position.set(tip.x * 0.72, tip.y - 0.04, 0);
+  collar.rotation.z = rotZ;
+  group.add(collar);
+  const blade = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.13, 0.028), metal(tint)));
+  blade.position.set(tip.x + 0.07, tip.y + 0.01, 0);
+  blade.rotation.z = rotZ - 0.15;
+  group.add(blade);
+  const bit = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.072, 0.1, 6), metal(tint)));
+  bit.position.set(tip.x + 0.15, tip.y + 0.02, 0);
+  bit.rotation.z = rotZ + Math.PI / 2;
+  group.add(bit);
+  const poll = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 0.04), metal(tint)));
+  poll.position.set(tip.x - 0.04, tip.y - 0.01, 0);
+  poll.rotation.z = rotZ;
+  group.add(poll);
+}
+
+function addWarePickaxe(group, tint) {
+  const rotZ = 0.42;
+  const haft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.022, 0.56, 8), wood(0x5a3a22)));
+  haft.position.set(0, 0.3, 0);
+  haft.rotation.z = rotZ;
+  group.add(haft);
+  const tip = shaftTip(0.3, rotZ, 0.28);
+  const bar = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.05), metal(tint)));
+  bar.position.set(tip.x, tip.y, 0);
+  bar.rotation.z = rotZ + 0.15;
+  group.add(bar);
+  const spike = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.16, 6), metal(tint)));
+  spike.position.set(tip.x + 0.12, tip.y - 0.04, 0);
+  spike.rotation.z = rotZ + 1.15;
+  group.add(spike);
+  const spike2 = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.12, 6), metal(tint)));
+  spike2.position.set(tip.x - 0.1, tip.y + 0.05, 0);
+  spike2.rotation.z = rotZ - 1.05;
+  group.add(spike2);
+  const band = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.026, 0.05, 8), metal(tint)));
+  band.position.set(tip.x * 0.78, tip.y - 0.05, 0);
+  band.rotation.z = rotZ;
+  group.add(band);
+}
+
 function addDhideCoif(group, tint) {
   const hide = cloth(tint);
   const lining = cloth(0x3a2a1c);
@@ -1858,142 +1971,641 @@ export function setChestLid(chest, open, dt = 1) {
   lid.rotation.x += (target - lid.rotation.x) * Math.min(1, dt * 8);
 }
 
+function dressKing(group, { pose, type }) {
+  const robe = cloth(type.robe);
+  const mantle = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 0.62, 11), robe));
+  mantle.name = 'cue-cape';
+  mantle.scale.z = 0.86;
+  mantle.position.y = 0.5;
+  group.add(mantle);
+  const fur = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.028, 6, 14), cloth(0xf4eee4)));
+  fur.rotation.x = Math.PI / 2;
+  fur.position.y = 0.78;
+  group.add(fur);
+  const stole = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.54, 0.045), cloth(0xf4eee4)));
+  stole.name = 'cue-stole';
+  stole.position.set(0, 0.7, 0.12);
+  group.add(stole);
+  const diamond = metal(0xe8e4f0);
+  const spots = [
+    [-0.04, 0.88], [0.04, 0.8], [0, 0.7], [-0.038, 0.58], [0.036, 0.5],
+  ];
+  for (const [x, y] of spots) {
+    const gem = addShadow(new THREE.Mesh(new THREE.OctahedronGeometry(0.016, 0), diamond));
+    gem.name = 'cue-diamond';
+    gem.position.set(x, y, 0.148);
+    group.add(gem);
+  }
+  const crown = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.145, 0.1, 10), metal(0xe3b34a)));
+  crown.name = 'cue-crown';
+  crown.position.y = pose.headTop + 0.03;
+  group.add(crown);
+  for (const side of [-1, -0.5, 0, 0.5, 1]) {
+    const point = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.1, 5), metal(0xe3b34a)));
+    point.position.set(side * 0.09, pose.headTop + 0.1, 0.02);
+    group.add(point);
+  }
+  const gem = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), glow(0xc42a28)));
+  gem.name = 'cue-gem';
+  gem.position.set(0, pose.headTop + 0.07, 0.13);
+  group.add(gem);
+  const cuff = cloth(0xf4eee4);
+  for (const side of [-1, 1]) {
+    const band = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.036, 0.042, 8), cuff));
+    band.name = 'cue-cuff';
+    band.position.set(side * pose.handR.x, pose.handR.y + 0.055, pose.handR.z);
+    group.add(band);
+  }
+  return pose.headTop + 0.38;
+}
+
+function addHeldShortSword(parent, tint) {
+  const group = new THREE.Group();
+  const blade = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.32, 0.01), metal(tint)));
+  blade.position.y = 0.16;
+  group.add(blade);
+  const guard = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.016, 0.02), metal(0xc4a05a)));
+  group.add(guard);
+  group.rotation.set(0.1, 0, -0.35);
+  group.position.set(0.02, 0.04, 0.02);
+  parent.add(group);
+  return group;
+}
+
+function addHeldMallet(parent) {
+  const group = new THREE.Group();
+  const haft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.32, 6), wood(0x5a3a22)));
+  haft.position.y = 0.12;
+  group.add(haft);
+  const head = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.07), wood(0x6a4a28)));
+  head.position.y = 0.26;
+  group.add(head);
+  group.rotation.set(0.15, 0.1, -0.4);
+  group.position.set(0.02, 0.05, 0.02);
+  parent.add(group);
+  return group;
+}
+
+function addHeldBouquet(parent) {
+  const group = new THREE.Group();
+  const stems = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.014, 0.22, 6), cloth(0x3a5a28)));
+  stems.position.y = 0.08;
+  group.add(stems);
+  for (const [x, y, z, hex] of [[-0.03, 0.2, 0.01, 0x6a3a88], [0.02, 0.22, -0.01, 0xc8d0e4], [0.0, 0.18, 0.02, 0x6a3a88]]) {
+    const bloom = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.028, 7, 6), cloth(hex)));
+    bloom.position.set(x, y, z);
+    group.add(bloom);
+  }
+  group.rotation.set(0.2, 0, 0.25);
+  group.position.set(0.02, 0.04, 0.02);
+  parent.add(group);
+  return group;
+}
+
+function dressPilgrim(group, { pose, rand, set: given }) {
+  const kit = given ?? pickPilgrimCiv(rand);
+  group.userData.pilgrimSet = kit.id;
+  let labelY = pose.headTop + 0.22;
+
+  if (kit.style === 'tunic') {
+    const tunic = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.12, 0.28, 10), cloth(kit.shirt)));
+    tunic.name = 'cue-tunic';
+    tunic.scale.z = 0.62;
+    tunic.position.y = 0.9;
+    group.add(tunic);
+    if (kit.gloves) {
+      for (const hand of [group.userData.hand, group.userData.handL]) {
+        if (!hand) continue;
+        const glove = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.032, 6, 5), cloth(kit.gloves)));
+        glove.scale.set(1.05, 0.68, 1.1);
+        hand.add(glove);
+      }
+    }
+  } else if (kit.style === 'gentry') {
+    const doublet = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.132, 0.118, 0.3, 10), cloth(kit.shirt)));
+    doublet.name = 'cue-tunic';
+    doublet.scale.z = 0.62;
+    doublet.position.y = 0.9;
+    group.add(doublet);
+    const ruff = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.022, 6, 14), cloth(kit.ruff)));
+    ruff.name = 'cue-ruff';
+    ruff.rotation.x = Math.PI / 2;
+    ruff.position.y = 1.08;
+    group.add(ruff);
+    const cape = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.62, 9), cloth(kit.cape)));
+    cape.name = 'cue-cape';
+    cape.position.set(0, 0.62, -0.08);
+    cape.rotation.x = 0.32;
+    group.add(cape);
+  } else if (kit.style === 'skirt') {
+    const crop = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.108, 0.18, 10), cloth(kit.shirt)));
+    crop.name = 'cue-tunic';
+    crop.scale.z = 0.64;
+    crop.position.y = 0.96;
+    group.add(crop);
+    const skirt = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 0.62, 10), cloth(kit.skirt)));
+    skirt.name = 'cue-skirt';
+    skirt.scale.z = 0.86;
+    skirt.position.y = 0.42;
+    group.add(skirt);
+    const belt = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.012, 6, 12), cloth(kit.belt)));
+    belt.rotation.x = Math.PI / 2;
+    belt.position.y = 0.72;
+    group.add(belt);
+  } else if (kit.style === 'cook') {
+    const bib = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.34, 8), cloth(kit.apron)));
+    bib.name = 'cue-apron';
+    bib.scale.z = 0.24;
+    bib.position.set(0, 0.9, 0.09);
+    group.add(bib);
+    const skirt = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.28, 10), cloth(kit.apron)));
+    skirt.scale.z = 0.7;
+    skirt.position.set(0, 0.56, 0.02);
+    group.add(skirt);
+    const hat = buildChefHat();
+    hat.name = 'cue-chefhat';
+    hat.position.y = pose.headTop;
+    group.add(hat);
+    labelY = pose.headTop + 0.38;
+  } else {
+    const tunic = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.128, 0.14, 0.26, 9), cloth(kit.shirt)));
+    tunic.name = 'cue-tunic';
+    tunic.scale.z = 0.64;
+    tunic.position.y = 0.92;
+    group.add(tunic);
+    const wrap = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.42, 9), cloth(kit.wrap ?? kit.pants)));
+    wrap.scale.z = 0.8;
+    wrap.position.y = 0.48;
+    group.add(wrap);
+    const sash = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.016, 6, 12), cloth(kit.sash)));
+    sash.rotation.x = Math.PI / 2;
+    sash.position.y = 0.7;
+    group.add(sash);
+  }
+
+  const hold = group.userData.hand ?? group;
+  if (kit.weapon === 'sword') {
+    const sword = addHeldShortSword(hold, 0x4a4e54);
+    sword.name = 'cue-sword';
+  } else if (kit.weapon === 'mallet') {
+    const mallet = addHeldMallet(hold);
+    mallet.name = 'cue-mallet';
+  } else if (kit.weapon === 'bouquet') {
+    const flowers = addHeldBouquet(hold);
+    flowers.name = 'cue-bouquet';
+  }
+  return labelY;
+}
+
+function addHeldScimitar(parent, tint) {
+  const group = new THREE.Group();
+  addScimitar(group, tint);
+  group.scale.setScalar(0.52);
+  group.rotation.set(0.15, 0.2, -0.85);
+  group.position.set(0.02, 0.06, 0.03);
+  parent.add(group);
+  return group;
+}
+
+function addKiteShield(group, kit) {
+  const shield = new THREE.Group();
+  shield.name = 'cue-shield';
+  const rim = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.36, 0.024), metal(kit.shieldRim)));
+  shield.add(rim);
+  const face = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.31, 0.03), metal(kit.shield)));
+  face.position.z = 0.006;
+  shield.add(face);
+  const barH = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.012), metal(kit.shieldRim)));
+  barH.position.z = 0.02;
+  shield.add(barH);
+  const barV = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.28, 0.012), metal(kit.shieldRim)));
+  barV.position.z = 0.02;
+  shield.add(barV);
+  shield.position.set(-0.24, 0.78, 0.02);
+  shield.rotation.y = 0.42;
+  group.add(shield);
+  return shield;
+}
+
+function dressMercenary(group, { pose, rand, set: given }) {
+  const kit = given ?? pickMercenaryPlate(rand);
+  group.userData.mercenarySet = kit.id;
+  const plateMat = metal(kit.plate);
+  const trimMat = metal(kit.trim);
+  const body = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.122, 0.34, 10), plateMat));
+  body.name = 'cue-plate';
+  body.scale.z = 0.6;
+  body.position.set(0, 0.9, 0.03);
+  group.add(body);
+  const gorget = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.08, 8), trimMat));
+  gorget.position.y = 1.08;
+  group.add(gorget);
+  for (const side of [-1, 1]) {
+    const pauldron = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), trimMat));
+    pauldron.scale.set(1.25, 0.7, 1);
+    pauldron.position.set(side * pose.shoulderX, pose.shoulderY + 0.03, 0.01);
+    group.add(pauldron);
+  }
+  const legsMat = kit.legsStyle === 'hide' ? scaleHide(kit.legs) : metal(kit.legs);
+  const skirt = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.22, 9), legsMat));
+  skirt.scale.z = 0.7;
+  skirt.position.y = 0.58;
+  group.add(skirt);
+  for (const side of [-1, 1]) {
+    const greave = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.05, 0.24, 8), legsMat));
+    greave.position.set(side * 0.074, 0.22, 0.01);
+    group.add(greave);
+    const boot = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, 0.14), metal(kit.boots)));
+    boot.position.set(side * 0.074, 0.05, 0.04);
+    group.add(boot);
+    const toe = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.08, 6), metal(kit.boots)));
+    toe.rotation.x = Math.PI / 2;
+    toe.position.set(side * 0.074, 0.04, 0.12);
+    group.add(toe);
+  }
+  const helm = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.15, 11, 9), plateMat));
+  helm.name = 'cue-helm';
+  helm.scale.set(1.04, 1.02, 1.08);
+  helm.position.set(0, pose.headY + 0.05, 0.02);
+  group.add(helm);
+  const visor = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.045, 0.05), metal(0x1a1814)));
+  visor.position.set(0, pose.headY + 0.03, 0.14);
+  group.add(visor);
+  if (kit.plumeOn) {
+    const plume = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.2, 6), cloth(kit.plume)));
+    plume.position.set(0.02, pose.headY + 0.24, -0.02);
+    plume.rotation.z = 0.35;
+    group.add(plume);
+    const puff = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.035, 7, 6), cloth(kit.plume)));
+    puff.position.set(0.06, pose.headY + 0.3, -0.02);
+    group.add(puff);
+  }
+  const cord = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.008, 5, 12), metal(0xe3b34a)));
+  cord.name = 'cue-amulet';
+  cord.rotation.x = Math.PI / 2;
+  cord.position.y = pose.shoulderY - 0.04;
+  group.add(cord);
+  const charm = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.007, 6, 12), metal(0xe3b34a)));
+  charm.position.set(0, pose.shoulderY - 0.12, 0.09);
+  group.add(charm);
+  const gem = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.014, 7, 6), glow(0xb42a22)));
+  gem.position.set(0, pose.shoulderY - 0.12, 0.09);
+  group.add(gem);
+  for (const hand of [group.userData.hand, group.userData.handL]) {
+    if (!hand) continue;
+    const glove = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.036, 7, 6), metal(kit.gloves)));
+    glove.scale.set(1.08, 0.7, 1.15);
+    hand.add(glove);
+  }
+  addKiteShield(group, kit);
+  const hold = group.userData.hand ?? group;
+  const scim = addHeldScimitar(hold, kit.plate);
+  scim.name = 'cue-scimitar';
+  return pose.headTop + (kit.plumeOn ? 0.42 : 0.3);
+}
+
+function addHeldCrossbow(parent, tint) {
+  const group = new THREE.Group();
+  const stock = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.26, 0.036), wood(tint)));
+  stock.position.y = 0.06;
+  group.add(stock);
+  const prod = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.028, 0.028), wood(tint)));
+  prod.position.y = 0.16;
+  group.add(prod);
+  for (const side of [-1, 1]) {
+    const limb = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.022, 0.018), wood(tint)));
+    limb.position.set(side * 0.16, 0.16, 0);
+    limb.rotation.z = side * 0.42;
+    group.add(limb);
+  }
+  const string = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.004, 0.004, 0.3, 5),
+    new THREE.MeshStandardMaterial({ color: 0xead3ae, roughness: 0.5 }),
+  ));
+  string.rotation.z = Math.PI / 2;
+  string.position.set(0, 0.12, 0.012);
+  group.add(string);
+  group.rotation.set(-0.22, Math.PI / 2, 0.12);
+  group.position.set(0.02, 0.05, 0.04);
+  parent.add(group);
+  return group;
+}
+
+function addRangerQuiver(group, fletchHex, side = 1) {
+  const rig = group.userData.rig;
+  const parent = (side < 0 ? rig?.legL : rig?.legR) ?? group;
+  const quiver = new THREE.Group();
+  quiver.name = 'cue-quiver';
+  const tube = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.032, 0.26, 8), cloth(0x4a3018)));
+  quiver.add(tube);
+  const rim = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.028, 0.008, 5, 10), cloth(0x2a1c10)));
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 0.12;
+  quiver.add(rim);
+  for (const [dx, dy, dz] of [[-0.012, 0.16, 0.004], [0.01, 0.2, -0.006], [0.0, 0.18, 0.01]]) {
+    const fletch = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.028, 0.006), cloth(fletchHex)));
+    fletch.position.set(dx, dy, dz);
+    quiver.add(fletch);
+  }
+  if (parent === group) {
+    quiver.position.set(side * 0.12, 0.52, 0.04);
+    quiver.rotation.z = side * 0.18;
+  } else {
+    quiver.position.set(side * 0.058, -0.14, 0.05);
+    quiver.rotation.z = side * 0.22;
+    quiver.rotation.x = 0.12;
+  }
+  parent.add(quiver);
+  return quiver;
+}
+
+function addRangerVambraces(group, mat) {
+  const rig = group.userData.rig;
+  if (!rig?.armL || !rig?.armR) return;
+  for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) {
+    const bracer = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.032, 0.11, 7), mat));
+    bracer.name = 'cue-vambrace';
+    bracer.position.set(side * 0.056, -0.36, 0.046);
+    bracer.rotation.z = side * 0.12;
+    arm.add(bracer);
+  }
+}
+
+function addRangerHood(group, pose, hex, { mask = false, name = 'cue-hood' } = {}) {
+  const mat = cloth(hex);
+  const hood = addShadow(new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.48),
+    mat,
+  ));
+  hood.name = name;
+  hood.position.set(0, pose.headY + 0.07, 0.01);
+  group.add(hood);
+  const drape = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.2, 8), mat));
+  drape.position.set(0, pose.headY - 0.04, -0.05);
+  drape.rotation.x = 0.55;
+  group.add(drape);
+  if (mask) {
+    const wrap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.055, 0.08), cloth(0x1a1410)));
+    wrap.position.set(0, pose.headY - 0.02, 0.08);
+    group.add(wrap);
+  }
+}
+
+function addRangerNecklace(group, pose) {
+  const cord = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.008, 5, 12), cloth(0xd8c8a0)));
+  cord.rotation.x = Math.PI / 2;
+  cord.position.y = pose.shoulderY - 0.06;
+  group.add(cord);
+  const gem = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.018, 7, 6), glow(0xc4a05a)));
+  gem.position.set(0, pose.shoulderY - 0.12, 0.08);
+  group.add(gem);
+}
+
+function dressRanger(group, { pose, type, rand, set: given }) {
+  const kit = given ?? pickRangerHide(rand);
+  group.userData.rangerSet = kit.id;
+  const hideMat = kit.style === 'hide' ? scaleHide(kit.hide) : cloth(kit.hide);
+  const leather = cloth(kit.hide);
+  addRangerVambraces(group, leather);
+  addRangerQuiver(group, kit.fletch, 1);
+
+  if (kit.style === 'hide') {
+    const vest = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.108, 0.3, 10), hideMat));
+    vest.name = 'cue-hide';
+    vest.scale.z = 0.62;
+    vest.position.set(0, 0.9, 0.02);
+    group.add(vest);
+    for (const side of [-1, 1]) {
+      const pad = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), cloth(kit.shoulder ?? 0x3a3a48)));
+      pad.scale.set(1.15, 0.62, 0.95);
+      pad.position.set(side * pose.shoulderX, pose.shoulderY + 0.02, 0.01);
+      group.add(pad);
+    }
+    const belt = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.118, 0.014, 6, 12), cloth(kit.belt)));
+    belt.rotation.x = Math.PI / 2;
+    belt.position.y = 0.66;
+    group.add(belt);
+  } else {
+    const vest = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.122, 0.108, 0.26, 10), leather));
+    vest.name = 'cue-hide';
+    vest.scale.z = 0.6;
+    vest.position.set(0, 0.9, 0.02);
+    group.add(vest);
+    const chaps = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.092, 0.34, 9), cloth(kit.chaps ?? type.robe)));
+    chaps.name = 'cue-chaps';
+    chaps.scale.z = 0.7;
+    chaps.position.y = 0.42;
+    group.add(chaps);
+    addRangerHood(group, pose, kit.hood ?? kit.hide, {
+      mask: Boolean(kit.mask),
+      name: kit.style === 'coif' ? 'cue-coif' : 'cue-hood',
+    });
+    addRangerNecklace(group, pose);
+  }
+
+  if (kit.shield) {
+    const shield = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.03, 6), cloth(0xc8c8c4)));
+    shield.name = 'cue-shield';
+    shield.rotation.x = Math.PI / 2;
+    shield.rotation.z = 0.35;
+    shield.position.set(-0.22, 0.76, 0.02);
+    group.add(shield);
+    const boss = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.028, 7, 6), metal(0xc4a05a)));
+    boss.position.set(-0.22, 0.76, 0.04);
+    group.add(boss);
+  }
+
+  const hold = group.userData.handL ?? group;
+  if (kit.weapon === 'crossbow') {
+    const bow = addHeldCrossbow(hold, 0x6a4a28);
+    bow.name = 'cue-crossbow';
+  } else if (kit.weapon === 'blade') {
+    const blade = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.22, 0.01), metal(0xc5ccd4)));
+    blade.name = 'cue-blade';
+    blade.position.set(0.01, 0.1, 0.02);
+    blade.rotation.z = -0.2;
+    (group.userData.hand ?? group).add(blade);
+  } else {
+    const bow = addHeldBow(hold, 0x7a5a32, 0.95);
+    if (bow) bow.name = 'cue-bow';
+  }
+  return pose.headTop + (kit.style === 'hide' ? 0.22 : 0.28);
+}
+
+function addMageSleeves(group, mat) {
+  const rig = group.userData.rig;
+  if (!rig?.armL || !rig?.armR) return;
+  for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) {
+    const sleeve = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.095, 0.4, 8), mat));
+    sleeve.position.set(side * 0.02, -0.18, 0.02);
+    sleeve.rotation.z = side * 0.12;
+    arm.add(sleeve);
+  }
+}
+
+function dressMage(group, { pose, rand, set: given }) {
+  const set = given ?? pickMageRobes(rand);
+  group.userData.mageSet = set.id;
+  const robeMat = cloth(set.robe);
+  const trimMat = cloth(set.trim);
+  const hatMat = cloth(set.hat);
+  const skirt = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.24, 0.72, 10), robeMat));
+  skirt.name = 'cue-robes';
+  skirt.scale.z = 0.88;
+  skirt.position.y = 0.4;
+  group.add(skirt);
+  const hem = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.016, 6, 14), trimMat));
+  hem.rotation.x = Math.PI / 2;
+  hem.position.y = 0.06;
+  group.add(hem);
+  const yoke = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2.2), robeMat));
+  yoke.position.y = 0.98;
+  yoke.scale.set(1.05, 0.55, 0.85);
+  group.add(yoke);
+  addMageSleeves(group, robeMat);
+  if (set.style !== 'bare') {
+    for (const [hand, side] of [[group.userData.handL, -1], [group.userData.hand, 1]]) {
+      if (!hand) continue;
+      const mitt = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.038, 7, 6), trimMat));
+      mitt.scale.set(1.05, 0.72, 1.15);
+      mitt.position.set(0, 0, 0);
+      hand.add(mitt);
+      void side;
+    }
+  }
+  if (set.id === 'umbral') {
+    const mark = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.09, 0.012), glow(set.orb)));
+    mark.position.set(0, 0.92, 0.11);
+    group.add(mark);
+  }
+  let labelY = pose.headTop + 0.24;
+  if (set.style === 'hood') {
+    const hood = addShadow(new THREE.Mesh(
+      new THREE.SphereGeometry(0.17, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.45),
+      robeMat,
+    ));
+    hood.name = 'cue-hood';
+    hood.position.set(0, pose.headY + 0.08, 0.02);
+    group.add(hood);
+    const cowl = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.2, 8), robeMat));
+    cowl.position.set(0, pose.headY - 0.02, 0.08);
+    cowl.rotation.x = 1.05;
+    group.add(cowl);
+    labelY = pose.headTop + 0.28;
+  } else if (set.style === 'hat') {
+    const brim = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.028, 12), hatMat));
+    brim.name = 'cue-hat';
+    brim.position.y = pose.headTop - 0.01;
+    group.add(brim);
+    const cone = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.125, 0.5, 10), hatMat));
+    cone.position.set(0.02, pose.headTop + 0.25, -0.01);
+    cone.rotation.z = -0.12;
+    group.add(cone);
+    const band = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.128, 0.128, 0.03, 10), trimMat));
+    band.position.y = pose.headTop + 0.02;
+    group.add(band);
+    labelY = pose.headTop + 0.56;
+  }
+  addHeldPole(group, {
+    x: pose.handR.x,
+    y: 0.52,
+    z: pose.handR.z,
+    length: 1.12,
+    woodColor: 0x5a3a22,
+    orb: { radius: 0.06, color: set.orb, emissive: set.orb },
+    name: 'cue-orb',
+  });
+  return labelY;
+}
+
+/** Per-class customer dressers. Later packs (mercenary/ranger art) plug in here. */
+export const CUSTOMER_LOOKS = {
+  king: dressKing,
+  pilgrim: dressPilgrim,
+  mercenary: dressMercenary,
+  ranger: dressRanger,
+  mage: dressMage,
+};
+
 export function buildAdventurer(typeId, opts = {}) {
   const type = CUSTOMERS[typeId] ?? CUSTOMERS.pilgrim;
   const group = new THREE.Group();
   group.name = typeId;
   const rand = hashStyle(opts.seed ?? Math.random());
-  const female = typeId === 'kingroald' ? false : rand() < 0.48;
-  const hairColor = HAIR_COLORS[Math.floor(rand() * HAIR_COLORS.length)];
+  const lookId = type.look ?? typeId;
+  const mageSet = lookId === 'mage' ? pickMageRobes(rand) : null;
+  const rangerSet = lookId === 'ranger' ? pickRangerHide(rand) : null;
+  const mercenarySet = lookId === 'mercenary' ? pickMercenaryPlate(rand) : null;
+  const pilgrimSet = lookId === 'pilgrim' ? pickPilgrimCiv(rand) : null;
+  const lookSet = mageSet ?? rangerSet ?? mercenarySet ?? pilgrimSet;
+  const female = typeId === 'kingroald' ? false
+    : (lookSet?.female != null ? lookSet.female : rand() < 0.48);
+  const hairColor = lookSet?.hair ?? HAIR_COLORS[Math.floor(rand() * HAIR_COLORS.length)];
   const mageHair = ['long', 'bun', 'ponytail', 'bob'];
+  const hideHairStyles = ['short', 'crop'];
   const femHair = ['long', 'ponytail', 'bun', 'bob'];
   const mascHair = ['short', 'crop', 'long', 'bun'];
-  const hairStyle = typeId === 'hedgemage' || typeId === 'kingroald'
-    ? mageHair[Math.floor(rand() * mageHair.length)]
-    : (female ? femHair : mascHair)[Math.floor(rand() * (female ? femHair.length : mascHair.length))];
-  const faceHair = female || typeId === 'kingroald'
-    ? (typeId === 'kingroald' && rand() < 0.7 ? 'beard' : 'none')
-    : (['none', 'none', 'beard', 'moustache', 'goatee'][Math.floor(rand() * 5)]);
+  const hairStyle = typeId === 'kingroald'
+    ? 'short'
+    : (lookSet?.hairStyle
+      ?? (rangerSet?.style === 'hide'
+        ? hideHairStyles[Math.floor(rand() * hideHairStyles.length)]
+        : (lookId === 'mage'
+          ? mageHair[Math.floor(rand() * mageHair.length)]
+          : (female ? femHair : mascHair)[Math.floor(rand() * (female ? femHair.length : mascHair.length))])));
+  const wantBeard = Boolean(mageSet?.beard);
+  const faceHair = typeId === 'kingroald'
+    ? 'goatee'
+    : (lookSet?.faceHair
+      ?? (female
+        ? 'none'
+        : (wantBeard ? 'beard' : (['none', 'none', 'beard', 'moustache', 'goatee'][Math.floor(rand() * 5)]))));
 
-  const robe = new THREE.MeshStandardMaterial({ color: type.robe, roughness: 0.88 });
-  const skin = new THREE.MeshStandardMaterial({ color: 0xe2c2a0, roughness: 0.7 });
-  const accent = new THREE.MeshStandardMaterial({ color: type.accent, roughness: 0.7 });
-  const pants = typeId === 'mercenary' || typeId === 'ranger'
-    ? new THREE.MeshStandardMaterial({ color: type.robe, roughness: 0.86 })
-    : robe;
+  const hideBody = rangerSet?.style === 'hide' ? scaleHide(rangerSet.hide) : null;
+  const robeHex = mageSet?.robe ?? type.robe;
+  const robe = hideBody
+    ?? (mercenarySet ? metal(mercenarySet.plate) : null)
+    ?? (pilgrimSet ? cloth(pilgrimSet.shirt) : null)
+    ?? new THREE.MeshStandardMaterial({ color: robeHex, roughness: 0.88 });
+  const skin = new THREE.MeshStandardMaterial({
+    color: mageSet?.id === 'ashen' ? 0xf2ece4 : 0xe2c2a0,
+    roughness: 0.7,
+  });
+  const mercLegs = mercenarySet
+    ? (mercenarySet.legsStyle === 'hide' ? scaleHide(mercenarySet.legs) : metal(mercenarySet.legs))
+    : null;
+  const civLegs = pilgrimSet
+    ? (pilgrimSet.check ? checkCloth(pilgrimSet.pants) : cloth(pilgrimSet.pants ?? pilgrimSet.skirt ?? type.robe))
+    : null;
+  const pants = hideBody
+    ?? (rangerSet ? cloth(rangerSet.chaps ?? type.robe) : null)
+    ?? mercLegs
+    ?? civLegs
+    ?? robe;
+  const sleeves = rangerSet?.sleeve != null
+    ? cloth(rangerSet.sleeve)
+    : (mercenarySet ? metal(mercenarySet.gloves)
+      : (pilgrimSet?.sleeve != null ? cloth(pilgrimSet.sleeve) : robe));
   const pose = addHumanoid(group, {
     skin,
     shirt: robe,
     pants,
-    boots: typeId === 'mercenary' ? metal(0x4a463f) : typeId === 'kingroald' ? metal(0xc4a05a) : cloth(0x2a1c12),
-    sleeves: robe,
+    boots: rangerSet?.boots != null
+      ? cloth(rangerSet.boots)
+      : (mercenarySet ? metal(mercenarySet.boots)
+        : (pilgrimSet?.boots != null ? cloth(pilgrimSet.boots)
+          : (lookId === 'king' ? metal(0xc4a05a) : cloth(0x2a1c12)))),
+    sleeves,
   });
 
-  addHair(group, pose, hairStyle, hairColor);
-  addFaceHair(group, pose, faceHair, hairColor);
-
-  let labelY = pose.headTop + 0.24;
-  if (typeId === 'kingroald') {
-    const mantle = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 0.55, 10), robe));
-    mantle.scale.z = 0.78;
-    mantle.position.y = 0.48;
-    group.add(mantle);
-    const trim = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.018, 6, 14), accent));
-    trim.rotation.x = Math.PI / 2;
-    trim.position.y = 0.72;
-    group.add(trim);
-    const crown = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.08, 10), metal(0xe3b34a)));
-    crown.position.y = pose.headTop + 0.02;
-    group.add(crown);
-    for (const side of [-1, 0, 1]) {
-      const point = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.08, 5), metal(0xe3b34a)));
-      point.position.set(side * 0.08, pose.headTop + 0.08, 0.02);
-      group.add(point);
-    }
-    const gem = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), glow(0x3a6ec8)));
-    gem.position.set(0, pose.headTop + 0.06, 0.12);
-    group.add(gem);
-    labelY = pose.headTop + 0.32;
-  } else if (typeId === 'pilgrim') {
-    const tunic = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 0.46, 10), robe));
-    tunic.scale.z = 0.78;
-    tunic.position.y = 0.44;
-    group.add(tunic);
-    const cord = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.012, 6, 12), cloth(type.accent)));
-    cord.rotation.x = Math.PI / 2;
-    cord.position.y = 0.64;
-    group.add(cord);
-    const hood = addShadow(new THREE.Mesh(
-      new THREE.SphereGeometry(0.145, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.85),
-      robe,
-    ));
-    hood.position.set(0, pose.headY + 0.04, 0.01);
-    group.add(hood);
-    addHeldPole(group, {
-      x: pose.handR.x,
-      y: 0.62,
-      z: pose.handR.z,
-      length: 1.18,
-      woodColor: 0x5b3c22,
-    });
-  } else if (typeId === 'mercenary') {
-    const plate = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.28, 10), accent));
-    plate.scale.z = 0.52;
-    plate.position.set(0, 0.9, 0.04);
-    group.add(plate);
-    for (const side of [-1, 1]) {
-      const pauldron = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), accent));
-      pauldron.scale.set(1.15, 0.7, 0.95);
-      pauldron.position.set(side * pose.shoulderX, pose.shoulderY + 0.02, 0.01);
-      group.add(pauldron);
-    }
-    const helm = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), accent));
-    helm.scale.set(0.98, 0.88, 0.95);
-    helm.position.set(0, pose.headY + 0.03, 0.01);
-    group.add(helm);
-    const visor = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.045, 10), metal(0x6a5a3a)));
-    visor.scale.z = 0.55;
-    visor.position.set(0, pose.headY + 0.02, 0.06);
-    group.add(visor);
-    labelY = pose.headTop + 0.2;
-  } else if (typeId === 'ranger') {
-    const vest = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.108, 0.26, 10), cloth(0x2f3a26)));
-    vest.scale.z = 0.62;
-    vest.position.set(0, 0.9, 0.02);
-    group.add(vest);
-    const hood = addShadow(new THREE.Mesh(
-      new THREE.SphereGeometry(0.14, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.7),
-      robe,
-    ));
-    hood.position.set(0, pose.headY + 0.05, 0.01);
-    group.add(hood);
-    const quiver = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.034, 0.32, 8), wood(0x5a3a22)));
-    quiver.position.set(-0.08, 0.92, -0.12);
-    quiver.rotation.z = 0.35;
-    group.add(quiver);
-    const hold = group.userData.handL ?? group;
-    addHeldBow(hold, 0x7a5a32, 0.82);
-  } else {
-    const robeSkirt = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 0.5, 10), robe));
-    robeSkirt.scale.z = 0.78;
-    robeSkirt.position.y = 0.42;
-    group.add(robeSkirt);
-    const brim = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.03, 10), accent));
-    brim.position.y = pose.headTop - 0.02;
-    group.add(brim);
-    const hat = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 8), accent));
-    hat.position.y = pose.headTop + 0.14;
-    group.add(hat);
-    addHeldPole(group, {
-      x: pose.handR.x,
-      y: 0.55,
-      z: pose.handR.z,
-      length: 0.95,
-      woodColor: 0x2f4a3a,
-      orb: { radius: 0.05, color: 0x9b6cff, emissive: 0x6a3cff },
-    });
-    labelY = pose.headTop + 0.42;
+  const hideHair = lookId === 'mercenary' || lookSet?.style === 'hood' || lookSet?.style === 'coif';
+  if (!hideHair) addHair(group, pose, hairStyle, hairColor);
+  if (lookSet?.style !== 'hood' && lookSet?.style !== 'coif' && lookSet?.style !== 'helm') {
+    addFaceHair(group, pose, faceHair, hairColor);
   }
+
+  const dress = CUSTOMER_LOOKS[lookId] ?? dressPilgrim;
+  const labelY = dress(group, { type, pose, rand, typeId, set: lookSet }) ?? pose.headTop + 0.24;
 
   const label = makeNameSprite(type.name);
   label.position.y = labelY;
@@ -2032,35 +2644,68 @@ export function buildGoblin() {
   const group = new THREE.Group();
   group.name = 'goblin';
   const body = new THREE.Group();
-  const skin = new THREE.MeshStandardMaterial({ color: 0x4a7a32, roughness: 0.72 });
-  const rag = cloth(0x3a4a28, 0.9);
-  const dark = cloth(0x2a2418, 0.88);
-  body.scale.set(0.78, 0.68, 0.8);
-  body.rotation.x = 0.28;
+  const skin = new THREE.MeshStandardMaterial({ color: 0x4a8a32, roughness: 0.72 });
+  const tunic = cloth(0xc4a06a, 0.9);
+  const plate = metal(0x6a7078);
+  body.scale.set(0.8, 0.62, 0.78);
+  body.rotation.x = 0.38;
 
   const pose = addHumanoid(body, {
     skin,
-    shirt: rag,
-    pants: dark,
-    boots: dark,
-    sleeves: rag,
+    shirt: tunic,
+    pants: plate,
+    boots: plate,
+    sleeves: tunic,
   });
 
-  const earMat = skin;
+  if (pose.rig?.armL) pose.rig.armL.scale.set(1.08, 1.38, 1.08);
+  if (pose.rig?.armR) pose.rig.armR.scale.set(1.08, 1.38, 1.08);
+
+  const wrap = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.3, 8), tunic));
+  wrap.name = 'cue-tunic';
+  wrap.position.y = 0.8;
+  wrap.scale.z = 0.78;
+  body.add(wrap);
+
   for (const side of [-1, 1]) {
-    const ear = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.16, 6), earMat));
-    ear.position.set(side * 0.13, pose.headY + 0.06, -0.02);
-    ear.rotation.z = side * -0.55;
-    ear.rotation.x = -0.25;
+    const pad = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.08, 7, 5), plate));
+    pad.name = 'cue-pauldron';
+    pad.scale.set(1.15, 0.52, 0.92);
+    pad.position.set(side * pose.shoulderX, pose.shoulderY + 0.02, 0.02);
+    body.add(pad);
+    const greave = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.042, 0.16, 6), plate));
+    greave.name = 'cue-greave';
+    greave.position.set(side * 0.074, 0.22, 0.01);
+    body.add(greave);
+  }
+
+  for (const side of [-1, 1]) {
+    const ear = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.2, 6), skin));
+    ear.name = 'cue-ear';
+    ear.position.set(side * 0.14, pose.headY + 0.08, -0.02);
+    ear.rotation.z = side * -0.62;
+    ear.rotation.x = -0.28;
     body.add(ear);
   }
-  const snout = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.08, 6), skin));
+  const snout = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.12, 6), skin));
+  snout.name = 'cue-nose';
   snout.rotation.x = Math.PI / 2;
-  snout.position.set(0, 1.19, 0.12);
+  snout.position.set(0, pose.headY - 0.02, 0.14);
   body.add(snout);
+
+  const knot = addShadow(new THREE.Mesh(
+    new THREE.ConeGeometry(0.045, 0.16, 6),
+    new THREE.MeshStandardMaterial({ color: 0x1c1410, roughness: 0.8 }),
+  ));
+  knot.name = 'cue-topknot';
+  knot.position.set(0, pose.headTop + 0.06, -0.02);
+  knot.rotation.z = 0.18;
+  body.add(knot);
+
   group.add(body);
   group.userData.rig = body.userData.rig;
   group.userData.walkPhase = 0;
+  group.userData.walkRest = body.userData.walkRest;
 
   const pick = new THREE.Mesh(
     new THREE.BoxGeometry(0.5, 1.05, 0.42),
@@ -2245,6 +2890,159 @@ function tintImportedMesh(root, hex) {
   });
 }
 
+const BONE_LEG_L = /left.*(up)?leg|leftthigh|l_?(up)?leg|thigh_?l|upleg_?l|mixamorig:?leftupleg/i;
+const BONE_LEG_R = /right.*(up)?leg|rightthigh|r_?(up)?leg|thigh_?r|upleg_?r|mixamorig:?rightupleg/i;
+const BONE_ARM_L = /left.*(upper)?arm|l_?(upper)?arm|arm_?l|shoulder_?l|mixamorig:?leftarm/i;
+const BONE_ARM_R = /right.*(upper)?arm|r_?(upper)?arm|arm_?r|shoulder_?r|mixamorig:?rightarm/i;
+const BONE_HAND_R = /right.*hand|r_?hand|hand_?r|mixamorig:?righthand|wrist_?r/i;
+
+function collectBones(root) {
+  const bones = [];
+  root.traverse((obj) => {
+    if (obj.isBone) bones.push(obj);
+    if (obj.isSkinnedMesh && obj.skeleton?.bones) {
+      for (const bone of obj.skeleton.bones) bones.push(bone);
+    }
+  });
+  return [...new Set(bones)];
+}
+
+function matchBone(bones, pattern) {
+  const scored = bones
+    .filter((bone) => pattern.test(bone.name || ''))
+    .sort((a, b) => (a.name?.length ?? 0) - (b.name?.length ?? 0));
+  return scored[0] ?? null;
+}
+
+function attachPreservingWorld(child, newParent) {
+  child.updateMatrixWorld(true);
+  newParent.updateMatrixWorld(true);
+  const world = child.matrixWorld.clone();
+  newParent.add(child);
+  const inv = new THREE.Matrix4().copy(newParent.matrixWorld).invert();
+  child.matrix.copy(inv.multiply(world));
+  child.matrix.decompose(child.position, child.quaternion, child.scale);
+}
+
+function makePivot(parent, worldPos, name) {
+  const pivot = new THREE.Group();
+  pivot.name = name;
+  parent.updateMatrixWorld(true);
+  const local = parent.worldToLocal(worldPos.clone());
+  pivot.position.copy(local);
+  parent.add(pivot);
+  return pivot;
+}
+
+function partitionLimbMeshes(root) {
+  const meshes = [];
+  root.traverse((child) => {
+    if (child.isMesh && child.geometry && !child.userData?.skipWalk) meshes.push(child);
+  });
+  if (meshes.length < 3) return null;
+  const box = new THREE.Box3().setFromObject(root);
+  const midX = (box.min.x + box.max.x) / 2;
+  const ySpan = Math.max(0.01, box.max.y - box.min.y);
+  const lowY = box.min.y + ySpan * 0.42;
+  const highY = box.min.y + ySpan * 0.5;
+  const wide = (box.max.x - box.min.x) * 0.1;
+  const legsL = [];
+  const legsR = [];
+  const armsL = [];
+  const armsR = [];
+  for (const mesh of meshes) {
+    const center = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
+    if (center.y < lowY) {
+      (center.x < midX ? legsL : legsR).push(mesh);
+    } else if (center.y > highY && Math.abs(center.x - midX) > wide) {
+      (center.x < midX ? armsL : armsR).push(mesh);
+    }
+  }
+  if (!legsL.length || !legsR.length) return null;
+  return { legsL, legsR, armsL, armsR, box };
+}
+
+function addProxyLimb(parent, x, y, length, name) {
+  const pivot = new THREE.Group();
+  pivot.name = name;
+  pivot.position.set(x, y, 0);
+  const stick = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.024, length, 6),
+    new THREE.MeshStandardMaterial({
+      color: 0x2a2218,
+      roughness: 0.9,
+      transparent: true,
+      opacity: 0.42,
+    }),
+  );
+  stick.position.y = -length * 0.45;
+  stick.userData.skipWalk = true;
+  pivot.add(stick);
+  parent.add(pivot);
+  return pivot;
+}
+
+/** Bind a simple biped rig so imported player/customer meshes use the stock walk cycle. */
+export function bindImportedWalkRig(group, mesh, height = 1.7) {
+  group.userData.walkBody = mesh;
+  const bones = collectBones(mesh);
+  const boneLegL = matchBone(bones, BONE_LEG_L);
+  const boneLegR = matchBone(bones, BONE_LEG_R);
+  if (boneLegL && boneLegR) {
+    const armL = matchBone(bones, BONE_ARM_L);
+    const armR = matchBone(bones, BONE_ARM_R);
+    group.userData.rig = { legL: boneLegL, legR: boneLegR, armL, armR };
+    group.userData.walkRest = {
+      legL: boneLegL.rotation.x,
+      legR: boneLegR.rotation.x,
+      armL: armL?.rotation.x ?? 0,
+      armR: armR?.rotation.x ?? 0,
+    };
+    group.userData.walkMode = 'bones';
+    return 'bones';
+  }
+  const parts = partitionLimbMeshes(mesh);
+  if (parts) {
+    const hipY = parts.box.min.y + (parts.box.max.y - parts.box.min.y) * 0.36;
+    const shoulderY = parts.box.min.y + (parts.box.max.y - parts.box.min.y) * 0.64;
+    const midX = (parts.box.min.x + parts.box.max.x) / 2;
+    const span = Math.max(0.08, (parts.box.max.x - parts.box.min.x) * 0.18);
+    mesh.updateMatrixWorld(true);
+    const legL = makePivot(mesh, new THREE.Vector3(midX - span, hipY, 0), 'walkLegL');
+    const legR = makePivot(mesh, new THREE.Vector3(midX + span, hipY, 0), 'walkLegR');
+    for (const child of parts.legsL) attachPreservingWorld(child, legL);
+    for (const child of parts.legsR) attachPreservingWorld(child, legR);
+    let armL = null;
+    let armR = null;
+    if (parts.armsL.length) {
+      armL = makePivot(mesh, new THREE.Vector3(midX - span * 1.2, shoulderY, 0), 'walkArmL');
+      for (const child of parts.armsL) attachPreservingWorld(child, armL);
+    }
+    if (parts.armsR.length) {
+      armR = makePivot(mesh, new THREE.Vector3(midX + span * 1.2, shoulderY, 0), 'walkArmR');
+      for (const child of parts.armsR) attachPreservingWorld(child, armR);
+    }
+    group.userData.rig = { legL, legR, armL, armR };
+    group.userData.walkRest = { legL: 0, legR: 0, armL: 0, armR: 0 };
+    group.userData.walkMode = 'parts';
+    return 'parts';
+  }
+  const hipY = height * 0.34;
+  const shoulderY = height * 0.62;
+  const hipX = Math.max(0.07, height * 0.05);
+  const legLen = height * 0.36;
+  const armLen = height * 0.28;
+  group.userData.rig = {
+    legL: addProxyLimb(group, -hipX, hipY, legLen, 'proxyLegL'),
+    legR: addProxyLimb(group, hipX, hipY, legLen, 'proxyLegR'),
+    armL: addProxyLimb(group, -hipX * 1.7, shoulderY, armLen, 'proxyArmL'),
+    armR: addProxyLimb(group, hipX * 1.7, shoulderY, armLen, 'proxyArmR'),
+  };
+  group.userData.walkRest = { legL: 0, legR: 0, armL: 0, armR: 0 };
+  group.userData.walkMode = 'proxy';
+  return 'proxy';
+}
+
 /** Wrap a glTF scene as a player or customer stand-in. Throws if the file has no mesh. */
 export function wrapImportedCharacter(source, opts = {}) {
   if (!source) throw new Error('No model to use.');
@@ -2306,18 +3104,35 @@ export function wrapImportedCharacter(source, opts = {}) {
     group.userData.chefHat = chefHat;
   }
 
-  const hand = new THREE.Group();
-  hand.position.set(0.22, Math.min(height * 0.58, 1.05), 0.08);
-  group.add(hand);
-  const pickaxe = buildPickaxe();
-  pickaxe.visible = false;
-  hand.add(pickaxe);
-  group.userData.hand = hand;
-  group.userData.pickaxe = pickaxe;
   group.userData.hammers = [];
   group.userData.customMesh = true;
   group.userData.walkPhase = 0;
+  bindImportedWalkRig(group, mesh, height);
+  attachImportedGrip(group, mesh, height);
   return group;
+}
+
+function attachImportedGrip(group, mesh, height) {
+  const bones = collectBones(mesh);
+  const handBone = matchBone(bones, BONE_HAND_R);
+  const arm = group.userData.rig?.armR;
+  const grip = new THREE.Group();
+  grip.name = 'importedGrip';
+  const pickaxe = buildPickaxe();
+  pickaxe.visible = false;
+  grip.add(pickaxe);
+  if (handBone) {
+    handBone.add(grip);
+  } else if (arm) {
+    const drop = group.userData.walkMode === 'proxy' ? -height * 0.22 : -0.14;
+    grip.position.set(0.02, drop, 0.04);
+    arm.add(grip);
+  } else {
+    grip.position.set(0.22, Math.min(height * 0.58, 1.05), 0.08);
+    group.add(grip);
+  }
+  group.userData.hand = grip;
+  group.userData.pickaxe = pickaxe;
 }
 
 export function wareTopY(object) {

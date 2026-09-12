@@ -121,6 +121,25 @@ body {
   white-space: nowrap;
 }
 
+.minimap {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  max-width: 196px;
+  margin: 0 0 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(227, 179, 74, 0.45);
+  background: #2a4a28;
+  cursor: pointer;
+  pointer-events: auto;
+  image-rendering: pixelated;
+}
+
+.minimap[hidden] {
+  display: none;
+}
+
 .shop-xp {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -281,6 +300,10 @@ body {
   gap: 6px;
   margin-bottom: 8px;
   flex-shrink: 0;
+}
+
+.tabs.has-tools {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .tabs.subtabs {
@@ -1003,6 +1026,36 @@ body.modal-open #view {
   margin: 0 0 4px;
   color: #f0d9a8;
   font-weight: 700;
+}
+
+.inspect-pop {
+  position: absolute;
+  z-index: 22;
+  width: min(240px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--gold);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  display: grid;
+  gap: 6px;
+}
+
+.inspect-pop[hidden] {
+  display: none;
+}
+
+.inspect-pop p {
+  margin: 0;
+  color: #f0d9a8;
+  font-weight: 700;
+}
+
+.inspect-pop .inspect-blurb {
+  font-weight: 400;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--parchment);
 }
 
 #shop-fade {

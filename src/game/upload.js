@@ -4,7 +4,7 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { recipeList } from './catalog.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
-import { saveModel } from './storage.js';
+import { UPLOADS_CLEARED, clearModels, saveModel } from './storage.js';
 import { normalizeImported } from './models.js';
 
 export { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
@@ -149,6 +149,11 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
   const recipeRow = modal.querySelector('[data-recipes]');
   const cancelBtn = modal.querySelector('[data-cancel]');
   const errorEl = modal.querySelector('[data-error]');
+  const clearBtn = modal.querySelector('[data-clear-uploads]');
+  const clearBox = modal.querySelector('[data-clear-box]');
+  const clearYes = modal.querySelector('[data-clear-yes]');
+  const clearNo = modal.querySelector('[data-clear-no]');
+  const clearNote = modal.querySelector('[data-clear-note]');
 
   if (fileInput) {
     fileInput.accept = MODEL_ACCEPT;
@@ -166,6 +171,16 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
     errorEl.hidden = !text;
   }
 
+  function showClearNote(text) {
+    if (!clearNote) return;
+    clearNote.textContent = text || '';
+    clearNote.hidden = !text;
+  }
+
+  function hideClearConfirm() {
+    if (clearBox) clearBox.hidden = true;
+  }
+
   function showTags(on) {
     if (tagRow) tagRow.hidden = !on;
     recipeRow.hidden = true;
@@ -176,6 +191,8 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
     modal.hidden = true;
     showTags(false);
     showError('');
+    showClearNote('');
+    hideClearConfirm();
     title.textContent = '';
     syncModalClass();
   }
@@ -185,6 +202,8 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
     title.textContent = '';
     showTags(false);
     showError('');
+    showClearNote('');
+    hideClearConfirm();
     modal.hidden = false;
     syncModalClass();
   }
@@ -305,6 +324,23 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
   recipeRow.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-recipe]');
     if (btn) applyTag('ware', btn.dataset.recipe);
+  });
+  clearBtn?.addEventListener('click', () => {
+    if (clearBox) clearBox.hidden = false;
+    showClearNote('');
+    showError('');
+  });
+  clearNo?.addEventListener('click', hideClearConfirm);
+  clearYes?.addEventListener('click', async () => {
+    hideClearConfirm();
+    try {
+      world.clearUploads?.();
+      await clearModels();
+    } catch {
+      world.clearUploads?.();
+    }
+    showClearNote(UPLOADS_CLEARED);
+    onChange();
   });
   cancelBtn.addEventListener('click', close);
   modal.addEventListener('click', (event) => {

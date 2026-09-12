@@ -18,6 +18,11 @@ import {
   unlockNeed,
   CRAFT_TABS,
   ANVIL_SUBTABS,
+  MAGE_ROBE_SETS,
+  RANGER_HIDE_SETS,
+  MERCENARY_PLATE_SETS,
+  PILGRIM_CIVILIAN_SETS,
+  anvilTabForRecipe,
   AMMO_BATCH,
   DUNGEON_SKYBOX,
   skyIdForScene,
@@ -31,6 +36,7 @@ import {
   SHELF_SLOT_COUNT,
   SHELF_SLOT_LABELS,
   offerClassOf,
+  defaultAppearance,
 } from './catalog.js';
 import {
   applyState,
@@ -88,7 +94,7 @@ import {
 } from './economy.js';
 import { furnaceBesideAnvil } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
-import { DUNGEON_BOULDERS, DUNGEON_REMAINS } from './shopbuild.js';
+import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS } from './shopbuild.js';
 
 function finishCraft(state, recipeId, at = 0) {
   const recipe = RECIPES[recipeId];
@@ -482,6 +488,7 @@ describe('catalog', () => {
     assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 35);
     assert.equal(recipes.filter((r) => r.category === 'ammo').length, 8);
     assert.equal(recipes.filter((r) => r.category === 'rune').length, 4);
+    assert.equal(recipes.filter((r) => r.combatClass === 'tools').length, 14);
     assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 20);
     assert.equal(RECIPES.blue_dhide_coif.name, "Blue D'hide Coif");
     assert.equal(RECIPES.black_dhide_coif.slot, 'helm');
@@ -572,9 +579,9 @@ describe('catalog', () => {
     assert.equal(SHOP.clutter?.length ?? 0, 0);
   });
 
-  it('groups anvil recipes by melee, magic, and ranged with weapons and armour subtabs', () => {
-    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged']);
-    assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Runes']);
+  it('groups anvil recipes by melee, magic, ranged, and tools with weapons and armour subtabs', () => {
+    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged', 'Tools']);
+    assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Runes', 'Hatchet', 'Pickaxe']);
     const melee = recipesForTab('melee');
     const meleeWeapons = recipesForTab('melee', 'weapon');
     const meleeArmour = recipesForTab('melee', 'armour');
@@ -606,6 +613,15 @@ describe('catalog', () => {
     assert.ok(food.some((r) => r.id === 'anglerfish'));
     assert.equal(food.length, 13);
     assert.ok(!melee.some((r) => r.category === 'food'));
+    assert.ok(!melee.some((r) => r.combatClass === 'tools'));
+    const tools = recipesForTab('tools');
+    const hatchets = recipesForTab('tools', 'hatchet');
+    const pickaxes = recipesForTab('tools', 'pickaxe');
+    assert.equal(hatchets.length, 7);
+    assert.equal(pickaxes.length, 7);
+    assert.equal(hatchets.length + pickaxes.length, tools.length);
+    assert.ok(hatchets.every((r) => r.category === 'hatchet'));
+    assert.ok(pickaxes.every((r) => r.category === 'pickaxe'));
     assert.equal(RECIPES.strength_potion.name, 'Strength Potion');
     assert.equal(RECIPES.anti_poison_potion.name, 'Anti Poison Potion');
   });
@@ -1080,6 +1096,15 @@ describe('ores, appearance, king, and chest bin', () => {
     assert.equal(SKYBOXES.find((item) => item.id === 'blue').id, 'blue');
   });
 
+  it('starts the keeper bald with a goatee', () => {
+    const look = defaultAppearance();
+    assert.equal(look.hair, 'bald');
+    assert.equal(look.faceHair, 'goatee');
+    assert.equal(look.shirt, 'cream');
+    assert.equal(look.legs, 'green');
+    assert.equal(look.boots, 'brown');
+  });
+
   it('saves and loads player appearance and play time', () => {
     const state = createState();
     state.appearance = { hair: 'bun', shirt: 'red', legs: 'navy', boots: 'tan', faceHair: 'beard' };
@@ -1150,6 +1175,49 @@ describe('furnace bar unlocks', () => {
     assert.equal(next.craftCounts.smelt_bronze, 20);
     assert.equal(isUnlocked(next, 'smelt_iron'), true);
     assert.equal(isUnlocked(createState(), 'smelt_iron'), false);
+  });
+});
+
+describe('anvil tools', () => {
+  it('adds hatchet and pickaxe metal lines that use bars and unlock like other gear', () => {
+    const hatchets = recipesForTab('tools', 'hatchet');
+    const pickaxes = recipesForTab('tools', 'pickaxe');
+    assert.deepEqual(hatchets.map((r) => r.id), METALS.map((metal) => `${metal.id}_hatchet`));
+    assert.deepEqual(pickaxes.map((r) => r.id), METALS.map((metal) => `${metal.id}_pickaxe`));
+    assert.equal(RECIPES.bronze_hatchet.name, 'Bronze Hatchet');
+    assert.equal(RECIPES.runite_pickaxe.name, 'Runite Pickaxe');
+    assert.equal(RECIPES.dragon_hatchet.shape, 'hatchet');
+    assert.equal(RECIPES.dragon_pickaxe.shape, 'pickaxe');
+    assert.equal(anvilTabForRecipe(RECIPES.bronze_hatchet), 'tools');
+    assert.equal(anvilSubtabForRecipe(RECIPES.iron_pickaxe), 'pickaxe');
+    for (const metal of METALS) {
+      const hatchet = RECIPES[`${metal.id}_hatchet`];
+      const pickaxe = RECIPES[`${metal.id}_pickaxe`];
+      assert.equal(recipeCost(hatchet).materials[`${metal.id}_bar`], 1, hatchet.id);
+      assert.equal(recipeCost(hatchet).materials[metal.id], undefined, hatchet.id);
+      assert.equal(recipeCost(pickaxe).materials[`${metal.id}_bar`], 1, pickaxe.id);
+    }
+    const state = createState();
+    assert.equal(isUnlocked(state, 'bronze_hatchet'), true);
+    assert.equal(isUnlocked(state, 'iron_hatchet'), false);
+    state.materials.bronze_bar = 25;
+    for (let i = 0; i < 20; i += 1) finishCraft(state, 'bronze_hatchet', i);
+    assert.equal(isUnlocked(state, 'iron_hatchet'), true);
+    assert.equal(state.chest.bronze_hatchet, 20);
+    assert.ok(CUSTOMERS.mercenary.prefers.includes('bronze_pickaxe'));
+    assert.ok(CUSTOMERS.ranger.prefers.includes('bronze_hatchet'));
+    assert.equal(canDisplayOn('table', RECIPES.bronze_hatchet), true);
+    assert.equal(canDisplayOn('stand', RECIPES.bronze_pickaxe), false);
+    const prices = METALS.map((metal) => RECIPES[`${metal.id}_hatchet`].price);
+    for (let i = 1; i < prices.length; i += 1) {
+      assert.ok(prices[i] > prices[i - 1], `${METALS[i].id} hatchet should sell for more`);
+    }
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.chest.bronze_hatchet, 20);
+    assert.equal(isUnlocked(next, 'iron_hatchet'), true);
+    assert.equal(isUnlocked(createState(), 'iron_pickaxe'), false);
   });
 });
 
@@ -1358,6 +1426,61 @@ describe('dungeon sky and remains', () => {
     assert.deepEqual(DUNGEON_BOULDERS.map((spot) => spot.materialId), [
       'essence', 'bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon',
     ]);
+    const byId = Object.fromEntries(DUNGEON_BOULDERS.map((spot) => [spot.id, spot]));
+    const ores = ['bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon'];
+    assert.ok(ores.every((id) => byId[id].rock === byId.bronze.rock), 'ore bodies share one brown rock');
+    assert.equal(byId.bronze.vein, 0x8a5a32);
+    assert.equal(byId.iron.vein, 0x8a8f96);
+    assert.equal(byId.steel.vein, 0xc5ccd4);
+    assert.equal(byId.mithril.vein, 0x3a6ec8);
+    assert.equal(byId.adamant.vein, 0x3a8a45);
+    assert.equal(byId.runite.vein, 0x7ec8e8);
+    assert.equal(byId.dragon.vein, 0xb42a22);
+    assert.equal(byId.essence.rock, 0xb8babf);
+    assert.ok(byId.essence.essence);
+    assert.equal(boulderInspect('essence').name, 'Essence');
+    assert.equal(boulderInspect('bronze').name, 'Bronze Ore');
+    assert.equal(boulderInspect('mithril').name, 'Mithril Ore');
+    assert.equal(boulderInspect('dragon').name, 'Dragon Ore');
+    assert.match(boulderInspect('runite').blurb, /runite ore/i);
+  });
+});
+
+describe('customer look packs', () => {
+  it('uses original kit names and keeps a slot per combat class', () => {
+    const blob = JSON.stringify({
+      mage: MAGE_ROBE_SETS,
+      ranger: RANGER_HIDE_SETS,
+      mercenary: MERCENARY_PLATE_SETS,
+      pilgrim: PILGRIM_CIVILIAN_SETS,
+    });
+    assert.doesNotMatch(blob, /mystic/i);
+    assert.doesNotMatch(blob, /d'?hide|dragonhide/i);
+    assert.doesNotMatch(blob, /rune plate|adamant plate|barrows/i);
+    assert.deepEqual(MAGE_ROBE_SETS.map((set) => set.id), [
+      'azure', 'verdant', 'umbral', 'violet', 'crimson', 'ashen',
+    ]);
+    assert.ok(MAGE_ROBE_SETS.some((set) => set.style === 'hat'));
+    assert.ok(MAGE_ROBE_SETS.some((set) => set.style === 'hood'));
+    assert.deepEqual(RANGER_HIDE_SETS.map((set) => set.id), [
+      'fern', 'tide', 'ink', 'dusk', 'pale',
+    ]);
+    assert.ok(RANGER_HIDE_SETS.some((set) => set.style === 'hide'));
+    assert.ok(RANGER_HIDE_SETS.some((set) => set.weapon === 'bow'));
+    assert.deepEqual(MERCENARY_PLATE_SETS.map((set) => set.id), [
+      'greyplate', 'mossplate', 'frostplate', 'plainplate',
+    ]);
+    assert.ok(MERCENARY_PLATE_SETS.some((set) => set.plumeOn));
+    assert.ok(MERCENARY_PLATE_SETS.some((set) => !set.plumeOn));
+    assert.deepEqual(PILGRIM_CIVILIAN_SETS.map((set) => set.id), [
+      'wayfarer', 'gentry', 'skirted', 'cook', 'croft',
+    ]);
+    assert.ok(PILGRIM_CIVILIAN_SETS.some((set) => set.style === 'cook'));
+    assert.ok(PILGRIM_CIVILIAN_SETS.some((set) => set.style === 'skirt'));
+    assert.equal(CUSTOMERS.hedgemage.look, 'mage');
+    assert.equal(CUSTOMERS.ranger.look, 'ranger');
+    assert.equal(CUSTOMERS.mercenary.look, 'mercenary');
+    assert.equal(CUSTOMERS.pilgrim.look, 'pilgrim');
   });
 });
 

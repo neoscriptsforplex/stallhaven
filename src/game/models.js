@@ -651,6 +651,12 @@ function restX(mesh, key) {
   return mesh?.userData?.walkRest?.[key] ?? 0;
 }
 
+function restScaleY(mesh, body) {
+  const stored = mesh?.userData?.walkRest?.scaleY;
+  if (Number.isFinite(stored)) return stored;
+  return body?.scale?.y ?? 1;
+}
+
 export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
   const rig = mesh?.userData?.rig;
   const body = mesh?.userData?.walkBody;
@@ -665,7 +671,8 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
     const k = 1 - Math.exp(-dt * 14);
     body.rotation.x += (0 - body.rotation.x) * k;
     body.rotation.z += (0 - body.rotation.z) * k;
-    body.scale.y += (1 - body.scale.y) * k;
+    const restY = restScaleY(mesh, body);
+    body.scale.y += (restY - body.scale.y) * k;
   };
   if (!rig?.legL || !rig?.legR) {
     if (moving) {
@@ -675,7 +682,7 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
       if (body) {
         body.rotation.z = Math.sin(phase) * 0.07;
         body.rotation.x = Math.abs(Math.sin(phase * 2)) * 0.035;
-        body.scale.y = 1 - Math.abs(Math.sin(phase * 2)) * 0.035;
+        body.scale.y = restScaleY(mesh, body) * (1 - Math.abs(Math.sin(phase * 2)) * 0.035);
       }
       return;
     }
@@ -696,7 +703,7 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
     mesh.position.y = Math.abs(Math.sin(mesh.userData.walkPhase * 2)) * 0.028;
     if (body) {
       body.rotation.z = Math.sin(mesh.userData.walkPhase) * 0.04;
-      body.scale.y = 1 - Math.abs(Math.sin(mesh.userData.walkPhase * 2)) * 0.02;
+      body.scale.y = restScaleY(mesh, body) * (1 - Math.abs(Math.sin(mesh.userData.walkPhase * 2)) * 0.02);
     }
     return;
   }
@@ -710,24 +717,64 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
   if (Math.abs(mesh.position.y) < 0.002) mesh.position.y = 0;
 }
 
+function shaftTip(posY, rotZ, halfLen) {
+  return {
+    x: -halfLen * Math.sin(rotZ),
+    y: posY + halfLen * Math.cos(rotZ),
+    z: 0,
+  };
+}
+
+function assemblePickaxe(group, opts = {}) {
+  const tint = opts.tint ?? 0x6a7078;
+  const spikeTint = opts.spikeTint ?? tint;
+  const rotZ = opts.rotZ ?? 0.48;
+  const haftY = opts.haftY ?? 0.16;
+  const haftLen = opts.haftLen ?? 0.4;
+  const innerR = opts.innerR ?? 0.014;
+  const outerR = opts.outerR ?? 0.016;
+  const headSize = opts.headSize ?? [0.16, 0.045, 0.045];
+  const spikeA = opts.spikeA ?? { r: 0.028, h: 0.12, ox: 0.085, oy: -0.03, rot: 1.15 };
+  const spikeB = opts.spikeB ?? { r: 0.024, h: 0.1, ox: -0.072, oy: 0.036, rot: -1.05 };
+  const halfLen = haftLen / 2;
+  const haft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(innerR, outerR, haftLen, 8), wood(0x5a3a22)));
+  haft.name = 'pickaxe-haft';
+  haft.position.set(0, haftY, 0);
+  haft.rotation.z = rotZ;
+  group.add(haft);
+  const tip = shaftTip(haftY, rotZ, halfLen);
+  const band = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(outerR + 0.01, outerR + 0.008, 0.045, 8),
+    metal(tint),
+  ));
+  band.position.set(tip.x * 0.86, tip.y - 0.018 * Math.cos(rotZ), 0);
+  band.rotation.z = rotZ;
+  group.add(band);
+  const head = addShadow(new THREE.Mesh(new THREE.BoxGeometry(headSize[0], headSize[1], headSize[2]), metal(tint)));
+  head.name = 'pickaxe-head';
+  head.position.set(tip.x, tip.y, 0);
+  head.rotation.z = rotZ + 0.12;
+  group.add(head);
+  const spike = addShadow(new THREE.Mesh(new THREE.ConeGeometry(spikeA.r, spikeA.h, 6), metal(spikeTint)));
+  spike.position.set(tip.x + spikeA.ox, tip.y + spikeA.oy, 0);
+  spike.rotation.z = rotZ + spikeA.rot;
+  group.add(spike);
+  const spike2 = addShadow(new THREE.Mesh(new THREE.ConeGeometry(spikeB.r, spikeB.h, 6), metal(spikeTint)));
+  spike2.position.set(tip.x + spikeB.ox, tip.y + spikeB.oy, 0);
+  spike2.rotation.z = rotZ + spikeB.rot;
+  group.add(spike2);
+}
+
+export function poseHeldPickaxe(pickaxe) {
+  if (!pickaxe) return;
+  pickaxe.position.set(0.012, 0.0, 0.02);
+  pickaxe.rotation.set(-0.62, 0.2, 0.1);
+}
+
 export function buildPickaxe() {
   const group = new THREE.Group();
   group.name = 'pickaxe';
-  const haft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.4, 6), wood(0x5a3a22)));
-  haft.position.set(0, 0.16, 0.03);
-  haft.rotation.z = 0.55;
-  group.add(haft);
-  const head = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.045, 0.045), metal(0x6a7078)));
-  head.position.set(0.13, 0.31, 0.03);
-  group.add(head);
-  const spike = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.12, 6), metal(0x7a8088)));
-  spike.position.set(0.21, 0.27, 0.03);
-  spike.rotation.z = 1.15;
-  group.add(spike);
-  const spike2 = spike.clone();
-  spike2.position.set(0.05, 0.35, 0.03);
-  spike2.rotation.z = -0.95;
-  group.add(spike2);
+  assemblePickaxe(group);
   return group;
 }
 
@@ -847,6 +894,7 @@ export function buildShopkeeper(opts = {}) {
     hand.add(hammerHaft);
     hand.add(hammerHead);
     hand.add(pickaxe);
+    poseHeldPickaxe(pickaxe);
   } else {
     hammerHaft.position.set(pose.handR.x, pose.handR.y + 0.08, pose.handR.z + 0.04);
     group.add(hammerHaft);
@@ -854,6 +902,10 @@ export function buildShopkeeper(opts = {}) {
     group.add(hammerHead);
     pickaxe.position.set(pose.handR.x, pose.handR.y, pose.handR.z);
     group.add(pickaxe);
+    poseHeldPickaxe(pickaxe);
+    pickaxe.position.x += pose.handR.x;
+    pickaxe.position.y += pose.handR.y;
+    pickaxe.position.z += pose.handR.z;
   }
   hammerHaft.visible = false;
   hammerHead.visible = false;
@@ -920,13 +972,6 @@ export function buildAnvil() {
   const face = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.05, 0.28), faceSteel));
   face.position.y = 0.7;
   group.add(face);
-  const hammer = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.024, 0.42, 6), woodSurface(0x5a3a22, 0.88, 0.4, 1.2, 6113)));
-  hammer.position.set(0.26, 0.86, 0.18);
-  hammer.rotation.z = 0.7;
-  group.add(hammer);
-  const head = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, 0.06), iron));
-  head.position.set(0.42, 1.0, 0.18);
-  group.add(head);
   const label = makeNameSprite('Anvil');
   label.position.y = 1.22;
   group.add(label);
@@ -1218,14 +1263,6 @@ function addScimitar(group, tint) {
   tip.position.copy(curve.getPoint(1)).addScaledVector(tipDir, 0.05);
   tip.rotation.z = Math.atan2(tipDir.x, tipDir.y);
   group.add(tip);
-}
-
-function shaftTip(posY, rotZ, halfLen) {
-  return {
-    x: -halfLen * Math.sin(rotZ),
-    y: posY + halfLen * Math.cos(rotZ),
-    z: 0,
-  };
 }
 
 function addMace(group, tint) {
@@ -1696,28 +1733,18 @@ function addHatchet(group, tint) {
 }
 
 function addWarePickaxe(group, tint) {
-  const rotZ = 0.42;
-  const haft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.022, 0.56, 8), wood(0x5a3a22)));
-  haft.position.set(0, 0.3, 0);
-  haft.rotation.z = rotZ;
-  group.add(haft);
-  const tip = shaftTip(0.3, rotZ, 0.28);
-  const bar = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.05), metal(tint)));
-  bar.position.set(tip.x, tip.y, 0);
-  bar.rotation.z = rotZ + 0.15;
-  group.add(bar);
-  const spike = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.16, 6), metal(tint)));
-  spike.position.set(tip.x + 0.12, tip.y - 0.04, 0);
-  spike.rotation.z = rotZ + 1.15;
-  group.add(spike);
-  const spike2 = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.12, 6), metal(tint)));
-  spike2.position.set(tip.x - 0.1, tip.y + 0.05, 0);
-  spike2.rotation.z = rotZ - 1.05;
-  group.add(spike2);
-  const band = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.026, 0.05, 8), metal(tint)));
-  band.position.set(tip.x * 0.78, tip.y - 0.05, 0);
-  band.rotation.z = rotZ;
-  group.add(band);
+  assemblePickaxe(group, {
+    tint,
+    spikeTint: tint,
+    rotZ: 0.42,
+    haftY: 0.3,
+    haftLen: 0.56,
+    innerR: 0.016,
+    outerR: 0.022,
+    headSize: [0.22, 0.05, 0.05],
+    spikeA: { r: 0.03, h: 0.16, ox: 0.12, oy: -0.04, rot: 1.15 },
+    spikeB: { r: 0.026, h: 0.12, ox: -0.1, oy: 0.05, rot: -1.05 },
+  });
 }
 
 function addDhideCoif(group, tint) {
@@ -1960,6 +1987,7 @@ export function buildChest() {
   const label = makeNameSprite('Chest');
   label.position.y = 1.05;
   root.add(label);
+  root.scale.setScalar(0.6);
 
   return root;
 }
@@ -2858,11 +2886,21 @@ export function buildDust() {
   return points;
 }
 
-export function normalizeImported(root, targetSize, sitOnFloor = true) {
+export function normalizeImported(root, targetSize, sitOnFloor = true, opts = {}) {
+  root.updateMatrixWorld(true);
+  const rs = root.scale;
+  if (Math.abs(rs.x - rs.y) > 1e-4 || Math.abs(rs.y - rs.z) > 1e-4) {
+    const uniform = Math.max(Math.abs(rs.x), Math.abs(rs.y), Math.abs(rs.z), 0.0001);
+    rs.setScalar(Math.sign(rs.x || 1) * uniform);
+    root.updateMatrixWorld(true);
+  }
   const box = new THREE.Box3().setFromObject(root);
   const size = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z, 0.0001);
-  root.scale.multiplyScalar(targetSize / maxDim);
+  const dim = opts.fit === 'height'
+    ? Math.max(size.y, 0.0001)
+    : Math.max(size.x, size.y, size.z, 0.0001);
+  root.scale.multiplyScalar(targetSize / dim);
+  root.updateMatrixWorld(true);
   const box2 = new THREE.Box3().setFromObject(root);
   const center = box2.getCenter(new THREE.Vector3());
   root.position.x -= center.x;
@@ -3049,7 +3087,7 @@ export function wrapImportedCharacter(source, opts = {}) {
   const group = new THREE.Group();
   group.name = opts.name ?? 'character';
   const mesh = source.clone(true);
-  normalizeImported(mesh, opts.height ?? 1.7, true);
+  normalizeImported(mesh, opts.height ?? 1.7, true, { fit: 'height' });
   tintImportedMesh(mesh, opts.tint);
   group.add(mesh);
   const box = new THREE.Box3().setFromObject(group);
@@ -3108,6 +3146,10 @@ export function wrapImportedCharacter(source, opts = {}) {
   group.userData.customMesh = true;
   group.userData.walkPhase = 0;
   bindImportedWalkRig(group, mesh, height);
+  group.userData.walkRest = {
+    ...(group.userData.walkRest ?? {}),
+    scaleY: mesh.scale.y,
+  };
   attachImportedGrip(group, mesh, height);
   return group;
 }
@@ -3121,14 +3163,19 @@ function attachImportedGrip(group, mesh, height) {
   const pickaxe = buildPickaxe();
   pickaxe.visible = false;
   grip.add(pickaxe);
+  poseHeldPickaxe(pickaxe);
   if (handBone) {
     handBone.add(grip);
+    grip.position.set(0.035, 0.0, 0.02);
+    grip.rotation.set(Math.PI / 2, 0, Math.PI / 2);
   } else if (arm) {
-    const drop = group.userData.walkMode === 'proxy' ? -height * 0.22 : -0.14;
-    grip.position.set(0.02, drop, 0.04);
+    const drop = group.userData.walkMode === 'proxy' ? -height * 0.22 : -0.12;
+    grip.position.set(0.03, drop, 0.05);
+    grip.rotation.set(-0.35, 0.12, 0.08);
     arm.add(grip);
   } else {
-    grip.position.set(0.22, Math.min(height * 0.58, 1.05), 0.08);
+    grip.position.set(0.22, Math.min(height * 0.52, 0.98), 0.1);
+    grip.rotation.set(-0.35, 0.12, 0.08);
     group.add(grip);
   }
   group.userData.hand = grip;

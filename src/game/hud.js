@@ -104,7 +104,7 @@ import {
   stationLabel,
   STATION_UNLOCKS,
 } from './layout.js';
-import { drawMinimap, mapToWorld, shopMapBounds } from './minimap.js';
+import { clampMapZoom, drawMinimap, mapToWorld, shopMapBounds } from './minimap.js';
 import { boulderInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
@@ -140,6 +140,11 @@ export function bindHud(root, state, world) {
   const furnMenu = document.querySelector('#furn-menu');
   const inspectPop = document.querySelector('#inspect-pop');
   const minimap = document.querySelector('#minimap');
+  const minimapWrap = document.querySelector('.minimap-wrap');
+  const mapZoomIn = document.querySelector('[data-map-zoom="in"]');
+  const mapZoomOut = document.querySelector('[data-map-zoom="out"]');
+  let mapZoom = 1;
+  let mapPing = null;
   const shopFade = document.querySelector('#shop-fade');
   const activeCraft = root.querySelector('#active-craft');
   const activeCraftName = activeCraft?.querySelector('[data-active-craft-name]');
@@ -2062,6 +2067,14 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   });
 
+  function mapFocus(snap) {
+    return snap?.player ?? null;
+  }
+
+  function bumpMapZoom(factor) {
+    mapZoom = clampMapZoom(mapZoom * factor);
+  }
+
   minimap?.addEventListener('click', (event) => {
     if (minimap.hidden) return;
     const snap = world.getMinimapSnapshot?.();
@@ -2072,8 +2085,22 @@ export function bindHud(root, state, world) {
     const px = (event.clientX - rect.left) * (size / rect.width);
     const py = (event.clientY - rect.top) * (size / rect.height);
     const bounds = shopMapBounds(snap.expansions ?? []);
-    const dest = mapToWorld(px, py, bounds, size, snap.yaw ?? 0);
+    const dest = mapToWorld(px, py, bounds, size, snap.yaw ?? 0, mapZoom, mapFocus(snap));
+    mapPing = { x: dest.x, z: dest.z, at: performance.now() / 1000 };
     world.walkTo?.(dest.x, dest.z);
+  });
+  minimap?.addEventListener('wheel', (event) => {
+    if (minimap.hidden) return;
+    event.preventDefault();
+    bumpMapZoom(event.deltaY > 0 ? 1 / 1.12 : 1.12);
+  }, { passive: false });
+  mapZoomIn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    bumpMapZoom(1.16);
+  });
+  mapZoomOut?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    bumpMapZoom(1 / 1.16);
   });
 
   document.addEventListener('click', (event) => {
@@ -2209,11 +2236,20 @@ export function bindHud(root, state, world) {
     }
     const mapSnap = world.getMinimapSnapshot?.();
     if (minimap) {
-      minimap.hidden = Boolean(mapSnap?.hidden);
+      const hideMap = Boolean(mapSnap?.hidden);
+      minimap.hidden = hideMap;
+      if (minimapWrap) minimapWrap.hidden = hideMap;
       if (mapSnap && !mapSnap.hidden) {
         const ctx = minimap.getContext('2d');
         if (ctx) {
           mapSnap.bounds = shopMapBounds(mapSnap.expansions);
+          mapSnap.zoom = mapZoom;
+          mapSnap.focus = mapFocus(mapSnap);
+          if (mapPing) {
+            const age = (performance.now() / 1000) - mapPing.at;
+            if (age < 1) mapSnap.ping = { x: mapPing.x, z: mapPing.z, age };
+            else mapPing = null;
+          }
           drawMinimap(ctx, mapSnap);
         }
       }

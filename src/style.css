@@ -121,13 +121,23 @@ body {
   white-space: nowrap;
 }
 
+.minimap-wrap {
+  position: relative;
+  max-width: 196px;
+  margin: 0 0 8px;
+}
+
+.minimap-wrap[hidden] {
+  display: none;
+}
+
 .minimap {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 1;
   max-width: 196px;
-  margin: 0 0 8px;
+  margin: 0;
   border-radius: 10px;
   border: 1px solid rgba(227, 179, 74, 0.45);
   background: #2a4a28;
@@ -138,6 +148,31 @@ body {
 
 .minimap[hidden] {
   display: none;
+}
+
+.minimap-zoom {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  gap: 4px;
+}
+
+.minimap-zoom button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(227, 179, 74, 0.45);
+  background: rgba(28, 18, 10, 0.72);
+  color: #f0d9a8;
+  font-size: 0.92rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.minimap-zoom button:hover {
+  background: rgba(56, 36, 18, 0.88);
 }
 
 .shop-xp {

@@ -55,7 +55,7 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     // Counter blocks the customer-facing mass only, leaving a walkway behind it.
     blockFromPose(poses.counter, 1.09, 0.26),
     blockFromPose(poses.anvil, 0.44, 0.35),
-    blockFromPose(poses.chest, 0.49, 0.36),
+    blockFromPose(poses.chest, 0.3, 0.22),
     blockFromPose(poses.range, 0.34, 0.28),
   ];
   if (poses.cauldron) blocks.push(blockFromPose(poses.cauldron, 0.32, 0.32));

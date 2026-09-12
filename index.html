@@ -27,7 +27,13 @@
 
     <aside id="hud">
         <header class="ledger">
-        <canvas id="minimap" class="minimap" width="196" height="196" aria-label="Shop map. Click to walk."></canvas>
+        <div class="minimap-wrap">
+          <canvas id="minimap" class="minimap" width="196" height="196" aria-label="Shop map. Click to walk. Scroll to zoom."></canvas>
+          <div class="minimap-zoom">
+            <button type="button" data-map-zoom="out" aria-label="Zoom map out">−</button>
+            <button type="button" data-map-zoom="in" aria-label="Zoom map in">+</button>
+          </div>
+        </div>
         <div class="shop-xp" aria-label="Shop level">
           <span id="shop-level">Lv 1</span>
           <span class="xp-bar" title="Shop XP"><i data-shop-xp-bar></i></span>
@@ -47,7 +53,7 @@
     <div id="help-modal" class="modal" hidden>
       <div class="sheet">
         <h2>Help</h2>
-        <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the map above the shop XP bar to walk there too. Click the anvil, furnace, range, chest, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. Double-click a highlighted cell to confirm a new table, mannequin, spinning wheel, or cauldron. Scroll to zoom out for the roof and garden.</p>
+        <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the map above the shop XP bar to walk there too; scroll or use +/− to zoom the map. Click the anvil, furnace, range, chest, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. Double-click a highlighted cell to confirm a new table, mannequin, spinning wheel, or cauldron. Scroll to zoom out for the roof and garden.</p>
         <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back. In the dungeon, left-click an Essence boulder or an ore rock to walk over, swing a pickaxe, and fill a Mining bar. Each fill grants 5 Essence or 5 ore of that tier (Bronze through Dragon). Ore rocks share an olive-brown jagged body; only the vein changes colour (bronze copper, iron grey, steel light grey, mithril blue, adamant green, runite light blue, dragon red). Essence stays pale with a light-blue glow. Right-click a boulder to read its name (Essence, Bronze Ore, Runite Ore, …). Ores and Essence do not restock for gold or refill on their own.</p>
         <p>Click the anvil to smith Melee, Magic, Ranged, or Tools. Ranged has Weapons, Armour, and Ammo (arrows and cannonballs). Magic has Weapons, Armour, and Runes. Tools has Hatchet and Pickaxe (Bronze through Dragon, including Runite). Weapons, armour, and tools use metal bars. Each craft row has 1×, 5×, and Max — those count recipe actions (one arrow craft still makes 20). Cancel under the spinning preview stops a run and returns leftover actions (finished pieces stay). The starting shop already has a furnace beside the anvil — click it to smelt ores into bars. Higher bars unlock after enough smelts of the previous tier. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Click the cooking range for Food. Click a placed cauldron for Potions — the window matches the anvil (recipes on the left, preview on the right, materials along the bottom). Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>

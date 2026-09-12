@@ -30,14 +30,22 @@ export const FURNITURE_ROT_STEP = Math.PI / 12;
 export const FURNITURE_FORWARD = 0;
 export const SWAP_PRICE_RATIO = 0.65;
 export const CAULDRON_COST = 10000;
-/** Mid-tier station: between the spinning wheel (500) and the cauldron (10,000). */
-export const FURNACE_COST = 3000;
 export const WHEEL_COST = 500;
 export const STATION_UNLOCKS = [
   { id: 'wheel', label: 'Spinning Wheel', cost: WHEEL_COST },
-  { id: 'furnace', label: 'Furnace', cost: FURNACE_COST },
   { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
 ];
+
+/** Place a starter furnace on the anvil's right, matching the default pair spacing. */
+export function furnaceBesideAnvil(anvil = SHOP.anvil) {
+  const dx = SHOP.furnace.x - SHOP.anvil.x;
+  const dz = SHOP.furnace.z - SHOP.anvil.z;
+  return {
+    x: (anvil?.x ?? SHOP.anvil.x) + dx,
+    z: (anvil?.z ?? SHOP.anvil.z) + dz,
+    rot: anvil?.rot ?? FURNITURE_FORWARD,
+  };
+}
 export const FURNITURE_BUY_BASE = 500;
 export const FURNITURE_BUY_MULT = 3;
 export const FURNITURE_SHOP = [
@@ -213,7 +221,7 @@ export function defaultFurniture() {
     chest: { x: SHOP.chest.x, z: SHOP.chest.z, rot: FURNITURE_FORWARD },
     range: { x: SHOP.range.x, z: SHOP.range.z, rot: FURNITURE_FORWARD },
     cauldron: null,
-    furnace: null,
+    furnace: { x: SHOP.furnace.x, z: SHOP.furnace.z, rot: FURNITURE_FORWARD },
     wheel: null,
     displays: SHOP.displays.map((spot) => ({
       x: spot.x,

@@ -30,7 +30,6 @@ import {
 } from './catalog.js';
 import {
   CAULDRON_COST,
-  FURNACE_COST,
   WHEEL_COST,
   STATION_UNLOCKS,
   CHEST_MAX_LEVEL,
@@ -47,13 +46,13 @@ import {
   furnitureBuyCost,
   furnitureKindForType,
   furnitureLabelForType,
+  furnaceBesideAnvil,
   padById,
   padConnects,
 } from './layout.js';
 
 export {
   CAULDRON_COST,
-  FURNACE_COST,
   WHEEL_COST,
   STATION_UNLOCKS,
   furnitureBuyCost,
@@ -65,7 +64,7 @@ export {
   SKYBOXES,
 };
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
@@ -294,7 +293,7 @@ export function craftBlockReason(state, recipeId) {
     return 'Place a cauldron from Upgrade to brew potions.';
   }
   if (recipe.category === 'smelt' && !ownsFurnace(state)) {
-    return 'Place a furnace from Upgrade to smelt ores into bars.';
+    return 'The furnace is missing.';
   }
   if (recipe.category === 'spin' && !ownsWheel(state)) {
     return 'Place a spinning wheel from Upgrade to spin flax into bow string.';
@@ -987,7 +986,7 @@ export function applyState(state, data) {
         : null,
       furnace: data.furniture.furnace
         ? readPose(data.furniture.furnace, SHOP.furnace)
-        : null,
+        : furnaceBesideAnvil(readPose(data.furniture.anvil, defaults.anvil)),
       wheel: data.furniture.wheel
         ? readPose(data.furniture.wheel, SHOP.wheel)
         : null,

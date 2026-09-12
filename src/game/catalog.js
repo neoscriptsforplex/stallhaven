@@ -177,6 +177,7 @@ export const MATERIALS = {
   flour: { id: 'flour', name: 'Flour', restock: 3, start: 10, tier: 1, regenEvery: regenEvery(1) },
   pineapple: { id: 'pineapple', name: 'Pineapple', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   raspberry: { id: 'raspberry', name: 'Raspberry', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
+  chocolate: { id: 'chocolate', name: 'Chocolate', restock: 6, start: 2, tier: 1, regenEvery: regenEvery(1) },
   fish: { id: 'fish', name: 'Fish', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   herbs: { id: 'herbs', name: 'Herbs', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   water: { id: 'water', name: 'Water', restock: 2, start: 12, tier: 1, regenEvery: regenEvery(1) },
@@ -400,38 +401,56 @@ MAGIC_SETS.forEach((set, index) => {
 });
 
 const FOOD_LINE = [
-  { id: 'bread', name: 'Bread', mats: { flour: 1 }, tint: 0xc4a05a },
-  { id: 'pizza', name: 'Pizza', mats: { flour: 1, pineapple: 1 }, tint: 0xd4a04a },
-  { id: 'cake', name: 'Cake', mats: { flour: 1, egg: 1 }, tint: 0xe8c8a0 },
-  { id: 'pie', name: 'Pie', mats: { flour: 1, raspberry: 1 }, tint: 0xb45a4a },
-  { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, fish: 1 }, tint: 0xc8b07a },
+  { id: 'bread', name: 'Bread', mats: { flour: 1 }, tint: 0xc4a05a, time: 3, price: 8 },
+  { id: 'pizza', name: 'Pizza', mats: { flour: 1, pineapple: 1 }, tint: 0xd4a04a, time: 4, price: 14 },
+  { id: 'cake', name: 'Cake', mats: { flour: 1, egg: 1 }, tint: 0xe8c8a0, time: 5, price: 20 },
+  { id: 'pie', name: 'Pie', mats: { flour: 1, raspberry: 1 }, tint: 0xb45a4a, time: 6, price: 26 },
+  { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, fish: 1 }, tint: 0xc8b07a, time: 7, price: 32 },
 ];
 
-// Food is small and sits on wall shelves. Potions share the same four shelf slots.
-FOOD_LINE.forEach((food, index) => {
-  const previousId = index === 0 ? null : FOOD_LINE[index - 1].id;
-  addRecipe({
-    id: food.id,
-    name: food.name,
-    category: 'food',
-    combatClass: null,
-    slot: 'food',
-    shape: food.id,
-    setKey: 'kitchen',
-    lineId: 'food-bake',
-    lineName: 'Kitchen',
-    lineIndex: index,
-    previousId,
-    unlockNeed: unlockNeed(index),
-    tier: index + 1,
-    cost: { materials: { ...food.mats }, gold: 0 },
-    time: 3 + index,
-    price: 8 + index * 6,
-    buyers: ['pilgrim'],
-    tint: food.tint,
-    shelfItem: true,
+/** Grill / feast line. Prices sit around Cake (20g): Salmon below, then Lobster and up. */
+const FEAST_LINE = [
+  { id: 'salmon', name: 'Salmon', mats: { fish: 1 }, tint: 0xe07a4a, time: 3, price: 16 },
+  { id: 'lobster', name: 'Lobster', mats: { fish: 1 }, tint: 0xc45a32, time: 5, price: 28 },
+  { id: 'chocolate_cake', name: 'Chocolate Cake', mats: { flour: 1, egg: 1, chocolate: 1 }, tint: 0x5a3220, time: 6, price: 38 },
+  { id: 'monkfish', name: 'Monkfish', mats: { fish: 2 }, tint: 0xd8c8a0, time: 7, price: 50 },
+  { id: 'curry', name: 'Curry', mats: { fish: 1, herbs: 1 }, tint: 0xd48a28, time: 8, price: 64 },
+  { id: 'shark', name: 'Shark', mats: { fish: 2 }, tint: 0x6a7a88, time: 9, price: 80 },
+  { id: 'summer_pie', name: 'Summer Pie', mats: { flour: 1, pineapple: 1, raspberry: 1 }, tint: 0xe8a04a, time: 10, price: 98 },
+  { id: 'anglerfish', name: 'Anglerfish', mats: { fish: 3 }, tint: 0xc8a04a, time: 12, price: 120 },
+];
+
+function addFoodLine(list, lineId, lineName, setKey, firstPreviousId = null) {
+  list.forEach((food, index) => {
+    const previousId = index === 0 ? firstPreviousId : list[index - 1].id;
+    const need = index === 0 && firstPreviousId ? unlockNeed(1) : unlockNeed(index);
+    addRecipe({
+      id: food.id,
+      name: food.name,
+      category: 'food',
+      combatClass: null,
+      slot: 'food',
+      shape: food.id,
+      setKey,
+      lineId,
+      lineName,
+      lineIndex: index,
+      previousId,
+      unlockNeed: need,
+      tier: index + 1,
+      cost: { materials: { ...food.mats }, gold: 0 },
+      time: food.time,
+      price: food.price,
+      buyers: ['pilgrim'],
+      tint: food.tint,
+      shelfItem: true,
+    });
   });
-});
+}
+
+// Food is small and sits on wall shelves. Potions share the same four shelf slots.
+addFoodLine(FOOD_LINE, 'food-bake', 'Kitchen', 'kitchen');
+addFoodLine(FEAST_LINE, 'food-feast', 'Feast', 'feast', 'bread');
 
 const POTION_LINE = [
   { id: 'strength_potion', name: 'Strength Potion', tint: 0xe8d24a, buyers: ['mercenary'] },
@@ -525,7 +544,7 @@ export const CUSTOMERS = {
     id: 'pilgrim',
     name: 'Pilgrim',
     combatClass: null,
-    prefers: [...FOOD_LINE.map((food) => food.id), 'prayer_potion', 'energy_potion'],
+    prefers: [...FOOD_LINE.map((food) => food.id), ...FEAST_LINE.map((food) => food.id), 'prayer_potion', 'energy_potion'],
     patient: true,
     leaveIfEmpty: false,
     robe: 0xc8b48a,
@@ -590,12 +609,12 @@ export const SHOP = {
   outside: { x: 0, z: 5.55 },
   counter: { x: 0, z: -1.72 },
   keeper: { x: -0.48, z: -2.52 },
-  anvil: { x: -2.98, z: -2.42 },
+  anvil: { x: -3.2, z: -2.42 },
   // Floor, right of the counter, in the gap before the chest (not the back-left corner).
   range: { x: 1.92, z: -2.22 },
   chest: { x: 2.98, z: -2.42 },
   cauldron: { x: 0, z: 0.8 },
-  furnace: { x: -1.2, z: 0.8 },
+  furnace: { x: -2.12, z: -2.42 },
   wheel: { x: 1.2, z: 0.8 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [

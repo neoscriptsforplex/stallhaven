@@ -48,6 +48,7 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     anvil: { x: shop.anvil.x, z: shop.anvil.z, rot: 0.35 },
     chest: { x: shop.chest.x, z: shop.chest.z, rot: -0.45 },
     range: { x: shop.range.x, z: shop.range.z, rot: 0.12 },
+    furnace: shop.furnace ? { x: shop.furnace.x, z: shop.furnace.z, rot: 0 } : null,
     displays: shop.displays.map((spot) => ({ x: spot.x, z: spot.z, rot: spot.rot ?? 0 })),
   };
   const blocks = [

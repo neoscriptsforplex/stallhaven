@@ -120,16 +120,32 @@ export function roomFloor(gx, gz) {
   };
 }
 
-function doorwayBetween(a, b) {
+/** How far a room-seam walk rect overlaps each room. Must exceed 2× player radius. */
+export const DOORWAY_WALK_OVERLAP = 0.75;
+const ROOM_SEAM_INSET = 0.18;
+
+export function doorwayFloor(a, b) {
+  const fa = roomFloor(a.gx, a.gz);
+  const fb = roomFloor(b.gx, b.gz);
   if (a.gx === b.gx && Math.abs(a.gz - b.gz) === 1) {
-    const x = roomCenter(a.gx, a.gz).x;
-    const z = (roomCenter(a.gx, a.gz).z + roomCenter(b.gx, b.gz).z) / 2;
-    return { minX: x - 0.7, maxX: x + 0.7, minZ: z - 0.55, maxZ: z + 0.55 };
+    const north = a.gz > b.gz ? fa : fb;
+    const south = a.gz > b.gz ? fb : fa;
+    return {
+      minX: Math.max(fa.minX, fb.minX) + ROOM_SEAM_INSET,
+      maxX: Math.min(fa.maxX, fb.maxX) - ROOM_SEAM_INSET,
+      minZ: south.maxZ - DOORWAY_WALK_OVERLAP,
+      maxZ: north.minZ + DOORWAY_WALK_OVERLAP,
+    };
   }
   if (a.gz === b.gz && Math.abs(a.gx - b.gx) === 1) {
-    const z = roomCenter(a.gx, a.gz).z;
-    const x = (roomCenter(a.gx, a.gz).x + roomCenter(b.gx, b.gz).x) / 2;
-    return { minX: x - 0.55, maxX: x + 0.55, minZ: z - 0.7, maxZ: z + 0.7 };
+    const east = a.gx > b.gx ? fa : fb;
+    const west = a.gx > b.gx ? fb : fa;
+    return {
+      minX: west.maxX - DOORWAY_WALK_OVERLAP,
+      maxX: east.minX + DOORWAY_WALK_OVERLAP,
+      minZ: Math.max(fa.minZ, fb.minZ) + ROOM_SEAM_INSET,
+      maxZ: Math.min(fa.maxZ, fb.maxZ) - ROOM_SEAM_INSET,
+    };
   }
   return null;
 }
@@ -139,7 +155,7 @@ export function walkFloors(expansionIds = []) {
   const floors = cells.map((cell) => roomFloor(cell.gx, cell.gz));
   for (let i = 0; i < cells.length; i += 1) {
     for (let j = i + 1; j < cells.length; j += 1) {
-      const door = doorwayBetween(cells[i], cells[j]);
+      const door = doorwayFloor(cells[i], cells[j]);
       if (door) floors.push(door);
     }
   }

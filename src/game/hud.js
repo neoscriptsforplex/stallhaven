@@ -223,7 +223,7 @@ export function bindHud(root, state, world) {
               <button type="button" data-craft-qty="max" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>Max</button>
             </div>
           </article>
-        `;}
+        `;
       }).join('');
     }).join('');
   }

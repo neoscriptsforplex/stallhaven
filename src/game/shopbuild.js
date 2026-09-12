@@ -15,6 +15,7 @@ import {
   occupiedCells,
   padConnects,
   roomCenter,
+  doorwayFloor,
   wallVineMounts,
 } from './layout.js';
 import { initRatWander } from './rats.js';
@@ -338,12 +339,18 @@ function woodFloorMap() {
   return tex;
 }
 
+function markGround(mesh) {
+  mesh.userData.kind = 'ground';
+  return mesh;
+}
+
 function addFloor(root, center) {
   const base = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(ROOM_W, 0.08, ROOM_D),
     wood(0x5a3a22, 0.92),
   ));
   base.position.set(center.x, 0.04, center.z);
+  markGround(base);
   root.add(base);
   const plankW = 0.28;
   const count = Math.ceil(ROOM_D / plankW);
@@ -362,6 +369,7 @@ function addFloor(root, center) {
     ));
     const z = center.z - ROOM_D / 2 + plankW * 0.5 + i * plankW;
     plank.position.set(center.x, 0.085, z);
+    markGround(plank);
     root.add(plank);
   }
 }
@@ -1236,13 +1244,32 @@ export function buildShop(expansionIds = []) {
     if (isOrigin) addOriginDecor(root, c);
 
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(ROOM_W - 0.15, ROOM_D - 0.15),
+      new THREE.PlaneGeometry(ROOM_W, ROOM_D),
       pickMat(),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(c.x, 0.09, c.z);
     ground.userData.kind = 'ground';
     grounds.add(ground);
+  }
+
+  for (let i = 0; i < cells.length; i += 1) {
+    for (let j = i + 1; j < cells.length; j += 1) {
+      const door = doorwayFloor(cells[i], cells[j]);
+      if (!door) continue;
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(door.maxX - door.minX, door.maxZ - door.minZ),
+        pickMat(),
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(
+        (door.minX + door.maxX) / 2,
+        0.095,
+        (door.minZ + door.maxZ) / 2,
+      );
+      mesh.userData.kind = 'ground';
+      grounds.add(mesh);
+    }
   }
 
   const grass = gardenBox(expansionIds);

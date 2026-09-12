@@ -30,6 +30,9 @@ import {
   wallVineMounts,
   outdoorWalkFloors,
   playerWalkFloors,
+  doorwayFloor,
+  roomCenter,
+  roomFloor,
 } from './layout.js';
 import { FLOOR, isWalkable, shopObstacles } from './nav.js';
 import { SHOP } from './catalog.js';
@@ -178,6 +181,26 @@ describe('layout numbers', () => {
     assert.ok(Math.abs(side.x - 1.4) < 1e-9);
     assert.ok(Math.abs(along.z - 1.4) < 1e-9);
     assert.notEqual(along.z, side.z);
+  });
+
+  it('keeps side and rear expansion floors walkable through doorways', () => {
+    const right = walkFloors(['right']);
+    const back = walkFloors(['back']);
+    const rightCenter = roomCenter(1, 0);
+    const backCenter = roomCenter(0, -1);
+    assert.equal(isWalkable(rightCenter.x, rightCenter.z, [], 0.28, right), true);
+    assert.equal(isWalkable(backCenter.x, backCenter.z, [], 0.28, back), true);
+    const sideDoor = doorwayFloor({ gx: 0, gz: 0 }, { gx: 1, gz: 0 });
+    const rearDoor = doorwayFloor({ gx: 0, gz: 0 }, { gx: 0, gz: -1 });
+    assert.ok(sideDoor);
+    assert.ok(rearDoor);
+    const shop = roomFloor(0, 0);
+    const east = roomFloor(1, 0);
+    const midX = (shop.maxX + east.minX) / 2;
+    assert.equal(isWalkable(midX, 0.1, [], 0.28, right), true, 'side doorway should fit the player');
+    const rear = roomFloor(0, -1);
+    const midZ = (shop.minZ + rear.maxZ) / 2;
+    assert.equal(isWalkable(0, midZ, [], 0.28, back), true, 'rear doorway should fit the player');
   });
 
   it('lets the player walk the grass and path outside the shop', () => {

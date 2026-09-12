@@ -95,4 +95,28 @@ describe('shop navigation', () => {
     const end = hatchPath[hatchPath.length - 1];
     assert.ok(Math.hypot(end.x - hatch.x, end.z - hatch.z) < 1.2);
   });
+
+  it('walks from the main shop onto side and rear expansion floors', () => {
+    const right = createState();
+    right.expansions = ['right'];
+    const rightPath = planPlayerWalk(
+      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+      { x: 8.2, z: 0.1 },
+      right,
+    );
+    assert.ok(rightPath.length >= 1, 'should path into the right expansion');
+    const endRight = rightPath[rightPath.length - 1];
+    assert.ok(endRight.x > 5, 'should finish inside the side room');
+
+    const back = createState();
+    back.expansions = ['back'];
+    const backPath = planPlayerWalk(
+      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+      { x: 0, z: -7 },
+      back,
+    );
+    assert.ok(backPath.length >= 1, 'should path into the rear expansion');
+    const endBack = backPath[backPath.length - 1];
+    assert.ok(endBack.z < -4, 'should finish inside the rear room');
+  });
 });

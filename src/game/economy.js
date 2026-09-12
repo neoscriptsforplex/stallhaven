@@ -304,7 +304,7 @@ export function craftBlockReason(state, recipeId) {
     return `Locked. Craft ${remain} more ${prev?.name ?? 'item'} first.`;
   }
   if (state.crafts[recipeId]) return `${recipe.name} is already in progress.`;
-  if (!isMaterialCraft(recipe) && !chestHasSpace(state)) return 'The chest is full.';
+  if (!isMaterialCraft(recipe) && !chestHasSpace(state, recipe.outputCount ?? 1)) return 'The chest is full.';
   const cost = recipeCost(recipe);
   if ((cost.gold || 0) > state.gold) return `Need ${formatGold(cost.gold)}g more.`;
   for (const [materialId, need] of Object.entries(cost.materials)) {
@@ -340,16 +340,68 @@ export function canCraft(state, recipeId) {
   return craftBlockReason(state, recipeId) == null;
 }
 
-export function startCraft(state, recipeId, nowSeconds) {
+/** How many more recipe actions can be paid for with current gold, mats, and chest space. */
+export function maxCraftActions(state, recipeId) {
   const recipe = RECIPES[recipeId];
-  if (!canCraft(state, recipeId)) return false;
+  if (!recipe) return 0;
+  if (recipe.category === 'potion' && !ownsCauldron(state)) return 0;
+  if (recipe.category === 'smelt' && !ownsFurnace(state)) return 0;
+  if (recipe.category === 'spin' && !ownsWheel(state)) return 0;
+  if (!isUnlocked(state, recipeId)) return 0;
   const cost = recipeCost(recipe);
-  state.gold -= cost.gold || 0;
-  for (const [materialId, need] of Object.entries(cost.materials)) {
-    state.materials[materialId] -= need;
+  let max = Infinity;
+  for (const [materialId, need] of Object.entries(cost.materials ?? {})) {
+    if (!need) continue;
+    max = Math.min(max, Math.floor((state.materials[materialId] ?? 0) / need));
   }
-  state.crafts[recipeId] = { startedAt: nowSeconds, duration: craftDuration(state, recipeId) };
-  return true;
+  if ((cost.gold || 0) > 0) {
+    max = Math.min(max, Math.floor(state.gold / cost.gold));
+  }
+  if (!isMaterialCraft(recipe)) {
+    const out = Math.max(1, recipe.outputCount ?? 1);
+    const reserved = (state.crafts[recipeId]?.left ?? 0) * out;
+    const free = chestCapacity(state) - chestTotal(state) - reserved;
+    max = Math.min(max, Math.floor(Math.max(0, free) / out));
+  }
+  if (!Number.isFinite(max)) return 0;
+  return Math.max(0, Math.floor(max));
+}
+
+function payCraftCost(state, recipe, times) {
+  const cost = recipeCost(recipe);
+  const n = Math.max(0, Math.round(Number(times) || 0));
+  state.gold -= (cost.gold || 0) * n;
+  for (const [materialId, need] of Object.entries(cost.materials ?? {})) {
+    state.materials[materialId] = (state.materials[materialId] ?? 0) - need * n;
+  }
+}
+
+export function startCraft(state, recipeId, nowSeconds) {
+  return startCraftBatch(state, recipeId, 1, nowSeconds) > 0;
+}
+
+/** Queue `want` actions (or as many as affordable). Returns how many were queued. */
+export function startCraftBatch(state, recipeId, want, nowSeconds) {
+  const recipe = RECIPES[recipeId];
+  if (!recipe) return 0;
+  const cap = maxCraftActions(state, recipeId);
+  const asked = want === Infinity || want === 'max' ? cap : Math.max(0, Math.round(Number(want) || 0));
+  const n = Math.min(cap, asked);
+  if (n < 1) return 0;
+  payCraftCost(state, recipe, n);
+  const existing = state.crafts[recipeId];
+  if (existing) {
+    existing.left = (existing.left ?? 1) + n;
+    existing.total = (existing.total ?? 1) + n;
+    return n;
+  }
+  state.crafts[recipeId] = {
+    startedAt: nowSeconds,
+    duration: craftDuration(state, recipeId),
+    left: n,
+    total: n,
+  };
+  return n;
 }
 
 export function craftProgress(state, recipeId, nowSeconds) {
@@ -357,7 +409,19 @@ export function craftProgress(state, recipeId, nowSeconds) {
   if (!craft) return null;
   const elapsed = nowSeconds - craft.startedAt;
   const left = Math.max(0, craft.duration - elapsed);
-  return { left, duration: craft.duration, t: Math.min(1, elapsed / craft.duration) };
+  const currentT = craft.duration > 0 ? Math.min(1, elapsed / craft.duration) : 1;
+  const remaining = craft.left ?? 1;
+  const total = Math.max(remaining, craft.total ?? remaining);
+  const done = Math.max(0, total - remaining);
+  return {
+    left,
+    duration: craft.duration,
+    t: total > 0 ? (done + currentT) / total : currentT,
+    currentT,
+    remaining,
+    total,
+    done,
+  };
 }
 
 export function chestCount(state, recipeId) {
@@ -375,9 +439,10 @@ export function chestList(state) {
     .sort((a, b) => a.recipe.name.localeCompare(b.recipe.name));
 }
 
-export function addToChest(state, recipeId) {
+export function addToChest(state, recipeId, amount = 1) {
   if (!RECIPES[recipeId]) return false;
-  state.chest[recipeId] = chestCount(state, recipeId) + 1;
+  const n = Math.max(1, Math.round(Number(amount) || 1));
+  state.chest[recipeId] = chestCount(state, recipeId) + n;
   if (state.ready) state.ready = chestReadyIds(state);
   return true;
 }
@@ -660,22 +725,40 @@ export function takeStock(state, recipeId) {
   return true;
 }
 
+function finishOneCraft(state, recipeId) {
+  const recipe = RECIPES[recipeId];
+  if (isMaterialCraft(recipe) && MATERIALS[recipe.outputMaterial]) {
+    const n = recipe.outputCount ?? 1;
+    state.materials[recipe.outputMaterial] = (state.materials[recipe.outputMaterial] ?? 0) + n;
+  } else {
+    addToChest(state, recipeId, recipe.outputCount ?? 1);
+  }
+  if (!state.craftCounts) state.craftCounts = {};
+  state.craftCounts[recipeId] = craftCount(state, recipeId) + 1;
+  grantShopXp(state, recipeId);
+}
+
 export function completeCrafts(state, nowSeconds) {
   const finished = [];
-  for (const [recipeId, craft] of Object.entries(state.crafts)) {
-    if (nowSeconds - craft.startedAt >= craft.duration) {
-      delete state.crafts[recipeId];
-      const recipe = RECIPES[recipeId];
-      if (isMaterialCraft(recipe) && MATERIALS[recipe.outputMaterial]) {
-        const n = recipe.outputCount ?? 1;
-        state.materials[recipe.outputMaterial] = (state.materials[recipe.outputMaterial] ?? 0) + n;
-      } else {
-        addToChest(state, recipeId);
-      }
-      if (!state.craftCounts) state.craftCounts = {};
-      state.craftCounts[recipeId] = craftCount(state, recipeId) + 1;
-      grantShopXp(state, recipeId);
+  for (const [recipeId, startCraftState] of Object.entries(state.crafts)) {
+    let craft = startCraftState;
+    while (craft && nowSeconds - craft.startedAt >= craft.duration) {
+      const finishAt = craft.startedAt + craft.duration;
+      finishOneCraft(state, recipeId);
       finished.push(recipeId);
+      const remaining = (craft.left ?? 1) - 1;
+      if (remaining > 0) {
+        craft = {
+          startedAt: finishAt,
+          duration: craftDuration(state, recipeId),
+          left: remaining,
+          total: craft.total ?? remaining + 1,
+        };
+        state.crafts[recipeId] = craft;
+      } else {
+        delete state.crafts[recipeId];
+        craft = null;
+      }
     }
   }
   if (finished.length) refreshShowcases(state);

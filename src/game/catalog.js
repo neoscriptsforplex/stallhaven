@@ -4,6 +4,8 @@ export const START_GOLD = 40;
 
 export const SHOP_MAX_LEVEL = 99;
 export const DEFAULT_SKYBOX = 'blue';
+/** Dungeon clear colour / fog, independent of the overworld Settings skybox. */
+export const DUNGEON_SKYBOX = 'dark-grey';
 export const SKYBOXES = [
   { id: 'white', label: 'White', color: 0xf4f4f0, fog: 0xeaeae4 },
   { id: 'black', label: 'Black', color: 0x0b0b0e, fog: 0x121218 },
@@ -12,6 +14,11 @@ export const SKYBOXES = [
   { id: 'light-grey', label: 'Light Grey', color: 0xc5c5ca, fog: 0xc5c5ca },
   { id: 'peach', label: 'Peach', color: 0xf4c49a, fog: 0xf0c4a0 },
 ];
+
+export function skyIdForScene(sceneMode, savedSky) {
+  if (sceneMode === 'dungeon') return DUNGEON_SKYBOX;
+  return SKYBOXES.some((item) => item.id === savedSky) ? savedSky : DEFAULT_SKYBOX;
+}
 
 export const KING_ROALD_MIN = 10 * 60;
 export const KING_ROALD_MAX = 60 * 60;
@@ -105,7 +112,12 @@ export const ANVIL_TABS = [
 export const ANVIL_SUBTABS = [
   { id: 'weapon', label: 'Weapons' },
   { id: 'armour', label: 'Armour' },
+  { id: 'ammo', label: 'Ammo' },
+  { id: 'rune', label: 'Runes' },
 ];
+
+/** One anvil ammo recipe action puts this many units in the chest. */
+export const AMMO_BATCH = 20;
 
 /** @deprecated Food moved to the cooking range; anvil uses ANVIL_TABS. */
 export const CRAFT_TABS = ANVIL_TABS;
@@ -181,6 +193,7 @@ export const MATERIALS = {
   fish: { id: 'fish', name: 'Fish', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   herbs: { id: 'herbs', name: 'Herbs', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   water: { id: 'water', name: 'Water', restock: 2, start: 12, tier: 1, regenEvery: regenEvery(1) },
+  essence: { id: 'essence', name: 'Essence', restock: 3, start: 10, tier: 1, regenEvery: regenEvery(1) },
 };
 
 METALS.forEach((metal, index) => {
@@ -225,7 +238,18 @@ function addRecipe(recipe) {
   return recipe;
 }
 
-function metalLine({ piece, category, combatClass, buyers, extraMats = {}, gold0 = 0, time0 = 3, price0 = 10 }) {
+function metalLine({
+  piece,
+  category,
+  combatClass,
+  buyers,
+  extraMats = {},
+  gold0 = 0,
+  time0 = 3,
+  price0 = 10,
+  priceStep = 8,
+  outputCount = 1,
+}) {
   METALS.forEach((metal, index) => {
     const id = `${metal.id}_${piece.id}`;
     const previousId = index === 0 ? null : `${METALS[index - 1].id}_${piece.id}`;
@@ -248,9 +272,10 @@ function metalLine({ piece, category, combatClass, buyers, extraMats = {}, gold0
         gold: gold0 + index * 2,
       },
       time: time0 + index,
-      price: price0 + index * 8,
+      price: price0 + index * priceStep,
       buyers,
       tint: metal.tint,
+      outputCount,
     });
   });
 }
@@ -289,7 +314,6 @@ const RANGE_WEAPONS = [
   { id: 'crossbow', name: 'Crossbow', slot: 'bow', shape: 'crossbow', extra: { logs: 1, bow_string: 1 } },
   { id: 'knives', name: 'Knives', slot: 'thrown', shape: 'knives' },
   { id: 'thrownaxe', name: 'Thrown Axe', slot: 'thrown', shape: 'thrownaxe' },
-  { id: 'arrows', name: 'Arrows', slot: 'ammo', shape: 'arrows', extra: { logs: 1 } },
 ];
 
 for (const piece of RANGE_WEAPONS) {
@@ -301,6 +325,42 @@ for (const piece of RANGE_WEAPONS) {
     extraMats: piece.extra ?? {},
   });
 }
+
+// Ammo uses Runite naming to match Runite Bar / Runite gear. One craft is 20 units.
+metalLine({
+  piece: { id: 'arrows', name: 'Arrows', slot: 'ammo', shape: 'arrows' },
+  category: 'ammo',
+  combatClass: 'range',
+  buyers: ['ranger'],
+  extraMats: { logs: 1 },
+  time0: 3,
+  price0: 2,
+  priceStep: 1,
+  outputCount: AMMO_BATCH,
+});
+
+// Single-tier cannonballs: Steel Bar only (not a metal ladder). Same ×20 batch as arrows.
+addRecipe({
+  id: 'cannonballs',
+  name: 'Cannonballs',
+  category: 'ammo',
+  combatClass: 'range',
+  slot: 'ammo',
+  shape: 'cannonballs',
+  setKey: 'cannon',
+  lineId: 'range-cannonballs',
+  lineName: 'Cannonballs',
+  lineIndex: 0,
+  previousId: null,
+  unlockNeed: 0,
+  tier: 3,
+  cost: { materials: { steel_bar: 1 }, gold: 0 },
+  time: 5,
+  price: 3,
+  buyers: ['ranger', 'mercenary'],
+  tint: 0xc5ccd4,
+  outputCount: AMMO_BATCH,
+});
 
 const DHIDE_PIECES = [
   { id: 'coif', name: 'Coif', slot: 'helm', shape: 'dhide_coif' },
@@ -400,6 +460,40 @@ MAGIC_SETS.forEach((set, index) => {
   }
 });
 
+/** Air → Earth → Water → Fire. Same 20 / 30 / +10 unlock ladder as weapon lines. */
+const RUNE_LINE = [
+  { id: 'air_rune', name: 'Air Rune', mark: 'air', tint: 0xf4f4f0 },
+  { id: 'earth_rune', name: 'Earth Rune', mark: 'earth', tint: 0x8a5a32 },
+  { id: 'water_rune', name: 'Water Rune', mark: 'water', tint: 0x3a7ec8 },
+  { id: 'fire_rune', name: 'Fire Rune', mark: 'fire', tint: 0xc42a22 },
+];
+
+RUNE_LINE.forEach((rune, index) => {
+  const previousId = index === 0 ? null : RUNE_LINE[index - 1].id;
+  addRecipe({
+    id: rune.id,
+    name: rune.name,
+    category: 'rune',
+    combatClass: 'magic',
+    slot: 'rune',
+    shape: 'rune',
+    runeMark: rune.mark,
+    setKey: 'runes',
+    lineId: 'magic-runes',
+    lineName: 'Runes',
+    lineIndex: index,
+    previousId,
+    unlockNeed: unlockNeed(index),
+    tier: index + 1,
+    cost: { materials: { essence: 1 }, gold: 0 },
+    time: 3 + index,
+    price: 6 + index * 2,
+    buyers: ['hedgemage', 'pilgrim', 'mercenary', 'ranger'],
+    tint: rune.tint,
+    shelfItem: true,
+  });
+});
+
 const FOOD_LINE = [
   { id: 'bread', name: 'Bread', mats: { flour: 1 }, tint: 0xc4a05a, time: 3, price: 8 },
   { id: 'pizza', name: 'Pizza', mats: { flour: 1, pineapple: 1 }, tint: 0xd4a04a, time: 4, price: 14 },
@@ -453,14 +547,14 @@ addFoodLine(FOOD_LINE, 'food-bake', 'Kitchen', 'kitchen');
 addFoodLine(FEAST_LINE, 'food-feast', 'Feast', 'feast', 'bread');
 
 const POTION_LINE = [
-  { id: 'strength_potion', name: 'Strength Potion', tint: 0xe8d24a, buyers: ['mercenary'] },
-  { id: 'prayer_potion', name: 'Prayer Potion', tint: 0x3ec8c4, buyers: ['pilgrim', 'hedgemage'] },
-  { id: 'attack_potion', name: 'Attack Potion', tint: 0x40c8c0, buyers: ['mercenary'] },
-  { id: 'anti_poison_potion', name: 'Anti Poison Potion', tint: 0x8ee53f, buyers: ['mercenary', 'ranger'] },
-  { id: 'ranging_potion', name: 'Ranging Potion', tint: 0x87ceeb, buyers: ['ranger'] },
-  { id: 'antifire_potion', name: 'Antifire Potion', tint: 0x8a4ec8, buyers: ['mercenary', 'ranger'] },
-  { id: 'energy_potion', name: 'Energy Potion', tint: 0xe87aa8, buyers: ['pilgrim', 'ranger'] },
-  { id: 'magic_potion', name: 'Magic Potion', tint: 0xf4c49a, buyers: ['hedgemage'] },
+  { id: 'strength_potion', name: 'Strength Potion', tint: 0xe8d24a, buyers: ['mercenary'], price: 1000 },
+  { id: 'prayer_potion', name: 'Prayer Potion', tint: 0x3ec8c4, buyers: ['pilgrim', 'hedgemage'], price: 1500 },
+  { id: 'attack_potion', name: 'Attack Potion', tint: 0x40c8c0, buyers: ['mercenary'], price: 2250 },
+  { id: 'anti_poison_potion', name: 'Anti Poison Potion', tint: 0x8ee53f, buyers: ['mercenary', 'ranger'], price: 3500 },
+  { id: 'ranging_potion', name: 'Ranging Potion', tint: 0x87ceeb, buyers: ['ranger'], price: 5000 },
+  { id: 'antifire_potion', name: 'Antifire Potion', tint: 0x8a4ec8, buyers: ['mercenary', 'ranger'], price: 7500 },
+  { id: 'energy_potion', name: 'Energy Potion', tint: 0xe87aa8, buyers: ['pilgrim', 'ranger'], price: 11000 },
+  { id: 'magic_potion', name: 'Magic Potion', tint: 0xf4c49a, buyers: ['hedgemage'], price: 16000 },
 ];
 
 POTION_LINE.forEach((potion, index) => {
@@ -484,7 +578,7 @@ POTION_LINE.forEach((potion, index) => {
       gold: 0,
     },
     time: 4 + index,
-    price: 12 + index * 6,
+    price: potion.price,
     buyers: potion.buyers,
     tint: potion.tint,
     shelfItem: true,
@@ -492,6 +586,7 @@ POTION_LINE.forEach((potion, index) => {
 });
 
 METALS.forEach((metal, index) => {
+  const previousId = index === 0 ? null : `smelt_${METALS[index - 1].id}`;
   addRecipe({
     id: `smelt_${metal.id}`,
     name: `${metal.name} Bar`,
@@ -503,8 +598,8 @@ METALS.forEach((metal, index) => {
     lineId: 'smelt-bars',
     lineName: 'Metal Bars',
     lineIndex: index,
-    previousId: null,
-    unlockNeed: 0,
+    previousId,
+    unlockNeed: unlockNeed(index),
     tier: index + 1,
     cost: { materials: { [metal.id]: 1 }, gold: 0 },
     time: 3 + index,
@@ -544,7 +639,13 @@ export const CUSTOMERS = {
     id: 'pilgrim',
     name: 'Pilgrim',
     combatClass: null,
-    prefers: [...FOOD_LINE.map((food) => food.id), ...FEAST_LINE.map((food) => food.id), 'prayer_potion', 'energy_potion'],
+    prefers: [
+      ...FOOD_LINE.map((food) => food.id),
+      ...FEAST_LINE.map((food) => food.id),
+      'prayer_potion',
+      'energy_potion',
+      ...RUNE_LINE.map((rune) => rune.id),
+    ],
     patient: true,
     leaveIfEmpty: false,
     robe: 0xc8b48a,
@@ -556,7 +657,11 @@ export const CUSTOMERS = {
     name: 'Mercenary',
     combatClass: 'melee',
     prefers: Object.values(RECIPES)
-      .filter((recipe) => recipe.combatClass === 'melee' || ['strength_potion', 'attack_potion', 'anti_poison_potion', 'antifire_potion'].includes(recipe.id))
+      .filter((recipe) => (
+        recipe.combatClass === 'melee'
+        || recipe.category === 'rune'
+        || ['strength_potion', 'attack_potion', 'anti_poison_potion', 'antifire_potion'].includes(recipe.id)
+      ))
       .map((recipe) => recipe.id),
     patient: false,
     leaveIfEmpty: true,
@@ -569,7 +674,11 @@ export const CUSTOMERS = {
     name: 'Ranger',
     combatClass: 'range',
     prefers: Object.values(RECIPES)
-      .filter((recipe) => recipe.combatClass === 'range' || ['ranging_potion', 'antifire_potion', 'energy_potion', 'anti_poison_potion'].includes(recipe.id))
+      .filter((recipe) => (
+        recipe.combatClass === 'range'
+        || recipe.category === 'rune'
+        || ['ranging_potion', 'antifire_potion', 'energy_potion', 'anti_poison_potion'].includes(recipe.id)
+      ))
       .map((recipe) => recipe.id),
     patient: true,
     leaveIfEmpty: false,
@@ -668,7 +777,7 @@ export function nearestShelfSlot(localX, localY, localZ = 0) {
 }
 
 export function isShelfItem(recipe) {
-  return Boolean(recipe?.shelfItem || recipe?.category === 'food' || recipe?.category === 'potion');
+  return Boolean(recipe?.shelfItem || recipe?.category === 'food' || recipe?.category === 'potion' || recipe?.category === 'rune');
 }
 
 export function stationForRecipe(recipe) {
@@ -691,7 +800,10 @@ export function anvilTabForRecipe(recipe) {
 }
 
 export function anvilSubtabForRecipe(recipe) {
-  return recipe?.category === 'armour' ? 'armour' : 'weapon';
+  if (recipe?.category === 'armour') return 'armour';
+  if (recipe?.category === 'ammo') return 'ammo';
+  if (recipe?.category === 'rune') return 'rune';
+  return 'weapon';
 }
 
 export function recipeList() {
@@ -723,7 +835,7 @@ export function recipesForTab(tabId, subtabId = null) {
   if (tabId === 'spin') return recipeList().filter((recipe) => recipe.category === 'spin');
   const combatClass = tabId === 'ranged' ? 'range' : tabId;
   const list = recipeList().filter((recipe) => recipe.combatClass === combatClass);
-  if (subtabId === 'weapon' || subtabId === 'armour') {
+  if (subtabId === 'weapon' || subtabId === 'armour' || subtabId === 'ammo' || subtabId === 'rune') {
     return list.filter((recipe) => recipe.category === subtabId);
   }
   return list;
@@ -756,7 +868,10 @@ export function costLabel(recipe, duration = recipe?.time) {
   const gold = cost.gold ? ` + ${formatGold(cost.gold)}g` : '';
   const time = Number.isFinite(duration) ? duration : recipe.time;
   const timeText = Number.isInteger(time) ? `${time}s` : `${time.toFixed(1)}s`;
-  return `${mats}${gold} · ${timeText} · sells ${formatGold(recipe.price)}g`;
+  const yieldText = (recipe.outputCount ?? 1) > 1 && !recipe.outputMaterial
+    ? ` · ×${recipe.outputCount}`
+    : '';
+  return `${mats}${gold}${yieldText} · ${timeText} · sells ${formatGold(recipe.price)}g`;
 }
 
 /** Offer/trade class: melee, ranged, magic, food, or potion. */
@@ -781,7 +896,8 @@ export function offerClassLabel(cls) {
 
 export function classLabel(combatClass, category = null) {
   if (category === 'potion') return 'Potion';
-  if (category === 'food' || (!combatClass && category !== 'weapon' && category !== 'armour')) return 'Food';
+  if (category === 'rune') return 'Magic';
+  if (category === 'food' || (!combatClass && category !== 'weapon' && category !== 'armour' && category !== 'ammo' && category !== 'rune')) return 'Food';
   if (combatClass === 'melee') return 'Melee';
   if (combatClass === 'range') return 'Ranged';
   if (combatClass === 'magic') return 'Magic';

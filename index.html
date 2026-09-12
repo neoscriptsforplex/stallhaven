@@ -48,7 +48,7 @@
         <h2>Help</h2>
         <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the anvil, furnace, range, chest, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. Double-click a highlighted cell to confirm a new table, mannequin, spinning wheel, or cauldron. Scroll to zoom out for the roof and garden.</p>
         <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back.</p>
-        <p>Click the anvil to smith Melee, Magic, or Ranged (Weapons and Armour) from metal bars. The starting shop already has a furnace beside the anvil — click it to smelt ores into bars. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Click the cooking range for Food. Click a placed cauldron for Potions. Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
+        <p>Click the anvil to smith Melee, Magic, or Ranged. Ranged has Weapons, Armour, and Ammo (arrows and cannonballs). Magic has Weapons, Armour, and Runes. Weapons and armour use metal bars. Each craft row has 1×, 5×, and Max — those count recipe actions (one arrow craft still makes 20). The starting shop already has a furnace beside the anvil — click it to smelt ores into bars. Higher bars unlock after enough smelts of the previous tier. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Click the cooking range for Food. Click a placed cauldron for Potions. Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
         <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Right-click furniture for Move or Rotate — wares travel with the piece. The counter only moves from a right-click.</p>
         <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist you upload — Shuffle, Play, Pause, Skip, and Stop. The cog beside it opens Settings for the skybox, player look, and cheat codes. Upload a .glb as Furniture, Ware, Player, or Customer.</p>
@@ -84,7 +84,14 @@
         <div id="craft-tabs" class="tabs"></div>
         <div id="craft-subtabs" class="tabs subtabs" hidden></div>
         <p data-craft-note class="craft-note" hidden></p>
-        <div id="crafts"></div>
+        <div class="craft-body">
+          <div id="crafts"></div>
+          <aside class="craft-preview-pane">
+            <canvas data-craft-preview width="220" height="220" aria-label="Item preview"></canvas>
+            <p data-craft-preview-name class="meta">Select or hover a recipe.</p>
+            <p class="meta craft-qty-hint">1× / 5× / Max count craft actions. Ammo makes 20 per action.</p>
+          </aside>
+        </div>
         <div id="materials" class="craft-mats" aria-label="Materials"></div>
         <button type="button" class="ghost" data-craft-close>Close</button>
       </div>
@@ -219,7 +226,14 @@
         <h2>Cauldron</h2>
         <p>Brew potions from herbs and water. Finished vials land in the chest and sit on wall shelves.</p>
         <p data-potion-note class="craft-note" hidden></p>
-        <div id="potion-crafts"></div>
+        <div class="craft-body">
+          <div id="potion-crafts"></div>
+          <aside class="craft-preview-pane">
+            <canvas data-potion-preview width="220" height="220" aria-label="Potion preview"></canvas>
+            <p data-potion-preview-name class="meta">Select or hover a potion.</p>
+            <p class="meta craft-qty-hint">1× / 5× / Max brew as many vials as herbs and water allow.</p>
+          </aside>
+        </div>
         <div id="potion-materials" class="craft-mats" aria-label="Materials"></div>
         <button type="button" class="ghost" data-potion-close>Close</button>
       </div>

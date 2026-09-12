@@ -18,6 +18,11 @@ import {
   unlockNeed,
   CRAFT_TABS,
   ANVIL_SUBTABS,
+  AMMO_BATCH,
+  DUNGEON_SKYBOX,
+  skyIdForScene,
+  anvilSubtabForRecipe,
+  costLabel,
   nearestShelfSlot,
   SHELF_SLOT_COUNT,
   SHELF_SLOT_LABELS,
@@ -59,11 +64,14 @@ import {
   ownsWheel,
   placeFromChest,
   placeOnDisplay,
+  reducedSalePrice,
   restock,
   sellToCustomer,
   serializeState,
   shopProgress,
+  maxCraftActions,
   startCraft,
+  startCraftBatch,
   swapOffer,
   tickMaterials,
   unlockRemaining,
@@ -71,6 +79,7 @@ import {
 } from './economy.js';
 import { furnaceBesideAnvil } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
+import { DUNGEON_REMAINS } from './shopbuild.js';
 
 function finishCraft(state, recipeId, at = 0) {
   const recipe = RECIPES[recipeId];
@@ -101,6 +110,7 @@ describe('stall economy', () => {
     assert.equal(state.materials.hide, 8);
     assert.equal(state.materials.herbs, 8);
     assert.equal(state.materials.water, 12);
+    assert.equal(state.materials.essence, 10);
     assert.equal(state.materials.string, undefined);
     assert.equal(MATERIALS.string, undefined);
   });
@@ -220,6 +230,10 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'staff'), true);
     assert.equal(isUnlocked(state, 'blue_dhide_body'), true);
     assert.equal(isUnlocked(state, 'bread'), true);
+    assert.equal(isUnlocked(state, 'air_rune'), true);
+    assert.equal(isUnlocked(state, 'earth_rune'), false);
+    assert.equal(isUnlocked(state, 'smelt_bronze'), true);
+    assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
     assert.equal(isUnlocked(state, 'mystic_staff'), false);
     assert.equal(isUnlocked(state, 'green_dhide_body'), false);
@@ -456,7 +470,9 @@ describe('catalog', () => {
     assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'armour').length, 56);
     assert.equal(recipes.filter((r) => r.shape?.startsWith('staff')).length, 5);
     assert.equal(recipes.filter((r) => r.combatClass === 'magic' && r.category === 'armour').length, 25);
-    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 42);
+    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 35);
+    assert.equal(recipes.filter((r) => r.category === 'ammo').length, 8);
+    assert.equal(recipes.filter((r) => r.category === 'rune').length, 4);
     assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 20);
     assert.equal(RECIPES.blue_dhide_coif.name, "Blue D'hide Coif");
     assert.equal(RECIPES.black_dhide_coif.slot, 'helm');
@@ -549,7 +565,7 @@ describe('catalog', () => {
 
   it('groups anvil recipes by melee, magic, and ranged with weapons and armour subtabs', () => {
     assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged']);
-    assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour']);
+    assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Runes']);
     const melee = recipesForTab('melee');
     const meleeWeapons = recipesForTab('melee', 'weapon');
     const meleeArmour = recipesForTab('melee', 'armour');
@@ -1057,6 +1073,176 @@ describe('ores, appearance, king, and chest bin', () => {
     assert.equal(buyExpansion(state, 'back'), true);
     assert.equal(state.displays[center].removed, true);
     assert.equal(chestCount(state, 'bread'), 2);
+  });
+});
+
+describe('furnace bar unlocks', () => {
+  it('unlocks iron after 20 bronze smelts, then steel after 30 iron smelts', () => {
+    const state = createState();
+    assert.equal(isUnlocked(state, 'smelt_bronze'), true);
+    assert.equal(isUnlocked(state, 'smelt_iron'), false);
+    assert.equal(unlockRemaining(state, 'smelt_iron'), 20);
+    state.materials.bronze = 40;
+    for (let i = 0; i < 19; i += 1) finishCraft(state, 'smelt_bronze', i);
+    assert.equal(isUnlocked(state, 'smelt_iron'), false);
+    finishCraft(state, 'smelt_bronze', 20);
+    assert.equal(state.craftCounts.smelt_bronze, 20);
+    assert.equal(isUnlocked(state, 'smelt_iron'), true);
+    assert.equal(isUnlocked(state, 'smelt_steel'), false);
+    state.materials.iron = 40;
+    state.craftCounts.smelt_iron = 29;
+    finishCraft(state, 'smelt_iron');
+    assert.equal(isUnlocked(state, 'smelt_steel'), true);
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.craftCounts.smelt_bronze, 20);
+    assert.equal(isUnlocked(next, 'smelt_iron'), true);
+    assert.equal(isUnlocked(createState(), 'smelt_iron'), false);
+  });
+});
+
+describe('ranged ammo', () => {
+  it('puts arrows and cannonballs on the ammo subtab and crafts twenty at a time', () => {
+    const weapons = recipesForTab('ranged', 'weapon');
+    const ammo = recipesForTab('ranged', 'ammo');
+    assert.ok(!weapons.some((r) => r.id === 'bronze_arrows'));
+    assert.ok(ammo.every((r) => r.category === 'ammo'));
+    assert.ok(ammo.some((r) => r.id === 'bronze_arrows'));
+    assert.ok(ammo.some((r) => r.id === 'runite_arrows'));
+    assert.equal(RECIPES.runite_arrows.name, 'Runite Arrows');
+    assert.ok(ammo.some((r) => r.id === 'cannonballs'));
+    assert.equal(RECIPES.bronze_arrows.outputCount, AMMO_BATCH);
+    assert.equal(RECIPES.cannonballs.outputCount, AMMO_BATCH);
+    assert.equal(recipeCost(RECIPES.bronze_arrows).materials.bronze_bar, 1);
+    assert.equal(recipeCost(RECIPES.bronze_arrows).materials.logs, 1);
+    assert.equal(recipeCost(RECIPES.cannonballs).materials.steel_bar, 1);
+    assert.equal(anvilSubtabForRecipe(RECIPES.bronze_arrows), 'ammo');
+    const state = createState();
+    state.materials.bronze_bar = 1;
+    state.materials.logs = 2;
+    finishCraft(state, 'bronze_arrows');
+    assert.equal(state.chest.bronze_arrows, 20);
+    assert.equal(state.craftCounts.bronze_arrows, 1);
+    assert.equal(isUnlocked(state, 'iron_arrows'), false);
+    state.craftCounts.bronze_arrows = 20;
+    assert.equal(isUnlocked(state, 'iron_arrows'), true);
+    assert.match(costLabel(RECIPES.bronze_arrows), /×20/);
+    assert.match(costLabel(RECIPES.bronze_arrows), /sells 2g/);
+  });
+});
+
+describe('magic runes', () => {
+  it('unlocks Air then Earth then Water then Fire on the weapon craft-count ladder', () => {
+    const runes = recipesForTab('magic', 'rune');
+    assert.deepEqual(runes.map((r) => r.id), ['air_rune', 'earth_rune', 'water_rune', 'fire_rune']);
+    assert.equal(anvilSubtabForRecipe(RECIPES.air_rune), 'rune');
+    const state = createState();
+    assert.equal(isUnlocked(state, 'air_rune'), true);
+    assert.equal(isUnlocked(state, 'earth_rune'), false);
+    assert.equal(unlockRemaining(state, 'earth_rune'), 20);
+    state.materials.essence = 80;
+    for (let i = 0; i < 19; i += 1) finishCraft(state, 'air_rune', i);
+    assert.equal(isUnlocked(state, 'earth_rune'), false);
+    finishCraft(state, 'air_rune', 20);
+    assert.equal(state.chest.air_rune, 20);
+    assert.equal(state.craftCounts.air_rune, 20);
+    assert.equal(isUnlocked(state, 'earth_rune'), true);
+    assert.equal(isUnlocked(state, 'water_rune'), false);
+    state.craftCounts.earth_rune = 29;
+    finishCraft(state, 'earth_rune');
+    assert.equal(isUnlocked(state, 'water_rune'), true);
+    assert.equal(isUnlocked(state, 'fire_rune'), false);
+    state.craftCounts.water_rune = 40;
+    assert.equal(isUnlocked(state, 'fire_rune'), true);
+    assert.ok(CUSTOMERS.hedgemage.prefers.includes('air_rune'));
+    assert.ok(CUSTOMERS.pilgrim.prefers.includes('fire_rune'));
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.craftCounts.air_rune, 20);
+    assert.equal(isUnlocked(next, 'earth_rune'), true);
+  });
+});
+
+describe('potion sell prices', () => {
+  it('starts at 1,000g and climbs by rarity, with comma labels and offer markdown', () => {
+    const prices = [
+      RECIPES.strength_potion.price,
+      RECIPES.prayer_potion.price,
+      RECIPES.attack_potion.price,
+      RECIPES.anti_poison_potion.price,
+      RECIPES.ranging_potion.price,
+      RECIPES.antifire_potion.price,
+      RECIPES.energy_potion.price,
+      RECIPES.magic_potion.price,
+    ];
+    assert.equal(prices[0], 1000);
+    for (let i = 1; i < prices.length; i += 1) {
+      assert.ok(prices[i] > prices[i - 1], `${i} should sell for more`);
+    }
+    assert.match(costLabel(RECIPES.strength_potion), /sells 1,000g/);
+    assert.match(costLabel(RECIPES.magic_potion), /sells 16,000g/);
+    const ask = decideRequest('hedgemage', () => 0.9, createState());
+    if (ask.recipeId === 'magic_potion' || RECIPES[ask.recipeId]?.category === 'potion') {
+      assert.equal(ask.gold, RECIPES[ask.recipeId].price);
+    }
+    assert.equal(reducedSalePrice(RECIPES.strength_potion.price), 650);
+    const state = createState();
+    state.gold = 20000;
+    state.furniture.cauldron = { x: 0, z: 0, rot: 0 };
+    finishCraft(state, 'strength_potion');
+    const offer = offerChoices(state, 'prayer_potion')[0];
+    assert.equal(offer.recipeId, 'strength_potion');
+    assert.equal(offer.listPrice, 1000);
+    assert.equal(offer.gold, 650);
+  });
+});
+
+describe('craft batches', () => {
+  it('queues five affordable crafts and finishes them in sequence', () => {
+    const state = createState();
+    state.materials.bronze_bar = 8;
+    assert.equal(maxCraftActions(state, 'bronze_sword'), 8);
+    assert.equal(startCraftBatch(state, 'bronze_sword', 5, 0), 5);
+    assert.equal(state.materials.bronze_bar, 3);
+    assert.equal(state.crafts.bronze_sword.left, 5);
+    assert.equal(state.chest.bronze_sword, undefined);
+    assert.deepEqual(completeCrafts(state, 2.9), []);
+    assert.deepEqual(completeCrafts(state, 3), ['bronze_sword']);
+    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.crafts.bronze_sword.left, 4);
+    assert.deepEqual(completeCrafts(state, 3 + RECIPES.bronze_sword.time * 4), [
+      'bronze_sword', 'bronze_sword', 'bronze_sword', 'bronze_sword',
+    ]);
+    assert.equal(state.chest.bronze_sword, 5);
+    assert.equal(state.crafts.bronze_sword, undefined);
+    assert.equal(state.craftCounts.bronze_sword, 5);
+  });
+
+  it('caps Max by materials and does not craft locked tiers', () => {
+    const state = createState();
+    state.materials.bronze_bar = 2;
+    state.materials.logs = 40;
+    assert.equal(maxCraftActions(state, 'bronze_arrows'), 2);
+    assert.equal(startCraftBatch(state, 'bronze_arrows', 'max', 0), 2);
+    assert.equal(completeCrafts(state, 100).length, 2);
+    assert.equal(state.chest.bronze_arrows, 40);
+    assert.equal(state.craftCounts.bronze_arrows, 2);
+    assert.equal(maxCraftActions(state, 'iron_arrows'), 0);
+    assert.equal(startCraftBatch(state, 'iron_arrows', 5, 0), 0);
+  });
+});
+
+describe('dungeon sky and remains', () => {
+  it('uses dark grey inside the dungeon and restores the saved overworld sky', () => {
+    assert.equal(DUNGEON_SKYBOX, 'dark-grey');
+    assert.equal(skyIdForScene('dungeon', 'peach'), 'dark-grey');
+    assert.equal(skyIdForScene('shop', 'peach'), 'peach');
+    assert.equal(skyIdForScene('shop', 'nope'), 'blue');
+    assert.ok(DUNGEON_REMAINS.length >= 8);
+    assert.ok(DUNGEON_REMAINS.some((spot) => spot.kind === 'slump'));
+    assert.ok(DUNGEON_REMAINS.some((spot) => spot.kind === 'pile'));
   });
 });
 

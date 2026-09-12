@@ -79,6 +79,77 @@ function cobbleMap() {
   return tex;
 }
 
+function woodPlankMap(seed = 4211) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#8a5a30';
+  ctx.fillRect(0, 0, 256, 256);
+  let s = seed;
+  const rand = () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+  const boards = 5;
+  const boardH = 256 / boards;
+  for (let i = 0; i < boards; i += 1) {
+    const y = i * boardH;
+    const warm = 118 + Math.floor(rand() * 46);
+    ctx.fillStyle = `rgb(${warm + 18}, ${Math.floor(warm * 0.62)}, ${Math.floor(warm * 0.28)})`;
+    ctx.fillRect(0, y, 256, boardH);
+    for (let g = 0; g < 10; g += 1) {
+      const gy = y + 5 + rand() * (boardH - 10);
+      ctx.strokeStyle = `rgba(42, 22, 10, ${0.16 + rand() * 0.28})`;
+      ctx.lineWidth = 0.7 + rand() * 1.6;
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.bezierCurveTo(
+        70,
+        gy + (rand() - 0.5) * 7,
+        170,
+        gy + (rand() - 0.5) * 7,
+        256,
+        gy,
+      );
+      ctx.stroke();
+    }
+    if (rand() > 0.4) {
+      const kx = 18 + rand() * 220;
+      const ky = y + boardH * (0.28 + rand() * 0.44);
+      ctx.fillStyle = 'rgba(48, 26, 12, 0.5)';
+      ctx.beginPath();
+      ctx.ellipse(kx, ky, 3.5 + rand() * 4, 2.2 + rand() * 2, rand() * Math.PI, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(30, 16, 8, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(22, 12, 6, 0.78)';
+    ctx.fillRect(0, y, 256, 4);
+    ctx.fillStyle = 'rgba(210, 160, 90, 0.22)';
+    ctx.fillRect(0, y + 4, 256, 2);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function plankWood(color, roughness = 0.86, repeatX = 1, repeatY = 1, seed = 4211) {
+  const map = woodPlankMap(seed);
+  map.repeat.set(repeatX, repeatY);
+  return new THREE.MeshStandardMaterial({
+    map,
+    color,
+    roughness,
+    metalness: 0.03,
+  });
+}
+
 function cobbleMat(repeatX, repeatY) {
   const map = cobbleMap();
   map.repeat.set(repeatX, repeatY);
@@ -727,12 +798,6 @@ export function buildShopkeeper(opts = {}) {
   skirt.scale.z = 0.74;
   skirt.position.set(0, 0.56, 0.02);
   group.add(skirt);
-  const strapL = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.34, 0.02), leather));
-  strapL.position.set(-0.08, 1.02, 0.1);
-  group.add(strapL);
-  const strapR = strapL.clone();
-  strapR.position.x = 0.08;
-  group.add(strapR);
   const belt = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.018, 6, 12), leather));
   belt.rotation.x = Math.PI / 2;
   belt.position.y = 0.68;
@@ -953,6 +1018,8 @@ export function buildWare(recipeId) {
     knives: () => addKnives(group, tint),
     thrownaxe: () => addThrownaxe(group, tint),
     arrows: () => addArrows(group, tint),
+    cannonballs: () => addCannonballs(group, tint),
+    rune: () => addRune(group, recipe?.runeMark ?? 'air', tint),
     dhide_coif: () => addDhideCoif(group, tint),
     dhide_body: () => addDhideBody(group, tint),
     dhide_chaps: () => addChaps(group, tint),
@@ -982,7 +1049,7 @@ export function buildWare(recipeId) {
     lump.position.y = 0.1;
     group.add(lump);
   }
-  if (recipe?.category === 'food' || recipe?.category === 'potion') group.scale.setScalar(0.55);
+  if (recipe?.category === 'food' || recipe?.category === 'potion' || recipe?.category === 'rune') group.scale.setScalar(0.55);
   group.userData.recipeId = recipeId;
   return group;
 }
@@ -1365,6 +1432,64 @@ function addHeldBow(parent, tint, scale = 0.85) {
   return bow;
 }
 
+function addCannonballs(group, tint) {
+  const steel = metal(tint);
+  for (const [x, z, y, s] of [
+    [-0.05, 0.02, 0.07, 1],
+    [0.05, -0.01, 0.07, 0.92],
+    [0.0, 0.06, 0.07, 0.88],
+    [0.0, 0.0, 0.14, 0.78],
+  ]) {
+    const ball = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055 * s, 10, 8), steel));
+    ball.position.set(x, y, z);
+    group.add(ball);
+  }
+}
+
+function addRune(group, mark, tint) {
+  const stone = new THREE.MeshStandardMaterial({
+    color: 0x8a8a90,
+    roughness: 0.55,
+    metalness: 0.18,
+  });
+  const disc = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.028, 20), stone));
+  disc.position.y = 0.05;
+  group.add(disc);
+  const ink = glow(tint);
+  const y = 0.068;
+  if (mark === 'air') {
+    for (const [sx, rot] of [[0.055, 0.4], [0.038, 1.8], [0.07, -1.1]]) {
+      const swirl = addShadow(new THREE.Mesh(new THREE.TorusGeometry(sx, 0.008, 6, 14, Math.PI * 1.15), ink));
+      swirl.rotation.x = Math.PI / 2;
+      swirl.rotation.z = rot;
+      swirl.position.y = y;
+      group.add(swirl);
+    }
+  } else if (mark === 'earth') {
+    for (const [x, w, rot] of [[-0.02, 0.11, 0.35], [0.015, 0.1, -0.2], [0.0, 0.08, 0.7]]) {
+      const wave = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w, 0.012, 0.018), ink));
+      wave.position.set(x, y, rot * 0.04);
+      wave.rotation.y = rot;
+      group.add(wave);
+    }
+  } else if (mark === 'water') {
+    const drop = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.038, 10, 8), ink));
+    drop.scale.set(0.85, 1.15, 0.85);
+    drop.position.set(0, y + 0.01, 0.01);
+    group.add(drop);
+    const tip = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.05, 8), ink));
+    tip.position.set(0, y + 0.04, 0.01);
+    group.add(tip);
+  } else {
+    for (const [x, h, lean] of [[0, 0.08, 0], [-0.03, 0.06, 0.35], [0.028, 0.055, -0.28]]) {
+      const flame = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.018, h, 6), ink));
+      flame.position.set(x, y + h * 0.35, 0);
+      flame.rotation.z = lean;
+      group.add(flame);
+    }
+  }
+}
+
 function addArrows(group, tint) {
   const wrap = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.12, 8), cloth(0x5a3a22)));
   wrap.position.y = 0.16;
@@ -1619,8 +1744,9 @@ function addPie(group, tint, filling) {
 export function buildChest() {
   const root = new THREE.Group();
   root.name = 'chest';
-  const oak = wood(0x6a4324, 0.8);
-  const dark = wood(0x3d2414, 0.78);
+  const oak = plankWood(0xc49a62, 0.88, 1, 1, 4211);
+  const dark = plankWood(0x7a4a28, 0.9, 1, 0.7, 5029);
+  const lidWood = plankWood(0xd2a86c, 0.86, 1, 1.15, 6113);
   const band = metal(0xb08a3c);
 
   const base = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.42, 0.62), oak));
@@ -1638,12 +1764,12 @@ export function buildChest() {
 
   const lid = new THREE.Group();
   lid.position.set(0, 0.48, -0.28);
-  const lidBoard = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.08, 0.62), oak));
+  const lidBoard = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.08, 0.62), lidWood));
   lidBoard.position.set(0, 0.04, 0.31);
   lid.add(lidBoard);
   const lidRound = addShadow(new THREE.Mesh(
     new THREE.CylinderGeometry(0.31, 0.31, 0.9, 12, 1, false, 0, Math.PI),
-    oak,
+    lidWood,
   ));
   lidRound.rotation.z = Math.PI / 2;
   lidRound.position.set(0, 0.08, 0.31);

@@ -21,7 +21,7 @@ To turn on the official GitHub Pages link (one time, free, no coding):
 ## How to play
 
 1. **Click the floor** to walk, including **behind the counter**. The camera follows you — scroll or `-` / `=` to zoom (zoom far out to see the **roof** and garden), arrow keys to change the angle. Customers still line up on the customer side of the counter.
-2. Click the **anvil** (left, behind the counter). Craft under **Melee**, **Magic**, or **Ranged**, then **Weapons** or **Armour**. Weapons and armour use **metal bars**, not raw ore. A **furnace** already sits beside the anvil — click it to smelt ores into bars. Click a **spinning wheel** to turn **Flax** into **Bow String** (required for every bow and crossbow). Click the compact **cooking range** for **Food**. Click a placed **cauldron** for **Potions**. Higher tiers stay locked until you craft enough of the previous item in that same line. A progress bar fills while a piece is working. Restock materials from inside the craft window.
+2. Click the **anvil** (left, behind the counter). Craft under **Melee**, **Magic**, or **Ranged**, then **Weapons** or **Armour**. **Ranged** also has **Ammo**. **Magic** also has **Runes**. Weapons and armour use **metal bars**, not raw ore. A **furnace** already sits beside the anvil — click it to smelt ores into bars (Bronze starts unlocked; Iron and up unlock after enough smelts of the previous bar). Click a **spinning wheel** to turn **Flax** into **Bow String** (required for every bow and crossbow). Click the compact **cooking range** for **Food**. Click a placed **cauldron** for **Potions**. Higher tiers stay locked until you craft enough of the previous item in that same line. Each recipe row has **1×**, **5×**, and **Max** (craft actions — ammo still makes 20 per action). A progress bar fills while a piece or batch is working. Restock materials from inside the craft window.
 3. Finished gear goes in the wooden **chest** (100 slots to start). Click the chest to see it. **Right-click** the chest for **Upgrade**, **Move**, or **Rotate**. **Right-click a table or wall shelf** and choose **Display item…** to place a chest ware. On a **shelf**, pick the item, then **Top Left**, **Top Right**, **Bottom Left**, or **Bottom Right**. If that slot is full, the old ware returns to the chest. Food and potions are small shelf items.
 4. Adventurers come through the **front door** and **line up at the counter**. The traveler at the front is who you trade with.
 5. **Click the traveler at the front** to open trade: **Sell** if you have the item, **Offer** a different chest item at a reduced price (click the item, then Confirm), **Craft** what they asked for on the anvil, range, furnace, spinning wheel, or cauldron, **Refuse** to send them off, or **Buy their goods** for a scrap of material.
@@ -38,6 +38,8 @@ The **?** button opens Help (click-to-walk, anvil, range, chest, and the rest of
 Each item line unlocks in order. Craft 20 of the first piece to open the next, then 30, then 40, 50, 60, 70.
 
 Example: 20 Bronze Swords unlock Iron Sword; 30 Iron Swords unlock Steel Sword.
+
+The furnace uses the same ladder for bars: Bronze Bar from the start; 20 Bronze Bars unlock Iron Bar; 30 Iron Bars unlock Steel Bar; then +10 each step.
 
 Potions unlock after a cauldron is placed, then 5 crafts of the previous vial.
 
@@ -63,7 +65,13 @@ Same seven metals for Shortbow, Longbow, Crossbow, Knives, Thrown Axe.
 
 Bows and crossbows also need **Bow String** (spun from Flax) plus logs.
 
+**Ammo** (Ranged sub-tab): metal **Arrows** (Bronze through Dragon; Runite Arrows match Runite Bar). One craft makes **20** arrows for 1 matching bar + 1 Logs. **Cannonballs** are a single Steel Bar recipe (not a metal ladder) that also makes 20, sellable to rangers and mercenaries.
+
 Dragonhide armour in Blue, Green, Red, Black: Body, Chaps, Vambraces, Boots.
+
+### Runes
+
+Anvil **Magic → Runes**. Grey discs with coloured marks, crafted from **Essence**. Unlock Air → Earth → Water → Fire on the same 20 / 30 / +10 ladder. Air starts unlocked. Hedge mages and other travelers may ask for them.
 
 ### Food
 
@@ -75,7 +83,7 @@ Cook these on the **range**, not the anvil. Food displays on wall shelves.
 
 ### Potions
 
-Brew on a placed **cauldron** from **Herbs** and **Water**: Strength (yellow), Prayer (aqua), Attack (turquoise), Anti Poison (lime), Ranging (light blue), Antifire (purple), Energy (pink), Magic (peach). Vials sit on wall shelves.
+Brew on a placed **cauldron** from **Herbs** and **Water**: Strength (yellow), Prayer (aqua), Attack (turquoise), Anti Poison (lime), Ranging (light blue), Antifire (purple), Energy (pink), Magic (peach). Sell prices start at **1,000g** for Strength and climb with rarity (Prayer 1,500g … Magic 16,000g). Vials sit on wall shelves.
 
 ## Shop upgrades
 

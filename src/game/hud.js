@@ -81,7 +81,9 @@ import {
   placeOnDisplay,
   sellToCustomer,
   shopProgress,
+  maxCraftActions,
   startCraft,
+  startCraftBatch,
   stationCost,
   unlockRemaining,
   upgradeChest,
@@ -98,6 +100,7 @@ import {
   STATION_UNLOCKS,
 } from './layout.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
+import { createCraftPreview } from './craftpreview.js';
 
 export function bindHud(root, state, world) {
   const goldEl = root.querySelector('#gold');
@@ -137,6 +140,9 @@ export function bindHud(root, state, world) {
   const musicFile = document.querySelector('#music-file');
   const fillModal = document.querySelector('#fill-modal');
   const fillItems = document.querySelector('#fill-items');
+  let craftPreview = null;
+  let potionPreview = null;
+  let lastPreviewAt = 0;
   let fillClass = 'melee';
   let selectedFillId = null;
   let fillTarget = null;
@@ -201,14 +207,22 @@ export function bindHud(root, state, world) {
         const mats = recipeMatsLabel(recipe);
         const focus = recipe.id === craftFocusId ? ' is-focus' : '';
         const star = mastered ? '<span class="mastery-star" title="Mastered">★</span>' : '';
+        const affordable = locked ? 0 : maxCraftActions(state, recipe.id);
         return `
-          <button type="button" class="craft${locked ? ' is-locked' : ''}${mastered ? ' is-mastered' : ''}${focus}" data-craft="${recipe.id}">
-            <strong>${star}${recipe.name}</strong>
-            <span class="meta">${lockText}</span>
-            ${mats ? `<span class="craft-mats-line">${mats}</span>` : ''}
-            <span class="timer" data-timer="${recipe.id}"></span>
-            <span class="craft-bar" aria-hidden="true"><i data-bar="${recipe.id}"></i></span>
-          </button>
+          <article class="craft-row${locked ? ' is-locked' : ''}${focus}" data-craft-row="${recipe.id}">
+            <button type="button" class="craft${locked ? ' is-locked' : ''}${mastered ? ' is-mastered' : ''}${focus}" data-craft="${recipe.id}">
+              <strong>${star}${recipe.name}</strong>
+              <span class="meta">${lockText}</span>
+              ${mats ? `<span class="craft-mats-line">${mats}</span>` : ''}
+              <span class="timer" data-timer="${recipe.id}"></span>
+              <span class="craft-bar" aria-hidden="true"><i data-bar="${recipe.id}"></i></span>
+            </button>
+            <div class="craft-qty">
+              <button type="button" data-craft-qty="1" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>1×</button>
+              <button type="button" data-craft-qty="5" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>5×</button>
+              <button type="button" data-craft-qty="max" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>Max</button>
+            </div>
+          </article>
         `;
       }).join('');
     }).join('');
@@ -241,23 +255,29 @@ export function bindHud(root, state, world) {
         : cauldronMode
           ? 'Brew potions from herbs and water. Finished vials land in the chest and sit on wall shelves.'
           : furnaceMode
-            ? 'Smelt ores into metal bars. Bars are used at the anvil for weapons and armour — they are not restocked for free.'
+            ? 'Smelt ores into metal bars. Bronze starts unlocked; higher bars need enough smelts of the previous tier. Bars are used at the anvil — they are not restocked for free.'
             : wheelMode
               ? 'Spin flax into bow string. Bows and crossbows need bow string; it is not restocked for free.'
-              : 'Work a ware here. Finished pieces land in the chest. Weapons and armour use metal bars. Bows and crossbows also need bow string.';
+              : 'Work a ware here. 1× / 5× / Max are craft actions (ammo makes 20 per action). Finished pieces land in the chest. Weapons, armour, and ammo use metal bars. Bows and crossbows also need bow string. Magic Runes use Essence.';
     }
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
       btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
     }
+    const showAmmo = !simpleStation && craftTab === 'ranged';
+    const showRunes = !simpleStation && craftTab === 'magic';
+    subtabsEl.classList.toggle('has-extra', showAmmo || showRunes);
     for (const btn of subtabsEl.querySelectorAll('[data-subtab]')) {
+      if (btn.dataset.subtab === 'ammo') btn.hidden = !showAmmo;
+      if (btn.dataset.subtab === 'rune') btn.hidden = !showRunes;
       btn.classList.toggle('is-on', btn.dataset.subtab === craftSubtab);
     }
     paintRecipeButtons(craftsEl, currentRecipes());
     if (potionCraftsEl) paintRecipeButtons(potionCraftsEl, recipesForTab('potion'));
     if (craftFocusId) {
+      showPreview(craftFocusId);
       requestAnimationFrame(() => {
-        const el = (cauldronMode ? potionCraftsEl : craftsEl)?.querySelector(`[data-craft="${craftFocusId}"]`)
-          ?? craftsEl.querySelector(`[data-craft="${craftFocusId}"]`);
+        const el = (cauldronMode ? potionCraftsEl : craftsEl)?.querySelector(`[data-craft-row="${craftFocusId}"]`)
+          ?? craftsEl.querySelector(`[data-craft-row="${craftFocusId}"]`);
         el?.scrollIntoView({ block: 'center' });
       });
     }
@@ -316,28 +336,77 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   });
 
-  function onCraftClick(event) {
-    const btn = event.target.closest('[data-craft]');
-    if (!btn) return;
-    const recipeId = btn.dataset.craft;
+  function showPreview(recipeId) {
+    const recipe = RECIPES[recipeId];
+    if (craftPreview) craftPreview.show(recipeId);
+    if (potionPreview) potionPreview.show(recipeId);
+    const label = recipe?.name ?? 'Select or hover a recipe.';
+    const craftName = craftModal.querySelector('[data-craft-preview-name]');
+    const potionName = potionModal.querySelector('[data-potion-preview-name]');
+    if (craftName) craftName.textContent = label;
+    if (potionName) potionName.textContent = label;
+  }
+
+  function queueCraft(recipeId, want) {
     craftFocusId = recipeId;
-    const reason = craftBlockReason(state, recipeId);
-    if (reason) {
+    showPreview(recipeId);
+    const affordable = maxCraftActions(state, recipeId);
+    if (affordable < 1) {
+      const reason = craftBlockReason(state, recipeId) || 'Nothing left to craft.';
       setCraftNote(reason);
+      const potionNote = potionModal.querySelector('[data-potion-note]');
+      if (potionNote && craftStation === 'cauldron') {
+        potionNote.hidden = false;
+        potionNote.textContent = reason;
+      }
       paintCrafts();
       render(performance.now() / 1000);
       return;
     }
-    if (startCraft(state, recipeId, performance.now() / 1000)) {
-      playClick('craft');
-      setCraftNote('');
-      pushLog(state, `Crafting ${RECIPES[recipeId].name}…`);
-      paintCrafts();
-      render(performance.now() / 1000);
+    const n = startCraftBatch(state, recipeId, want, performance.now() / 1000);
+    if (!n) return;
+    playClick('craft');
+    setCraftNote('');
+    const potionNote = potionModal.querySelector('[data-potion-note]');
+    if (potionNote) {
+      potionNote.hidden = true;
+      potionNote.textContent = '';
     }
+    const recipe = RECIPES[recipeId];
+    const batch = recipe?.outputCount > 1 && !recipe.outputMaterial
+      ? ` ×${n} (${n * recipe.outputCount} in the chest)`
+      : n > 1 ? ` ×${n}` : '';
+    pushLog(state, `Crafting ${recipe.name}${batch}…`);
+    paintCrafts();
+    render(performance.now() / 1000);
   }
+
+  function onCraftClick(event) {
+    const qty = event.target.closest('[data-craft-qty]');
+    if (qty) {
+      const recipeId = qty.dataset.craftFor;
+      const want = qty.dataset.craftQty === 'max' ? Infinity : Number(qty.dataset.craftQty);
+      queueCraft(recipeId, want);
+      return;
+    }
+    const btn = event.target.closest('[data-craft]');
+    if (!btn) return;
+    queueCraft(btn.dataset.craft, 1);
+  }
+
+  function onCraftHover(event) {
+    const row = event.target.closest('[data-craft-row]');
+    if (!row) return;
+    showPreview(row.dataset.craftRow);
+  }
+
   craftsEl.addEventListener('click', onCraftClick);
   potionCraftsEl?.addEventListener('click', onCraftClick);
+  craftsEl.addEventListener('pointerover', onCraftHover);
+  potionCraftsEl?.addEventListener('pointerover', onCraftHover);
+
+  craftPreview = createCraftPreview(craftModal.querySelector('[data-craft-preview]'));
+  potionPreview = createCraftPreview(potionModal.querySelector('[data-potion-preview]'));
 
   chestModal.querySelector('[data-chest-close]').addEventListener('click', closeChest);
   chestModal.addEventListener('click', (event) => {
@@ -420,7 +489,11 @@ export function bindHud(root, state, world) {
     else if (craftStation === 'wheel') craftTab = 'spin';
     else {
       craftTab = recipe ? anvilTabForRecipe(recipe) : (craftTab === 'food' || craftTab === 'potion' ? 'melee' : craftTab);
-      craftSubtab = recipe ? anvilSubtabForRecipe(recipe) : (craftSubtab === 'armour' ? craftSubtab : 'weapon');
+      craftSubtab = recipe
+        ? anvilSubtabForRecipe(recipe)
+        : (craftSubtab === 'armour' || craftSubtab === 'ammo' || craftSubtab === 'rune' ? craftSubtab : 'weapon');
+      if (craftTab !== 'ranged' && craftSubtab === 'ammo') craftSubtab = 'weapon';
+      if (craftTab !== 'magic' && craftSubtab === 'rune') craftSubtab = 'weapon';
     }
     if (craftStation === 'cauldron') {
       craftModal.hidden = true;
@@ -1941,7 +2014,8 @@ export function bindHud(root, state, world) {
     if (!btn) return;
     if (
       btn.dataset.craft
-      ||       btn.dataset.offerItem
+      || btn.dataset.craftQty
+      || btn.dataset.offerItem
       || btn.dataset.displayItem
       || btn.hasAttribute('data-trade-sell')
       || btn.hasAttribute('data-trade-buy-btn')
@@ -1959,25 +2033,34 @@ export function bindHud(root, state, world) {
     for (const recipe of recipes) {
       const btn = container.querySelector(`[data-craft="${recipe.id}"]`);
       const timer = container.querySelector(`[data-timer="${recipe.id}"]`);
+      const row = container.querySelector(`[data-craft-row="${recipe.id}"]`);
       if (!btn || !timer) continue;
       const progress = craftProgress(state, recipe.id, now);
       const locked = !isUnlocked(state, recipe.id);
+      const affordable = maxCraftActions(state, recipe.id);
       btn.classList.toggle('is-locked', locked);
+      row?.classList.toggle('is-locked', locked);
       if (progress) {
-        btn.disabled = true;
         btn.classList.add('is-busy');
-        timer.textContent = `${Math.ceil(progress.left)}s`;
+        const batch = progress.total > 1 ? `${progress.done + 1}/${progress.total} · ` : '';
+        timer.textContent = `${batch}${Math.ceil(progress.left)}s`;
         btn.style.setProperty('--t', String(progress.t));
       } else {
-        btn.disabled = !canCraft(state, recipe.id);
         btn.classList.remove('is-busy');
         timer.textContent = '';
         btn.style.setProperty('--t', '0');
+      }
+      for (const qty of row?.querySelectorAll('[data-craft-qty]') ?? []) {
+        qty.disabled = locked || affordable < 1;
       }
     }
   }
 
   function render(now) {
+    const dt = lastPreviewAt ? Math.min(0.05, Math.max(0, now - lastPreviewAt)) : 0;
+    lastPreviewAt = now;
+    if (!craftModal.hidden) craftPreview?.tick(dt);
+    if (!potionModal.hidden) potionPreview?.tick(dt);
     goldEl.textContent = `Coins: ${formatGold(state.gold)}`;
     const xp = shopProgress(state.shopXp ?? 0);
     const levelEl = document.querySelector('#shop-level');
@@ -2013,7 +2096,10 @@ export function bindHud(root, state, world) {
       if (busyId) {
         const progress = craftProgress(state, busyId, now);
         activeCraft.hidden = false;
-        if (activeCraftName) activeCraftName.textContent = `Crafting ${RECIPES[busyId].name}`;
+        if (activeCraftName) {
+          const batch = progress?.total > 1 ? ` (${progress.done + 1}/${progress.total})` : '';
+          activeCraftName.textContent = `Crafting ${RECIPES[busyId].name}${batch}`;
+        }
         activeCraft.style.setProperty('--t', String(progress?.t ?? 0));
       } else {
         activeCraft.hidden = true;

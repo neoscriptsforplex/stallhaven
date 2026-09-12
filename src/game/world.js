@@ -4,6 +4,7 @@ import {
   CUSTOMERS,
   DEFAULT_SKYBOX,
   FIRST_CUSTOMER_DELAY,
+  skyIdForScene,
   MAX_CUSTOMERS,
   RECIPES,
   REQUEST_WAIT,
@@ -44,6 +45,13 @@ import {
   queueSlot,
 } from './nav.js';
 import { playClick } from './audio.js';
+import {
+  STATION_ARRIVE,
+  STATION_HIT,
+  pickUseHit,
+  resolveStationUse,
+  stationAtFloor,
+} from './interact.js';
 import {
   buildAdventurer,
   buildAnvil,
@@ -286,39 +294,39 @@ export function createWorld(canvas, state) {
 
   const anvil = buildAnvil();
   scene.add(anvil);
-  const anvilPick = makePick(0.95, 1.45, 0.72, 'anvil');
+  const anvilPick = makePick(STATION_HIT.anvil.w, STATION_HIT.anvil.h, STATION_HIT.anvil.d, 'anvil');
 
   const chest = buildChest();
   scene.add(chest);
-  const chestPick = makePick(1.28, 1.45, 1.02, 'chest');
+  const chestPick = makePick(STATION_HIT.chest.w, STATION_HIT.chest.h, STATION_HIT.chest.d, 'chest');
   let chestOpen = false;
 
   const rangeMesh = buildRange();
   scene.add(rangeMesh);
-  const rangePick = makePick(0.78, 1.35, 0.62, 'range');
+  const rangePick = makePick(STATION_HIT.range.w, STATION_HIT.range.h, STATION_HIT.range.d, 'range');
 
   const cauldronMesh = buildCauldron();
   scene.add(cauldronMesh);
-  const cauldronPick = makePick(0.72, 1.15, 0.72, 'cauldron');
+  const cauldronPick = makePick(STATION_HIT.cauldron.w, STATION_HIT.cauldron.h, STATION_HIT.cauldron.d, 'cauldron');
 
   const furnaceMesh = buildFurnace();
   scene.add(furnaceMesh);
-  const furnacePick = makePick(0.82, 1.35, 0.72, 'furnace');
+  const furnacePick = makePick(STATION_HIT.furnace.w, STATION_HIT.furnace.h, STATION_HIT.furnace.d, 'furnace');
 
   const wheelMesh = buildSpinningWheel();
   scene.add(wheelMesh);
-  const wheelPick = makePick(0.72, 1.2, 0.62, 'wheel');
+  const wheelPick = makePick(STATION_HIT.wheel.w, STATION_HIT.wheel.h, STATION_HIT.wheel.d, 'wheel');
 
   const UNLOCK_STATIONS = ['cauldron', 'furnace', 'wheel'];
 
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
-    anvil: { mesh: anvil, pick: anvilPick, glow: null, pickY: 0.72 },
-    chest: { mesh: chest, pick: chestPick, glow: null, pickY: 0.72 },
-    range: { mesh: rangeMesh, pick: rangePick, glow: null, pickY: 0.68 },
-    cauldron: { mesh: cauldronMesh, pick: cauldronPick, glow: null, pickY: 0.58 },
-    furnace: { mesh: furnaceMesh, pick: furnacePick, glow: null, pickY: 0.68 },
-    wheel: { mesh: wheelMesh, pick: wheelPick, glow: null, pickY: 0.58 },
+    anvil: { mesh: anvil, pick: anvilPick, glow: null, pickY: STATION_HIT.anvil.pickY },
+    chest: { mesh: chest, pick: chestPick, glow: null, pickY: STATION_HIT.chest.pickY },
+    range: { mesh: rangeMesh, pick: rangePick, glow: null, pickY: STATION_HIT.range.pickY },
+    cauldron: { mesh: cauldronMesh, pick: cauldronPick, glow: null, pickY: STATION_HIT.cauldron.pickY },
+    furnace: { mesh: furnaceMesh, pick: furnacePick, glow: null, pickY: STATION_HIT.furnace.pickY },
+    wheel: { mesh: wheelMesh, pick: wheelPick, glow: null, pickY: STATION_HIT.wheel.pickY },
   };
 
   function applyFixturePose(id) {
@@ -715,21 +723,27 @@ export function createWorld(canvas, state) {
     cam.distance = Math.min(CAM_MAX_DISTANCE, Math.max(CAM_MIN_DISTANCE, cam.distance));
   }
 
-  function setMoveTarget(x, z) {
-    const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
-    const path = sceneMode === 'dungeon'
-      ? planWalk(from, { x, z }, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
-      : planPlayerWalk(from, { x, z }, state, PLAYER_RADIUS);
+  function applyWalkPath(path) {
+    if (!path?.length) return false;
     playerPath.length = 0;
-    if (!path.length) {
-      moveMarker.visible = false;
-      return false;
-    }
     playerPath.push(...path);
     const goal = path[path.length - 1];
     moveMarker.position.set(goal.x, 0.1, goal.z);
     moveMarker.visible = true;
     return true;
+  }
+
+  function setMoveTarget(x, z) {
+    const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
+    const path = sceneMode === 'dungeon'
+      ? planWalk(from, { x, z }, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
+      : planPlayerWalk(from, { x, z }, state, PLAYER_RADIUS);
+    if (!path.length) {
+      playerPath.length = 0;
+      moveMarker.visible = false;
+      return false;
+    }
+    return applyWalkPath(path);
   }
 
   function walkToward(actor, goal, dt, speed = CUSTOMER_SPEED) {
@@ -766,18 +780,36 @@ export function createWorld(canvas, state) {
 
   function queueUse(type, pose) {
     if (!pose) return;
-    const arrive = type === 'trapdoor' || type === 'ladder' ? 1.25 : 1.15;
-    if (isNearPose(pose, arrive)) {
+    const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
+    const arrive = type === 'trapdoor' || type === 'ladder' ? 1.35 : STATION_ARRIVE;
+    const plan = sceneMode === 'dungeon' || type === 'trapdoor' || type === 'ladder'
+      ? resolveStationUse(from, pose, state, (start, dest) => (
+        planWalk(start, dest, [], PLAYER_RADIUS, sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors)
+      ))
+      : resolveStationUse(from, pose, state);
+    if (plan.action === 'open' || isNearPose(pose, arrive)) {
       pendingUse = null;
+      playerPath.length = 0;
+      moveMarker.visible = false;
       pickHandler?.({ type });
+      playClick('ui');
       return;
     }
-    pendingUse = { type, x: pose.x, z: pose.z, arrive };
-    const walkTo = type === 'trapdoor' || type === 'ladder'
-      ? { x: pose.x, z: pose.z }
-      : { x: pose.x, z: pose.z + 0.7 };
-    const walked = setMoveTarget(walkTo.x, walkTo.z) || setMoveTarget(pose.x, pose.z);
-    playClick(walked ? 'move' : 'ui');
+    if (plan.action === 'walk' && applyWalkPath(plan.path)) {
+      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true };
+      playClick('move');
+      return;
+    }
+    const fallback = sceneMode === 'dungeon'
+      ? planWalk(from, { x: pose.x, z: pose.z }, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
+      : planPlayerWalk(from, { x: pose.x, z: pose.z }, state, PLAYER_RADIUS);
+    if (applyWalkPath(fallback)) {
+      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true };
+      playClick('move');
+      return;
+    }
+    pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: false };
+    playClick('ui');
   }
 
   function updatePlayer(dt, now) {
@@ -786,7 +818,7 @@ export function createWorld(canvas, state) {
         playerPath.shift();
         if (!playerPath.length) {
           moveMarker.visible = false;
-          if (pendingUse && isNearPose(pendingUse, pendingUse.arrive ?? 1.35)) {
+          if (pendingUse && (pendingUse.openOnArrive || isNearPose(pendingUse, pendingUse.arrive ?? STATION_ARRIVE))) {
             const type = pendingUse.type;
             pendingUse = null;
             pickHandler?.({ type });
@@ -950,13 +982,8 @@ export function createWorld(canvas, state) {
   }
 
   function hitFurniture(hits) {
+    const closest = pickUseHit(hits);
     const chestHit = hits.find((h) => h.object.userData.kind === 'chest');
-    const interactHits = hits.filter((h) => (
-      h.object.userData.kind !== 'ground'
-      && h.object.userData.kind !== 'customer'
-      && h.object.userData.kind !== 'expand-pad'
-    ));
-    const closest = interactHits[0];
     const preferChest = chestHit
       && closest?.object.userData.kind === 'anvil'
       && chestHit.distance - closest.distance < 0.5;
@@ -1064,27 +1091,10 @@ export function createWorld(canvas, state) {
     const groundHit = hits.find((h) => h.object.userData.kind === 'ground');
     if (groundHit) {
       const point = groundHit.point;
-      const chestPos = state.furniture.chest;
-      const anvilPos = state.furniture.anvil;
-      const rangePos = state.furniture.range;
-      if (Math.hypot(point.x - chestPos.x, point.z - chestPos.z) < 0.72) {
-        queueUse('chest', chestPos);
+      const station = stationAtFloor(point.x, point.z, state.furniture);
+      if (station) {
+        queueUse(station.type, station.pose);
         return;
-      }
-      if (Math.hypot(point.x - anvilPos.x, point.z - anvilPos.z) < 0.62) {
-        queueUse('anvil', anvilPos);
-        return;
-      }
-      if (Math.hypot(point.x - rangePos.x, point.z - rangePos.z) < 0.5) {
-        queueUse('range', rangePos);
-        return;
-      }
-      for (const id of UNLOCK_STATIONS) {
-        const pos = state.furniture[id];
-        if (pos && Math.hypot(point.x - pos.x, point.z - pos.z) < 0.52) {
-          queueUse(id, pos);
-          return;
-        }
       }
       const hatch = gardenTrapdoorSpot(state.expansions ?? []);
       if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 1.7) {
@@ -1818,6 +1828,7 @@ export function createWorld(canvas, state) {
     setShopLayerVisible(false);
     dungeon.root.visible = true;
     dungeon.grounds.visible = true;
+    applySkyColor(scene, skyIdForScene('dungeon', state.skybox));
     shopkeeper.position.set(-4.15, 0, 0.4);
     shopkeeper.rotation.y = Math.PI / 2;
   }
@@ -1832,6 +1843,7 @@ export function createWorld(canvas, state) {
       dungeon.grounds.visible = false;
     }
     setShopLayerVisible(true);
+    applySkyColor(scene, skyIdForScene('shop', state.skybox));
     shopkeeper.position.set(shopReturnPos.x, 0, shopReturnPos.z);
     shopkeeper.rotation.y = Math.PI;
   }
@@ -2012,7 +2024,7 @@ export function createWorld(canvas, state) {
     },
     setSkybox(id) {
       state.skybox = id;
-      applySkyColor(scene, id);
+      applySkyColor(scene, skyIdForScene(sceneMode, id));
     },
     setChefHat(on) {
       state.chefHat = Boolean(on);

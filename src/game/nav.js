@@ -302,6 +302,10 @@ export function planPlayerWalk(from, to, state, radius = PLAYER_RADIUS) {
   const doorOut = { x: 0, z: FLOOR.maxZ + radius + 0.35 };
   const fromInside = indoor.some((rect) => pointInRect(from.x, from.z, rect, -0.05));
   const toInside = indoor.some((rect) => pointInRect(to.x, to.z, rect, -0.05));
+  if (fromInside && toInside) {
+    const indoorPath = findPath(from, to, obstacles, radius, indoor);
+    if (indoorPath.length) return indoorPath;
+  }
   if (fromInside !== toInside) {
     const first = findPath(from, fromInside ? doorIn : doorOut, obstacles, radius, floors);
     const second = findPath(fromInside ? doorOut : doorIn, to, obstacles, radius, floors);

@@ -15,6 +15,7 @@ import {
   occupiedCells,
   padConnects,
   roomCenter,
+  doorwayFloor,
   wallVineMounts,
 } from './layout.js';
 import { initRatWander } from './rats.js';
@@ -338,12 +339,18 @@ function woodFloorMap() {
   return tex;
 }
 
+function markGround(mesh) {
+  mesh.userData.kind = 'ground';
+  return mesh;
+}
+
 function addFloor(root, center) {
   const base = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(ROOM_W, 0.08, ROOM_D),
     wood(0x5a3a22, 0.92),
   ));
   base.position.set(center.x, 0.04, center.z);
+  markGround(base);
   root.add(base);
   const plankW = 0.28;
   const count = Math.ceil(ROOM_D / plankW);
@@ -362,6 +369,7 @@ function addFloor(root, center) {
     ));
     const z = center.z - ROOM_D / 2 + plankW * 0.5 + i * plankW;
     plank.position.set(center.x, 0.085, z);
+    markGround(plank);
     root.add(plank);
   }
 }
@@ -1236,13 +1244,32 @@ export function buildShop(expansionIds = []) {
     if (isOrigin) addOriginDecor(root, c);
 
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(ROOM_W - 0.15, ROOM_D - 0.15),
+      new THREE.PlaneGeometry(ROOM_W, ROOM_D),
       pickMat(),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(c.x, 0.09, c.z);
     ground.userData.kind = 'ground';
     grounds.add(ground);
+  }
+
+  for (let i = 0; i < cells.length; i += 1) {
+    for (let j = i + 1; j < cells.length; j += 1) {
+      const door = doorwayFloor(cells[i], cells[j]);
+      if (!door) continue;
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(door.maxX - door.minX, door.maxZ - door.minZ),
+        pickMat(),
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(
+        (door.minX + door.maxX) / 2,
+        0.095,
+        (door.minZ + door.maxZ) / 2,
+      );
+      mesh.userData.kind = 'ground';
+      grounds.add(mesh);
+    }
   }
 
   const grass = gardenBox(expansionIds);
@@ -1289,6 +1316,89 @@ export function buildShop(expansionIds = []) {
   }
 
   return { root, roofs, grounds, pads };
+}
+
+/** Extra skulls, slumped skeletons, and bone piles around the dungeon floor. */
+export const DUNGEON_REMAINS = [
+  { kind: 'pile', x: 1.6, z: -1.4, rot: 0.1 },
+  { kind: 'pile', x: -2.6, z: 2.7, rot: 1.3 },
+  { kind: 'pile', x: 3.9, z: 3.1, rot: -0.6 },
+  { kind: 'slump', x: -1.1, z: -3.4, rot: 2.1 },
+  { kind: 'slump', x: 4.6, z: -2.8, rot: -1.2 },
+  { kind: 'slump', x: -4.5, z: 2.6, rot: 0.8 },
+  { kind: 'scatter', x: 0.9, z: 2.4, rot: 0.4 },
+  { kind: 'scatter', x: 3.1, z: -0.6, rot: 1.7 },
+  { kind: 'scatter', x: -3.6, z: -2.2, rot: -0.5 },
+];
+
+function boneMat() {
+  return new THREE.MeshStandardMaterial({ color: 0xe8dcc4, roughness: 0.7 });
+}
+
+function addBonePile(root, x, z, rot = 0) {
+  const bone = boneMat();
+  const skull = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), bone));
+  skull.position.set(x, 0.12, z);
+  skull.scale.set(1, 0.85, 1.15);
+  skull.rotation.y = rot;
+  root.add(skull);
+  const jaw = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.08), bone));
+  jaw.position.set(x + Math.sin(rot) * 0.12, 0.04, z + Math.cos(rot) * 0.12);
+  root.add(jaw);
+  for (const [dx, dz, r] of [[-0.25, -0.15, 0.6], [0.25, 0.2, -0.4], [-0.1, 0.35, 1.2], [0.35, -0.15, 0.2]]) {
+    const rib = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.32, 6), bone));
+    rib.position.set(x + dx, 0.08, z + dz);
+    rib.rotation.z = r;
+    rib.rotation.x = 1.1;
+    root.add(rib);
+  }
+}
+
+function addSlumpedSkeleton(root, x, z, rot = 0) {
+  const bone = boneMat();
+  const body = new THREE.Group();
+  body.position.set(x, 0, z);
+  body.rotation.y = rot;
+  const skull = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), bone));
+  skull.position.set(0.02, 0.42, 0.08);
+  skull.scale.set(1, 0.88, 1.1);
+  skull.rotation.z = 0.45;
+  body.add(skull);
+  const torso = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.36, 7), bone));
+  torso.position.set(0, 0.22, 0);
+  torso.rotation.z = 1.15;
+  body.add(torso);
+  for (const [sx, sy, sz, r] of [[-0.08, 0.16, 0.04, 0.8], [0.1, 0.12, -0.02, -0.5], [0.16, 0.08, 0.08, 1.4]]) {
+    const bonePiece = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.28, 6), bone));
+    bonePiece.position.set(sx, sy, sz);
+    bonePiece.rotation.set(1.05, 0, r);
+    body.add(bonePiece);
+  }
+  root.add(body);
+}
+
+function addScatteredBones(root, x, z, rot = 0) {
+  const bone = boneMat();
+  const skull = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 7), bone));
+  skull.position.set(x, 0.09, z);
+  skull.rotation.y = rot;
+  skull.rotation.z = 0.6;
+  root.add(skull);
+  for (const [dx, dz, r] of [[0.22, -0.12, 0.3], [-0.18, 0.2, -0.8], [0.08, 0.28, 1.6]]) {
+    const fem = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.02, 0.26, 6), bone));
+    fem.position.set(x + dx, 0.06, z + dz);
+    fem.rotation.z = r + rot;
+    fem.rotation.x = 1.2;
+    root.add(fem);
+  }
+}
+
+function addDungeonRemains(root) {
+  for (const spot of DUNGEON_REMAINS) {
+    if (spot.kind === 'slump') addSlumpedSkeleton(root, spot.x, spot.z, spot.rot);
+    else if (spot.kind === 'scatter') addScatteredBones(root, spot.x, spot.z, spot.rot);
+    else addBonePile(root, spot.x, spot.z, spot.rot);
+  }
 }
 
 export function buildDungeon() {
@@ -1362,21 +1472,7 @@ export function buildDungeon() {
     root.add(web);
   }
 
-  const bone = new THREE.MeshStandardMaterial({ color: 0xe8dcc4, roughness: 0.7 });
-  const skull = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), bone));
-  skull.position.set(1.6, 0.12, -1.4);
-  skull.scale.set(1, 0.85, 1.15);
-  root.add(skull);
-  const jaw = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.08), bone));
-  jaw.position.set(1.6, 0.04, -1.28);
-  root.add(jaw);
-  for (const [x, z, rot] of [[1.35, -1.55, 0.6], [1.85, -1.2, -0.4], [1.5, -1.05, 1.2], [1.95, -1.55, 0.2]]) {
-    const rib = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.32, 6), bone));
-    rib.position.set(x, 0.08, z);
-    rib.rotation.z = rot;
-    rib.rotation.x = 1.1;
-    root.add(rib);
-  }
+  addDungeonRemains(root);
 
   const rats = [];
   for (let i = 0; i < 4; i += 1) {

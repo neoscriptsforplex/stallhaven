@@ -12,6 +12,8 @@ import {
   buildAnvil,
   buildChest,
   buildCounter,
+  buildShopDoor,
+  setDoorOpen,
   buildGoblin,
   buildPickaxe,
   buildShopkeeper,
@@ -336,7 +338,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
     assert.ok(ids.includes('goblin'));
@@ -453,6 +455,24 @@ describe('bundled prop swaps', () => {
     const want = measureVisibleBox(target).getSize(new THREE.Vector3());
     assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
   });
+
+  it('fits a bundled front door dump to the current leaf bbox without stretch', async () => {
+    let bundled;
+    try {
+      bundled = await loadFolder('door');
+    } catch {
+      return;
+    }
+    const target = new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.1));
+    target.position.y = 1.04;
+    const fitted = wrapBundledProp(bundled, target, { name: 'door-leaf', fit: 'max' });
+    assert.equal(fitted.name, 'door-leaf');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+  });
 });
 
 describe('shop props', () => {
@@ -466,6 +486,16 @@ describe('shop props', () => {
     assert.ok(gap < 0.04, `head should sit on the shaft tip, gap=${gap}`);
     const keeper = buildShopkeeper();
     assert.equal(keeper.userData.pickaxe.parent, keeper.userData.hand);
+  });
+
+  it('keeps the shop door hinged open so the front doorway stays walkable', () => {
+    const door = buildShopDoor();
+    assert.equal(door.name, 'shop-door');
+    assert.ok(door.userData.hinge);
+    assert.ok(door.userData.hinge.rotation.y > 1.5);
+    door.userData.hinge.rotation.y = 0.2;
+    setDoorOpen(door, true, 1);
+    assert.ok(door.userData.hinge.rotation.y > 1.4);
   });
 
   it('builds a clean anvil without a resting hammer', () => {

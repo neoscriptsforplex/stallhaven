@@ -236,7 +236,7 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   rebuildArchitecture();
-  const shopDoor = buildShopDoor();
+  let shopDoor = buildShopDoor();
   scene.add(shopDoor);
   const dust = buildDust();
   scene.add(dust);
@@ -2262,6 +2262,15 @@ export function createWorld(canvas, state, opts = {}) {
       replaceFixture('furnace', buildFurnace);
       replaceFixture('anvil', buildAnvil);
       replaceFixture('cauldron', buildCauldron);
+      try {
+        const nextDoor = buildShopDoor();
+        nextDoor.visible = shopDoor.visible;
+        scene.remove(shopDoor);
+        shopDoor = nextDoor;
+        scene.add(shopDoor);
+      } catch (err) {
+        console.warn('Bundled door skipped:', err?.message || err);
+      }
       if (dungeon) {
         const keepVisible = dungeon.root.visible;
         scene.remove(dungeon.root);

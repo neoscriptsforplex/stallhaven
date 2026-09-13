@@ -358,11 +358,42 @@ function buildProceduralTable() {
   return group;
 }
 
+const DOOR_LEAF = { w: 1.12, h: 2.08, d: 0.1 };
+const DOOR_HINGE = { x: -0.58, z: 3.4 };
+const OPEN_DOOR_ANGLE = 1.72;
+
 export function buildShopDoor() {
+  const bundled = getBundledLook('door');
+  if (bundled) return buildBundledShopDoor(bundled);
+  return buildProceduralShopDoor();
+}
+
+function doorLeafFitTarget() {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(DOOR_LEAF.w, DOOR_LEAF.h, DOOR_LEAF.d));
+  mesh.position.y = DOOR_LEAF.h / 2;
+  return mesh;
+}
+
+function buildBundledShopDoor(source) {
   const root = new THREE.Group();
   root.name = 'shop-door';
-  const hingeX = -0.58;
-  const hingeZ = 3.4;
+  const hinge = new THREE.Group();
+  hinge.position.set(DOOR_HINGE.x, 0, DOOR_HINGE.z);
+  const leaf = wrapBundledProp(source, doorLeafFitTarget(), { name: 'door-leaf', fit: 'max' });
+  const box = measureVisibleBox(leaf);
+  leaf.position.x -= box.min.x;
+  hinge.add(leaf);
+  hinge.rotation.y = OPEN_DOOR_ANGLE;
+  root.add(hinge);
+  root.userData.hinge = hinge;
+  return root;
+}
+
+function buildProceduralShopDoor() {
+  const root = new THREE.Group();
+  root.name = 'shop-door';
+  const hingeX = DOOR_HINGE.x;
+  const hingeZ = DOOR_HINGE.z;
   for (const y of [0.38, 1.12, 1.86]) {
     const knuckle = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.16, 8), metal(0xe3b34a)));
     knuckle.rotation.x = Math.PI / 2;
@@ -410,8 +441,6 @@ export function buildShopDoor() {
   root.userData.hinge = hinge;
   return root;
 }
-
-const OPEN_DOOR_ANGLE = 1.72;
 
 export function setDoorOpen(door, _open, dt = 1) {
   const hinge = door.userData.hinge;

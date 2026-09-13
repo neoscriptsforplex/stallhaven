@@ -4,10 +4,16 @@ import {
   CAULDRON_COST,
   WHEEL_COST,
   furnaceBesideAnvil,
+  poseRect,
+  rectsOverlap,
   CHEST_MAX_LEVEL,
   EXPANSION_PADS,
   FURNITURE_FORWARD,
   FURNITURE_ROT_STEP,
+  FURNITURE_START_YAW,
+  furnitureHalfSize,
+  furnitureVisualYaw,
+  rotatedFootprint,
   SWAP_PRICE_RATIO,
   chestSlots,
   chestUpgradeCost,
@@ -82,6 +88,19 @@ describe('layout numbers', () => {
     assert.equal(occupiedCells(['left', 'back']).length, 3);
   });
 
+  it('yaws chest, range, and furnace −90° CCW from above and the counter 180° at start only', () => {
+    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (-Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(FURNITURE_START_YAW.range - (-Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(FURNITURE_START_YAW.furnace - (-Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(FURNITURE_START_YAW.counter - Math.PI) < 1e-9);
+    assert.equal(FURNITURE_START_YAW.anvil, undefined);
+    assert.ok(Math.abs(furnitureVisualYaw('chest', 0) - (-Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(furnitureVisualYaw('range', FURNITURE_ROT_STEP) - (-Math.PI / 2 + FURNITURE_ROT_STEP)) < 1e-9);
+    assert.ok(Math.abs(furnitureVisualYaw('furnace', 0) - (-Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(furnitureVisualYaw('counter', 0) - Math.PI) < 1e-9);
+    assert.equal(furnitureVisualYaw('anvil', 0), FURNITURE_FORWARD);
+  });
+
   it('defaults every furniture piece to the shared door-facing rotation', () => {
     const furniture = defaultFurniture();
     assert.equal(furniture.counter.rot, FURNITURE_FORWARD);
@@ -101,24 +120,42 @@ describe('layout numbers', () => {
     assert.equal(furniture.wheel, null);
   });
 
-  it('sits the starter furnace beside the anvil with a small gap', () => {
+  it('sits the starter furnace on the back wall, not overlapping the side-wall anvil', () => {
+    assert.ok(SHOP.furnace.z < SHOP.anvil.z - 1.4, 'furnace should sit on the back wall');
     assert.ok(SHOP.furnace.x > SHOP.anvil.x);
-    assert.ok(SHOP.furnace.x - SHOP.anvil.x > 0.9);
-    assert.ok(SHOP.furnace.x - SHOP.anvil.x < 1.3);
-    assert.equal(SHOP.furnace.z, SHOP.anvil.z);
     const beside = furnaceBesideAnvil({ x: -2.98, z: -2.42, rot: 0 });
-    assert.ok(Math.abs(beside.x - (-2.98 + SHOP.furnace.x - SHOP.anvil.x)) < 1e-9);
-    assert.equal(beside.z, -2.42);
+    assert.equal(beside.x, SHOP.furnace.x);
+    assert.equal(beside.z, SHOP.furnace.z);
   });
 
-  it('puts the cooking range on the floor right of the counter, between counter and chest', () => {
-    const counterRight = SHOP.counter.x + 1.3;
-    const chestLeft = SHOP.chest.x - 0.46;
-    assert.ok(SHOP.range.x > counterRight, 'range should sit past the counter’s right edge');
-    assert.ok(SHOP.range.x < chestLeft, 'range should sit left of the chest');
-    assert.ok(SHOP.range.x > 0, 'range should be on the right, not the back-left corner');
-    assert.ok(SHOP.range.z < SHOP.counter.z + 0.2);
-    assert.ok(SHOP.range.z > -3.0);
+  it('puts the cooking range on the back wall and the chest on the right wall', () => {
+    assert.ok(SHOP.range.x > 0, 'range should sit on the right half of the back wall');
+    assert.ok(SHOP.range.z < SHOP.counter.z - 0.2, 'range should sit behind the counter');
+    assert.ok(SHOP.chest.x > 2.6, 'chest should sit on the right wall');
+    assert.ok(SHOP.chest.z > SHOP.range.z + 1.4, 'chest should sit forward of the back-wall range');
+    assert.ok(SHOP.anvil.x < -2.6, 'anvil should sit on the left wall');
+  });
+
+  it('keeps starter stations from overlapping each other or remaining tables', () => {
+    const stations = [
+      ['anvil', SHOP.anvil],
+      ['chest', SHOP.chest],
+      ['furnace', SHOP.furnace],
+      ['range', SHOP.range],
+      ['counter', SHOP.counter],
+    ];
+    const rects = stations.map(([kind, pose]) => poseRect(kind, pose));
+    for (let i = 0; i < rects.length; i += 1) {
+      for (let j = i + 1; j < rects.length; j += 1) {
+        assert.equal(rectsOverlap(rects[i], rects[j], 0.04), false, `${stations[i][0]} overlaps ${stations[j][0]}`);
+      }
+    }
+    for (const spot of SHOP.displays) {
+      const display = poseRect(spot.kind, spot);
+      for (let i = 0; i < rects.length; i += 1) {
+        assert.equal(rectsOverlap(display, rects[i], 0.02), false, `${spot.id} overlaps ${stations[i][0]}`);
+      }
+    }
   });
 
   it('keeps wall vines off the food and potion display shelves', () => {

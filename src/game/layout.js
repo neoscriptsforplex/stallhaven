@@ -28,6 +28,26 @@ export const FURNITURE_SNAP = 0.2;
 export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
+/**
+ * Start-only visual yaw around world +Y. Applied to the placed mesh and pick
+ * (including async dump swaps), not stored in furniture.rot so queue / saves
+ * stay on the gameplay facing.
+ * Three.js Y-up: −π/2 is 90° counter-clockwise when viewed from above.
+ */
+export const FURNITURE_START_YAW = {
+  chest: -Math.PI / 2,
+  range: -Math.PI / 2,
+  furnace: -Math.PI / 2,
+  counter: Math.PI,
+};
+
+export function furnitureStartYaw(id) {
+  return FURNITURE_START_YAW[id] ?? 0;
+}
+
+export function furnitureVisualYaw(id, poseRot = FURNITURE_FORWARD) {
+  return (poseRot ?? FURNITURE_FORWARD) + furnitureStartYaw(id);
+}
 export const SWAP_PRICE_RATIO = 0.65;
 export const CAULDRON_COST = 10000;
 export const WHEEL_COST = 500;
@@ -36,13 +56,11 @@ export const STATION_UNLOCKS = [
   { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
 ];
 
-/** Place a starter furnace on the anvil's right, matching the default pair spacing. */
+/** Place a missing furnace on the starter back-wall spot. */
 export function furnaceBesideAnvil(anvil = SHOP.anvil) {
-  const dx = SHOP.furnace.x - SHOP.anvil.x;
-  const dz = SHOP.furnace.z - SHOP.anvil.z;
   return {
-    x: (anvil?.x ?? SHOP.anvil.x) + dx,
-    z: (anvil?.z ?? SHOP.anvil.z) + dz,
+    x: SHOP.furnace.x,
+    z: SHOP.furnace.z,
     rot: anvil?.rot ?? FURNITURE_FORWARD,
   };
 }
@@ -202,11 +220,33 @@ export function furnitureHalfSize(kind) {
   if (kind === 'wheel') return { hw: 0.36, hd: 0.32 };
   if (kind === 'anvil') return { hw: 0.44, hd: 0.35 };
   if (kind === 'chest') return { hw: 0.3, hd: 0.22 };
-  if (kind === 'range') return { hw: 0.34, hd: 0.28 };
+  if (kind === 'range') return { hw: 0.68, hd: 0.56 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
   if (kind === 'stand') return { hw: 0.36, hd: 0.36 };
   return { hw: 0.76, hd: 0.51 };
+}
+
+/** Axis-aligned footprint after start yaw + gameplay rot. */
+export function poseRect(kind, pose) {
+  const { hw, hd } = furnitureHalfSize(kind);
+  const span = rotatedFootprint(hw, hd, furnitureVisualYaw(kind, pose?.rot));
+  return {
+    minX: pose.x - span.hw,
+    maxX: pose.x + span.hw,
+    minZ: pose.z - span.hd,
+    maxZ: pose.z + span.hd,
+  };
+}
+
+export function rectsOverlap(a, b, pad = 0) {
+  if (!a || !b) return false;
+  return !(
+    a.maxX + pad < b.minX
+    || a.minX - pad > b.maxX
+    || a.maxZ + pad < b.minZ
+    || a.minZ - pad > b.maxZ
+  );
 }
 
 export function padConnects(pad, expansionIds = []) {

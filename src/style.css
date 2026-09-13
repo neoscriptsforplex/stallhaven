@@ -1018,6 +1018,20 @@ body.modal-open #view {
   background: linear-gradient(#8a5a30, #5a3518);
 }
 
+.settings-bright {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 6px;
+  font-size: 0.82rem;
+  color: #e6d3b2;
+}
+
+.settings-bright input {
+  width: 100%;
+}
+
 .cheat-form {
   display: grid;
   grid-template-columns: 1fr auto;

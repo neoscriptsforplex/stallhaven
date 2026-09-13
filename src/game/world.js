@@ -30,6 +30,8 @@ import {
   FURNITURE_ROT_STEP,
   FURNITURE_SNAP,
   cloneFurniture,
+  furnitureStartYaw,
+  furnitureVisualYaw,
   gardenBox,
   gardenTrapdoorSpot,
   playerWalkFloors,
@@ -83,6 +85,7 @@ import {
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
+import { applySceneLighting, clampBrightness } from './lighting.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
@@ -148,7 +151,7 @@ export function createWorld(canvas, state, opts = {}) {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.12;
 
   const scene = new THREE.Scene();
   applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
@@ -164,8 +167,10 @@ export function createWorld(canvas, state, opts = {}) {
   camera.position.set(SHOP.cameraStart.x, SHOP.cameraStart.y, SHOP.cameraStart.z);
   camera.lookAt(camLook);
 
-  const hemi = new THREE.HemisphereLight(0xf0e2c4, 0x6a5340, 0.9);
+  const hemi = new THREE.HemisphereLight(0xf0e2c4, 0x6a5340, 1.14);
   scene.add(hemi);
+  const ambient = new THREE.AmbientLight(0xf4e6c8, 0.24);
+  scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xffe1b0, 1.15);
   sun.position.set(-4.5, 12, 6.5);
   sun.castShadow = true;
@@ -178,9 +183,24 @@ export function createWorld(canvas, state, opts = {}) {
   sun.shadow.camera.bottom = -22;
   scene.add(sun);
 
-  const doorLight = new THREE.PointLight(0xffe1b0, 2.4, 6, 2);
+  const doorLight = new THREE.PointLight(0xffe1b0, 2.2, 6, 2);
   doorLight.position.set(0, 2.15, 3.9);
   scene.add(doorLight);
+  const shopFill = new THREE.PointLight(0xffe8c4, 0.48, 16, 2);
+  shopFill.position.set(0, 2.55, -0.35);
+  scene.add(shopFill);
+
+  function syncLighting(mode = sceneMode) {
+    applySceneLighting({
+      hemi,
+      ambient,
+      fill: shopFill,
+      door: doorLight,
+      sun,
+      renderer,
+    }, mode, state.brightness);
+  }
+  syncLighting('shop');
 
   if (!state.furniture) state.furniture = cloneFurniture();
   let architecture = null;
@@ -234,7 +254,7 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   rebuildArchitecture();
-  const shopDoor = buildShopDoor();
+  let shopDoor = buildShopDoor();
   scene.add(shopDoor);
   const dust = buildDust();
   scene.add(dust);
@@ -361,9 +381,10 @@ export function createWorld(canvas, state, opts = {}) {
     if (slot.glow) slot.glow.visible = owned;
     if (!pose) return;
     slot.mesh.position.set(pose.x, 0, pose.z);
-    slot.mesh.rotation.y = pose.rot ?? FURNITURE_FORWARD;
+    const yaw = furnitureVisualYaw(id, pose.rot);
+    slot.mesh.rotation.y = yaw;
     slot.pick.position.set(pose.x, slot.pickY, pose.z);
-    slot.pick.rotation.y = pose.rot ?? FURNITURE_FORWARD;
+    slot.pick.rotation.y = yaw;
     if (slot.glow) slot.glow.position.set(pose.x, 0.08, pose.z);
   }
 
@@ -1014,7 +1035,11 @@ export function createWorld(canvas, state, opts = {}) {
     }
     const slot = fixtureMeshes[moveTarget.id];
     if (!slot) return poseOf(moveTarget);
-    return { x: slot.mesh.position.x, z: slot.mesh.position.z, rot: slot.mesh.rotation.y };
+    return {
+      x: slot.mesh.position.x,
+      z: slot.mesh.position.z,
+      rot: slot.mesh.rotation.y - furnitureStartYaw(moveTarget.id),
+    };
   }
 
   function tryConfirmPlace() {
@@ -1932,6 +1957,7 @@ export function createWorld(canvas, state, opts = {}) {
     dungeon.root.visible = true;
     dungeon.grounds.visible = true;
     applySkyColor(scene, skyIdForScene('dungeon', state.skybox));
+    syncLighting('dungeon');
     shopkeeper.position.set(-4.15, 0, 0.4);
     shopkeeper.rotation.y = Math.PI / 2;
   }
@@ -1948,6 +1974,7 @@ export function createWorld(canvas, state, opts = {}) {
     }
     setShopLayerVisible(true);
     applySkyColor(scene, skyIdForScene('shop', state.skybox));
+    syncLighting('shop');
     shopkeeper.position.set(shopReturnPos.x, 0, shopReturnPos.z);
     shopkeeper.rotation.y = Math.PI;
   }
@@ -1976,6 +2003,7 @@ export function createWorld(canvas, state, opts = {}) {
         setChefHatVisible(shopkeeper, Boolean(state.chefHat));
       }
       applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
+      syncLighting(sceneMode);
     },
     setChestOpen(open) {
       chestOpen = Boolean(open);
@@ -2125,6 +2153,11 @@ export function createWorld(canvas, state, opts = {}) {
       state.skybox = id;
       applySkyColor(scene, skyIdForScene(sceneMode, id));
     },
+    setBrightness(value) {
+      state.brightness = clampBrightness(value);
+      syncLighting(sceneMode);
+      return state.brightness;
+    },
     setChefHat(on) {
       state.chefHat = Boolean(on);
       setChefHatVisible(shopkeeper, state.chefHat);
@@ -2253,6 +2286,28 @@ export function createWorld(canvas, state, opts = {}) {
       replaceFixture('chest', buildChest);
       replaceFixture('range', buildRange);
       replaceFixture('furnace', buildFurnace);
+      replaceFixture('anvil', buildAnvil);
+      replaceFixture('cauldron', buildCauldron);
+      replaceFixture('wheel', buildSpinningWheel);
+      try {
+        const nextDoor = buildShopDoor();
+        nextDoor.visible = shopDoor.visible;
+        scene.remove(shopDoor);
+        shopDoor = nextDoor;
+        scene.add(shopDoor);
+      } catch (err) {
+        console.warn('Bundled door skipped:', err?.message || err);
+      }
+      if (dungeon) {
+        const keepVisible = dungeon.root.visible;
+        scene.remove(dungeon.root);
+        scene.remove(dungeon.grounds);
+        dungeon = buildDungeon();
+        dungeon.root.visible = keepVisible;
+        dungeon.grounds.visible = keepVisible;
+        scene.add(dungeon.root);
+        scene.add(dungeon.grounds);
+      }
       displays.forEach((slot) => {
         try {
           slot.anchor.remove(slot.furniture);

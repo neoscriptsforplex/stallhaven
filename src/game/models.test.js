@@ -12,6 +12,8 @@ import {
   buildAnvil,
   buildChest,
   buildCounter,
+  buildShopDoor,
+  setDoorOpen,
   buildGoblin,
   buildPickaxe,
   buildShopkeeper,
@@ -21,13 +23,14 @@ import {
   setHeldTool,
   updateMinePose,
   updateWalkPose,
+  setBundledLook,
   wrapBundledProp,
   wrapImportedCharacter,
   wrapShopPlayer,
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { pointHitsShop } from './layout.js';
-import { buildFountain, buildFurnace, buildRat, buildShop, buildTree, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -135,6 +138,22 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(fur < 0x505050);
   });
 
+  it('keeps basic white skull and loose-bone props out of the dungeon', () => {
+    assert.ok(DUNGEON_REMAINS.every((spot) => spot.kind === 'slump'));
+    const { root } = buildDungeon();
+    let ivorySpheres = 0;
+    let namedSkeleton = 0;
+    root.traverse((child) => {
+      if (child.name === 'skeleton') namedSkeleton += 1;
+      if (child.isMesh && child.geometry?.type === 'SphereGeometry') {
+        const hex = child.material?.color?.getHex?.();
+        if (hex === 0xe8dcc4) ivorySpheres += 1;
+      }
+    });
+    assert.equal(ivorySpheres, 0);
+    assert.equal(namedSkeleton, 0);
+  });
+
   it('instances many grass blades and clears them inside a left expansion', () => {
     const origin = buildShop([]).root;
     const left = buildShop(['left']).root;
@@ -158,6 +177,26 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(originCount > 800, `expected a lush lawn, got ${originCount} blades`);
     assert.ok(leftCount < originCount);
     assert.equal(leftInRoom, 0);
+  });
+
+  it('keeps round dark-green bushes off garden soil patches', () => {
+    const { root } = buildShop([]);
+    let bushes = 0;
+    let soils = 0;
+    let flowerBeds = 0;
+    root.traverse((child) => {
+      if (child.name === 'flowers') flowerBeds += 1;
+      if (child.isMesh && child.geometry?.type === 'CylinderGeometry' && child.material?.color?.getHex?.() === 0x4a331c) {
+        soils += 1;
+      }
+      if (child.isMesh && child.geometry?.type === 'SphereGeometry' && child.geometry.parameters?.radius === 0.28) {
+        const hex = child.material?.color?.getHex?.();
+        if (hex === 0x2f6a32) bushes += 1;
+      }
+    });
+    assert.equal(bushes, 0);
+    assert.ok(soils >= 1, 'dirt patches should remain');
+    assert.ok(flowerBeds >= 1, 'flower beds should remain');
   });
 
   it('lights expansion rooms with extra wall torches', () => {
@@ -319,7 +358,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
     assert.ok(ids.includes('goblin'));
@@ -359,6 +398,24 @@ describe('bundled prop swaps', () => {
     assertGrounded(skeleton);
     const skBox = measureVisibleBox(skeleton);
     assert.ok(Math.abs(skBox.max.y - 0.5) < 0.08, `skeleton height ${skBox.max.y}`);
+
+    setBundledLook('skeleton', await loadFolder('skeleton'));
+    try {
+      const { root } = buildDungeon();
+      let slumps = 0;
+      let ivorySpheres = 0;
+      root.traverse((child) => {
+        if (child.name === 'skeleton') slumps += 1;
+        if (child.isMesh && child.geometry?.type === 'SphereGeometry') {
+          const hex = child.material?.color?.getHex?.();
+          if (hex === 0xe8dcc4) ivorySpheres += 1;
+        }
+      });
+      assert.equal(slumps, DUNGEON_REMAINS.length);
+      assert.equal(ivorySpheres, 0);
+    } finally {
+      setBundledLook('skeleton', null);
+    }
   });
 
   it('keeps fountain water pouring from the top of a bundled body', async () => {
@@ -384,6 +441,157 @@ describe('bundled prop swaps', () => {
     assert.ok(Math.abs(fx.fallStart - stone.max.y) < 0.02, `stream should start at the spout, ${fx.fallStart} vs ${stone.max.y}`);
     assert.ok(fx.fallStart > fx.fallEnd);
   });
+
+  it('fits a bundled anvil dump to the current anvil bbox without stretch', async () => {
+    let bundled;
+    try {
+      bundled = await loadFolder('anvil');
+    } catch {
+      return;
+    }
+    const target = buildAnvil();
+    const fitted = wrapBundledProp(bundled, target, { name: 'anvil', fit: 'max', label: 'Anvil' });
+    assert.equal(fitted.name, 'anvil');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+  });
+
+  it('fits a bundled cauldron dump to the current cauldron bbox without stretch', async () => {
+    let bundled;
+    try {
+      bundled = await loadFolder('cauldron');
+    } catch {
+      return;
+    }
+    const target = buildCauldron();
+    const fitted = wrapBundledProp(bundled, target, { name: 'cauldron', fit: 'max', label: 'Cauldron' });
+    assert.equal(fitted.name, 'cauldron');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+  });
+
+  it('fits a bundled front door dump to the current leaf bbox without stretch', async () => {
+    let bundled;
+    try {
+      bundled = await loadFolder('door');
+    } catch {
+      return;
+    }
+    const target = new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.1));
+    target.position.y = 1.04;
+    const fitted = wrapBundledProp(bundled, target, { name: 'door-leaf', fit: 'max' });
+    assert.equal(fitted.name, 'door-leaf');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+  });
+
+  it('fits a bundled dungeon ladder dump to the current rails without stretch', async () => {
+    let bundled;
+    try {
+      bundled = await loadFolder('ladder');
+    } catch {
+      return;
+    }
+    const target = new THREE.Mesh(new THREE.BoxGeometry(0.41, 2.6, 0.1));
+    target.position.y = 1.3;
+    const fitted = wrapBundledProp(bundled, target, { name: 'ladder', fit: 'max' });
+    assert.equal(fitted.name, 'ladder');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+  });
+
+  it('fits a bundled wall torch dump upright with flame light', async () => {
+    const bundled = await loadFolder('torch');
+    const target = buildTorch();
+    const fitted = wrapBundledProp(bundled, target, { name: 'torch', fit: 'max' });
+    assert.equal(fitted.name, 'torch');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    setBundledLook('torch', bundled);
+    try {
+      const torch = buildTorch();
+      assert.ok(torch.getObjectByName('torch-glow'));
+      assert.ok(torch.getObjectByName('torch-flame'));
+      const shop = buildShop([]).root;
+      const dungeon = buildDungeon().root;
+      const mounts = [];
+      shop.traverse((child) => {
+        if (child.name === 'torch') mounts.push(child);
+      });
+      dungeon.traverse((child) => {
+        if (child.name === 'torch') mounts.push(child);
+      });
+      assert.ok(mounts.length >= 8);
+      for (const mount of mounts) {
+        assert.ok(Math.abs(mount.rotation.z) < 0.05, `torch should stay upright, z=${mount.rotation.z}`);
+      }
+      const origin = [];
+      shop.traverse((child) => {
+        if (child.name === 'torch') origin.push([child.position.x, child.position.y, child.position.z]);
+      });
+      assert.ok(origin.some(([x, y, z]) => (
+        Math.abs(x + 3.92) < 0.08 && Math.abs(y - 1.62) < 0.05 && Math.abs(z + 1.75) < 0.08
+      )));
+    } finally {
+      setBundledLook('torch', null);
+    }
+  });
+
+  it('fits a bundled outdoor trapdoor dump flush without stretch', async () => {
+    const bundled = await loadFolder('trapdoor');
+    const target = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.16, 0.95));
+    target.position.y = 0.08;
+    const fitted = wrapBundledProp(bundled, target, { name: 'trapdoor', fit: 'max' });
+    assert.equal(fitted.name, 'trapdoor');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+    setBundledLook('trapdoor', bundled);
+    try {
+      const shop = buildShop([]).root;
+      let marked = 0;
+      shop.traverse((child) => {
+        if (child.userData?.kind === 'trapdoor') marked += 1;
+      });
+      assert.ok(marked >= 2, 'visual hatch and walk-to-fade pick should stay marked');
+    } finally {
+      setBundledLook('trapdoor', null);
+    }
+  });
+
+  it('fits a bundled spinning wheel dump without stretch and keeps craft spin hook', async () => {
+    const bundled = await loadFolder('wheel');
+    const target = buildSpinningWheel();
+    const fitted = wrapBundledProp(bundled, target, { name: 'wheel', fit: 'max' });
+    assert.equal(fitted.name, 'wheel');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+    setBundledLook('wheel', bundled);
+    try {
+      const wheel = buildSpinningWheel();
+      assert.equal(wheel.name, 'wheel');
+      assert.ok(wheel.userData.spinWheel);
+    } finally {
+      setBundledLook('wheel', null);
+    }
+  });
 });
 
 describe('shop props', () => {
@@ -399,6 +607,29 @@ describe('shop props', () => {
     assert.equal(keeper.userData.pickaxe.parent, keeper.userData.hand);
   });
 
+  it('keeps a climbable dungeon ladder pick for the walk-to-fade exit', () => {
+    const ladder = buildDungeonLadder();
+    assert.equal(ladder.name, 'ladder');
+    let marked = 0;
+    ladder.traverse((child) => {
+      if (child.userData?.kind === 'ladder') marked += 1;
+    });
+    assert.ok(marked >= 1);
+    const built = buildDungeon();
+    assert.equal(built.ladder?.name, 'ladder');
+    assert.ok(Math.abs(built.ladder.position.z - 0.4) < 1e-6);
+  });
+
+  it('keeps the shop door hinged open so the front doorway stays walkable', () => {
+    const door = buildShopDoor();
+    assert.equal(door.name, 'shop-door');
+    assert.ok(door.userData.hinge);
+    assert.ok(door.userData.hinge.rotation.y > 1.5);
+    door.userData.hinge.rotation.y = 0.2;
+    setDoorOpen(door, true, 1);
+    assert.ok(door.userData.hinge.rotation.y > 1.4);
+  });
+
   it('builds a clean anvil without a resting hammer', () => {
     const anvil = buildAnvil();
     let highBoxes = 0;
@@ -406,6 +637,17 @@ describe('shop props', () => {
       if (child.isMesh && child.geometry?.type === 'BoxGeometry' && child.position.y >= 0.95) highBoxes += 1;
     });
     assert.equal(highBoxes, 0);
+  });
+
+  it('doubles the cooking range uniformly and keeps it on the floor', () => {
+    assert.equal(RANGE_WORLD_SCALE, 2);
+    const range = buildRange();
+    assert.ok(Math.abs(range.scale.x - range.scale.y) < 1e-6);
+    assert.ok(Math.abs(range.scale.y - range.scale.z) < 1e-6);
+    assert.ok(Math.abs(range.scale.x - RANGE_WORLD_SCALE) < 1e-6);
+    const box = measureVisibleBox(range);
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `range should sit on the floor, minY=${box.min.y}`);
+    assert.ok(box.max.y > 1.8, `range should be 2× tall, maxY=${box.max.y}`);
   });
 
   it('scales the chest to 60% and keeps it on the floor', () => {

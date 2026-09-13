@@ -3,6 +3,7 @@ import {
   FOUNTAIN,
   defaultFurniture,
   furnitureHalfSize,
+  furnitureVisualYaw,
   gardenTreeSpots,
   gardenRockSpots,
   keepFountain,
@@ -42,6 +43,11 @@ function blockFromPose(pose, hw, hd) {
   return rectFromCenter(pose.x, pose.z, span.hw * 2, span.hd * 2);
 }
 
+function livePose(id, pose) {
+  if (!pose) return pose;
+  return { ...pose, rot: furnitureVisualYaw(id, pose.rot) };
+}
+
 export function shopObstacles(shop = SHOP, furniture = null) {
   const poses = furniture ?? {
     counter: { x: shop.counter.x, z: shop.counter.z, rot: 0 },
@@ -51,16 +57,17 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     furnace: shop.furnace ? { x: shop.furnace.x, z: shop.furnace.z, rot: 0 } : null,
     displays: shop.displays.map((spot) => ({ x: spot.x, z: spot.z, rot: spot.rot ?? 0 })),
   };
+  const yaw = (id, pose) => (furniture ? livePose(id, pose) : pose);
   const blocks = [
     // Counter blocks the customer-facing mass only, leaving a walkway behind it.
-    blockFromPose(poses.counter, 1.09, 0.26),
-    blockFromPose(poses.anvil, 0.44, 0.35),
-    blockFromPose(poses.chest, 0.3, 0.22),
-    blockFromPose(poses.range, 0.34, 0.28),
+    blockFromPose(yaw('counter', poses.counter), 1.09, 0.26),
+    blockFromPose(yaw('anvil', poses.anvil), 0.44, 0.35),
+    blockFromPose(yaw('chest', poses.chest), 0.3, 0.22),
+    blockFromPose(yaw('range', poses.range), furnitureHalfSize('range').hw, furnitureHalfSize('range').hd),
   ];
-  if (poses.cauldron) blocks.push(blockFromPose(poses.cauldron, 0.32, 0.32));
-  if (poses.furnace) blocks.push(blockFromPose(poses.furnace, 0.4, 0.36));
-  if (poses.wheel) blocks.push(blockFromPose(poses.wheel, 0.36, 0.32));
+  if (poses.cauldron) blocks.push(blockFromPose(yaw('cauldron', poses.cauldron), 0.32, 0.32));
+  if (poses.furnace) blocks.push(blockFromPose(yaw('furnace', poses.furnace), 0.4, 0.36));
+  if (poses.wheel) blocks.push(blockFromPose(yaw('wheel', poses.wheel), 0.36, 0.32));
   const displayPoses = poses.displays ?? [];
   const kinds = furniture?.displayKinds;
   const removed = furniture?.displayRemoved;
@@ -138,7 +145,7 @@ function rectsOverlap(a, b, pad = 0) {
 export function placementBlocked(pose, kind, obstacles, floors, { checkAisle = true } = {}) {
   if (!pose) return 'That spot is off the shop floor.';
   const { hw, hd } = furnitureHalfSize(kind);
-  const span = rotatedFootprint(hw, hd, pose.rot ?? 0);
+  const span = rotatedFootprint(hw, hd, furnitureVisualYaw(kind, pose.rot));
   if (!pointOnFloors(pose.x, pose.z, floors, 0.28)) return 'That spot is off the shop floor.';
   if (checkAisle && kind !== 'counter' && rectHitsAisle(pose.x, pose.z, span.hw, span.hd)) {
     return 'That spot blocks the customer queue.';

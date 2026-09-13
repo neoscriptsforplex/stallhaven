@@ -28,6 +28,25 @@ export const FURNITURE_SNAP = 0.2;
 export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
+/**
+ * Start-only visual yaw around world +Y. Applied to the placed mesh and pick
+ * (including async dump swaps), not stored in furniture.rot so queue / saves
+ * stay on the gameplay facing.
+ * Three.js Y-up: −π/2 is 90° counter-clockwise when viewed from above.
+ */
+export const FURNITURE_START_YAW = {
+  chest: -Math.PI / 2,
+  range: -Math.PI / 2,
+  counter: Math.PI,
+};
+
+export function furnitureStartYaw(id) {
+  return FURNITURE_START_YAW[id] ?? 0;
+}
+
+export function furnitureVisualYaw(id, poseRot = FURNITURE_FORWARD) {
+  return (poseRot ?? FURNITURE_FORWARD) + furnitureStartYaw(id);
+}
 export const SWAP_PRICE_RATIO = 0.65;
 export const CAULDRON_COST = 10000;
 export const WHEEL_COST = 500;

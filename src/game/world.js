@@ -30,6 +30,8 @@ import {
   FURNITURE_ROT_STEP,
   FURNITURE_SNAP,
   cloneFurniture,
+  furnitureStartYaw,
+  furnitureVisualYaw,
   gardenBox,
   gardenTrapdoorSpot,
   playerWalkFloors,
@@ -361,9 +363,10 @@ export function createWorld(canvas, state, opts = {}) {
     if (slot.glow) slot.glow.visible = owned;
     if (!pose) return;
     slot.mesh.position.set(pose.x, 0, pose.z);
-    slot.mesh.rotation.y = pose.rot ?? FURNITURE_FORWARD;
+    const yaw = furnitureVisualYaw(id, pose.rot);
+    slot.mesh.rotation.y = yaw;
     slot.pick.position.set(pose.x, slot.pickY, pose.z);
-    slot.pick.rotation.y = pose.rot ?? FURNITURE_FORWARD;
+    slot.pick.rotation.y = yaw;
     if (slot.glow) slot.glow.position.set(pose.x, 0.08, pose.z);
   }
 
@@ -1014,7 +1017,11 @@ export function createWorld(canvas, state, opts = {}) {
     }
     const slot = fixtureMeshes[moveTarget.id];
     if (!slot) return poseOf(moveTarget);
-    return { x: slot.mesh.position.x, z: slot.mesh.position.z, rot: slot.mesh.rotation.y };
+    return {
+      x: slot.mesh.position.x,
+      z: slot.mesh.position.z,
+      rot: slot.mesh.rotation.y - furnitureStartYaw(moveTarget.id),
+    };
   }
 
   function tryConfirmPlace() {
@@ -2253,6 +2260,16 @@ export function createWorld(canvas, state, opts = {}) {
       replaceFixture('chest', buildChest);
       replaceFixture('range', buildRange);
       replaceFixture('furnace', buildFurnace);
+      if (dungeon) {
+        const keepVisible = dungeon.root.visible;
+        scene.remove(dungeon.root);
+        scene.remove(dungeon.grounds);
+        dungeon = buildDungeon();
+        dungeon.root.visible = keepVisible;
+        dungeon.grounds.visible = keepVisible;
+        scene.add(dungeon.root);
+        scene.add(dungeon.grounds);
+      }
       displays.forEach((slot) => {
         try {
           slot.anchor.remove(slot.furniture);

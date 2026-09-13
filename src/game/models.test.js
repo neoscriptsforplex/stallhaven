@@ -21,13 +21,14 @@ import {
   setHeldTool,
   updateMinePose,
   updateWalkPose,
+  setBundledLook,
   wrapBundledProp,
   wrapImportedCharacter,
   wrapShopPlayer,
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { pointHitsShop } from './layout.js';
-import { buildFountain, buildFurnace, buildRat, buildShop, buildTree, mountFountainWater } from './shopbuild.js';
+import { buildDungeon, buildFountain, buildFurnace, buildRat, buildShop, buildTree, DUNGEON_REMAINS, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -133,6 +134,22 @@ describe('outdoor and dungeon extras', () => {
       if (child.isMesh && child.material?.color && !fur) fur = child.material.color.getHex();
     });
     assert.ok(fur < 0x505050);
+  });
+
+  it('keeps basic white skull and loose-bone props out of the dungeon', () => {
+    assert.ok(DUNGEON_REMAINS.every((spot) => spot.kind === 'slump'));
+    const { root } = buildDungeon();
+    let ivorySpheres = 0;
+    let namedSkeleton = 0;
+    root.traverse((child) => {
+      if (child.name === 'skeleton') namedSkeleton += 1;
+      if (child.isMesh && child.geometry?.type === 'SphereGeometry') {
+        const hex = child.material?.color?.getHex?.();
+        if (hex === 0xe8dcc4) ivorySpheres += 1;
+      }
+    });
+    assert.equal(ivorySpheres, 0);
+    assert.equal(namedSkeleton, 0);
   });
 
   it('instances many grass blades and clears them inside a left expansion', () => {
@@ -359,6 +376,24 @@ describe('bundled prop swaps', () => {
     assertGrounded(skeleton);
     const skBox = measureVisibleBox(skeleton);
     assert.ok(Math.abs(skBox.max.y - 0.5) < 0.08, `skeleton height ${skBox.max.y}`);
+
+    setBundledLook('skeleton', await loadFolder('skeleton'));
+    try {
+      const { root } = buildDungeon();
+      let slumps = 0;
+      let ivorySpheres = 0;
+      root.traverse((child) => {
+        if (child.name === 'skeleton') slumps += 1;
+        if (child.isMesh && child.geometry?.type === 'SphereGeometry') {
+          const hex = child.material?.color?.getHex?.();
+          if (hex === 0xe8dcc4) ivorySpheres += 1;
+        }
+      });
+      assert.equal(slumps, DUNGEON_REMAINS.length);
+      assert.equal(ivorySpheres, 0);
+    } finally {
+      setBundledLook('skeleton', null);
+    }
   });
 
   it('keeps fountain water pouring from the top of a bundled body', async () => {

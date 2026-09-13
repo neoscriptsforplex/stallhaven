@@ -1419,9 +1419,9 @@ describe('dungeon sky and remains', () => {
     assert.equal(skyIdForScene('dungeon', 'peach'), 'dark-grey');
     assert.equal(skyIdForScene('shop', 'peach'), 'peach');
     assert.equal(skyIdForScene('shop', 'nope'), 'blue');
-    assert.ok(DUNGEON_REMAINS.length >= 8);
-    assert.ok(DUNGEON_REMAINS.some((spot) => spot.kind === 'slump'));
-    assert.ok(DUNGEON_REMAINS.some((spot) => spot.kind === 'pile'));
+    assert.ok(DUNGEON_REMAINS.length >= 3);
+    assert.ok(DUNGEON_REMAINS.every((spot) => spot.kind === 'slump'));
+    assert.equal(DUNGEON_REMAINS.some((spot) => spot.kind === 'pile' || spot.kind === 'scatter'), false);
     assert.equal(DUNGEON_BOULDERS.length, 8);
     assert.deepEqual(DUNGEON_BOULDERS.map((spot) => spot.materialId), [
       'essence', 'bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon',

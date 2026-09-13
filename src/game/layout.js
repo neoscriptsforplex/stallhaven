@@ -37,6 +37,7 @@ export const FURNITURE_FORWARD = 0;
 export const FURNITURE_START_YAW = {
   chest: -Math.PI / 2,
   range: -Math.PI / 2,
+  furnace: -Math.PI / 2,
   counter: Math.PI,
 };
 

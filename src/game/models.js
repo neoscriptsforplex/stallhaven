@@ -966,6 +966,15 @@ export function setChefHatVisible(keeper, on) {
 }
 
 export function buildAnvil() {
+  const bundled = getBundledLook('anvil');
+  if (bundled) {
+    const target = buildProceduralAnvil();
+    return wrapBundledProp(bundled, target, { name: 'anvil', fit: 'max', label: 'Anvil', wareY: 'top' });
+  }
+  return buildProceduralAnvil();
+}
+
+function buildProceduralAnvil() {
   const group = new THREE.Group();
   group.name = 'anvil';
   const iron = wornMetal(0x5a6068, 0.4, 0.78);

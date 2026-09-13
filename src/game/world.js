@@ -2260,6 +2260,7 @@ export function createWorld(canvas, state, opts = {}) {
       replaceFixture('chest', buildChest);
       replaceFixture('range', buildRange);
       replaceFixture('furnace', buildFurnace);
+      replaceFixture('anvil', buildAnvil);
       if (dungeon) {
         const keepVisible = dungeon.root.visible;
         scene.remove(dungeon.root);

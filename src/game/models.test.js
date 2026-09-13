@@ -336,7 +336,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
     assert.ok(ids.includes('goblin'));
@@ -418,6 +418,23 @@ describe('bundled prop swaps', () => {
     const fx = group.userData.fountainWater;
     assert.ok(Math.abs(fx.fallStart - stone.max.y) < 0.02, `stream should start at the spout, ${fx.fallStart} vs ${stone.max.y}`);
     assert.ok(fx.fallStart > fx.fallEnd);
+  });
+
+  it('fits a bundled anvil dump to the current anvil bbox without stretch', async () => {
+    let bundled;
+    try {
+      bundled = await loadFolder('anvil');
+    } catch {
+      return;
+    }
+    const target = buildAnvil();
+    const fitted = wrapBundledProp(bundled, target, { name: 'anvil', fit: 'max', label: 'Anvil' });
+    assert.equal(fitted.name, 'anvil');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
   });
 });
 

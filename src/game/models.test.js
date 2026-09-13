@@ -179,6 +179,26 @@ describe('outdoor and dungeon extras', () => {
     assert.equal(leftInRoom, 0);
   });
 
+  it('keeps round dark-green bushes off garden soil patches', () => {
+    const { root } = buildShop([]);
+    let bushes = 0;
+    let soils = 0;
+    let flowerBeds = 0;
+    root.traverse((child) => {
+      if (child.name === 'flowers') flowerBeds += 1;
+      if (child.isMesh && child.geometry?.type === 'CylinderGeometry' && child.material?.color?.getHex?.() === 0x4a331c) {
+        soils += 1;
+      }
+      if (child.isMesh && child.geometry?.type === 'SphereGeometry' && child.geometry.parameters?.radius === 0.28) {
+        const hex = child.material?.color?.getHex?.();
+        if (hex === 0x2f6a32) bushes += 1;
+      }
+    });
+    assert.equal(bushes, 0);
+    assert.ok(soils >= 1, 'dirt patches should remain');
+    assert.ok(flowerBeds >= 1, 'flower beds should remain');
+  });
+
   it('lights expansion rooms with extra wall torches', () => {
     const countTorches = (root) => {
       let n = 0;

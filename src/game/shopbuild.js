@@ -1229,12 +1229,6 @@ function addGardenBed(root, x, z, rand) {
   const flowers = buildFlowerCluster(rand);
   flowers.position.set(x, 0.08, z);
   root.add(flowers);
-  const bush = addShadow(new THREE.Mesh(
-    new THREE.SphereGeometry(0.28, 8, 6),
-    new THREE.MeshStandardMaterial({ color: 0x2f6a32, roughness: 0.9 }),
-  ));
-  bush.position.set(x + 0.45, 0.28, z + 0.15);
-  root.add(bush);
 }
 
 function buildFlowerCluster(rand) {

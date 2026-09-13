@@ -15,7 +15,7 @@ import {
 } from './nav.js';
 
 describe('shop navigation', () => {
-  const obstacles = shopObstacles();
+  const obstacles = shopObstacles(SHOP, defaultFurniture());
 
   it('lets the shopkeeper stand behind the counter', () => {
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, obstacles), true);

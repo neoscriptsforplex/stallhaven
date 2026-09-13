@@ -1814,7 +1814,7 @@ export function createWorld(canvas, state, opts = {}) {
       positions.setY(i, y);
     }
     positions.needsUpdate = true;
-    setChestLid(chest, chestOpen, dt);
+    setChestLid(fixtureMeshes.chest.mesh, chestOpen, dt);
     counterGlow.material.opacity = moveTarget?.id === 'counter' ? 0.7 : 0.0;
     setDoorOpen(shopDoor, true, dt);
     for (const puff of clouds.children) {
@@ -2228,6 +2228,55 @@ export function createWorld(canvas, state, opts = {}) {
     },
     walkTo(x, z) {
       return setMoveTarget(x, z);
+    },
+    applyBundledDefaults(playerScene) {
+      bundledPlayerSource = playerScene ?? null;
+      try {
+        rebuildArchitecture();
+      } catch (err) {
+        console.warn('Bundled shop architecture skipped:', err?.message || err);
+      }
+      const replaceFixture = (id, builder) => {
+        try {
+          const slot = fixtureMeshes[id];
+          if (!slot) return;
+          const next = builder();
+          scene.remove(slot.mesh);
+          slot.mesh = next;
+          scene.add(next);
+          applyFixturePose(id);
+        } catch (err) {
+          console.warn(`Bundled ${id} skipped:`, err?.message || err);
+        }
+      };
+      replaceFixture('counter', buildCounter);
+      replaceFixture('chest', buildChest);
+      replaceFixture('range', buildRange);
+      replaceFixture('furnace', buildFurnace);
+      displays.forEach((slot) => {
+        try {
+          slot.anchor.remove(slot.furniture);
+          const furniture = buildFurniture(slot.spot.kind);
+          slot.anchor.add(furniture);
+          slot.furniture = furniture;
+          slot.wareAnchor.position.y = furniture.userData.stand ? 0 : furniture.userData.wareY;
+          slot.anchor.add(slot.wareAnchor);
+        } catch (err) {
+          console.warn('Bundled furniture skipped:', err?.message || err);
+        }
+      });
+      if (!customPlayerSource) {
+        try {
+          replaceShopkeeperMesh(makeDefaultKeeper());
+        } catch (err) {
+          console.warn('Bundled player skipped:', err?.message || err);
+          bundledPlayerSource = null;
+          replaceShopkeeperMesh(makeDefaultKeeper());
+        }
+      }
+      applyAllPoses();
+      syncDisplays();
+      spawnGoblins();
     },
     clearUploads() {
       customPlayerSource = null;

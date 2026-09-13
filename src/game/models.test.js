@@ -30,7 +30,7 @@ import {
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { pointHitsShop } from './layout.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildTorch, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -338,7 +338,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
     assert.ok(ids.includes('goblin'));
@@ -490,6 +490,41 @@ describe('bundled prop swaps', () => {
     const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
     const want = measureVisibleBox(target).getSize(new THREE.Vector3());
     assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+  });
+
+  it('fits a bundled wall torch dump upright with flame light', async () => {
+    const bundled = await loadFolder('torch');
+    const target = buildTorch();
+    const fitted = wrapBundledProp(bundled, target, { name: 'torch', fit: 'max' });
+    assert.equal(fitted.name, 'torch');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    setBundledLook('torch', bundled);
+    try {
+      const torch = buildTorch();
+      assert.ok(torch.getObjectByName('torch-glow'));
+      assert.ok(torch.getObjectByName('torch-flame'));
+      const shop = buildShop([]).root;
+      const dungeon = buildDungeon().root;
+      const mounts = [];
+      shop.traverse((child) => {
+        if (child.name === 'torch') mounts.push(child);
+      });
+      dungeon.traverse((child) => {
+        if (child.name === 'torch') mounts.push(child);
+      });
+      assert.ok(mounts.length >= 8);
+      for (const mount of mounts) {
+        assert.ok(Math.abs(mount.rotation.z) < 0.05, `torch should stay upright, z=${mount.rotation.z}`);
+      }
+      const origin = [];
+      shop.traverse((child) => {
+        if (child.name === 'torch') origin.push([child.position.x, child.position.y, child.position.z]);
+      });
+      assert.ok(origin.some(([x, y, z]) => Math.abs(x + 4.1) < 0.2 && Math.abs(y - 1.62) < 0.05 && Math.abs(z + 1.85) < 0.05));
+    } finally {
+      setBundledLook('torch', null);
+    }
   });
 });
 

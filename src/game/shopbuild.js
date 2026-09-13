@@ -257,6 +257,30 @@ function flameMat() {
 }
 
 export function buildTorch() {
+  const bundled = getBundledLook('torch');
+  if (bundled) {
+    const fitted = wrapBundledProp(bundled, buildProceduralTorch(), { name: 'torch', fit: 'max' });
+    fitted.name = 'torch';
+    attachTorchFx(fitted);
+    return fitted;
+  }
+  return buildProceduralTorch();
+}
+
+function attachTorchFx(mesh) {
+  const box = measureVisibleBox(mesh);
+  const tipY = Number.isFinite(box.max.y) ? box.max.y : 0.42;
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 7), flameMat());
+  flame.name = 'torch-flame';
+  flame.position.y = tipY + 0.04;
+  mesh.add(flame);
+  const glow = new THREE.PointLight(0xff9a3a, 1.15, 4.5, 2);
+  glow.name = 'torch-glow';
+  glow.position.y = tipY + 0.02;
+  mesh.add(glow);
+}
+
+function buildProceduralTorch() {
   const group = new THREE.Group();
   group.name = 'torch';
   const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, 0.42, 6), wood(0x5a3a22)));
@@ -278,7 +302,8 @@ function addWallTorch(root, x, y, z, rotY = 0) {
   const torch = buildTorch();
   torch.position.set(x, y, z);
   torch.rotation.y = rotY;
-  torch.rotation.z = 0.55;
+  // Procedural sconces lean off the wall. The dumped torch stays upright.
+  if (!getBundledLook('torch')) torch.rotation.z = 0.55;
   root.add(torch);
   return torch;
 }

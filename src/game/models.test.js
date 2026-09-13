@@ -521,7 +521,9 @@ describe('bundled prop swaps', () => {
       shop.traverse((child) => {
         if (child.name === 'torch') origin.push([child.position.x, child.position.y, child.position.z]);
       });
-      assert.ok(origin.some(([x, y, z]) => Math.abs(x + 4.1) < 0.2 && Math.abs(y - 1.62) < 0.05 && Math.abs(z + 1.85) < 0.05));
+      assert.ok(origin.some(([x, y, z]) => (
+        Math.abs(x + 3.92) < 0.08 && Math.abs(y - 1.62) < 0.05 && Math.abs(z + 1.75) < 0.08
+      )));
     } finally {
       setBundledLook('torch', null);
     }

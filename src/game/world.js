@@ -85,6 +85,7 @@ import {
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
+import { applySceneLighting } from './lighting.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
@@ -150,7 +151,7 @@ export function createWorld(canvas, state, opts = {}) {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.12;
 
   const scene = new THREE.Scene();
   applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
@@ -166,8 +167,10 @@ export function createWorld(canvas, state, opts = {}) {
   camera.position.set(SHOP.cameraStart.x, SHOP.cameraStart.y, SHOP.cameraStart.z);
   camera.lookAt(camLook);
 
-  const hemi = new THREE.HemisphereLight(0xf0e2c4, 0x6a5340, 0.9);
+  const hemi = new THREE.HemisphereLight(0xf0e2c4, 0x6a5340, 1.14);
   scene.add(hemi);
+  const ambient = new THREE.AmbientLight(0xf4e6c8, 0.24);
+  scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xffe1b0, 1.15);
   sun.position.set(-4.5, 12, 6.5);
   sun.castShadow = true;
@@ -180,9 +183,24 @@ export function createWorld(canvas, state, opts = {}) {
   sun.shadow.camera.bottom = -22;
   scene.add(sun);
 
-  const doorLight = new THREE.PointLight(0xffe1b0, 2.4, 6, 2);
+  const doorLight = new THREE.PointLight(0xffe1b0, 2.2, 6, 2);
   doorLight.position.set(0, 2.15, 3.9);
   scene.add(doorLight);
+  const shopFill = new THREE.PointLight(0xffe8c4, 0.48, 16, 2);
+  shopFill.position.set(0, 2.55, -0.35);
+  scene.add(shopFill);
+
+  function syncLighting(mode) {
+    applySceneLighting({
+      hemi,
+      ambient,
+      fill: shopFill,
+      door: doorLight,
+      sun,
+      renderer,
+    }, mode);
+  }
+  syncLighting('shop');
 
   if (!state.furniture) state.furniture = cloneFurniture();
   let architecture = null;
@@ -1939,6 +1957,7 @@ export function createWorld(canvas, state, opts = {}) {
     dungeon.root.visible = true;
     dungeon.grounds.visible = true;
     applySkyColor(scene, skyIdForScene('dungeon', state.skybox));
+    syncLighting('dungeon');
     shopkeeper.position.set(-4.15, 0, 0.4);
     shopkeeper.rotation.y = Math.PI / 2;
   }
@@ -1955,6 +1974,7 @@ export function createWorld(canvas, state, opts = {}) {
     }
     setShopLayerVisible(true);
     applySkyColor(scene, skyIdForScene('shop', state.skybox));
+    syncLighting('shop');
     shopkeeper.position.set(shopReturnPos.x, 0, shopReturnPos.z);
     shopkeeper.rotation.y = Math.PI;
   }

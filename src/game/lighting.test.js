@@ -1,6 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DUNGEON_LIGHT, SHOP_LIGHT, applySceneLighting, lightingForScene } from './lighting.js';
+import {
+  DUNGEON_LIGHT,
+  SHOP_LIGHT,
+  applySceneLighting,
+  brightnessForScene,
+  clampBrightness,
+  lightingForScene,
+} from './lighting.js';
 
 describe('scene lighting', () => {
   it('brightens the shop with a modest ambient and fill, not a blown-out key', () => {
@@ -36,5 +43,24 @@ describe('scene lighting', () => {
     assert.equal(lights.hemi.intensity, DUNGEON_LIGHT.hemi);
     assert.equal(lights.fill.intensity, 0);
     assert.equal(lights.door.intensity, 0);
+  });
+
+  it('uses 100% brightness as the current shop bump and damps dungeon highs', () => {
+    assert.equal(clampBrightness(undefined), 1);
+    assert.equal(clampBrightness(0.2), 0.5);
+    assert.equal(clampBrightness(2), 1.5);
+    assert.equal(brightnessForScene('shop', 1), 1);
+    assert.equal(brightnessForScene('dungeon', 1), 1);
+    assert.equal(brightnessForScene('shop', 1.5), 1.5);
+    assert.ok(brightnessForScene('dungeon', 1.5) < 1.5);
+    assert.ok(brightnessForScene('dungeon', 1.5) <= 1.12);
+    const shopHigh = lightingForScene('shop', 1.5);
+    const dungeonHigh = lightingForScene('dungeon', 1.5);
+    assert.ok(shopHigh.hemi > SHOP_LIGHT.hemi);
+    assert.ok(dungeonHigh.hemi < DUNGEON_LIGHT.hemi * 1.5);
+    assert.ok(dungeonHigh.exposure < DUNGEON_LIGHT.exposure * 1.5);
+    const shopDefault = lightingForScene('shop', 1);
+    assert.equal(shopDefault.hemi, SHOP_LIGHT.hemi);
+    assert.equal(shopDefault.exposure, SHOP_LIGHT.exposure);
   });
 });

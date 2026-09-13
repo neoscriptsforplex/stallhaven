@@ -947,6 +947,25 @@ function buildProceduralFurnace() {
 }
 
 export function buildSpinningWheel() {
+  const bundled = getBundledLook('wheel');
+  if (bundled) {
+    const target = buildProceduralSpinningWheel();
+    const fitted = wrapBundledProp(bundled, target, {
+      name: 'wheel',
+      fit: 'max',
+      label: 'Spinning Wheel',
+      wareY: 'top',
+    });
+    const spinner = new THREE.Group();
+    spinner.name = 'spin-wheel';
+    fitted.add(spinner);
+    fitted.userData.spinWheel = spinner;
+    return fitted;
+  }
+  return buildProceduralSpinningWheel();
+}
+
+function buildProceduralSpinningWheel() {
   const group = new THREE.Group();
   group.name = 'wheel';
   const oak = woodSurface(0x6b4423, 0.86, 0.8, 1.1, 4211);
@@ -1403,7 +1422,41 @@ function markTrapdoorMesh(mesh) {
   return mesh;
 }
 
+function trapdoorFitTarget() {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.16, 0.95));
+  mesh.position.y = 0.08;
+  return mesh;
+}
+
+function attachTrapdoorPick(root) {
+  const pick = markTrapdoorMesh(new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 1.2, 2.2),
+    pickMat(),
+  ));
+  pick.position.y = 0.55;
+  root.add(pick);
+  return pick;
+}
+
 function buildTrapdoor() {
+  const bundled = getBundledLook('trapdoor');
+  if (bundled) {
+    const fitted = wrapBundledProp(bundled, trapdoorFitTarget(), { name: 'trapdoor', fit: 'max' });
+    fitted.name = 'trapdoor';
+    markTrapdoorMesh(fitted);
+    fitted.traverse((child) => {
+      if (child.isMesh) markTrapdoorMesh(child);
+    });
+    const group = new THREE.Group();
+    group.name = 'trapdoor';
+    group.add(fitted);
+    attachTrapdoorPick(group);
+    return group;
+  }
+  return buildProceduralTrapdoor();
+}
+
+function buildProceduralTrapdoor() {
   const group = new THREE.Group();
   group.name = 'trapdoor';
   const frame = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.95), wood(0x3f2716)));
@@ -1419,12 +1472,7 @@ function buildTrapdoor() {
   const ring = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 10), metal(0xb08a3c)));
   ring.position.set(0, 0.12, 0.22);
   group.add(ring);
-  const pick = markTrapdoorMesh(new THREE.Mesh(
-    new THREE.BoxGeometry(2.2, 1.2, 2.2),
-    pickMat(),
-  ));
-  pick.position.y = 0.55;
-  group.add(pick);
+  attachTrapdoorPick(group);
   return group;
 }
 

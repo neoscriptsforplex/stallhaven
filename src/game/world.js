@@ -85,7 +85,7 @@ import {
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
-import { applySceneLighting } from './lighting.js';
+import { applySceneLighting, clampBrightness } from './lighting.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
@@ -190,7 +190,7 @@ export function createWorld(canvas, state, opts = {}) {
   shopFill.position.set(0, 2.55, -0.35);
   scene.add(shopFill);
 
-  function syncLighting(mode) {
+  function syncLighting(mode = sceneMode) {
     applySceneLighting({
       hemi,
       ambient,
@@ -198,7 +198,7 @@ export function createWorld(canvas, state, opts = {}) {
       door: doorLight,
       sun,
       renderer,
-    }, mode);
+    }, mode, state.brightness);
   }
   syncLighting('shop');
 
@@ -2003,6 +2003,7 @@ export function createWorld(canvas, state, opts = {}) {
         setChefHatVisible(shopkeeper, Boolean(state.chefHat));
       }
       applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
+      syncLighting(sceneMode);
     },
     setChestOpen(open) {
       chestOpen = Boolean(open);
@@ -2152,6 +2153,11 @@ export function createWorld(canvas, state, opts = {}) {
       state.skybox = id;
       applySkyColor(scene, skyIdForScene(sceneMode, id));
     },
+    setBrightness(value) {
+      state.brightness = clampBrightness(value);
+      syncLighting(sceneMode);
+      return state.brightness;
+    },
     setChefHat(on) {
       state.chefHat = Boolean(on);
       setChefHatVisible(shopkeeper, state.chefHat);
@@ -2282,6 +2288,7 @@ export function createWorld(canvas, state, opts = {}) {
       replaceFixture('furnace', buildFurnace);
       replaceFixture('anvil', buildAnvil);
       replaceFixture('cauldron', buildCauldron);
+      replaceFixture('wheel', buildSpinningWheel);
       try {
         const nextDoor = buildShopDoor();
         nextDoor.visible = shopDoor.visible;

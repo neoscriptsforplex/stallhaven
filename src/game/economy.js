@@ -53,6 +53,13 @@ import {
   padById,
   padConnects,
 } from './layout.js';
+import {
+  BRIGHTNESS_MAX,
+  BRIGHTNESS_MIN,
+  DEFAULT_BRIGHTNESS,
+  clampBrightness,
+  readStoredBrightness,
+} from './lighting.js';
 
 export {
   CAULDRON_COST,
@@ -65,6 +72,9 @@ export {
   SHOP_MAX_LEVEL,
   DEFAULT_SKYBOX,
   SKYBOXES,
+  BRIGHTNESS_MAX,
+  BRIGHTNESS_MIN,
+  DEFAULT_BRIGHTNESS,
 };
 
 export const SAVE_VERSION = 9;
@@ -253,6 +263,7 @@ export function createState() {
     shopXp: 0,
     shopLevel: 1,
     skybox: DEFAULT_SKYBOX,
+    brightness: readStoredBrightness(),
     chefHat: false,
     appearance: defaultAppearance(),
     playTime: 0,
@@ -961,6 +972,7 @@ export function serializeState(state) {
     shopXp: Math.max(0, Math.round(state.shopXp ?? 0)),
     shopLevel: shopProgress(state.shopXp ?? 0).level,
     skybox: skyboxId(state.skybox),
+    brightness: clampBrightness(state.brightness),
     chefHat: Boolean(state.chefHat),
     appearance: normalizeAppearance(state.appearance),
     playTime: Math.max(0, Number(state.playTime) || 0),
@@ -1089,6 +1101,9 @@ export function applyState(state, data) {
   }
   next.shopLevel = shopProgress(next.shopXp).level;
   next.skybox = skyboxId(data.skybox);
+  next.brightness = data.brightness != null
+    ? clampBrightness(data.brightness)
+    : DEFAULT_BRIGHTNESS;
   if (typeof data.chefHat === 'boolean') next.chefHat = data.chefHat;
   next.appearance = normalizeAppearance(data.appearance);
   if (typeof data.playTime === 'number' && Number.isFinite(data.playTime)) {
@@ -1152,6 +1167,7 @@ export function applyState(state, data) {
   state.shopXp = next.shopXp;
   state.shopLevel = next.shopLevel;
   state.skybox = next.skybox;
+  state.brightness = next.brightness;
   state.chefHat = next.chefHat;
   state.appearance = next.appearance;
   state.playTime = next.playTime;

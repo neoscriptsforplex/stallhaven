@@ -30,7 +30,7 @@ import {
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { pointHitsShop } from './layout.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildTorch, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -358,7 +358,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
     assert.ok(ids.includes('goblin'));
@@ -546,6 +546,50 @@ describe('bundled prop swaps', () => {
       )));
     } finally {
       setBundledLook('torch', null);
+    }
+  });
+
+  it('fits a bundled outdoor trapdoor dump flush without stretch', async () => {
+    const bundled = await loadFolder('trapdoor');
+    const target = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.16, 0.95));
+    target.position.y = 0.08;
+    const fitted = wrapBundledProp(bundled, target, { name: 'trapdoor', fit: 'max' });
+    assert.equal(fitted.name, 'trapdoor');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+    setBundledLook('trapdoor', bundled);
+    try {
+      const shop = buildShop([]).root;
+      let marked = 0;
+      shop.traverse((child) => {
+        if (child.userData?.kind === 'trapdoor') marked += 1;
+      });
+      assert.ok(marked >= 2, 'visual hatch and walk-to-fade pick should stay marked');
+    } finally {
+      setBundledLook('trapdoor', null);
+    }
+  });
+
+  it('fits a bundled spinning wheel dump without stretch and keeps craft spin hook', async () => {
+    const bundled = await loadFolder('wheel');
+    const target = buildSpinningWheel();
+    const fitted = wrapBundledProp(bundled, target, { name: 'wheel', fit: 'max' });
+    assert.equal(fitted.name, 'wheel');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+    setBundledLook('wheel', bundled);
+    try {
+      const wheel = buildSpinningWheel();
+      assert.equal(wheel.name, 'wheel');
+      assert.ok(wheel.userData.spinWheel);
+    } finally {
+      setBundledLook('wheel', null);
     }
   });
 });

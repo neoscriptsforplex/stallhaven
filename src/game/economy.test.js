@@ -292,6 +292,7 @@ describe('save and load', () => {
     state.furniture.anvil.x = -2.4;
     state.materialAcc.bronze = 0.4;
     state.skybox = 'black';
+    state.brightness = 1.25;
     state.chefHat = true;
     const saved = serializeState(state);
     const other = createState();
@@ -306,6 +307,7 @@ describe('save and load', () => {
     assert.equal(other.chest.bronze_scimitar, 1);
     assert.equal(other.music.volume, state.music.volume);
     assert.equal(other.skybox, 'black');
+    assert.equal(other.brightness, 1.25);
     assert.equal(other.chefHat, true);
     assert.ok(other.shopXp > 0);
     assert.equal(other.shopLevel, shopProgress(other.shopXp).level);
@@ -331,6 +333,7 @@ describe('save and load', () => {
     assert.equal(state.fullscreen, false);
     assert.ok(state.music.volume > 0);
     assert.equal(state.skybox, 'blue');
+    assert.equal(state.brightness, 1);
     assert.equal(state.chefHat, false);
     assert.equal(state.shopXp, 0);
     assert.equal(state.shopLevel, 1);

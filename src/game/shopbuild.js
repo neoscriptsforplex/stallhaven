@@ -760,13 +760,25 @@ function addWallVines(root, center) {
   });
 }
 
+/** Uniform world scale vs the baked range (dump or procedural) after size-match. */
+export const RANGE_WORLD_SCALE = 2;
+
+function applyRangeWorldScale(mesh) {
+  mesh.scale.multiplyScalar(RANGE_WORLD_SCALE);
+  mesh.updateMatrixWorld(true);
+  const box = measureVisibleBox(mesh);
+  if (Number.isFinite(box.min.y)) mesh.position.y -= box.min.y;
+  if (mesh.userData.wareY != null) mesh.userData.wareY *= RANGE_WORLD_SCALE;
+  return mesh;
+}
+
 export function buildRange() {
   const bundled = getBundledLook('range');
+  const target = applyRangeWorldScale(buildProceduralRange());
   if (bundled) {
-    const target = buildProceduralRange();
     return wrapBundledProp(bundled, target, { name: 'range', fit: 'height', label: 'Range', wareY: 'top' });
   }
-  return buildProceduralRange();
+  return target;
 }
 
 function buildProceduralRange() {

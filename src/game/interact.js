@@ -7,7 +7,7 @@ export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulde
 export const STATION_HIT = {
   anvil: { w: 1.62, h: 1.9, d: 1.42, pickY: 0.9, floorR: 1.2 },
   chest: { w: 1.55, h: 1.7, d: 1.28, pickY: 0.82, floorR: 1.1 },
-  range: { w: 1.2, h: 1.65, d: 1.1, pickY: 0.8, floorR: 1.0 },
+  range: { w: 2.4, h: 3.3, d: 2.2, pickY: 1.6, floorR: 1.55 },
   furnace: { w: 1.28, h: 1.7, d: 1.2, pickY: 0.8, floorR: 1.05 },
   cauldron: { w: 1.15, h: 1.55, d: 1.15, pickY: 0.74, floorR: 1.0 },
   wheel: { w: 1.2, h: 1.6, d: 1.15, pickY: 0.74, floorR: 1.0 },

@@ -28,7 +28,7 @@ import {
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { pointHitsShop } from './layout.js';
-import { buildDungeon, buildFountain, buildFurnace, buildRat, buildShop, buildTree, DUNGEON_REMAINS, mountFountainWater } from './shopbuild.js';
+import { buildDungeon, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -441,6 +441,17 @@ describe('shop props', () => {
       if (child.isMesh && child.geometry?.type === 'BoxGeometry' && child.position.y >= 0.95) highBoxes += 1;
     });
     assert.equal(highBoxes, 0);
+  });
+
+  it('doubles the cooking range uniformly and keeps it on the floor', () => {
+    assert.equal(RANGE_WORLD_SCALE, 2);
+    const range = buildRange();
+    assert.ok(Math.abs(range.scale.x - range.scale.y) < 1e-6);
+    assert.ok(Math.abs(range.scale.y - range.scale.z) < 1e-6);
+    assert.ok(Math.abs(range.scale.x - RANGE_WORLD_SCALE) < 1e-6);
+    const box = measureVisibleBox(range);
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `range should sit on the floor, minY=${box.min.y}`);
+    assert.ok(box.max.y > 1.8, `range should be 2× tall, maxY=${box.max.y}`);
   });
 
   it('scales the chest to 60% and keeps it on the floor', () => {

@@ -63,7 +63,7 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     blockFromPose(yaw('counter', poses.counter), 1.09, 0.26),
     blockFromPose(yaw('anvil', poses.anvil), 0.44, 0.35),
     blockFromPose(yaw('chest', poses.chest), 0.3, 0.22),
-    blockFromPose(yaw('range', poses.range), 0.34, 0.28),
+    blockFromPose(yaw('range', poses.range), furnitureHalfSize('range').hw, furnitureHalfSize('range').hd),
   ];
   if (poses.cauldron) blocks.push(blockFromPose(yaw('cauldron', poses.cauldron), 0.32, 0.32));
   if (poses.furnace) blocks.push(blockFromPose(yaw('furnace', poses.furnace), 0.4, 0.36));

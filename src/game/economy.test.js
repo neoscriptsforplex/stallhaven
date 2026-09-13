@@ -553,7 +553,7 @@ describe('catalog', () => {
     assert.equal(rectHitsAisle(SHOP.anvil.x, SHOP.anvil.z, 0.48, 0.4, QUEUE_AISLE), false);
     assert.equal(rectHitsAisle(SHOP.furnace.x, SHOP.furnace.z, 0.4, 0.36, QUEUE_AISLE), false);
     assert.equal(rectHitsAisle(SHOP.chest.x, SHOP.chest.z, 0.54, 0.41, QUEUE_AISLE), false);
-    assert.equal(rectHitsAisle(SHOP.range.x, SHOP.range.z, 0.34, 0.28, QUEUE_AISLE), false);
+    assert.equal(rectHitsAisle(SHOP.range.x, SHOP.range.z, 0.68, 0.56, QUEUE_AISLE), false);
   });
 
   it('lines travelers up in front of the counter', () => {

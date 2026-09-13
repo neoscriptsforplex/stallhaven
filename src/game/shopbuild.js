@@ -1860,30 +1860,54 @@ function buildProceduralRat() {
   return group;
 }
 
-function buildDungeonLadder() {
-  const group = new THREE.Group();
-  group.name = 'ladder';
-  const rail = wood(0x5a3a22);
-  const mark = (mesh) => {
-    mesh.userData.kind = 'ladder';
-    return mesh;
-  };
-  for (const x of [-0.18, 0.18]) {
-    const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.05), rail));
-    post.position.set(x, 1.3, 0);
-    group.add(mark(post));
+function markLadder(mesh) {
+  mesh.userData.kind = 'ladder';
+  return mesh;
+}
+
+function ladderFitTarget() {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.41, 2.6, 0.1));
+  mesh.position.y = 1.3;
+  return mesh;
+}
+
+export function buildDungeonLadder() {
+  const bundled = getBundledLook('ladder');
+  if (bundled) {
+    const fitted = wrapBundledProp(bundled, ladderFitTarget(), { name: 'ladder', fit: 'max' });
+    fitted.name = 'ladder';
+    markLadder(fitted);
+    fitted.traverse((child) => markLadder(child));
+    fitted.add(makeLadderPick());
+    return fitted;
   }
-  for (let i = 0; i < 8; i += 1) {
-    const rung = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.04, 0.05), rail));
-    rung.position.set(0, 0.28 + i * 0.3, 0.02);
-    group.add(mark(rung));
-  }
-  const pick = mark(new THREE.Mesh(
+  return buildProceduralDungeonLadder();
+}
+
+function makeLadderPick() {
+  const pick = markLadder(new THREE.Mesh(
     new THREE.BoxGeometry(1.1, 2.8, 0.7),
     pickMat(),
   ));
   pick.position.set(0, 1.3, 0.12);
-  group.add(pick);
+  return pick;
+}
+
+function buildProceduralDungeonLadder() {
+  const group = new THREE.Group();
+  group.name = 'ladder';
+  const rail = wood(0x5a3a22);
+  for (const x of [-0.18, 0.18]) {
+    const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.05), rail));
+    post.position.set(x, 1.3, 0);
+    group.add(markLadder(post));
+  }
+  for (let i = 0; i < 8; i += 1) {
+    const rung = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.04, 0.05), rail));
+    rung.position.set(0, 0.28 + i * 0.3, 0.02);
+    group.add(markLadder(rung));
+  }
+  group.add(makeLadderPick());
   return group;
 }
 

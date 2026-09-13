@@ -30,7 +30,7 @@ import {
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { pointHitsShop } from './layout.js';
-import { buildCauldron, buildDungeon, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -338,7 +338,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
     assert.ok(ids.includes('goblin'));
@@ -473,6 +473,24 @@ describe('bundled prop swaps', () => {
     const want = measureVisibleBox(target).getSize(new THREE.Vector3());
     assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
   });
+
+  it('fits a bundled dungeon ladder dump to the current rails without stretch', async () => {
+    let bundled;
+    try {
+      bundled = await loadFolder('ladder');
+    } catch {
+      return;
+    }
+    const target = new THREE.Mesh(new THREE.BoxGeometry(0.41, 2.6, 0.1));
+    target.position.y = 1.3;
+    const fitted = wrapBundledProp(bundled, target, { name: 'ladder', fit: 'max' });
+    assert.equal(fitted.name, 'ladder');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+  });
 });
 
 describe('shop props', () => {
@@ -486,6 +504,19 @@ describe('shop props', () => {
     assert.ok(gap < 0.04, `head should sit on the shaft tip, gap=${gap}`);
     const keeper = buildShopkeeper();
     assert.equal(keeper.userData.pickaxe.parent, keeper.userData.hand);
+  });
+
+  it('keeps a climbable dungeon ladder pick for the walk-to-fade exit', () => {
+    const ladder = buildDungeonLadder();
+    assert.equal(ladder.name, 'ladder');
+    let marked = 0;
+    ladder.traverse((child) => {
+      if (child.userData?.kind === 'ladder') marked += 1;
+    });
+    assert.ok(marked >= 1);
+    const built = buildDungeon();
+    assert.equal(built.ladder?.name, 'ladder');
+    assert.ok(Math.abs(built.ladder.position.z - 0.4) < 1e-6);
   });
 
   it('keeps the shop door hinged open so the front doorway stays walkable', () => {

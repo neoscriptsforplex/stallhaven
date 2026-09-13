@@ -824,6 +824,15 @@ function buildProceduralRange() {
 }
 
 export function buildCauldron() {
+  const bundled = getBundledLook('cauldron');
+  if (bundled) {
+    const target = buildProceduralCauldron();
+    return wrapBundledProp(bundled, target, { name: 'cauldron', fit: 'max', label: 'Cauldron', wareY: 'top' });
+  }
+  return buildProceduralCauldron();
+}
+
+function buildProceduralCauldron() {
   const group = new THREE.Group();
   group.name = 'cauldron';
   const iron = sootMetal(0x3a4248, 0.5, 0.58);

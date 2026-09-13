@@ -118,6 +118,7 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'furnace', folder: 'furnace' },
   { id: 'range', folder: 'range' },
   { id: 'anvil', folder: 'anvil' },
+  { id: 'cauldron', folder: 'cauldron' },
   { id: 'goblin', folder: 'goblin' },
   { id: 'rat', folder: 'rat' },
   { id: 'table', folder: 'table' },

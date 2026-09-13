@@ -28,7 +28,7 @@ import {
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { pointHitsShop } from './layout.js';
-import { buildDungeon, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -336,7 +336,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'anvil', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
     assert.ok(ids.includes('goblin'));
@@ -430,6 +430,23 @@ describe('bundled prop swaps', () => {
     const target = buildAnvil();
     const fitted = wrapBundledProp(bundled, target, { name: 'anvil', fit: 'max', label: 'Anvil' });
     assert.equal(fitted.name, 'anvil');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+    const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+  });
+
+  it('fits a bundled cauldron dump to the current cauldron bbox without stretch', async () => {
+    let bundled;
+    try {
+      bundled = await loadFolder('cauldron');
+    } catch {
+      return;
+    }
+    const target = buildCauldron();
+    const fitted = wrapBundledProp(bundled, target, { name: 'cauldron', fit: 'max', label: 'Cauldron' });
+    assert.equal(fitted.name, 'cauldron');
     assertUniform(fitted);
     assertGrounded(fitted);
     const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());

@@ -56,13 +56,11 @@ export const STATION_UNLOCKS = [
   { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
 ];
 
-/** Place a starter furnace on the anvil's right, matching the default pair spacing. */
+/** Place a missing furnace on the starter back-wall spot. */
 export function furnaceBesideAnvil(anvil = SHOP.anvil) {
-  const dx = SHOP.furnace.x - SHOP.anvil.x;
-  const dz = SHOP.furnace.z - SHOP.anvil.z;
   return {
-    x: (anvil?.x ?? SHOP.anvil.x) + dx,
-    z: (anvil?.z ?? SHOP.anvil.z) + dz,
+    x: SHOP.furnace.x,
+    z: SHOP.furnace.z,
     rot: anvil?.rot ?? FURNITURE_FORWARD,
   };
 }
@@ -227,6 +225,28 @@ export function furnitureHalfSize(kind) {
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
   if (kind === 'stand') return { hw: 0.36, hd: 0.36 };
   return { hw: 0.76, hd: 0.51 };
+}
+
+/** Axis-aligned footprint after start yaw + gameplay rot. */
+export function poseRect(kind, pose) {
+  const { hw, hd } = furnitureHalfSize(kind);
+  const span = rotatedFootprint(hw, hd, furnitureVisualYaw(kind, pose?.rot));
+  return {
+    minX: pose.x - span.hw,
+    maxX: pose.x + span.hw,
+    minZ: pose.z - span.hd,
+    maxZ: pose.z + span.hd,
+  };
+}
+
+export function rectsOverlap(a, b, pad = 0) {
+  if (!a || !b) return false;
+  return !(
+    a.maxX + pad < b.minX
+    || a.minX - pad > b.maxX
+    || a.maxZ + pad < b.minZ
+    || a.minZ - pad > b.maxZ
+  );
 }
 
 export function padConnects(pad, expansionIds = []) {

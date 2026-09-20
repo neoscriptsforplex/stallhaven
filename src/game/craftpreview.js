@@ -5,15 +5,26 @@ import { buildWare } from './models.js';
 const _box = new THREE.Box3();
 const _center = new THREE.Vector3();
 const _sphere = new THREE.Sphere();
+const _xAxis = new THREE.Vector3(1, 0, 0);
+const _zAxis = new THREE.Vector3(0, 0, 1);
+const _pitch = new THREE.Quaternion();
+const _spin = new THREE.Quaternion();
 
 export function isRunePreview(id) {
   const recipe = RECIPES[id];
   return recipe?.category === 'rune' || recipe?.shape === 'rune';
 }
 
-function poseRuneForFrontView(object) {
+/**
+ * Bundled/procedural runes sit as Y-up discs with the glyph on +Y.
+ * Pitch +90° around X so that face points at a +Z camera. The previous −90°
+ * pitch showed the blank underside (the grey slab in the craft pane).
+ */
+export function poseRuneForFrontView(object, spin = 0) {
   if (!object) return;
-  object.rotation.x = -Math.PI / 2;
+  _pitch.setFromAxisAngle(_xAxis, Math.PI / 2);
+  _spin.setFromAxisAngle(_zAxis, spin);
+  object.quaternion.copy(_spin).multiply(_pitch);
   object.updateMatrixWorld(true);
 }
 
@@ -65,6 +76,7 @@ export function createCraftPreview(canvas) {
   let recipeId = null;
   let frame = null;
   let runeFront = false;
+  let runeSpin = 0;
 
   function previewOpts() {
     return runeFront ? { view: 'front' } : {};
@@ -92,19 +104,24 @@ export function createCraftPreview(canvas) {
     }
     frame = null;
     runeFront = false;
+    runeSpin = 0;
     if (!next) return;
     mesh = buildWare(next);
     mesh.position.set(0, 0, 0);
     runeFront = isRunePreview(next);
-    if (runeFront) poseRuneForFrontView(mesh);
+    if (runeFront) poseRuneForFrontView(mesh, 0);
     scene.add(mesh);
     frame = frameCraftPreview(mesh, camera, 1.42, null, previewOpts());
   }
 
   function tick(dt) {
     if (mesh) {
-      if (runeFront) mesh.rotation.x = -Math.PI / 2;
-      mesh.rotation.y += dt * 0.85;
+      if (runeFront) {
+        runeSpin += dt * 0.85;
+        poseRuneForFrontView(mesh, runeSpin);
+      } else {
+        mesh.rotation.y += dt * 0.85;
+      }
     }
     fit();
     renderer.render(scene, camera);

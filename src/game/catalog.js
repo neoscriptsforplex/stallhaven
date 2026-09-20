@@ -141,7 +141,7 @@ export const METALS = [
   { id: 'steel', name: 'Steel', tint: 0xc5ccd4, restock: 7, start: 1 },
   { id: 'mithril', name: 'Mithril', tint: 0x3a6ec8, restock: 10, start: 1 },
   { id: 'adamant', name: 'Adamant', tint: 0x3a8a45, restock: 13, start: 0 },
-  { id: 'runite', name: 'Runite', tint: 0x3ec8c4, restock: 16, start: 0 },
+  { id: 'runite', name: 'Rune', tint: 0x3ec8c4, restock: 16, start: 0 },
   { id: 'dragon', name: 'Dragon', tint: 0xb42a22, restock: 22, start: 0 },
 ];
 
@@ -335,7 +335,7 @@ for (const piece of RANGE_WEAPONS) {
   });
 }
 
-// Ammo uses Runite naming to match Runite Bar / Runite gear. One craft is 20 units.
+// Ammo uses Rune naming to match Rune Bar / Rune gear. One craft is 20 units.
 metalLine({
   piece: { id: 'arrows', name: 'Arrows', slot: 'ammo', shape: 'arrows' },
   category: 'ammo',

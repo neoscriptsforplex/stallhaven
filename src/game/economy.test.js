@@ -1190,7 +1190,7 @@ describe('ores, appearance, king, and chest bin', () => {
     assert.equal(MATERIALS.dragon.name, 'Dragon Ore');
     assert.equal(MATERIALS.bronze_bar.name, 'Bronze Bar');
     assert.equal(MATERIALS.adamant_bar.name, 'Adamant Bar');
-    assert.equal(MATERIALS.runite_bar.name, 'Runite Bar');
+    assert.equal(MATERIALS.runite_bar.name, 'Rune Bar');
     assert.equal(MATERIALS.dragon_bar.name, 'Dragon Bar');
     assert.equal(METALS.find((metal) => metal.id === 'adamant')?.name, 'Adamant');
     assert.equal(RECIPES.adamant_dagger?.name, 'Adamant Dagger');
@@ -1250,6 +1250,54 @@ describe('ores, appearance, king, and chest bin', () => {
     assert.doesNotMatch(costLabel(RECIPES.adamant_hatchet), /Adamantite/);
     assert.doesNotMatch(costLabel(RECIPES.adamant_pickaxe), /Adamantite/);
     assert.doesNotMatch(costLabel(RECIPES.adamant_arrows), /Adamantite/);
+  });
+
+  it('names runite gear Rune and keeps ore and rock Runite', () => {
+    assert.equal(MATERIALS.runite.name, 'Runite Ore');
+    assert.equal(MATERIALS.runite_bar.name, 'Rune Bar');
+    assert.equal(METALS.find((metal) => metal.id === 'runite')?.name, 'Rune');
+    assert.equal(boulderInspect('runite').name, 'Runite');
+    assert.notEqual(boulderInspect('runite').name, 'Rune Ore');
+
+    const runiteRecipes = recipeList().filter(
+      (recipe) => recipe.id === 'smelt_runite' || recipe.id.startsWith('runite_'),
+    );
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'weapon'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'armour'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'ammo'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'hatchet'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'pickaxe'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'smelt'));
+    assert.ok(runiteRecipes.length > 8, 'expected a full Rune gear ladder');
+    for (const recipe of runiteRecipes) {
+      assert.equal(recipe.name.startsWith('Rune '), true, `${recipe.id} should display as Rune …`);
+      assert.equal(recipe.name.includes('Runite'), false, recipe.id);
+    }
+    assert.equal(RECIPES.smelt_runite.name, 'Rune Bar');
+    assert.equal(RECIPES.runite_scimitar.name, 'Rune Scimitar');
+    assert.equal(RECIPES.runite_platebody.name, 'Rune Platebody');
+    assert.equal(RECIPES.runite_hatchet.name, 'Rune Hatchet');
+    assert.equal(RECIPES.runite_pickaxe.name, 'Rune Pickaxe');
+    assert.equal(RECIPES.runite_arrows.name, 'Rune Arrows');
+
+    for (const recipe of recipeList()) {
+      assert.equal(recipe.name.includes('Runite'), false, recipe.id);
+    }
+    for (const material of Object.values(MATERIALS)) {
+      if (material.id === 'runite') {
+        assert.equal(material.name, 'Runite Ore');
+        continue;
+      }
+      assert.equal(material.name.includes('Runite'), false, material.id);
+    }
+
+    assert.match(costLabel(RECIPES.smelt_runite), /Runite Ore/);
+    assert.doesNotMatch(costLabel(RECIPES.smelt_runite), /Rune Ore/);
+    assert.doesNotMatch(costLabel(RECIPES.runite_dagger), /Runite/);
+    assert.match(costLabel(RECIPES.runite_dagger), /Rune Bar/);
+    assert.doesNotMatch(costLabel(RECIPES.runite_hatchet), /Runite/);
+    assert.doesNotMatch(costLabel(RECIPES.runite_pickaxe), /Runite/);
+    assert.doesNotMatch(costLabel(RECIPES.runite_arrows), /Runite/);
   });
 
   it('lists peach among skyboxes', () => {
@@ -1347,7 +1395,7 @@ describe('anvil tools', () => {
     assert.deepEqual(hatchets.map((r) => r.id), METALS.map((metal) => `${metal.id}_hatchet`));
     assert.deepEqual(pickaxes.map((r) => r.id), METALS.map((metal) => `${metal.id}_pickaxe`));
     assert.equal(RECIPES.bronze_hatchet.name, 'Bronze Hatchet');
-    assert.equal(RECIPES.runite_pickaxe.name, 'Runite Pickaxe');
+    assert.equal(RECIPES.runite_pickaxe.name, 'Rune Pickaxe');
     assert.equal(RECIPES.dragon_hatchet.shape, 'hatchet');
     assert.equal(RECIPES.dragon_pickaxe.shape, 'pickaxe');
     assert.equal(anvilTabForRecipe(RECIPES.bronze_hatchet), 'tools');
@@ -1391,7 +1439,7 @@ describe('ranged ammo', () => {
     assert.ok(ammo.every((r) => r.category === 'ammo'));
     assert.ok(ammo.some((r) => r.id === 'bronze_arrows'));
     assert.ok(ammo.some((r) => r.id === 'runite_arrows'));
-    assert.equal(RECIPES.runite_arrows.name, 'Runite Arrows');
+    assert.equal(RECIPES.runite_arrows.name, 'Rune Arrows');
     assert.ok(ammo.some((r) => r.id === 'cannonballs'));
     assert.equal(RECIPES.bronze_arrows.outputCount, AMMO_BATCH);
     assert.equal(RECIPES.cannonballs.outputCount, AMMO_BATCH);

@@ -49,7 +49,7 @@ Potions unlock after a cauldron is placed, then 5 crafts of the previous vial.
 
 ### Melee metals
 
-Bronze (brown), Iron (grey), Steel (silver), Mithril (blue), Adamant (green), Runite (aqua), Dragon (red).
+Bronze (brown), Iron (grey), Steel (silver), Mithril (blue), Adamant (green), Rune (aqua), Dragon (red).
 
 Weapons: Scimitar, Dagger, Sword, Mace, Spear, 2H Sword, Defender.
 
@@ -63,7 +63,7 @@ Robes: Magic, Mystic, Battlemage, Lunar, Ancient. Each set has Hat, Robe Top, Ro
 
 ### Tools
 
-Anvil **Tools** tab: **Hatchet** and **Pickaxe**, same seven metals (Bronze through Dragon, including **Runite**). Each craft uses 1 matching **bar**. Guards and rangers may ask for them. They display on tables, not armour stands.
+Anvil **Tools** tab: **Hatchet** and **Pickaxe**, same seven metals (Bronze through Dragon, including **Rune**). Each craft uses 1 matching **bar**. Guards and rangers may ask for them. They display on tables, not armour stands.
 
 ### Range
 
@@ -71,7 +71,7 @@ Same seven metals for Shortbow, Longbow, Crossbow, Knives, Thrown Axe.
 
 Bows and crossbows also need **Bow String** (spun from Flax) plus logs.
 
-**Ammo** (Ranged sub-tab): metal **Arrows** (Bronze through Dragon; Runite Arrows match Runite Bar). One craft makes **20** arrows for 1 matching bar + 1 Logs. **Cannonballs** are a single Steel Bar recipe (not a metal ladder) that also makes 20, sellable to rangers and guards.
+**Ammo** (Ranged sub-tab): metal **Arrows** (Bronze through Dragon; Rune Arrows match Rune Bar). One craft makes **20** arrows for 1 matching bar + 1 Logs. **Cannonballs** are a single Steel Bar recipe (not a metal ladder) that also makes 20, sellable to rangers and guards.
 
 Dragonhide armour in Green, Blue, Red, Black: Body, Chaps, Vambraces, Boots.
 

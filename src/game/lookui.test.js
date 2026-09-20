@@ -26,6 +26,13 @@ describe('player look UI', () => {
     assert.equal(help.includes('Adamant Ore'), false);
   });
 
+  it('names runite rocks Runite in Help and gear Rune, not Rune Ore', () => {
+    const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
+    assert.match(help, /Adamantite, Runite/);
+    assert.match(help, /including Rune/);
+    assert.equal(help.includes('Rune Ore'), false);
+  });
+
   it('keeps Settings to a Player Avatar Customize button, not look grids', () => {
     const settings = slice(html, 'id="settings-dock"', 'id="look-dock"');
     assert.match(settings, /<h3>Player Avatar<\/h3>/);

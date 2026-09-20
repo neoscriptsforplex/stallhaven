@@ -997,13 +997,25 @@ export function setChefHatVisible(keeper, on) {
   if (hat) hat.visible = Boolean(on);
 }
 
+export const ANVIL_WORLD_SCALE = 0.5;
+
+function applyAnvilWorldScale(mesh) {
+  mesh.scale.multiplyScalar(ANVIL_WORLD_SCALE);
+  mesh.updateMatrixWorld(true);
+  sitVisibleOnY(mesh, 0);
+  if (mesh.userData.wareY != null) mesh.userData.wareY *= ANVIL_WORLD_SCALE;
+  return mesh;
+}
+
 export function buildAnvil() {
   const bundled = getBundledLook('anvil');
+  const target = applyAnvilWorldScale(buildProceduralAnvil());
   if (bundled) {
-    const target = buildProceduralAnvil();
-    return wrapBundledProp(bundled, target, { name: 'anvil', fit: 'max', label: 'Anvil', wareY: 'top' });
+    const fitted = wrapBundledProp(bundled, target, { name: 'anvil', fit: 'max', label: 'Anvil', wareY: 'top' });
+    sitVisibleOnY(fitted, 0);
+    return fitted;
   }
-  return buildProceduralAnvil();
+  return target;
 }
 
 function buildProceduralAnvil() {

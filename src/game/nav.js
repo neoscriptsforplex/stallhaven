@@ -62,7 +62,7 @@ export function shopObstacles(shop = SHOP, furniture = null) {
   const blocks = [
     // Counter blocks the customer-facing mass only, leaving a walkway behind it.
     blockFromPose(yaw('counter', poses.counter), 1.09, 0.26),
-    blockFromPose(yaw('anvil', poses.anvil), 0.44, 0.35),
+    blockFromPose(yaw('anvil', poses.anvil), 0.22, 0.175),
     blockFromPose(yaw('chest', poses.chest), 0.3, 0.22),
   ];
   if (poses.range) {

@@ -30,6 +30,7 @@ import {
   wrapImportedCharacter,
   wrapShopPlayer,
   sitVisibleOnY,
+  ANVIL_WORLD_SCALE,
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y } from './layout.js';
@@ -1061,6 +1062,19 @@ describe('shop props', () => {
       if (child.isMesh && child.geometry?.type === 'BoxGeometry' && child.position.y >= 0.95) highBoxes += 1;
     });
     assert.equal(highBoxes, 0);
+  });
+
+  it('halves the anvil uniformly and keeps it on the floor', () => {
+    assert.equal(ANVIL_WORLD_SCALE, 0.5);
+    const anvil = buildAnvil();
+    assert.ok(Math.abs(anvil.scale.x - anvil.scale.y) < 1e-6);
+    assert.ok(Math.abs(anvil.scale.y - anvil.scale.z) < 1e-6);
+    anvil.updateMatrixWorld(true);
+    const box = measureVisibleBox(anvil);
+    const size = box.getSize(new THREE.Vector3());
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `anvil should sit on the floor, minY=${box.min.y}`);
+    assert.ok(size.y < 0.75, `anvil should be half height, y=${size.y}`);
+    assert.ok(size.x < 0.7, `anvil should be half width, x=${size.x}`);
   });
 
   it('doubles the cooking range uniformly and keeps it on the floor', () => {

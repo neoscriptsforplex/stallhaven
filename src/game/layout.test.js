@@ -18,6 +18,7 @@ import {
   FURNITURE_ROT_STEP,
   FURNITURE_START_YAW,
   furnitureHalfSize,
+  furnitureRotateDelta,
   furnitureVisualYaw,
   rotatedFootprint,
   SWAP_PRICE_RATIO,
@@ -108,8 +109,11 @@ describe('layout numbers', () => {
   it('yaws the chest 90° clockwise from the upright door-wall facing, and range/furnace −90° at start only', () => {
     // Gameplay yaw still uses furniture.rot. Start yaw is around +Y only — never X pitch.
     assert.equal(CHEST_UPRIGHT_YAW, Math.PI);
+    assert.equal(furnitureRotateDelta('chest'), FURNITURE_ROT_STEP);
+    assert.equal(furnitureRotateDelta('anvil'), FURNITURE_ROT_STEP);
+    assert.ok(Math.abs(furnitureRotateDelta('shelf') - Math.PI / 2) < 1e-9);
+    assert.ok(Math.abs(CHEST_YAW_CLOCKWISE - furnitureRotateDelta('chest') * 6) < 1e-9);
     assert.ok(Math.abs(CHEST_YAW_CLOCKWISE - Math.PI / 2) < 1e-9);
-    assert.ok(Math.abs(CHEST_YAW_CLOCKWISE - FURNITURE_ROT_STEP * 6) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.chest - (CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.chest - (Math.PI + Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.range - (-Math.PI / 2)) < 1e-9);

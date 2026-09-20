@@ -32,10 +32,16 @@ export const WALL_THICK = 0.16;
 export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
+
+/** Yaw added by one furniture-menu Rotate click. Floor pieces 15°; shelves 90°. */
+export function furnitureRotateDelta(kind) {
+  return kind === 'shelf' ? Math.PI / 2 : FURNITURE_ROT_STEP;
+}
+
 /** Upright chest facing from before the bad X-axis tip. */
 export const CHEST_UPRIGHT_YAW = Math.PI;
-/** 90° on the furniture Rotate axis: pose.rot +=, world +Y. */
-export const CHEST_YAW_CLOCKWISE = FURNITURE_ROT_STEP * 6;
+/** One 90° floor-furniture Rotate turn: six 15° clicks on world +Y. */
+export const CHEST_YAW_CLOCKWISE = furnitureRotateDelta('chest') * 6;
 /**
  * Start-only visual yaw around world +Y. Applied to the placed mesh and pick
  * (including async dump swaps), not stored in furniture.rot so queue / saves

@@ -27,8 +27,8 @@ import {
 import { grantMinedMaterial, hasStock, pushLog } from './economy.js';
 import {
   FURNITURE_FORWARD,
-  FURNITURE_ROT_STEP,
   FURNITURE_SNAP,
+  furnitureRotateDelta,
   snapGridSpan,
   cloneFurniture,
   furnitureStartYaw,
@@ -1101,14 +1101,14 @@ export function createWorld(canvas, state, opts = {}) {
     const pose = poseOf(target);
     if (!pose) return false;
     const kind = placeKindOf(target);
+    const nextRot = (pose.rot ?? FURNITURE_FORWARD) + furnitureRotateDelta(kind);
     if (kind === 'shelf') {
-      const nextRot = (pose.rot ?? FURNITURE_FORWARD) + Math.PI / 2;
       const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot);
       pose.x = snapped.x;
       pose.z = snapped.z;
       pose.rot = snapped.rot;
     } else {
-      pose.rot = (pose.rot ?? FURNITURE_FORWARD) + FURNITURE_ROT_STEP;
+      pose.rot = nextRot;
     }
     if (target.id === 'display') applyDisplayPose(target.index);
     else applyFixturePose(target.id);

@@ -2080,11 +2080,17 @@ export function buildChest() {
       name: 'chest',
       fit: 'height',
       label: 'Chest',
+      // Dump is already Y-up / sitting on y=0. Do not bake an X pitch.
+      rotateX: 0,
+      rotateY: 0,
+      rotateZ: 0,
     });
+    fitted.rotation.set(0, 0, 0);
     fitted.userData.lid = fitted.userData.lid ?? null;
     sitVisibleOnY(fitted, SHOP_FURNITURE_FLOOR_Y);
     const root = new THREE.Group();
     root.name = 'chest';
+    root.rotation.set(0, 0, 0);
     root.add(fitted);
     root.userData.lid = fitted.userData.lid ?? null;
     return root;

@@ -395,9 +395,10 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pose) return;
     slot.mesh.position.set(pose.x, 0, pose.z);
     const yaw = furnitureVisualYaw(id, pose.rot);
-    slot.mesh.rotation.y = yaw;
+    // Yaw only (same axis as furniture Rotate). Never pitch/roll stations onto a side.
+    slot.mesh.rotation.set(0, yaw, 0);
     slot.pick.position.set(pose.x, slot.pickY, pose.z);
-    slot.pick.rotation.y = yaw;
+    slot.pick.rotation.set(0, yaw, 0);
     if (slot.glow) slot.glow.position.set(pose.x, 0.08, pose.z);
   }
 

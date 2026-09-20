@@ -104,7 +104,7 @@ describe('layout numbers', () => {
   });
 
   it('yaws the chest 90° clockwise from the upright door-wall facing, and range/furnace −90° at start only', () => {
-    // Gameplay yaw still uses furniture.rot. The bundled chest stays upright (no X pitch).
+    // Gameplay yaw still uses furniture.rot. Start yaw is around +Y only — never X pitch.
     assert.ok(Math.abs(FURNITURE_START_YAW.chest - (Math.PI + Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.range - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.furnace - (-Math.PI / 2)) < 1e-9);

@@ -747,19 +747,39 @@ describe('bundled prop swaps', () => {
     const bundled = await loadFolder('chest');
     const procedural = buildChest();
     const procH = measureVisibleBox(procedural).getSize(new THREE.Vector3()).y;
+    const uprightDump = wrapBundledProp(bundled, procedural, { name: 'chest', fit: 'height' });
+    const pitchedDump = wrapBundledProp(bundled, procedural, {
+      name: 'chest',
+      fit: 'height',
+      rotateX: -Math.PI / 2,
+    });
+    const uprightSize = measureVisibleBox(uprightDump).getSize(new THREE.Vector3());
+    const pitchedSize = measureVisibleBox(pitchedDump).getSize(new THREE.Vector3());
     setBundledLook('chest', bundled);
     try {
       const chest = buildChest();
       assert.equal(chest.name, 'chest');
       const sized = measureVisibleBox(chest);
-      assert.ok(Math.abs((sized.max.y - sized.min.y) - procH) < 0.08, `chest should keep 60% height, ${sized.max.y - sized.min.y} vs ${procH}`);
+      const got = sized.getSize(new THREE.Vector3());
+      assert.ok(Math.abs(got.y - procH) < 0.08, `chest should keep 60% height, ${got.y} vs ${procH}`);
+      assert.ok(Math.abs(got.x - uprightSize.x) < 0.03, `no X pitch: width ${got.x} vs upright ${uprightSize.x}`);
+      assert.ok(Math.abs(got.z - uprightSize.z) < 0.03, `no X pitch: depth ${got.z} vs upright ${uprightSize.z}`);
+      assert.ok(
+        Math.abs(uprightSize.x - pitchedSize.x) > 0.01 || Math.abs(uprightSize.z - pitchedSize.z) > 0.01,
+        'pitched dump footprint should differ from upright',
+      );
       chest.position.set(2.1, 0, -1.4);
-      chest.rotation.y = furnitureVisualYaw('chest', 0);
+      chest.rotation.set(0, furnitureVisualYaw('chest', 0), 0);
       chest.updateMatrixWorld(true);
       const box = measureVisibleBox(chest);
       assert.ok(Math.abs(box.min.y - SHOP_FURNITURE_FLOOR_Y) < 0.03, `chest should sit on the floor, minY=${box.min.y}`);
       assert.ok(Math.abs(chest.rotation.x) < 1e-8, 'chest stays unpitched');
       assert.ok(Math.abs(chest.rotation.z) < 1e-8, 'chest stays unrolled');
+      chest.traverse((child) => {
+        if (child.isSprite) return;
+        assert.ok(Math.abs(child.rotation.x) < 1e-8, `${child.name || child.type} stays unpitched`);
+        assert.ok(Math.abs(child.rotation.z) < 1e-8, `${child.name || child.type} stays unrolled`);
+      });
     } finally {
       setBundledLook('chest', null);
     }

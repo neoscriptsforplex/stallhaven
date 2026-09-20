@@ -34,15 +34,15 @@ export const FURNITURE_ROT_STEP = Math.PI / 12;
 export const FURNITURE_FORWARD = 0;
 /** Upright chest facing from before the bad X-axis tip. */
 export const CHEST_UPRIGHT_YAW = Math.PI;
-/** 90° clockwise around world +Y (Three.js Y-up). */
-export const CHEST_YAW_CLOCKWISE = -Math.PI / 2;
+/** 90° on the furniture Rotate axis: pose.rot +=, world +Y. */
+export const CHEST_YAW_CLOCKWISE = FURNITURE_ROT_STEP * 6;
 /**
  * Start-only visual yaw around world +Y. Applied to the placed mesh and pick
  * (including async dump swaps), not stored in furniture.rot so queue / saves
  * stay on the gameplay facing.
  */
 export const FURNITURE_START_YAW = {
-  // Upright floor sit, then 90° clockwise. No pitch/roll.
+  // Flat on the floor, then one 90° Rotate-button turn. No pitch/roll.
   chest: CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE,
   range: -Math.PI / 2,
   furnace: -Math.PI / 2,

@@ -34,6 +34,8 @@ import {
 import {
   CAULDRON_COST,
   WHEEL_COST,
+  FURNACE_COST,
+  RANGE_COST,
   STATION_UNLOCKS,
   CHEST_MAX_LEVEL,
   FURNITURE_FORWARD,
@@ -49,9 +51,9 @@ import {
   furnitureBuyCost,
   furnitureKindForType,
   furnitureLabelForType,
-  furnaceBesideAnvil,
   padById,
   padConnects,
+  stationUnlock,
 } from './layout.js';
 import {
   BRIGHTNESS_MAX,
@@ -64,6 +66,8 @@ import {
 export {
   CAULDRON_COST,
   WHEEL_COST,
+  FURNACE_COST,
+  RANGE_COST,
   STATION_UNLOCKS,
   furnitureBuyCost,
   masteryNeed,
@@ -77,12 +81,12 @@ export {
   DEFAULT_BRIGHTNESS,
 };
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
 function emptyBoughtFurniture() {
-  return { table: 0, mannequin: 0 };
+  return { table: 0, mannequin: 0, shelf: 0 };
 }
 
 /** Old saves used ores for smithing. Copy ore counts onto bars so progress is not bricked. */
@@ -294,6 +298,7 @@ export function isUnlocked(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return false;
   if (recipe.category === 'potion' && !ownsCauldron(state)) return false;
+  if (recipe.category === 'food' && !ownsRange(state)) return false;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return false;
   if (recipe.category === 'spin' && !ownsWheel(state)) return false;
   if (!recipe.previousId) return true;
@@ -306,8 +311,11 @@ export function craftBlockReason(state, recipeId) {
   if (recipe.category === 'potion' && !ownsCauldron(state)) {
     return 'Place a cauldron from Upgrade to brew potions.';
   }
+  if (recipe.category === 'food' && !ownsRange(state)) {
+    return 'Place a cooking range from Upgrade to bake food.';
+  }
   if (recipe.category === 'smelt' && !ownsFurnace(state)) {
-    return 'The furnace is missing.';
+    return 'Place a furnace from Upgrade to smelt ores into bars.';
   }
   if (recipe.category === 'spin' && !ownsWheel(state)) {
     return 'Place a spinning wheel from Upgrade to spin flax into bow string.';
@@ -359,6 +367,7 @@ export function maxCraftActions(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 0;
   if (recipe.category === 'potion' && !ownsCauldron(state)) return 0;
+  if (recipe.category === 'food' && !ownsRange(state)) return 0;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return 0;
   if (recipe.category === 'spin' && !ownsWheel(state)) return 0;
   if (!isUnlocked(state, recipeId)) return 0;
@@ -571,13 +580,14 @@ export function ownsStation(state, id) {
 }
 
 export function canBuyStation(state, id) {
-  const cost = stationCost(id);
-  return cost > 0 && !ownsStation(state, id) && state.gold >= cost;
+  const unlock = stationUnlock(id);
+  if (!unlock) return false;
+  return !ownsStation(state, id) && state.gold >= unlock.cost;
 }
 
 export function buyStation(state, id, pose) {
   const cost = stationCost(id);
-  if (cost <= 0 || state.gold < cost || !pose || ownsStation(state, id)) return false;
+  if (!stationUnlock(id) || state.gold < cost || !pose || ownsStation(state, id)) return false;
   state.gold -= cost;
   state.furniture[id] = {
     x: pose.x,
@@ -603,12 +613,24 @@ export function ownsFurnace(state) {
   return ownsStation(state, 'furnace');
 }
 
+export function ownsRange(state) {
+  return ownsStation(state, 'range');
+}
+
 export function canBuyFurnace(state) {
   return canBuyStation(state, 'furnace');
 }
 
 export function buyFurnace(state, pose) {
   return buyStation(state, 'furnace', pose);
+}
+
+export function canBuyRange(state) {
+  return canBuyStation(state, 'range');
+}
+
+export function buyRange(state, pose) {
+  return buyStation(state, 'range', pose);
 }
 
 export function ownsWheel(state) {
@@ -632,7 +654,7 @@ export function nextFurnitureCost(state, type) {
 }
 
 export function canBuyFurniture(state, type) {
-  if (type !== 'table' && type !== 'mannequin') return false;
+  if (!['table', 'mannequin', 'shelf'].includes(type)) return false;
   return state.gold >= nextFurnitureCost(state, type);
 }
 
@@ -992,6 +1014,7 @@ export function serializeState(state) {
     boughtFurniture: {
       table: boughtFurnitureCount(state, 'table'),
       mannequin: boughtFurnitureCount(state, 'mannequin'),
+      shelf: boughtFurnitureCount(state, 'shelf'),
     },
   };
 }
@@ -1058,7 +1081,7 @@ export function applyState(state, data) {
   }
   next.boughtFurniture = emptyBoughtFurniture();
   if (data.boughtFurniture && typeof data.boughtFurniture === 'object') {
-    for (const type of ['table', 'mannequin']) {
+    for (const type of ['table', 'mannequin', 'shelf']) {
       const value = data.boughtFurniture[type];
       if (typeof value === 'number' && Number.isFinite(value)) {
         next.boughtFurniture[type] = Math.max(0, Math.round(value));
@@ -1066,7 +1089,8 @@ export function applyState(state, data) {
     }
   } else {
     for (let index = SHOP.displays.length; index < next.displays.length; index += 1) {
-      const type = next.displays[index].kind === 'stand' ? 'mannequin' : 'table';
+      const kind = next.displays[index].kind;
+      const type = kind === 'stand' ? 'mannequin' : kind === 'shelf' ? 'shelf' : 'table';
       next.boughtFurniture[type] += 1;
     }
   }
@@ -1127,15 +1151,17 @@ export function applyState(state, data) {
       counter: readPose(data.furniture.counter, defaults.counter),
       anvil: readPose(data.furniture.anvil, defaults.anvil),
       chest: readPose(data.furniture.chest, defaults.chest),
-      range: readPose(data.furniture.range, defaults.range),
+      range: data.furniture.range
+        ? readPose(data.furniture.range, { ...SHOP.range, rot: FURNITURE_FORWARD })
+        : null,
       cauldron: data.furniture.cauldron
-        ? readPose(data.furniture.cauldron, SHOP.cauldron)
+        ? readPose(data.furniture.cauldron, { ...SHOP.cauldron, rot: FURNITURE_FORWARD })
         : null,
       furnace: data.furniture.furnace
-        ? readPose(data.furniture.furnace, SHOP.furnace)
-        : furnaceBesideAnvil(readPose(data.furniture.anvil, defaults.anvil)),
+        ? readPose(data.furniture.furnace, { ...SHOP.furnace, rot: FURNITURE_FORWARD })
+        : null,
       wheel: data.furniture.wheel
-        ? readPose(data.furniture.wheel, SHOP.wheel)
+        ? readPose(data.furniture.wheel, { ...SHOP.wheel, rot: FURNITURE_FORWARD })
         : null,
       displays: next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {

@@ -1,5 +1,22 @@
 export const MUSIC_EXTENSIONS = ['mp3', 'wav', 'ogg'];
 export const MUSIC_ACCEPT = '.mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav';
+export const BUNDLED_MUSIC_TRACKS = [
+  'Adventure',
+  'Dream',
+  'Flute Salad',
+  'Garden',
+  'Harmony',
+  'Horizon',
+  'Long Way Home',
+  'Medieval',
+  'Newbie Melody',
+  'Overture',
+  'Scape Soft',
+  'Spirit',
+  'Start',
+  'Still Night',
+  'Yesteryear',
+];
 const MUSIC_MIME = [
   'audio/mpeg',
   'audio/mp3',
@@ -166,6 +183,7 @@ export async function addMusicFiles(files) {
       name: file.name || `Track ${serial}`,
       url,
       audio: audioEl,
+      revoke: true,
     };
     serial += 1;
     playlist.push(track);
@@ -191,7 +209,7 @@ export function removePlaylistTrack(index) {
   if (!track) return false;
   const wasCurrent = index === currentIndex;
   if (wasCurrent) stopCurrent();
-  if (track.url) URL.revokeObjectURL(track.url);
+  if (track.url && track.revoke) URL.revokeObjectURL(track.url);
   playlist.splice(index, 1);
   if (!playlist.length) {
     currentIndex = -1;
@@ -246,9 +264,61 @@ export async function skipTrack() {
 export function clearMusic() {
   stopCurrent();
   for (const track of playlist) {
-    if (track.url) URL.revokeObjectURL(track.url);
+    if (track.url && track.revoke) URL.revokeObjectURL(track.url);
   }
   playlist.length = 0;
   currentIndex = -1;
   bg = null;
+}
+
+function bundledMusicBases() {
+  let envBase = './';
+  try {
+    const raw = import.meta.env.BASE_URL || './';
+    envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  } catch {
+    envBase = './';
+  }
+  const roots = [`${envBase}music/`, `${envBase}public/music/`];
+  if (envBase !== './') roots.push('./music/', './public/music/');
+  return [...new Set(roots)];
+}
+
+export async function addMusicUrl(url, name, { revoke = false, autoplay = false } = {}) {
+  const audioEl = new Audio(url);
+  audioEl.preload = 'metadata';
+  const track = {
+    id: `track-${serial}`,
+    name: name || `Track ${serial}`,
+    url,
+    audio: audioEl,
+    revoke: Boolean(revoke),
+  };
+  serial += 1;
+  playlist.push(track);
+  if (autoplay && currentIndex < 0) await playTrackAt(playlist.length - 1);
+  return track.name;
+}
+
+export async function loadBundledMusic() {
+  const added = [];
+  const bases = bundledMusicBases();
+  for (const name of BUNDLED_MUSIC_TRACKS) {
+    const encoded = encodeURIComponent(`${name}.ogg`);
+    const urls = bases.map((base) => `${base}${encoded}`);
+    let url = urls.find((item) => item.includes('public/music/')) ?? urls[0];
+    for (const candidate of urls) {
+      try {
+        const res = await fetch(candidate, { method: 'GET', headers: { Range: 'bytes=0-0' } });
+        if (res.ok || res.status === 206) {
+          url = candidate;
+          break;
+        }
+      } catch {
+        // try the next public/githack root
+      }
+    }
+    added.push(await addMusicUrl(url, name, { autoplay: false }));
+  }
+  return added;
 }

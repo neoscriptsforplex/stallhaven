@@ -1377,10 +1377,14 @@ export function bindHud(root, state, world) {
         itemBuy.disabled = true;
         itemBuy.textContent = 'Owned';
       } else {
-        itemStatus.textContent = `Costs ${formatGold(station.cost)} gp.`;
+        itemStatus.textContent = station.cost > 0
+          ? `Costs ${formatGold(station.cost)} gp.`
+          : 'Free. Place it on the floor snap grid, then confirm.';
         itemStatus.classList.remove('craft-note');
         itemBuy.disabled = !canBuyStation(state, station.id);
-        itemBuy.textContent = `Buy · ${formatGold(station.cost)} gp`;
+        itemBuy.textContent = station.cost > 0
+          ? `Buy · ${formatGold(station.cost)} gp`
+          : 'Place · Free';
       }
     }
     const expandStatus = buildModal.querySelector('[data-expand-status]');
@@ -1398,16 +1402,20 @@ export function bindHud(root, state, world) {
         expandBuy.textContent = `Place Room · ${formatGold(cost)}g`;
       }
     }
-    for (const type of ['table', 'mannequin']) {
+    for (const type of ['table', 'mannequin', 'shelf']) {
       const itemStatus = buildModal.querySelector(`[data-${type}-status]`);
       const itemBuy = buildModal.querySelector(`[data-${type}-buy]`);
       if (!itemStatus || !itemBuy) continue;
       const cost = nextFurnitureCost(state, type);
       const label = furnitureLabelForType(type);
       const bought = state.boughtFurniture?.[type] ?? 0;
-      const extra = bought === 0
-        ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
-        : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
+      const extra = type === 'shelf'
+        ? (bought === 0
+          ? `First 3 shelves are included. The next costs ${formatGold(cost)}g.`
+          : `Next shelf costs ${formatGold(cost)}g (${bought} bought).`)
+        : (bought === 0
+          ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
+          : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`);
       itemStatus.textContent = extra;
       itemStatus.classList.remove('craft-note');
       itemBuy.disabled = false;
@@ -1426,7 +1434,9 @@ export function bindHud(root, state, world) {
     if (blurb) {
       blurb.textContent = STATION_UNLOCKS.some((item) => item.id === pendingPlace.type)
         ? 'Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Double-click a highlighted cell to confirm.'
-        : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
+        : pendingPlace.type === 'shelf'
+          ? 'Move the shelf on the wall grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.'
+          : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
     }
     if (costEl) costEl.textContent = `Cost: ${formatGold(pendingPlace.cost)} gp.`;
     if (note) {
@@ -1501,7 +1511,9 @@ export function bindHud(root, state, world) {
     const label = stationLabel(id).toLowerCase();
     const status = buildModal.querySelector(`[data-${id}-status]`);
     if (!canBuyStation(state, id)) {
-      const msg = `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(state.gold)}g.`;
+      const msg = cost > 0
+        ? `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(state.gold)}g.`
+        : `A ${label} is already placed.`;
       if (status) {
         status.textContent = msg;
         status.classList.add('craft-note');
@@ -1524,6 +1536,7 @@ export function bindHud(root, state, world) {
   }
   buildModal.querySelector('[data-table-buy]')?.addEventListener('click', () => startFurniturePlace('table'));
   buildModal.querySelector('[data-mannequin-buy]')?.addEventListener('click', () => startFurniturePlace('mannequin'));
+  buildModal.querySelector('[data-shelf-buy]')?.addEventListener('click', () => startFurniturePlace('shelf'));
   function confirmPendingPlace() {
     if (!pendingPlace) return;
     const check = world.tryConfirmPlace?.() ?? { ok: Boolean(world.getPlacePose()), pose: world.getPlacePose() };
@@ -1551,7 +1564,9 @@ export function bindHud(root, state, world) {
       }
       world.confirmPlaceUnlock();
       closePlace();
-      pushLog(state, `Placed a ${stationLabel(pending.type).toLowerCase()} for ${formatGold(cost)} gp.`);
+      pushLog(state, cost > 0
+        ? `Placed a ${stationLabel(pending.type).toLowerCase()} for ${formatGold(cost)} gp.`
+        : `Placed a ${stationLabel(pending.type).toLowerCase()}.`);
       render(performance.now() / 1000);
       return;
     }

@@ -260,7 +260,11 @@ function flameMat() {
 export function buildTorch() {
   const bundled = getBundledLook('torch');
   if (bundled) {
-    const fitted = wrapBundledProp(bundled, buildProceduralTorch(), { name: 'torch', fit: 'max' });
+    const fitted = wrapBundledProp(bundled, buildProceduralTorch(), {
+      name: 'torch',
+      fit: 'max',
+      rotateZ: Math.PI / 2,
+    });
     fitted.name = 'torch';
     attachTorchFx(fitted);
     return fitted;
@@ -1674,11 +1678,56 @@ function shadeHex(hex, factor) {
   return color.getHex();
 }
 
+function attachEssenceGlow(group) {
+  const aura = new THREE.Mesh(
+    new THREE.SphereGeometry(0.68, 18, 14),
+    new THREE.MeshBasicMaterial({
+      color: 0x9ad4ff,
+      transparent: true,
+      opacity: 0.14,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  aura.position.y = 0.34;
+  aura.scale.set(1.05, 0.86, 1.02);
+  group.add(aura);
+  const glow = new THREE.PointLight(0x9ad4ff, 0.62, 3.4, 2);
+  glow.position.set(0, 0.42, 0);
+  group.add(glow);
+}
+
+function attachBoulderPick(group, spot) {
+  const pick = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.05, 1.35), pickMat());
+  pick.position.y = 0.48;
+  pick.userData.kind = 'boulder';
+  pick.userData.materialId = spot.materialId;
+  pick.userData.name = spot.name;
+  pick.userData.x = spot.x;
+  pick.userData.z = spot.z;
+  group.add(pick);
+}
+
 function buildMineBoulder(spot) {
   const group = new THREE.Group();
   group.name = `boulder-${spot.id}`;
   group.position.set(spot.x, 0, spot.z);
   group.rotation.y = spot.rot ?? 0;
+  const target = buildProceduralOreRock(spot);
+  const bundled = getBundledLook(`ore-${spot.id}`);
+  if (bundled) {
+    group.add(wrapBundledProp(bundled, target, { name: `ore-${spot.id}`, fit: 'max' }));
+  } else {
+    for (const child of target.children.slice()) group.add(child);
+  }
+  if (spot.essence) attachEssenceGlow(group);
+  attachBoulderPick(group, spot);
+  return group;
+}
+
+function buildProceduralOreRock(spot) {
+  const group = new THREE.Group();
+  group.name = `ore-${spot.id}`;
   const rockHex = spot.rock ?? 0xb8babf;
   const rock = new THREE.MeshStandardMaterial({
     color: rockHex,
@@ -1730,32 +1779,6 @@ function buildMineBoulder(spot) {
     streak.rotation.set(rx, 0, rz);
     group.add(streak);
   }
-  if (spot.essence) {
-    const aura = new THREE.Mesh(
-      new THREE.SphereGeometry(0.68, 18, 14),
-      new THREE.MeshBasicMaterial({
-        color: 0x9ad4ff,
-        transparent: true,
-        opacity: 0.14,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    );
-    aura.position.y = 0.34;
-    aura.scale.set(1.05, 0.86, 1.02);
-    group.add(aura);
-    const glow = new THREE.PointLight(0x9ad4ff, 0.62, 3.4, 2);
-    glow.position.set(0, 0.42, 0);
-    group.add(glow);
-  }
-  const pick = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.05, 1.35), pickMat());
-  pick.position.y = 0.48;
-  pick.userData.kind = 'boulder';
-  pick.userData.materialId = spot.materialId;
-  pick.userData.name = spot.name;
-  pick.userData.x = spot.x;
-  pick.userData.z = spot.z;
-  group.add(pick);
   return group;
 }
 

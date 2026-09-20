@@ -35,7 +35,7 @@ export const FURNITURE_FORWARD = 0;
  * Three.js Y-up: −π/2 is 90° counter-clockwise when viewed from above.
  */
 export const FURNITURE_START_YAW = {
-  chest: -Math.PI / 2,
+  chest: Math.PI,
   range: -Math.PI / 2,
   furnace: -Math.PI / 2,
   counter: Math.PI,
@@ -51,7 +51,11 @@ export function furnitureVisualYaw(id, poseRot = FURNITURE_FORWARD) {
 export const SWAP_PRICE_RATIO = 0.65;
 export const CAULDRON_COST = 10000;
 export const WHEEL_COST = 500;
+export const FURNACE_COST = 0;
+export const RANGE_COST = 0;
 export const STATION_UNLOCKS = [
+  { id: 'furnace', label: 'Furnace', cost: FURNACE_COST },
+  { id: 'range', label: 'Cooking Range', cost: RANGE_COST },
   { id: 'wheel', label: 'Spinning Wheel', cost: WHEEL_COST },
   { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
 ];
@@ -69,7 +73,11 @@ export const FURNITURE_BUY_MULT = 3;
 export const FURNITURE_SHOP = [
   { type: 'table', kind: 'table', label: 'Table' },
   { type: 'mannequin', kind: 'stand', label: 'Mannequin' },
+  { type: 'shelf', kind: 'shelf', label: 'Shelf' },
 ];
+/** How far a wall shelf sits past the floor edge, toward the wall. */
+export const SHELF_WALL_OUTSET = 0.04;
+export const TREE_BED_CLEAR = 1.7;
 
 export const GRASS_PAD = 9;
 export const FOUNTAIN = { x: 0, z: 8.85, radius: 0.7, apron: 1.42 };
@@ -213,7 +221,11 @@ export function stationUnlock(id) {
 
 export function stationLabel(id) {
   return stationUnlock(id)?.label
-    ?? (id === 'wheel' ? 'Spinning Wheel' : id === 'furnace' ? 'Furnace' : id === 'cauldron' ? 'Cauldron' : furnitureLabelForType(id));
+    ?? (id === 'wheel' ? 'Spinning Wheel'
+      : id === 'furnace' ? 'Furnace'
+        : id === 'range' ? 'Cooking Range'
+          : id === 'cauldron' ? 'Cauldron'
+            : furnitureLabelForType(id));
 }
 
 export function furnitureHalfSize(kind) {
@@ -226,7 +238,7 @@ export function furnitureHalfSize(kind) {
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
   if (kind === 'stand') return { hw: 0.36, hd: 0.36 };
-  return { hw: 0.76, hd: 0.51 };
+  return { hw: 1.38, hd: 0.88 };
 }
 
 /** Axis-aligned footprint after start yaw + gameplay rot. */
@@ -277,9 +289,9 @@ export function defaultFurniture() {
     counter: { x: SHOP.counter.x, z: SHOP.counter.z, rot: FURNITURE_FORWARD },
     anvil: { x: SHOP.anvil.x, z: SHOP.anvil.z, rot: FURNITURE_FORWARD },
     chest: { x: SHOP.chest.x, z: SHOP.chest.z, rot: FURNITURE_FORWARD },
-    range: { x: SHOP.range.x, z: SHOP.range.z, rot: FURNITURE_FORWARD },
+    range: null,
     cauldron: null,
-    furnace: { x: SHOP.furnace.x, z: SHOP.furnace.z, rot: FURNITURE_FORWARD },
+    furnace: null,
     wheel: null,
     displays: SHOP.displays.map((spot) => ({
       x: spot.x,
@@ -299,7 +311,7 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     counter: { ...furniture.counter },
     anvil: { ...furniture.anvil },
     chest: { ...furniture.chest },
-    range: { ...furniture.range },
+    range: clonePose(furniture.range),
     cauldron: clonePose(furniture.cauldron),
     furnace: clonePose(furniture.furnace),
     wheel: clonePose(furniture.wheel),
@@ -391,6 +403,12 @@ export function keepGardenSpot(spot, expansionIds = []) {
   return true;
 }
 
+export function gardenSpotClearOfBeds(spot, expansionIds = [], minDist = TREE_BED_CLEAR) {
+  return gardenBedSpots(expansionIds).every((bed) => (
+    Math.hypot(spot.x - bed.x, spot.z - bed.z) >= minDist
+  ));
+}
+
 export function gardenTreeSpots(expansionIds = []) {
   const box = footprintBox(expansionIds);
   const grass = gardenBox(expansionIds);
@@ -408,12 +426,12 @@ export function gardenTreeSpots(expansionIds = []) {
     { x: cx, z: box.minZ - 2.8, side: 'rear' },
     { x: box.minX - 1.6, z: box.maxZ + 2.4, side: 'front-left' },
     { x: box.maxX + 1.6, z: box.maxZ + 2.4, side: 'front-right' },
-    { x: -2.55, z: 7.15, side: 'path' },
-    { x: 2.62, z: 7.35, side: 'path' },
-    { x: -2.85, z: 10.2, side: 'path' },
-    { x: 2.95, z: 10.45, side: 'path' },
-    { x: -2.15, z: 11.8, side: 'path' },
-    { x: 2.25, z: 11.55, side: 'path' },
+    { x: -4.45, z: 6.35, side: 'path' },
+    { x: 4.55, z: 6.55, side: 'path' },
+    { x: -4.65, z: 9.25, side: 'path' },
+    { x: 4.75, z: 9.45, side: 'path' },
+    { x: -4.15, z: 12.35, side: 'path' },
+    { x: 4.25, z: 12.15, side: 'path' },
     { x: grass.minX + 1.4, z: grass.minZ + 1.6, side: 'edge' },
     { x: grass.maxX - 1.4, z: grass.minZ + 1.8, side: 'edge' },
     { x: grass.minX + 1.6, z: grass.maxZ - 1.5, side: 'edge' },
@@ -423,7 +441,9 @@ export function gardenTreeSpots(expansionIds = []) {
     { x: cx - 5.4, z: grass.minZ + 1.3, side: 'edge' },
     { x: cx + 5.6, z: grass.minZ + 1.4, side: 'edge' },
   ];
-  return spots.filter((spot) => keepGardenSpot(spot, expansionIds));
+  return spots.filter((spot) => (
+    keepGardenSpot(spot, expansionIds) && gardenSpotClearOfBeds(spot, expansionIds)
+  ));
 }
 
 export function gardenRockSpots(expansionIds = []) {
@@ -436,8 +456,15 @@ export function gardenRockSpots(expansionIds = []) {
     { x: 6.4, z: -4.8, scale: 0.8, side: 'rear' },
     { x: -7.4, z: 2.2, scale: 0.95, side: 'left' },
     { x: 7.6, z: 1.6, scale: 1.1, side: 'right' },
+    { x: -8.35, z: 7.85, scale: 2.35, side: 'left' },
+    { x: 8.55, z: 8.35, scale: 2.8, side: 'right' },
+    { x: -5.85, z: 13.15, scale: 2.15, side: 'path' },
+    { x: 6.15, z: 13.45, scale: 2.55, side: 'path' },
+    { x: 0.2, z: -7.35, scale: 2.95, side: 'rear' },
   ];
-  return spots.filter((spot) => keepGardenSpot(spot, expansionIds));
+  return spots.filter((spot) => (
+    keepGardenSpot(spot, expansionIds) && gardenSpotClearOfBeds(spot, expansionIds)
+  ));
 }
 
 export function gardenTrapdoorSpot(expansionIds = []) {
@@ -532,6 +559,174 @@ export function rotatedFootprint(hw, hd, rot = 0) {
     hw: hw * c + hd * s,
     hd: hw * s + hd * c,
   };
+}
+
+const SHELF_WALL_END_PAD = 0.72;
+const SHELF_DOOR_HALF = 1.12;
+
+function pushWallMount(mounts, {
+  wall, axis, along0, minAlong, maxAlong, x, z, rot, doorAlong = null,
+}) {
+  const ranges = [];
+  if (doorAlong == null) {
+    ranges.push([minAlong, maxAlong]);
+  } else {
+    const leftMax = doorAlong - SHELF_DOOR_HALF;
+    const rightMin = doorAlong + SHELF_DOOR_HALF;
+    if (leftMax - minAlong > 0.9) ranges.push([minAlong, leftMax]);
+    if (maxAlong - rightMin > 0.9) ranges.push([rightMin, maxAlong]);
+  }
+  for (const [lo, hi] of ranges) {
+    mounts.push({
+      wall,
+      axis,
+      along0,
+      minAlong: lo,
+      maxAlong: hi,
+      x,
+      z,
+      rot,
+    });
+  }
+}
+
+/** Wall-grid mounts for shelves: exposed shop walls, skipping doorways. */
+export function wallShelfMounts(expansionIds = []) {
+  const mounts = [];
+  for (const cell of occupiedCells(expansionIds)) {
+    const floor = roomFloor(cell.gx, cell.gz);
+    const neigh = neighborsOf(cell.gx, cell.gz, expansionIds);
+    const midX = (floor.minX + floor.maxX) / 2;
+    const midZ = (floor.minZ + floor.maxZ) / 2;
+    if (!neigh.back) {
+      pushWallMount(mounts, {
+        wall: 'back',
+        axis: 'x',
+        along0: midX,
+        minAlong: floor.minX + SHELF_WALL_END_PAD,
+        maxAlong: floor.maxX - SHELF_WALL_END_PAD,
+        z: floor.minZ - SHELF_WALL_OUTSET,
+        rot: 0,
+      });
+    } else {
+      pushWallMount(mounts, {
+        wall: 'back',
+        axis: 'x',
+        along0: midX,
+        minAlong: floor.minX + SHELF_WALL_END_PAD,
+        maxAlong: floor.maxX - SHELF_WALL_END_PAD,
+        z: floor.minZ - SHELF_WALL_OUTSET,
+        rot: 0,
+        doorAlong: midX,
+      });
+    }
+    if (!neigh.front) {
+      pushWallMount(mounts, {
+        wall: 'front',
+        axis: 'x',
+        along0: midX,
+        minAlong: floor.minX + SHELF_WALL_END_PAD,
+        maxAlong: floor.maxX - SHELF_WALL_END_PAD,
+        z: floor.maxZ + SHELF_WALL_OUTSET,
+        rot: Math.PI,
+      });
+    } else {
+      pushWallMount(mounts, {
+        wall: 'front',
+        axis: 'x',
+        along0: midX,
+        minAlong: floor.minX + SHELF_WALL_END_PAD,
+        maxAlong: floor.maxX - SHELF_WALL_END_PAD,
+        z: floor.maxZ + SHELF_WALL_OUTSET,
+        rot: Math.PI,
+        doorAlong: midX,
+      });
+    }
+    if (!neigh.left) {
+      pushWallMount(mounts, {
+        wall: 'left',
+        axis: 'z',
+        along0: midZ,
+        minAlong: floor.minZ + SHELF_WALL_END_PAD,
+        maxAlong: floor.maxZ - SHELF_WALL_END_PAD,
+        x: floor.minX - SHELF_WALL_OUTSET,
+        rot: Math.PI / 2,
+      });
+    } else {
+      pushWallMount(mounts, {
+        wall: 'left',
+        axis: 'z',
+        along0: midZ,
+        minAlong: floor.minZ + SHELF_WALL_END_PAD,
+        maxAlong: floor.maxZ - SHELF_WALL_END_PAD,
+        x: floor.minX - SHELF_WALL_OUTSET,
+        rot: Math.PI / 2,
+        doorAlong: midZ,
+      });
+    }
+    if (!neigh.right) {
+      pushWallMount(mounts, {
+        wall: 'right',
+        axis: 'z',
+        along0: midZ,
+        minAlong: floor.minZ + SHELF_WALL_END_PAD,
+        maxAlong: floor.maxZ - SHELF_WALL_END_PAD,
+        x: floor.maxX + SHELF_WALL_OUTSET,
+        rot: -Math.PI / 2,
+      });
+    } else {
+      pushWallMount(mounts, {
+        wall: 'right',
+        axis: 'z',
+        along0: midZ,
+        minAlong: floor.minZ + SHELF_WALL_END_PAD,
+        maxAlong: floor.maxZ - SHELF_WALL_END_PAD,
+        x: floor.maxX + SHELF_WALL_OUTSET,
+        rot: -Math.PI / 2,
+        doorAlong: midZ,
+      });
+    }
+  }
+  return mounts;
+}
+
+function wrapAngle(rad) {
+  const tau = Math.PI * 2;
+  let wrapped = rad % tau;
+  if (wrapped > Math.PI) wrapped -= tau;
+  if (wrapped < -Math.PI) wrapped += tau;
+  return wrapped;
+}
+
+function angleDiff(a, b) {
+  return Math.abs(wrapAngle((a ?? 0) - (b ?? 0)));
+}
+
+export function snapToWallGrid(x, z, expansionIds = [], preferRot = null) {
+  const mounts = wallShelfMounts(expansionIds);
+  let best = null;
+  let bestScore = Infinity;
+  for (const mount of mounts) {
+    let nx;
+    let nz;
+    if (mount.axis === 'x') {
+      nx = Math.round(x / FURNITURE_SNAP) * FURNITURE_SNAP;
+      nx = Math.min(mount.maxAlong, Math.max(mount.minAlong, nx));
+      nz = mount.z;
+    } else {
+      nz = Math.round(z / FURNITURE_SNAP) * FURNITURE_SNAP;
+      nz = Math.min(mount.maxAlong, Math.max(mount.minAlong, nz));
+      nx = mount.x;
+    }
+    const dist = Math.hypot(nx - x, nz - z);
+    const facing = preferRot == null ? 0 : angleDiff(preferRot, mount.rot) * 0.35;
+    const score = dist + facing;
+    if (score < bestScore) {
+      bestScore = score;
+      best = { x: nx, z: nz, rot: mount.rot };
+    }
+  }
+  return best ?? { x, z, rot: preferRot ?? FURNITURE_FORWARD };
 }
 
 export function pointOnFloors(x, z, floors, pad = 0) {

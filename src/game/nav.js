@@ -53,8 +53,8 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     counter: { x: shop.counter.x, z: shop.counter.z, rot: 0 },
     anvil: { x: shop.anvil.x, z: shop.anvil.z, rot: 0.35 },
     chest: { x: shop.chest.x, z: shop.chest.z, rot: -0.45 },
-    range: { x: shop.range.x, z: shop.range.z, rot: 0.12 },
-    furnace: shop.furnace ? { x: shop.furnace.x, z: shop.furnace.z, rot: 0 } : null,
+    range: null,
+    furnace: null,
     displays: shop.displays.map((spot) => ({ x: spot.x, z: spot.z, rot: spot.rot ?? 0 })),
   };
   const yaw = (id, pose) => (furniture ? livePose(id, pose) : pose);
@@ -63,8 +63,14 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     blockFromPose(yaw('counter', poses.counter), 1.09, 0.26),
     blockFromPose(yaw('anvil', poses.anvil), 0.44, 0.35),
     blockFromPose(yaw('chest', poses.chest), 0.3, 0.22),
-    blockFromPose(yaw('range', poses.range), furnitureHalfSize('range').hw, furnitureHalfSize('range').hd),
   ];
+  if (poses.range) {
+    blocks.push(blockFromPose(
+      yaw('range', poses.range),
+      furnitureHalfSize('range').hw,
+      furnitureHalfSize('range').hd,
+    ));
+  }
   if (poses.cauldron) blocks.push(blockFromPose(yaw('cauldron', poses.cauldron), 0.32, 0.32));
   if (poses.furnace) blocks.push(blockFromPose(yaw('furnace', poses.furnace), 0.4, 0.36));
   if (poses.wheel) blocks.push(blockFromPose(yaw('wheel', poses.wheel), 0.36, 0.32));
@@ -78,9 +84,8 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     const pose = displayPoses[index] ?? { x: spot?.x ?? 0, z: spot?.z ?? 0, rot: spot?.rot ?? 0 };
     if (Math.abs(pose.x) > 80 || Math.abs(pose.z) > 80) continue;
     const kind = kinds?.[index] ?? spot?.kind ?? 'table';
-    if (kind === 'shelf') blocks.push(blockFromPose(pose, 0.75, 0.25));
-    else if (kind === 'stand') blocks.push(blockFromPose(pose, 0.36, 0.36));
-    else blocks.push(blockFromPose(pose, 0.76, 0.51));
+    const { hw, hd } = furnitureHalfSize(kind);
+    blocks.push(blockFromPose(pose, hw, hd));
   }
   for (const item of shop.clutter ?? []) {
     blocks.push(rectFromCenter(item.x, item.z, item.w, item.d));
@@ -100,10 +105,10 @@ export function liveObstacles(state, shop = SHOP, skip = null) {
   furniture.displayRemoved = (state?.displays ?? []).map((display) => Boolean(display?.removed));
   if (skip?.id === 'cauldron') furniture.cauldron = null;
   if (skip?.id === 'furnace') furniture.furnace = null;
+  if (skip?.id === 'range') furniture.range = null;
   if (skip?.id === 'wheel') furniture.wheel = null;
   if (skip?.id === 'anvil') furniture.anvil = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'chest') furniture.chest = { x: 999, z: 999, rot: 0 };
-  if (skip?.id === 'range') furniture.range = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'counter') furniture.counter = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'display' && skip.index != null) {
     const displays = [...(furniture.displays ?? [])];
@@ -145,8 +150,14 @@ function rectsOverlap(a, b, pad = 0) {
 export function placementBlocked(pose, kind, obstacles, floors, { checkAisle = true } = {}) {
   if (!pose) return 'That spot is off the shop floor.';
   const { hw, hd } = furnitureHalfSize(kind);
-  const span = rotatedFootprint(hw, hd, furnitureVisualYaw(kind, pose.rot));
-  if (!pointOnFloors(pose.x, pose.z, floors, 0.28)) return 'That spot is off the shop floor.';
+  const span = rotatedFootprint(hw, hd, furnitureVisualYaw(kind, pose?.rot));
+  if (kind === 'shelf') {
+    if (!pointOnFloors(pose.x, pose.z, floors, -0.35)) {
+      return 'That spot is off the shop wall.';
+    }
+  } else if (!pointOnFloors(pose.x, pose.z, floors, 0.28)) {
+    return 'That spot is off the shop floor.';
+  }
   if (checkAisle && kind !== 'counter' && rectHitsAisle(pose.x, pose.z, span.hw, span.hd)) {
     return 'That spot blocks the customer queue.';
   }

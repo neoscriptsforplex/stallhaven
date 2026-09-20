@@ -326,12 +326,24 @@ function buildProceduralCounter() {
 }
 
 export function buildDefaultTable() {
+  const target = applyTableWorldScale(buildProceduralTable());
   const bundled = getBundledLook('table');
   if (bundled) {
-    const target = buildProceduralTable();
     return wrapBundledProp(bundled, target, { name: 'table', fit: 'xz', wareY: 'top' });
   }
-  return buildProceduralTable();
+  return target;
+}
+
+/** Uniform world scale vs the baked table after size-match. */
+export const TABLE_WORLD_SCALE = 2;
+
+function applyTableWorldScale(mesh) {
+  mesh.scale.multiplyScalar(TABLE_WORLD_SCALE);
+  mesh.updateMatrixWorld(true);
+  const box = measureVisibleBox(mesh);
+  if (Number.isFinite(box.min.y)) mesh.position.y -= box.min.y;
+  if (mesh.userData.wareY != null) mesh.userData.wareY *= TABLE_WORLD_SCALE;
+  return mesh;
 }
 
 function buildProceduralTable() {
@@ -1671,6 +1683,23 @@ function addCannonballs(group, tint) {
 }
 
 function addRune(group, mark, tint) {
+  const bundled = getBundledLook(`rune-${mark}`);
+  if (bundled) {
+    const target = buildProceduralRuneMark(mark, tint);
+    const fitted = wrapBundledProp(bundled, target, { name: `rune-${mark}`, fit: 'max' });
+    group.add(fitted);
+    return;
+  }
+  addProceduralRune(group, mark, tint);
+}
+
+function buildProceduralRuneMark(mark, tint) {
+  const group = new THREE.Group();
+  addProceduralRune(group, mark, tint);
+  return group;
+}
+
+function addProceduralRune(group, mark, tint) {
   const stone = new THREE.MeshStandardMaterial({
     color: 0x8a8a90,
     roughness: 0.55,
@@ -3077,6 +3106,7 @@ export function wrapBundledProp(source, target, opts = {}) {
   if (!source) return null;
   const mesh = source.clone(true);
   if (opts.mirrorX) mirrorImportedX(mesh);
+  bakeImportedEuler(mesh, opts.rotateX ?? 0, opts.rotateY ?? 0, opts.rotateZ ?? 0);
   const tbox = opts.targetBox ?? measureVisibleBox(target);
   const tsize = tbox.getSize(new THREE.Vector3());
   const targetSize = opts.fit === 'xz'
@@ -3100,6 +3130,33 @@ export function wrapBundledProp(source, target, opts = {}) {
     mesh.add(tag);
   }
   return mesh;
+}
+
+/** Bake an Euler rotation into dump geometry so wall mounts can stay identity. */
+function bakeImportedEuler(root, rx = 0, ry = 0, rz = 0) {
+  if (!root || (!rx && !ry && !rz)) return root;
+  root.rotation.set(
+    root.rotation.x + rx,
+    root.rotation.y + ry,
+    root.rotation.z + rz,
+  );
+  root.updateMatrixWorld(true);
+  const world = new THREE.Matrix4();
+  root.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    world.copy(child.matrixWorld);
+    child.geometry = child.geometry.clone();
+    child.geometry.applyMatrix4(world);
+    child.geometry.computeVertexNormals();
+  });
+  root.traverse((child) => {
+    child.position.set(0, 0, 0);
+    child.quaternion.identity();
+    child.scale.set(1, 1, 1);
+    child.updateMatrix();
+  });
+  root.updateMatrixWorld(true);
+  return root;
 }
 
 /** Horizontally mirror dump geometry (knob/latch side) without stretching. */

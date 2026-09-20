@@ -60,6 +60,10 @@ describe('station walk-then-open', () => {
   it('retargets a walk to the anvil, furnace, chest, and range from the keeper', () => {
     const state = createState();
     const from = { x: SHOP.keeper.x, z: SHOP.keeper.z };
+    assert.equal(resolveStationUse(from, state.furniture.furnace, state).action, 'none');
+    assert.equal(resolveStationUse(from, state.furniture.range, state).action, 'none');
+    state.furniture.furnace = { x: SHOP.furnace.x, z: SHOP.furnace.z, rot: 0 };
+    state.furniture.range = { x: SHOP.range.x, z: SHOP.range.z, rot: 0 };
     for (const id of ['anvil', 'furnace', 'chest', 'range']) {
       const plan = resolveStationUse(from, state.furniture[id], state);
       assert.equal(plan.action, 'walk', `${id} should path from the keeper`);

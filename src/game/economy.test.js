@@ -46,9 +46,11 @@ import {
   buyFromCustomer,
   buyFurniture,
   buyFurnace,
+  buyRange,
   buyWheel,
   canBuyCauldron,
   canBuyFurnace,
+  canBuyRange,
   canBuyWheel,
   canRestock,
   canBuyFurniture,
@@ -73,6 +75,7 @@ import {
   OLD_DEFAULT_DISPLAYS,
   ownsCauldron,
   ownsFurnace,
+  ownsRange,
   ownsWheel,
   placeFromChest,
   placeOnDisplay,
@@ -92,12 +95,19 @@ import {
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
-import { furnaceBesideAnvil } from './layout.js';
+import { furnitureHalfSize, furnaceBesideAnvil } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS } from './shopbuild.js';
 
+function placeStation(state, id) {
+  const pose = SHOP[id];
+  state.furniture[id] = { x: pose.x, z: pose.z, rot: 0 };
+}
+
 function finishCraft(state, recipeId, at = 0) {
   const recipe = RECIPES[recipeId];
+  if (recipe.category === 'food' && !state.furniture.range) placeStation(state, 'range');
+  if (recipe.category === 'smelt' && !state.furniture.furnace) placeStation(state, 'furnace');
   const cost = recipeCost(recipe);
   for (const [id, n] of Object.entries(cost.materials)) {
     state.materials[id] = Math.max(state.materials[id] ?? 0, n);
@@ -132,6 +142,7 @@ describe('stall economy', () => {
 
   it('crafts from materials into the chest without auto-placing on stalls', () => {
     const state = createState();
+    placeStation(state, 'range');
     assert.equal(canCraft(state, 'bread'), true);
     assert.equal(startCraft(state, 'bread', 0), true);
     assert.equal(state.materials.flour, 9);
@@ -244,9 +255,13 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'bronze_sword'), true);
     assert.equal(isUnlocked(state, 'staff'), true);
     assert.equal(isUnlocked(state, 'blue_dhide_body'), true);
+    assert.equal(isUnlocked(state, 'bread'), false);
+    placeStation(state, 'range');
     assert.equal(isUnlocked(state, 'bread'), true);
     assert.equal(isUnlocked(state, 'air_rune'), true);
     assert.equal(isUnlocked(state, 'earth_rune'), false);
+    assert.equal(isUnlocked(state, 'smelt_bronze'), false);
+    placeStation(state, 'furnace');
     assert.equal(isUnlocked(state, 'smelt_bronze'), true);
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
@@ -328,7 +343,8 @@ describe('save and load', () => {
     assert.equal(state.materials.herbs, 8);
     assert.equal(state.materials.water, 12);
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
-    assert.equal(ownsFurnace(state), true);
+    assert.equal(ownsFurnace(state), false);
+    assert.equal(ownsRange(state), false);
     assert.equal(state.chest.bread, 2);
     assert.equal(state.fullscreen, false);
     assert.ok(state.music.volume > 0);
@@ -549,8 +565,7 @@ describe('catalog', () => {
   it('keeps a clear queue aisle in front of the counter', () => {
     for (const spot of SHOP.displays) {
       if (spot.kind === 'shelf') continue;
-      const hw = spot.kind === 'stand' ? 0.36 : 0.76;
-      const hd = spot.kind === 'stand' ? 0.36 : 0.52;
+      const { hw, hd } = furnitureHalfSize(spot.kind);
       assert.equal(rectHitsAisle(spot.x, spot.z, hw, hd, QUEUE_AISLE), false, spot.name);
     }
     assert.equal(rectHitsAisle(SHOP.anvil.x, SHOP.anvil.z, 0.48, 0.4, QUEUE_AISLE), false);
@@ -812,13 +827,14 @@ describe('furnace and spinning wheel', () => {
     }
   });
 
-  it('starts with a free furnace beside the anvil and smelts ore into a bar', () => {
+  it('starts without a furnace and places a free one from Upgrade to smelt ore into a bar', () => {
     const state = createState();
-    assert.equal(ownsFurnace(state), true);
-    assert.equal(canBuyFurnace(state), false);
-    assert.equal(buyFurnace(state, { x: -1, z: 0.6, rot: 0 }), false);
-    assert.equal(state.furniture.furnace.x, SHOP.furnace.x);
-    assert.equal(state.furniture.furnace.z, SHOP.furnace.z);
+    assert.equal(ownsFurnace(state), false);
+    assert.equal(canBuyFurnace(state), true);
+    assert.equal(buyFurnace(state, { x: -1, z: 0.6, rot: 0 }), true);
+    assert.equal(state.gold, START_GOLD);
+    assert.equal(state.furniture.furnace.x, -1);
+    assert.equal(state.furniture.furnace.z, 0.6);
     const ore = state.materials.bronze;
     assert.equal(canCraft(state, 'smelt_bronze'), true);
     finishCraft(state, 'smelt_bronze');
@@ -829,11 +845,11 @@ describe('furnace and spinning wheel', () => {
     const next = createState();
     assert.equal(applyState(next, saved), true);
     assert.equal(ownsFurnace(next), true);
-    assert.equal(next.furniture.furnace.x, SHOP.furnace.x);
+    assert.equal(next.furniture.furnace.x, -1);
     assert.equal(next.materials.bronze_bar, 1);
   });
 
-  it('keeps a furnace the player already placed and auto-places one if a save never had one', () => {
+  it('keeps a furnace the player already placed and leaves a missing one unplaced', () => {
     const kept = createState();
     assert.equal(applyState(kept, {
       version: 8,
@@ -854,14 +870,28 @@ describe('furnace and spinning wheel', () => {
         anvil: { x: -2.98, z: -2.42, rot: 0 },
       },
     }), true);
+    assert.equal(missing.furniture.furnace, null);
+    assert.equal(ownsFurnace(missing), false);
     const expected = furnaceBesideAnvil({ x: -2.98, z: -2.42, rot: 0 });
-    assert.equal(missing.furniture.furnace.x, expected.x);
-    assert.equal(missing.furniture.furnace.z, expected.z);
-    assert.equal(ownsFurnace(missing), true);
+    assert.equal(expected.x, SHOP.furnace.x);
+    assert.equal(expected.z, SHOP.furnace.z);
+  });
+
+  it('places a free cooking range from Upgrade before food unlocks', () => {
+    const state = createState();
+    assert.equal(ownsRange(state), false);
+    assert.equal(canBuyRange(state), true);
+    assert.match(craftBlockReason(state, 'bread'), /range/i);
+    assert.equal(buyRange(state, { x: 1.15, z: -2.22, rot: 0 }), true);
+    assert.equal(ownsRange(state), true);
+    assert.equal(canBuyRange(state), false);
+    assert.equal(isUnlocked(state, 'bread'), true);
+    assert.equal(canCraft(state, 'bread'), true);
   });
 
   it('unlocks feast foods after bread without changing the kitchen cake line', () => {
     const state = createState();
+    placeStation(state, 'range');
     assert.equal(isUnlocked(state, 'salmon'), false);
     assert.equal(isUnlocked(state, 'pizza'), false);
     state.craftCounts.bread = 20;
@@ -955,9 +985,33 @@ describe('build furniture', () => {
     assert.equal(applyState(next, saved), true);
     assert.equal(next.boughtFurniture.table, 2);
     assert.equal(next.boughtFurniture.mannequin, 2);
+    assert.equal(next.boughtFurniture.shelf, 0);
     assert.equal(next.displays.length, SHOP.displays.length + 4);
     assert.equal(next.displays.at(-1).kind, 'stand');
     assert.equal(next.furniture.displays.at(-1).z, 1.4);
+  });
+
+  it('sells extra shelves on the same 500 then ×3 curve after the included three', () => {
+    const state = createState();
+    const starterShelves = SHOP.displays.filter((d) => d.kind === 'shelf').length;
+    assert.equal(starterShelves, 3);
+    assert.equal(state.boughtFurniture.shelf, 0);
+    assert.equal(canBuyFurniture(state, 'shelf'), false);
+    state.gold = 500;
+    assert.equal(canBuyFurniture(state, 'shelf'), true);
+    assert.equal(buyFurniture(state, 'shelf', { x: 0, z: -3.22, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.shelf, 1);
+    assert.equal(state.displays.at(-1).kind, 'shelf');
+    state.gold = 1500;
+    assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.22, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.shelf, 2);
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.boughtFurniture.shelf, 2);
+    assert.equal(next.displays.filter((d) => d.kind === 'shelf').length, starterShelves + 2);
   });
 
   it('does not count starter tables or mannequins as paid extras in an old save', () => {
@@ -969,6 +1023,7 @@ describe('build furniture', () => {
     }), true);
     assert.equal(state.boughtFurniture.table, 0);
     assert.equal(state.boughtFurniture.mannequin, 0);
+    assert.equal(state.boughtFurniture.shelf, 0);
     assert.equal(state.displays.length, SHOP.displays.length);
     assert.equal(buyFurniture(state, 'table', { x: 0, z: 0.8, rot: 0 }), true);
     assert.equal(state.gold, 0);
@@ -1162,6 +1217,7 @@ describe('ores, appearance, king, and chest bin', () => {
 describe('furnace bar unlocks', () => {
   it('unlocks iron after 20 bronze smelts, then steel after 30 iron smelts', () => {
     const state = createState();
+    placeStation(state, 'furnace');
     assert.equal(isUnlocked(state, 'smelt_bronze'), true);
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(unlockRemaining(state, 'smelt_iron'), 20);

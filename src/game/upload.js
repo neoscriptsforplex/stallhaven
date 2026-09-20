@@ -133,6 +133,16 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'rock', folder: 'rock' },
   { id: 'fountain', folder: 'fountain' },
   { id: 'skeleton', folder: 'skeleton' },
+  { id: 'rune-air', folder: 'runes/air' },
+  { id: 'rune-water', folder: 'runes/water' },
+  { id: 'rune-earth', folder: 'runes/earth' },
+  { id: 'rune-fire', folder: 'runes/fire' },
+  { id: 'ore-bronze', folder: 'dungeon-rocks/bronze-rocks' },
+  { id: 'ore-iron', folder: 'dungeon-rocks/iron-rocks' },
+  { id: 'ore-mithril', folder: 'dungeon-rocks/mithril-rocks' },
+  { id: 'ore-adamant', folder: 'dungeon-rocks/adamant-rocks' },
+  { id: 'ore-dragon', folder: 'dungeon-rocks/dragon-rocks' },
+  { id: 'ore-essence', folder: 'dungeon-rocks/essence' },
 ];
 
 export async function parseBundledPlayerBuffers(objBuffer, mtlBuffer) {
@@ -256,7 +266,8 @@ export async function loadBundledPlayerScene() {
 }
 
 export async function loadBundledPropScene(folder) {
-  const names = [`${folder}.obj`, 'model.obj', 'player.obj'];
+  const baseName = String(folder).split('/').pop();
+  const names = [`${baseName}.obj`, `${folder}.obj`, 'model.obj', 'player.obj'];
   let lastErr = null;
   for (const objFile of names) {
     const mtlFile = objFile.replace(/\.obj$/i, '.mtl');

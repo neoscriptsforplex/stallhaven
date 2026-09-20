@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {
   CAULDRON_COST,
   WHEEL_COST,
+  FURNACE_COST,
+  RANGE_COST,
+  FURNITURE_SHOP,
+  TREE_BED_CLEAR,
   furnaceBesideAnvil,
   poseRect,
   rectsOverlap,
@@ -36,6 +40,7 @@ import {
   padById,
   rotatePose,
   snapToFloor,
+  snapToWallGrid,
   walkFloors,
   wallVineMounts,
   outdoorWalkFloors,
@@ -88,13 +93,13 @@ describe('layout numbers', () => {
     assert.equal(occupiedCells(['left', 'back']).length, 3);
   });
 
-  it('yaws chest, range, and furnace −90° CCW from above and the counter 180° at start only', () => {
-    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (-Math.PI / 2)) < 1e-9);
+  it('yaws the chest 180° toward the front-door wall, and range/furnace −90° at start only', () => {
+    assert.ok(Math.abs(FURNITURE_START_YAW.chest - Math.PI) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.range - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.furnace - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.counter - Math.PI) < 1e-9);
     assert.equal(FURNITURE_START_YAW.anvil, undefined);
-    assert.ok(Math.abs(furnitureVisualYaw('chest', 0) - (-Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(furnitureVisualYaw('chest', 0) - Math.PI) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('range', FURNITURE_ROT_STEP) - (-Math.PI / 2 + FURNITURE_ROT_STEP)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('furnace', 0) - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('counter', 0) - Math.PI) < 1e-9);
@@ -106,42 +111,35 @@ describe('layout numbers', () => {
     assert.equal(furniture.counter.rot, FURNITURE_FORWARD);
     assert.equal(furniture.anvil.rot, FURNITURE_FORWARD);
     assert.equal(furniture.chest.rot, FURNITURE_FORWARD);
-    assert.equal(furniture.range.rot, FURNITURE_FORWARD);
+    assert.equal(furniture.range, null);
     for (const pose of furniture.displays) {
       assert.equal(pose.rot, FURNITURE_FORWARD);
     }
-    const turned = rotatePose(furniture.range, 1);
-    assert.ok(Math.abs(turned.rot - FURNITURE_ROT_STEP) < 1e-9);
     assert.equal(furniture.cauldron, null);
-    assert.ok(furniture.furnace);
-    assert.equal(furniture.furnace.x, SHOP.furnace.x);
-    assert.equal(furniture.furnace.z, SHOP.furnace.z);
-    assert.equal(furniture.furnace.rot, FURNITURE_FORWARD);
+    assert.equal(furniture.furnace, null);
     assert.equal(furniture.wheel, null);
   });
 
-  it('sits the starter furnace on the back wall, not overlapping the side-wall anvil', () => {
-    assert.ok(SHOP.furnace.z < SHOP.anvil.z - 1.4, 'furnace should sit on the back wall');
-    assert.ok(SHOP.furnace.x > SHOP.anvil.x);
+  it('sits the starter anvil on the old furnace back-wall pad', () => {
+    assert.ok(SHOP.anvil.z < SHOP.counter.z - 0.2, 'anvil should sit on the back wall');
+    assert.ok(SHOP.anvil.x < 0);
     const beside = furnaceBesideAnvil({ x: -2.98, z: -2.42, rot: 0 });
     assert.equal(beside.x, SHOP.furnace.x);
     assert.equal(beside.z, SHOP.furnace.z);
   });
 
-  it('puts the cooking range on the back wall and the chest on the right wall', () => {
-    assert.ok(SHOP.range.x > 0, 'range should sit on the right half of the back wall');
-    assert.ok(SHOP.range.z < SHOP.counter.z - 0.2, 'range should sit behind the counter');
-    assert.ok(SHOP.chest.x > 2.6, 'chest should sit on the right wall');
-    assert.ok(SHOP.chest.z > SHOP.range.z + 1.4, 'chest should sit forward of the back-wall range');
-    assert.ok(SHOP.anvil.x < -2.6, 'anvil should sit on the left wall');
+  it('puts the chest on the old range pad, facing the front-door wall', () => {
+    assert.ok(SHOP.chest.x > 0, 'chest should sit on the right half of the back wall');
+    assert.ok(SHOP.chest.z < SHOP.counter.z - 0.2, 'chest should sit behind the counter');
+    assert.ok(Math.abs(SHOP.chest.x - 2.55) < 1e-9);
+    assert.ok(Math.abs(SHOP.chest.z - 2.22) < 1e-9 || Math.abs(SHOP.chest.z + 2.22) < 1e-9);
+    assert.ok(SHOP.anvil.x < -1.8, 'anvil should sit on the left half of the back wall');
   });
 
   it('keeps starter stations from overlapping each other or remaining tables', () => {
     const stations = [
       ['anvil', SHOP.anvil],
       ['chest', SHOP.chest],
-      ['furnace', SHOP.furnace],
-      ['range', SHOP.range],
       ['counter', SHOP.counter],
     ];
     const rects = stations.map(([kind, pose]) => poseRect(kind, pose));
@@ -271,5 +269,49 @@ describe('layout numbers', () => {
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, shopObstacles(SHOP), 0.28, player), true);
     assert.equal(isWalkable(0, SHOP.door.z, [], 0.28, player), true);
     assert.equal(isWalkable(0, 4.6, [], 0.28, player), true);
+  });
+
+  it('keeps garden trees and large rocks off flower beds', () => {
+    const beds = gardenBedSpots([]);
+    assert.ok(beds.length >= 3);
+    for (const tree of gardenTreeSpots([])) {
+      for (const bed of beds) {
+        const dist = Math.hypot(tree.x - bed.x, tree.z - bed.z);
+        assert.ok(dist >= TREE_BED_CLEAR, `tree at ${tree.x},${tree.z} overlaps bed at ${bed.x},${bed.z}`);
+      }
+    }
+    for (const rock of gardenRockSpots([])) {
+      for (const bed of beds) {
+        const dist = Math.hypot(rock.x - bed.x, rock.z - bed.z);
+        assert.ok(dist >= TREE_BED_CLEAR, `rock at ${rock.x},${rock.z} overlaps bed at ${bed.x},${bed.z}`);
+      }
+    }
+  });
+
+  it('places a few large outdoor rocks at 2–3× the usual garden scale', () => {
+    const rocks = gardenRockSpots([]);
+    const large = rocks.filter((spot) => spot.scale >= 2 && spot.scale <= 3);
+    assert.ok(large.length >= 3, `expected decorative boulders, got ${large.map((s) => s.scale)}`);
+    assert.ok(rocks.some((spot) => spot.scale < 1.2), 'small path rocks should remain');
+  });
+
+  it('snaps extra shelves to a wall grid instead of the floor', () => {
+    const back = snapToWallGrid(0.13, -2.9, []);
+    assert.ok(Math.abs(back.z + 3.18 + 0.04) < 1e-6 || Math.abs(back.z + 3.22) < 0.08);
+    assert.ok(Math.abs(back.rot) < 1e-6);
+    const side = snapToWallGrid(-3.5, 0.11, []);
+    assert.ok(Math.abs(side.x + 3.72 + 0.04) < 0.08 || Math.abs(side.x + 3.76) < 0.12);
+    assert.ok(Math.abs(Math.abs(side.rot) - Math.PI / 2) < 1e-6);
+  });
+
+  it('lists furnace and range as free upgrade stations and shelves in the furniture shop', () => {
+    assert.equal(FURNACE_COST, 0);
+    assert.equal(RANGE_COST, 0);
+    assert.equal(furnitureBuyCost(0), 500);
+    assert.equal(furnitureBuyCost(1), 1500);
+    assert.ok(FURNITURE_SHOP.some((item) => item.type === 'shelf' && item.kind === 'shelf'));
+    const table = furnitureHalfSize('table');
+    assert.ok(table.hw > 1.2);
+    assert.ok(table.hd > 0.7);
   });
 });

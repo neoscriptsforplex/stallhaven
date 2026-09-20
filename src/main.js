@@ -3,6 +3,7 @@ import { completeCrafts, createState, pushLog, tickMaterials } from './game/econ
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
 import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledLooks } from './game/upload.js';
+import { loadBundledMusic } from './game/audio.js';
 import { createWorld } from './game/world.js';
 import { normalizeImported, setBundledLooks } from './game/models.js';
 
@@ -54,6 +55,10 @@ async function bootGame() {
       return null;
     }),
     loadBundledLooks(),
+    loadBundledMusic().catch((err) => {
+      console.warn('Bundled music skipped:', err?.message || err);
+      return [];
+    }),
   ]).then(([bundledPlayer, bundledLooks]) => {
     try {
       setBundledLooks(bundledLooks);

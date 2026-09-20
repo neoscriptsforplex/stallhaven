@@ -38,6 +38,7 @@ import {
   pointHitsShop,
   pointOnFloors,
   snapToFloor,
+  snapToWallGrid,
   walkFloors,
 } from './layout.js';
 import {
@@ -358,7 +359,7 @@ export function createWorld(canvas, state, opts = {}) {
   scene.add(wheelMesh);
   const wheelPick = makePick(STATION_HIT.wheel.w, STATION_HIT.wheel.h, STATION_HIT.wheel.d, 'wheel');
 
-  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'wheel'];
+  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel'];
 
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
@@ -402,7 +403,7 @@ export function createWorld(canvas, state, opts = {}) {
       ? [1.15, 2.05, 1.05]
       : spot.kind === 'shelf'
         ? [1.42, 1.15, 0.46]
-        : [1.45, 1.15, 1.0];
+        : [2.9, 1.55, 1.9];
     const pick = new THREE.Mesh(
       new THREE.BoxGeometry(...pickSize),
       new THREE.MeshBasicMaterial({ visible: false }),
@@ -533,11 +534,15 @@ export function createWorld(canvas, state, opts = {}) {
 
   function previewFurnitureAt(x, z) {
     if (!moveTarget) return null;
-    const snapped = snapToFloor(x, z, floors);
+    const kind = placeKindOf(moveTarget);
+    const snapped = kind === 'shelf'
+      ? snapToWallGrid(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
+      : snapToFloor(x, z, floors);
     const pose = poseOf(moveTarget);
     if (!pose) return snapped;
     pose.x = snapped.x;
     pose.z = snapped.z;
+    if (kind === 'shelf' && snapped.rot != null) pose.rot = snapped.rot;
     applyMovePose(moveTarget);
     highlightSnapCell(snapped.x, snapped.z);
     return snapped;
@@ -1076,7 +1081,16 @@ export function createWorld(canvas, state, opts = {}) {
   function rotateFurniturePose(target) {
     const pose = poseOf(target);
     if (!pose) return false;
-    pose.rot = (pose.rot ?? FURNITURE_FORWARD) + FURNITURE_ROT_STEP;
+    const kind = placeKindOf(target);
+    if (kind === 'shelf') {
+      const nextRot = (pose.rot ?? FURNITURE_FORWARD) + Math.PI / 2;
+      const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot);
+      pose.x = snapped.x;
+      pose.z = snapped.z;
+      pose.rot = snapped.rot;
+    } else {
+      pose.rot = (pose.rot ?? FURNITURE_FORWARD) + FURNITURE_ROT_STEP;
+    }
     if (target.id === 'display') applyDisplayPose(target.index);
     else applyFixturePose(target.id);
     rebuildNav();
@@ -2075,17 +2089,25 @@ export function createWorld(canvas, state, opts = {}) {
       pickHandler?.({ type: 'furniture-place-start', furniture: { id } });
     },
     beginPlaceFurniture(kind) {
-      const start = snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, floors);
+      const start = kind === 'shelf'
+        ? snapToWallGrid(0, -3.22, state.expansions ?? [])
+        : snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, floors);
       const index = displays.length;
       const spot = {
         id: `new-${kind}-${index}`,
-        name: kind === 'stand' ? 'Mannequin' : 'Table',
+        name: kind === 'stand' ? 'Mannequin' : kind === 'shelf' ? 'Shelf' : 'Table',
         x: start.x,
         z: start.z,
         kind,
       };
       displays.push(makeDisplaySlot(spot, index, start));
-      placeDraft = { id: 'display', index, x: start.x, z: start.z, rot: FURNITURE_FORWARD };
+      placeDraft = {
+        id: 'display',
+        index,
+        x: start.x,
+        z: start.z,
+        rot: start.rot ?? FURNITURE_FORWARD,
+      };
       moveTarget = { id: 'display', index, kind };
       placeNeedsConfirm = true;
       expandMode = false;

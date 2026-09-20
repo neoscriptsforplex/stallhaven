@@ -26,6 +26,7 @@ import {
   furnitureBuyCost,
   gardenTreeSpots,
   gardenRockSpots,
+  gardenRockRadius,
   gardenTrapdoorSpot,
   gardenBedSpots,
   gardenGrassClusters,
@@ -318,13 +319,24 @@ describe('layout numbers', () => {
     const rocks = gardenRockSpots([]);
     assert.ok(rocks.length >= 2);
     for (const rock of rocks) {
-      const pad = Math.max(0.45, 0.28 * (rock.scale ?? 1));
+      const pad = gardenRockRadius(rock.scale ?? 1);
       assert.ok(rock.x >= grass.minX + pad - 1e-9, `rock x=${rock.x} off grass`);
       assert.ok(rock.x <= grass.maxX - pad + 1e-9, `rock x=${rock.x} off grass`);
       assert.ok(rock.z >= grass.minZ + pad - 1e-9, `rock z=${rock.z} off grass`);
       assert.ok(rock.z <= grass.maxZ - pad + 1e-9, `rock z=${rock.z} off grass`);
     }
     assert.equal(rocks.some((spot) => spot.z > 12.8), false);
+    const voidSide = [
+      { x: 6.15, z: 13.45 },
+      { x: -5.85, z: 13.15 },
+    ];
+    for (const miss of voidSide) {
+      assert.equal(
+        rocks.some((spot) => Math.hypot(spot.x - miss.x, spot.z - miss.z) < 0.5),
+        false,
+        `void rock at ${miss.x},${miss.z} should not spawn`,
+      );
+    }
   });
 
   it('snaps extra shelves to a wall grid instead of the floor', () => {

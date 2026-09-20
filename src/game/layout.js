@@ -469,9 +469,14 @@ export function gardenRockSpots(expansionIds = []) {
   ));
 }
 
+/** Horizontal radius of the garden boulder mesh, plus a sit-on-lawn margin. */
+export function gardenRockRadius(scale = 1) {
+  return 0.32 * scale + 0.35;
+}
+
 function gardenRockOnGrass(spot, expansionIds = []) {
   const grass = gardenBox(expansionIds);
-  const pad = Math.max(0.45, 0.28 * (spot.scale ?? 1));
+  const pad = gardenRockRadius(spot.scale ?? 1);
   return spot.x >= grass.minX + pad
     && spot.x <= grass.maxX - pad
     && spot.z >= grass.minZ + pad

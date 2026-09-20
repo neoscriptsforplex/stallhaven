@@ -178,7 +178,7 @@ export const MATERIALS = {
   iron: { id: 'iron', name: 'Iron Ore', restock: 0, start: 2, tier: 2, regenEvery: 0 },
   steel: { id: 'steel', name: 'Steel Ore', restock: 0, start: 1, tier: 3, regenEvery: 0 },
   mithril: { id: 'mithril', name: 'Mithril Ore', restock: 0, start: 1, tier: 4, regenEvery: 0 },
-  adamant: { id: 'adamant', name: 'Adamant Ore', restock: 0, start: 0, tier: 5, regenEvery: 0 },
+  adamant: { id: 'adamant', name: 'Adamantite', restock: 0, start: 0, tier: 5, regenEvery: 0 },
   runite: { id: 'runite', name: 'Runite Ore', restock: 0, start: 0, tier: 6, regenEvery: 0 },
   dragon: { id: 'dragon', name: 'Dragon Ore', restock: 0, start: 0, tier: 7, regenEvery: 0 },
   logs: { id: 'logs', name: 'Logs', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },

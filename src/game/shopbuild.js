@@ -1684,7 +1684,7 @@ export const DUNGEON_BOULDERS = [
   { id: 'iron', materialId: 'iron', name: 'Iron Ore', x: 1.4, z: -3.15, rot: -0.3, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.iron },
   { id: 'steel', materialId: 'steel', name: 'Steel Ore', x: 4.05, z: -1.5, rot: 0.8, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.steel },
   { id: 'mithril', materialId: 'mithril', name: 'Mithril Ore', x: 4.05, z: 2.15, rot: -0.6, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.mithril },
-  { id: 'adamant', materialId: 'adamant', name: 'Adamant Ore', x: -1.5, z: 3.15, rot: 1.1, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.adamant },
+  { id: 'adamant', materialId: 'adamant', name: 'Adamantite', x: -1.5, z: 3.15, rot: 1.1, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.adamant },
   { id: 'runite', materialId: 'runite', name: 'Runite', x: -4.05, z: 1.7, rot: 0.2, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.runite },
   { id: 'dragon', materialId: 'dragon', name: 'Dragon Ore', x: -4.05, z: -1.35, rot: -0.9, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.dragon },
 ];

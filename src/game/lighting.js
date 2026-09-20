@@ -10,7 +10,7 @@ export const SHOP_LIGHT = {
 };
 
 /** Dungeon base lights vs the previous cave values. Shop base is unchanged. */
-export const DUNGEON_LIGHT_BOOST = 1.5;
+export const DUNGEON_LIGHT_BOOST = 2;
 export const DUNGEON_LIGHT = {
   hemi: 0.46 * DUNGEON_LIGHT_BOOST,
   ambient: 0.06 * DUNGEON_LIGHT_BOOST,

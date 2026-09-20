@@ -91,7 +91,7 @@ describe('scene lighting', () => {
     const shopNeutral = lightingForScene('shop', BRIGHTNESS_NEUTRAL);
     assert.equal(shopNeutral.hemi, SHOP_LIGHT.hemi);
     assert.equal(shopNeutral.exposure, SHOP_LIGHT.exposure);
-    assert.equal(DUNGEON_LIGHT_BOOST, 1.5);
+    assert.equal(DUNGEON_LIGHT_BOOST, 2);
     assert.ok(Math.abs(DUNGEON_LIGHT.hemi - 0.46 * DUNGEON_LIGHT_BOOST) < 1e-9);
     assert.ok(Math.abs(DUNGEON_LIGHT.ambient - 0.06 * DUNGEON_LIGHT_BOOST) < 1e-9);
     assert.equal(SHOP_LIGHT.hemi, 1.14);

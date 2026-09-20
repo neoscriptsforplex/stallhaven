@@ -1177,11 +1177,18 @@ describe('default display order', () => {
 describe('ores, appearance, king, and chest bin', () => {
   it('names metal materials as ore and matching bars', () => {
     assert.equal(MATERIALS.bronze.name, 'Bronze Ore');
+    assert.equal(MATERIALS.adamant.name, 'Adamantite');
     assert.equal(MATERIALS.runite.name, 'Runite Ore');
     assert.equal(MATERIALS.dragon.name, 'Dragon Ore');
     assert.equal(MATERIALS.bronze_bar.name, 'Bronze Bar');
+    assert.equal(MATERIALS.adamant_bar.name, 'Adamant Bar');
     assert.equal(MATERIALS.runite_bar.name, 'Runite Bar');
     assert.equal(MATERIALS.dragon_bar.name, 'Dragon Bar');
+    assert.equal(METALS.find((metal) => metal.id === 'adamant')?.name, 'Adamant');
+    assert.equal(RECIPES.adamant_dagger?.name, 'Adamant Dagger');
+    assert.equal(RECIPES.adamant_platebody?.name, 'Adamant Platebody');
+    assert.equal(RECIPES.adamant_hatchet?.name, 'Adamant Hatchet');
+    assert.equal(RECIPES.smelt_adamant?.name, 'Adamant Bar');
     assert.equal(MATERIALS.bow_string.name, 'Bow String');
     assert.equal(MATERIALS.flax.name, 'Flax');
     assert.equal(MATERIALS.chocolate.name, 'Chocolate');
@@ -1539,8 +1546,10 @@ describe('dungeon sky and remains', () => {
     assert.equal(boulderInspect('essence').name, 'Essence');
     assert.equal(boulderInspect('bronze').name, 'Bronze Ore');
     assert.equal(boulderInspect('mithril').name, 'Mithril Ore');
+    assert.equal(boulderInspect('adamant').name, 'Adamantite');
+    assert.notEqual(boulderInspect('adamant').name, 'Adamant Ore');
     assert.equal(boulderInspect('dragon').name, 'Dragon Ore');
-    assert.match(boulderInspect('runite').blurb, /runite ore/i);
+    assert.match(boulderInspect('runite').blurb, /runite/i);
   });
 });
 

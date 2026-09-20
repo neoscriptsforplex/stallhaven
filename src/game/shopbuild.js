@@ -1767,6 +1767,47 @@ function attachBoulderPick(group, spot) {
   group.add(pick);
 }
 
+/** Modest sRGB albedo lift so dump Kd colors read under cave lights. */
+export const DUNGEON_ROCK_ALBEDO_LIFT = 1.28;
+
+function liftDungeonRockColor(color) {
+  const srgb = color.clone();
+  if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
+  srgb.multiplyScalar(DUNGEON_ROCK_ALBEDO_LIFT);
+  srgb.r = Math.min(1, srgb.r);
+  srgb.g = Math.min(1, srgb.g);
+  srgb.b = Math.min(1, srgb.b);
+  if (typeof srgb.convertSRGBToLinear === 'function') srgb.convertSRGBToLinear();
+  return srgb;
+}
+
+function mapLooksMissing(map) {
+  if (!map) return true;
+  const img = map.image;
+  return !(img && ((img.width ?? 0) > 0 || img.data));
+}
+
+/** Shared dump tweak: Standard lighting, drop broken maps, slight albedo lift. */
+function prepareDungeonRockDump(root) {
+  root?.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    const next = mats.map((mat) => {
+      const color = liftDungeonRockColor(mat.color ? mat.color.clone() : new THREE.Color(0x888888));
+      const std = new THREE.MeshStandardMaterial({
+        name: mat.name,
+        color,
+        roughness: 0.86,
+        metalness: 0.04,
+        side: mat.side ?? THREE.FrontSide,
+      });
+      if (mat.map && !mapLooksMissing(mat.map)) std.map = mat.map;
+      return std;
+    });
+    child.material = Array.isArray(child.material) ? next : next[0];
+  });
+}
+
 function stripEmissive(root) {
   const lights = [];
   root?.traverse((child) => {
@@ -1806,6 +1847,7 @@ function buildMineBoulder(spot) {
   const visual = bundled
     ? wrapBundledProp(bundled, target, { name: `ore-${spot.id}`, fit: 'max' })
     : target;
+  if (bundled) prepareDungeonRockDump(visual);
   group.add(visual);
   sitVisibleOnY(visual, DUNGEON_FLOOR_Y);
   attachBoulderPick(group, spot);

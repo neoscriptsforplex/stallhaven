@@ -34,7 +34,7 @@ import {
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, ESSENCE_OLD_XZ, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, ESSENCE_OLD_XZ, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -948,6 +948,47 @@ describe('bundled prop swaps', () => {
     } finally {
       setBundledLook('ore-bronze', null);
       setBundledLook('ore-essence', null);
+    }
+  });
+
+  it('lifts dungeon ore dump materials and drops missing maps', async () => {
+    assert.ok(DUNGEON_ROCK_ALBEDO_LIFT > 1);
+    setBundledLook('ore-dragon', await loadFolder('dungeon-rocks/dragon-rocks'));
+    setBundledLook('ore-bronze', await loadFolder('dungeon-rocks/bronze-rocks'));
+    try {
+      const built = buildDungeon();
+      const dragon = built.boulders.find((item) => item.name === 'boulder-dragon');
+      const bronze = built.boulders.find((item) => item.name === 'boulder-bronze');
+      assert.ok(dragon && bronze);
+      let dragonMaps = 0;
+      let dragonStd = 0;
+      let dragonMeshes = 0;
+      let bronzeMax = 0;
+      dragon.traverse((child) => {
+        if (!child.isMesh || child.userData?.kind === 'boulder') return;
+        dragonMeshes += 1;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        if (mats.some((mat) => mat?.map)) dragonMaps += 1;
+        if (mats.every((mat) => mat?.isMeshStandardMaterial)) dragonStd += 1;
+      });
+      bronze.traverse((child) => {
+        if (!child.isMesh || child.userData?.kind === 'boulder') return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+          const c = mat?.color;
+          if (!c) continue;
+          const srgb = c.clone();
+          if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
+          bronzeMax = Math.max(bronzeMax, srgb.r, srgb.g, srgb.b);
+        }
+      });
+      assert.ok(dragonMeshes >= 1);
+      assert.equal(dragonMaps, 0, 'missing .psd maps should not darken dragon rocks');
+      assert.equal(dragonStd, dragonMeshes);
+      assert.ok(bronzeMax > 0.12, `bronze albedo should not sit near black, max=${bronzeMax}`);
+    } finally {
+      setBundledLook('ore-dragon', null);
+      setBundledLook('ore-bronze', null);
     }
   });
 

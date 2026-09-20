@@ -69,7 +69,26 @@ function parseObjBuffer(buffer, sidecars = {}) {
   }
   const group = objLoader.parse(objText);
   if (!hasMesh(group)) throw new Error('That .obj has no mesh.');
+  dropUnusableMaps(group);
   return group;
+}
+
+/** MTL map_Kd to missing files (e.g. .psd) otherwise multiplies albedo toward black. */
+function dropUnusableMaps(root) {
+  const keys = ['map', 'emissiveMap', 'specularMap', 'normalMap', 'bumpMap', 'displacementMap', 'alphaMap'];
+  root?.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      for (const key of keys) {
+        const tex = mat[key];
+        if (!tex) continue;
+        const img = tex.image;
+        const ok = Boolean(img && ((img.width ?? 0) > 0 || img.data));
+        if (!ok) mat[key] = null;
+      }
+    }
+  });
 }
 
 function friendlyParseError(err, kind) {

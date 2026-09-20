@@ -53,6 +53,7 @@ import {
   furnitureLabelForType,
   padById,
   padConnects,
+  snapToWallGrid,
   stationUnlock,
 } from './layout.js';
 import {
@@ -1224,7 +1225,11 @@ export function applyState(state, data) {
           z: 0.8,
           rot: FURNITURE_FORWARD,
         };
-        return readPose(savedFurnitureDisplays?.[index] ?? data.furniture.displays?.[index], fallback);
+        const pose = readPose(savedFurnitureDisplays?.[index] ?? data.furniture.displays?.[index], fallback);
+        if ((display.kind ?? SHOP.displays[index]?.kind) === 'shelf') {
+          return snapToWallGrid(pose.x, pose.z, next.expansions ?? [], pose.rot);
+        }
+        return pose;
       }),
     };
   }

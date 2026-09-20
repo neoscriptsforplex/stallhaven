@@ -29,12 +29,13 @@ import {
   FURNITURE_FORWARD,
   FURNITURE_SNAP,
   furnitureRotateDelta,
-  snapGridSpan,
+  snapGridLines,
   cloneFurniture,
   furnitureStartYaw,
   furnitureVisualYaw,
   gardenBox,
   gardenTrapdoorSpot,
+  interiorFloors,
   playerWalkFloors,
   pointHitsShop,
   pointOnFloors,
@@ -497,15 +498,12 @@ export function createWorld(canvas, state, opts = {}) {
     });
     const positions = [];
     const y = 0.108;
-    for (const rect of placeRects) {
-      const { start: minX, end: maxX } = snapGridSpan(rect.minX, rect.maxX);
-      const { start: minZ, end: maxZ } = snapGridSpan(rect.minZ, rect.maxZ);
-      for (let x = minX; x <= maxX + 1e-6; x += FURNITURE_SNAP) {
-        const gx = Math.min(rect.maxX, Math.max(rect.minX, x));
+    for (const rect of interiorFloors(state.expansions ?? [])) {
+      const { xs, zs } = snapGridLines(rect);
+      for (const gx of xs) {
         positions.push(gx, y, rect.minZ, gx, y, rect.maxZ);
       }
-      for (let z = minZ; z <= maxZ + 1e-6; z += FURNITURE_SNAP) {
-        const gz = Math.min(rect.maxZ, Math.max(rect.minZ, z));
+      for (const gz of zs) {
         positions.push(rect.minX, y, gz, rect.maxX, y, gz);
       }
     }
@@ -2141,7 +2139,7 @@ export function createWorld(canvas, state, opts = {}) {
     },
     beginPlaceFurniture(kind) {
       const start = kind === 'shelf'
-        ? snapToWallGrid(0, -3.22, state.expansions ?? [])
+        ? snapToWallGrid(0, -3.11, state.expansions ?? [])
         : snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, placeRects);
       const index = displays.length;
       const spot = {

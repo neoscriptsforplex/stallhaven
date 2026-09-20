@@ -97,7 +97,7 @@ import {
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
-import { furnitureHalfSize, furnaceBesideAnvil } from './layout.js';
+import { furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS } from './shopbuild.js';
 
@@ -369,6 +369,23 @@ describe('save and load', () => {
     const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
     assert.equal(state.displays[shelfIndex].shelfSlots.length, 4);
     assert.equal(state.displays[shelfIndex].shelfSlots.every((id) => id == null), true);
+  });
+
+  it('snaps saved wall shelves onto the current back-wall mount', () => {
+    const state = createState();
+    const center = SHOP.displays.findIndex((d) => d.id === 'shelf-center');
+    const defaults = state.furniture.displays;
+    assert.equal(applyState(state, {
+      gold: 0,
+      furniture: {
+        displays: defaults.map((pose, i) => (
+          i === center ? { x: 0, z: -3.22, rot: 0 } : pose
+        )),
+      },
+    }), true);
+    const interior = roomInteriorFloor(0, 0);
+    assert.ok(Math.abs(state.furniture.displays[center].z - (interior.minZ + SHELF_FROM_WALL)) < 1e-6);
+    assert.ok(Math.abs(state.furniture.displays[center].rot) < 1e-6);
   });
 });
 

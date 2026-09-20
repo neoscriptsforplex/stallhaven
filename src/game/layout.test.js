@@ -48,9 +48,11 @@ import {
   rotatePose,
   snapToFloor,
   snapGridSpan,
+  snapGridLines,
   snapToWallGrid,
   walkFloors,
   placeFloors,
+  interiorFloors,
   wallVineMounts,
   outdoorWalkFloors,
   playerWalkFloors,
@@ -289,6 +291,14 @@ describe('layout numbers', () => {
     assert.ok(Math.abs(front.z - interior.maxZ) <= 0.05 + 1e-6, `front snap ${front.z} vs interior ${interior.maxZ}`);
     assert.ok(left.x < ORIGIN_FLOOR.minX, 'edge cells must sit past the old inset floor');
     assert.ok(back.z < ORIGIN_FLOOR.minZ, 'edge cells must sit past the old inset floor');
+    const { xs, zs } = snapGridLines(interior);
+    assert.ok(Math.abs(xs[0] - interior.minX) < 1e-9, `left grid line ${xs[0]} vs wall ${interior.minX}`);
+    assert.ok(Math.abs(xs.at(-1) - interior.maxX) < 1e-9, `right grid line ${xs.at(-1)} vs wall ${interior.maxX}`);
+    assert.ok(Math.abs(zs[0] - interior.minZ) < 1e-9, `back grid line ${zs[0]} vs wall ${interior.minZ}`);
+    assert.ok(Math.abs(zs.at(-1) - interior.maxZ) < 1e-9, `front grid line ${zs.at(-1)} vs wall ${interior.maxZ}`);
+    const overlay = interiorFloors([]);
+    assert.equal(overlay.length >= 1, true);
+    assert.ok(Math.abs(overlay[0].minZ - interior.minZ) < 1e-9);
   });
 
   it('keeps side and rear expansion floors walkable through doorways', () => {
@@ -386,8 +396,28 @@ describe('layout numbers', () => {
     for (const id of ['shelf-left', 'shelf-right', 'shelf-center']) {
       const spot = SHOP.displays.find((d) => d.id === id);
       assert.ok(spot, id);
-      assert.ok(Math.abs(spot.z - back.z) < 1e-9, `${id} should sit on the back-wall mount`);
+      const placed = snapToWallGrid(spot.x, spot.z, []);
+      assert.ok(Math.abs(placed.z - back.z) < 1e-9, `${id} should sit on the back-wall mount`);
+      assert.ok(Math.abs(placed.rot) < 1e-6, `${id} should face into the room like a back-wall mount`);
     }
+    const furniture = defaultFurniture();
+    for (const id of ['shelf-left', 'shelf-right', 'shelf-center']) {
+      const index = SHOP.displays.findIndex((d) => d.id === id);
+      const pose = furniture.displays[index];
+      assert.ok(Math.abs(pose.z - back.z) < 1e-9, `starter ${id} z=${pose.z}`);
+      assert.ok(Math.abs(pose.rot) < 1e-6, `starter ${id} rot=${pose.rot}`);
+    }
+    const right = snapToWallGrid(3.5, 0.11, []);
+    assert.ok(Math.abs(right.x - (interior.maxX - SHELF_FROM_WALL)) < 1e-6);
+    assert.ok(Math.abs(right.rot + Math.PI / 2) < 1e-6);
+    assert.ok(Math.abs((back.z - interior.minZ) - (interior.maxX - right.x)) < 1e-6, 'back and side use the same wall depth');
+    assert.ok(Math.abs((interior.maxZ - front.z) - (interior.maxX - right.x)) < 1e-6, 'front and side use the same wall depth');
+    const frontCorner = snapToWallGrid(0.2, 3.4, []);
+    assert.ok(Math.abs(Math.abs(frontCorner.rot) - Math.PI) < 1e-6, `front snap rot=${frontCorner.rot}`);
+    assert.ok(Math.abs(frontCorner.z - front.z) < 1e-9);
+    const backCorner = snapToWallGrid(0.2, -3.2, []);
+    assert.ok(Math.abs(backCorner.rot) < 1e-6, `back snap rot=${backCorner.rot}`);
+    assert.ok(Math.abs(backCorner.z - back.z) < 1e-9);
   });
 
   it('lists furnace and range as free upgrade stations and shelves in the furniture shop', () => {

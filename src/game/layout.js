@@ -206,6 +206,11 @@ export function roomPlaceFloor(gx = 0, gz = 0) {
   return expandRectToSnapWalls(roomInteriorFloor(gx, gz));
 }
 
+/** Interior wall-face rects (no snap expansion) — use these to draw the overlay. */
+export function interiorFloors(expansionIds = []) {
+  return floorsForCells(expansionIds, roomInteriorFloor);
+}
+
 /** How far a room-seam walk rect overlaps each room. Must exceed 2× player radius. */
 export const DOORWAY_WALK_OVERLAP = 0.75;
 const ROOM_SEAM_INSET = 0.18;
@@ -367,11 +372,11 @@ export function defaultFurniture() {
     cauldron: null,
     furnace: null,
     wheel: null,
-    displays: SHOP.displays.map((spot) => ({
-      x: spot.x,
-      z: spot.z,
-      rot: FURNITURE_FORWARD,
-    })),
+    displays: SHOP.displays.map((spot) => (
+      (spot.kind ?? 'table') === 'shelf'
+        ? snapToWallGrid(spot.x, spot.z, [])
+        : { x: spot.x, z: spot.z, rot: FURNITURE_FORWARD }
+    )),
   };
 }
 
@@ -756,18 +761,22 @@ export function snapToWallGrid(x, z, expansionIds = [], preferRot = null) {
   for (const mount of mounts) {
     let nx;
     let nz;
+    let perp;
     if (mount.axis === 'x') {
       nx = Math.round(x / FURNITURE_SNAP) * FURNITURE_SNAP;
       nx = Math.min(mount.maxAlong, Math.max(mount.minAlong, nx));
       nz = mount.z;
+      perp = Math.abs(z - mount.z);
     } else {
       nz = Math.round(z / FURNITURE_SNAP) * FURNITURE_SNAP;
       nz = Math.min(mount.maxAlong, Math.max(mount.minAlong, nz));
       nx = mount.x;
+      perp = Math.abs(x - mount.x);
     }
-    const dist = Math.hypot(nx - x, nz - z);
-    const facing = preferRot == null ? 0 : angleDiff(preferRot, mount.rot) * 0.35;
-    const score = dist + facing;
+    const along = mount.axis === 'x' ? Math.abs(nx - x) : Math.abs(nz - z);
+    const facing = preferRot == null ? 0 : angleDiff(preferRot, mount.rot) * 0.25;
+    // Prefer the nearest wall plane so front/back don't inherit side yaw.
+    const score = perp * 3 + along * 0.2 + facing;
     if (score < bestScore) {
       bestScore = score;
       best = { x: nx, z: nz, rot: mount.rot };
@@ -790,6 +799,25 @@ export function snapGridSpan(min, max, snap = FURNITURE_SNAP) {
   const start = Math.floor(min / snap) * snap;
   const end = Math.ceil(max / snap) * snap;
   return { start, end };
+}
+
+/**
+ * Overlay line positions for a floor rect. Extra snap cells past a wall are
+ * clamped onto the interior face so front/back lines sit on the stone the
+ * way the side-wall lines already do.
+ */
+export function snapGridLines(rect, snap = FURNITURE_SNAP) {
+  const { start: minX, end: maxX } = snapGridSpan(rect.minX, rect.maxX, snap);
+  const { start: minZ, end: maxZ } = snapGridSpan(rect.minZ, rect.maxZ, snap);
+  const xs = [];
+  const zs = [];
+  for (let x = minX; x <= maxX + 1e-6; x += snap) {
+    xs.push(Math.min(rect.maxX, Math.max(rect.minX, x)));
+  }
+  for (let z = minZ; z <= maxZ + 1e-6; z += snap) {
+    zs.push(Math.min(rect.maxZ, Math.max(rect.minZ, z)));
+  }
+  return { xs, zs };
 }
 
 export function snapToFloor(x, z, floors, margin = FLOOR_SNAP_MARGIN) {

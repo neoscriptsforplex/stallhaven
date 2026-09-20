@@ -1746,7 +1746,8 @@ export function boulderInspect(materialId) {
   if (spot.essence) {
     return { name: 'Essence', blurb: 'A pale boulder. Mine it for Essence, used to craft runes.' };
   }
-  return { name: spot.name, blurb: `A ${spot.name.toLowerCase()} boulder. Left-click to walk over and mine.` };
+  const article = /^[aeiou]/i.test(spot.name) ? 'An' : 'A';
+  return { name: spot.name, blurb: `${article} ${spot.name.toLowerCase()} boulder. Left-click to walk over and mine.` };
 }
 
 function shadeHex(hex, factor) {

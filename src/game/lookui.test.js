@@ -20,6 +20,12 @@ describe('player look UI', () => {
     assert.match(html, /data-boot-label/);
   });
 
+  it('names dungeon adamant rocks Adamantite in Help, not Adamant Ore', () => {
+    const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
+    assert.match(help, /Adamantite/);
+    assert.equal(help.includes('Adamant Ore'), false);
+  });
+
   it('keeps Settings to a Player Avatar Customize button, not look grids', () => {
     const settings = slice(html, 'id="settings-dock"', 'id="look-dock"');
     assert.match(settings, /<h3>Player Avatar<\/h3>/);

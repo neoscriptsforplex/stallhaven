@@ -1196,7 +1196,11 @@ describe('ores, appearance, king, and chest bin', () => {
     assert.equal(RECIPES.adamant_dagger?.name, 'Adamant Dagger');
     assert.equal(RECIPES.adamant_platebody?.name, 'Adamant Platebody');
     assert.equal(RECIPES.adamant_hatchet?.name, 'Adamant Hatchet');
+    assert.equal(RECIPES.adamant_pickaxe?.name, 'Adamant Pickaxe');
+    assert.equal(RECIPES.adamant_arrows?.name, 'Adamant Arrows');
     assert.equal(RECIPES.smelt_adamant?.name, 'Adamant Bar');
+    assert.match(costLabel(RECIPES.smelt_adamant), /Adamantite/);
+    assert.doesNotMatch(costLabel(RECIPES.smelt_adamant), /Adamant Ore/);
     assert.equal(MATERIALS.bow_string.name, 'Bow String');
     assert.equal(MATERIALS.flax.name, 'Flax');
     assert.equal(MATERIALS.chocolate.name, 'Chocolate');
@@ -1556,6 +1560,7 @@ describe('dungeon sky and remains', () => {
     assert.equal(boulderInspect('mithril').name, 'Mithril Ore');
     assert.equal(boulderInspect('adamant').name, 'Adamantite');
     assert.notEqual(boulderInspect('adamant').name, 'Adamant Ore');
+    assert.match(boulderInspect('adamant').blurb, /adamantite/i);
     assert.equal(boulderInspect('dragon').name, 'Dragon Ore');
     assert.match(boulderInspect('runite').blurb, /runite/i);
   });

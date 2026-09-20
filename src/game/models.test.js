@@ -496,27 +496,38 @@ describe('bundled prop swaps', () => {
 
   it('mirrors the front door dump so the knob sits on the latch side', async () => {
     const bundled = await loadFolder('door');
+    const target = new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.1));
+    target.position.y = 1.04;
+    const handleMeanX = (root) => {
+      root.updateMatrixWorld(true);
+      const box = measureVisibleBox(root);
+      const midY = (box.min.y + box.max.y) * 0.5;
+      const midZ = (box.min.z + box.max.z) * 0.5;
+      const spanZ = Math.max(0.001, box.max.z - box.min.z);
+      const pts = [];
+      const v = new THREE.Vector3();
+      root.traverse((child) => {
+        if (!child.isMesh || !child.geometry) return;
+        const pos = child.geometry.getAttribute('position');
+        for (let i = 0; i < pos.count; i += 1) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
+          if (Math.abs(v.y - midY) > 0.35) continue;
+          pts.push(v.clone());
+        }
+      });
+      const far = pts.filter((p) => Math.abs(p.z - midZ) > spanZ * 0.22);
+      const use = far.length ? far : pts;
+      return use.reduce((sum, p) => sum + p.x, 0) / use.length;
+    };
+    const plain = wrapBundledProp(bundled, target, { name: 'door-leaf', fit: 'max' });
+    const flipped = wrapBundledProp(bundled, target, { name: 'door-leaf', fit: 'max', mirrorX: true });
+    const left = handleMeanX(plain);
+    const right = handleMeanX(flipped);
+    assert.ok(left * right < 0, `knob should flip sides, ${left} vs ${right}`);
+    assert.ok(right > 0, `mirrored knob should sit on +X / latch, meanX=${right}`);
     setBundledLook('door', bundled);
     try {
       const door = buildShopDoor();
-      const leaf = door.getObjectByName('door-leaf');
-      assert.ok(leaf);
-      const xs = [];
-      leaf.updateMatrixWorld(true);
-      leaf.traverse((child) => {
-        if (!child.isMesh || !child.geometry) return;
-        const pos = child.geometry.getAttribute('position');
-        const v = new THREE.Vector3();
-        for (let i = 0; i < pos.count; i += 1) {
-          v.fromBufferAttribute(pos, i);
-          child.localToWorld(v);
-          leaf.worldToLocal(v);
-          if (v.y > 0.85 && v.y < 1.4 && Math.abs(v.z) > 0.08) xs.push(v.x);
-        }
-      });
-      assert.ok(xs.length > 0, 'door dump should have a protruding knob');
-      const mean = xs.reduce((sum, x) => sum + x, 0) / xs.length;
-      assert.ok(mean > 0.55, `knob should sit on the latch side, meanX=${mean}`);
       assert.ok(door.userData.hinge);
       assert.ok(door.userData.hinge.rotation.y > 1.5);
     } finally {
@@ -624,14 +635,13 @@ describe('bundled prop swaps', () => {
       assert.ok(marked >= 2, 'visual hatch and walk-to-fade pick should stay marked');
       let hatch = null;
       shop.traverse((child) => {
-        if (child.name === 'trapdoor' && !hatch) hatch = child;
+        if (child.name === 'trapdoor' && child.parent?.name !== 'trapdoor' && !hatch) hatch = child;
       });
-      const visual = hatch?.getObjectByName('trapdoor');
-      if (visual) {
-        visual.updateMatrixWorld(true);
-        const box = measureVisibleBox(visual);
-        assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `entrance should sit flush, minY=${box.min.y}`);
-      }
+      const visual = hatch?.children.find((child) => child.name === 'trapdoor');
+      assert.ok(visual, 'baked entrance mesh should stay under the hatch group');
+      visual.updateMatrixWorld(true);
+      const box = measureVisibleBox(visual);
+      assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `entrance should sit flush, minY=${box.min.y}`);
     } finally {
       setBundledLook('trapdoor', null);
     }

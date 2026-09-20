@@ -707,6 +707,23 @@ describe('bundled prop swaps', () => {
     }
   });
 
+  it('hides the dumped cooking-range wooden plate under the floor', async () => {
+    const bundled = await loadFolder('range');
+    setBundledLook('range', bundled);
+    try {
+      const range = buildRange();
+      const box = measureVisibleBox(range);
+      const height = box.max.y - box.min.y;
+      const sink = height * RANGE_PLATE_FRAC;
+      assert.ok(sink > 0.08, `plate should be thick enough to hide, sink=${sink}`);
+      assert.ok(Math.abs(box.min.y + sink) < 0.04, `plate bottom should sit sink below floor, minY=${box.min.y}`);
+      assert.ok(box.min.y < -0.08, `brown plate should be under the boards, minY=${box.min.y}`);
+      assert.ok(box.max.y > 1.6, `stove body should stay above the floor, maxY=${box.max.y}`);
+    } finally {
+      setBundledLook('range', null);
+    }
+  });
+
   it('sits a bundled chest on the shop floor after the world y=0 pose', async () => {
     const bundled = await loadFolder('chest');
     const procedural = buildChest();
@@ -1090,23 +1107,6 @@ describe('shop props', () => {
     const box = measureVisibleBox(range);
     assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `range should sit on the floor, minY=${box.min.y}`);
     assert.ok(box.max.y > 1.8, `range should be 2× tall, maxY=${box.max.y}`);
-  });
-
-  it('hides the dumped cooking-range wooden plate under the floor', async () => {
-    const bundled = await loadFolder('range');
-    setBundledLook('range', bundled);
-    try {
-      const range = buildRange();
-      const box = measureVisibleBox(range);
-      const height = box.max.y - box.min.y;
-      const sink = height * RANGE_PLATE_FRAC;
-      assert.ok(sink > 0.08, `plate should be thick enough to hide, sink=${sink}`);
-      assert.ok(Math.abs(box.min.y + sink) < 0.04, `plate bottom should sit sink below floor, minY=${box.min.y}`);
-      assert.ok(box.min.y < -0.08, `brown plate should be under the boards, minY=${box.min.y}`);
-      assert.ok(box.max.y > 1.6, `stove body should stay above the floor, maxY=${box.max.y}`);
-    } finally {
-      setBundledLook('range', null);
-    }
   });
 
   it('doubles the spinning wheel uniformly and keeps it on the floor', () => {

@@ -911,9 +911,24 @@ body.modal-open #view {
 }
 
 [data-music-shuffle].is-on,
-[data-music-loop].is-on {
+[data-music-loop].is-on,
+#music-dock [data-music-loop].is-on {
   border-color: var(--gold);
   background: linear-gradient(#8a5a30, #5a3518);
+}
+
+#music-dock {
+  width: min(340px, calc(100vw - 32px));
+}
+
+#music-dock .music-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+#music-dock .music-tabs .tab {
+  white-space: nowrap;
 }
 
 .playlist-name {

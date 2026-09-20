@@ -1790,7 +1790,11 @@ export function bindHud(root, state, world) {
         : 'No track loaded. Upload MP3, WAV, or OGG files.';
     }
     if (shuffleBtn) shuffleBtn.classList.toggle('is-on', isShuffle());
-    if (loopBtn) loopBtn.classList.toggle('is-on', isLooping());
+    if (loopBtn) {
+      const on = isLooping();
+      loopBtn.classList.toggle('is-on', on);
+      loopBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
     if (vol) vol.value = String(Math.round((state.music?.volume ?? getMusicVolume()) * 100));
     if (list) {
       if (!tracks.length) {

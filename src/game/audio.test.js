@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -52,6 +52,19 @@ describe('bundled music', () => {
     assert.equal(isLooping(), true);
     assert.equal(toggleLoop(), false);
     assert.equal(isLooping(), false);
+  });
+
+  it('puts a Loop toggle beside Play and Playlist in the music dock', () => {
+    const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../index.html'), 'utf8');
+    const start = html.indexOf('id="music-dock"');
+    const end = html.indexOf('id="display-modal"');
+    assert.ok(start >= 0 && end > start);
+    const dock = html.slice(start, end);
+    const play = dock.indexOf('data-music-tab="play"');
+    const playlist = dock.indexOf('data-music-tab="playlist"');
+    const loop = dock.indexOf('data-music-loop');
+    assert.ok(play >= 0 && playlist > play && loop > playlist);
+    assert.match(dock, />Loop</);
   });
 
   it('defaults autoplay to Newbie Melody', () => {

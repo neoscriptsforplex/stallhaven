@@ -863,11 +863,11 @@ export const SHOP = {
   counter: { x: 0, z: -1.72 },
   keeper: { x: -0.48, z: -2.52 },
   // Side walls stay open for doubled tables. Back wall: anvil left, chest right.
-  // Furnace and cooking range start unplaced and are free from Upgrade.
+  // Furnace and cooking range start unplaced; Upgrade previews them on open floor.
   anvil: { x: -2.55, z: -2.22 },
   chest: { x: 2.55, z: -2.22 },
-  furnace: { x: -1.15, z: -2.22 },
-  range: { x: 1.15, z: -2.22 },
+  furnace: { x: -1.65, z: -0.45 },
+  range: { x: 1.65, z: -0.45 },
   cauldron: { x: 0, z: 0.8 },
   wheel: { x: 1.2, z: 0.8 },
   queue: { x: 0, z: -0.82, gap: 0.88 },

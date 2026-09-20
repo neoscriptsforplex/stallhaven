@@ -882,7 +882,7 @@ describe('furnace and spinning wheel', () => {
     assert.equal(ownsRange(state), false);
     assert.equal(canBuyRange(state), true);
     assert.match(craftBlockReason(state, 'bread'), /range/i);
-    assert.equal(buyRange(state, { x: 1.15, z: -2.22, rot: 0 }), true);
+    assert.equal(buyRange(state, { x: 1.65, z: -0.45, rot: 0 }), true);
     assert.equal(ownsRange(state), true);
     assert.equal(canBuyRange(state), false);
     assert.equal(isUnlocked(state, 'bread'), true);

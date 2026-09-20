@@ -1948,7 +1948,7 @@ export function bindHud(root, state, world) {
   }
 
   function lookRoot() {
-    return lookDock ?? settingsDock;
+    return lookDock;
   }
 
   function fillLookGrids() {
@@ -2030,6 +2030,7 @@ export function bindHud(root, state, world) {
     closeBuild();
     closeExpand();
     closeMusicDock();
+    closeLookDock();
     hideFurnMenu();
     paintSettings();
     if (settingsDock) settingsDock.hidden = false;
@@ -2043,6 +2044,7 @@ export function bindHud(root, state, world) {
   settingsDock?.querySelector('[data-look-open]')?.addEventListener('click', openLookDock);
   lookDock?.querySelector('[data-look-back]')?.addEventListener('click', backToSettings);
   lookDock?.querySelector('[data-look-close]')?.addEventListener('click', closeSettingsDock);
+  paintLook();
   settingsDock?.querySelector('[data-skybox-list]')?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-skybox]');
     if (!btn) return;
@@ -2201,6 +2203,7 @@ export function bindHud(root, state, world) {
         paintCrafts();
         paintMusic();
         paintSettings();
+        paintLook();
         pushLog(state, 'Shop loaded from a file.');
       }
     } catch {

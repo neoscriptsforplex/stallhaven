@@ -76,6 +76,8 @@ export const FOUNTAIN = { x: 0, z: 8.85, radius: 0.7, apron: 1.42 };
 export const PATH_HALF_W = 0.72;
 export const PATH_START_Z = 4.22;
 export const TRAPDOOR = { x: 3.35, z: 9.55 };
+/** Shop plank / station floor plane. Bundled chests sit on this, not at y=0. */
+export const SHOP_FURNITURE_FLOOR_Y = 0.09;
 
 export function furnitureBuyCost(boughtCount = 0) {
   const n = Math.max(0, Math.round(Number(boughtCount) || 0));

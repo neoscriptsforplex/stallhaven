@@ -12,6 +12,7 @@ import {
   normalizeAppearance,
   isShelfItem,
 } from './catalog.js';
+import { SHOP_FURNITURE_FLOOR_Y } from './layout.js';
 import { wornMetal, weaveCloth, woodSurface, scaleHide, checkCloth } from './surfaces.js';
 
 function wood(color, roughness = 0.86) {
@@ -379,7 +380,9 @@ function buildBundledShopDoor(source) {
   root.name = 'shop-door';
   const hinge = new THREE.Group();
   hinge.position.set(DOOR_HINGE.x, 0, DOOR_HINGE.z);
-  const leaf = wrapBundledProp(source, doorLeafFitTarget(), { name: 'door-leaf', fit: 'max' });
+  const flipped = source.clone(true);
+  mirrorImportedX(flipped);
+  const leaf = wrapBundledProp(flipped, doorLeafFitTarget(), { name: 'door-leaf', fit: 'max' });
   const box = measureVisibleBox(leaf);
   leaf.position.x -= box.min.x;
   hinge.add(leaf);
@@ -2008,7 +2011,12 @@ export function buildChest() {
     const target = buildProceduralChest();
     const fitted = wrapBundledProp(bundled, target, { name: 'chest', fit: 'height', label: 'Chest' });
     fitted.userData.lid = fitted.userData.lid ?? null;
-    return fitted;
+    sitVisibleOnY(fitted, SHOP_FURNITURE_FLOOR_Y);
+    const root = new THREE.Group();
+    root.name = 'chest';
+    root.add(fitted);
+    root.userData.lid = fitted.userData.lid ?? null;
+    return root;
   }
   return buildProceduralChest();
 }
@@ -3068,6 +3076,7 @@ export function measureVisibleBox(root) {
 export function wrapBundledProp(source, target, opts = {}) {
   if (!source) return null;
   const mesh = source.clone(true);
+  if (opts.mirrorX) mirrorImportedX(mesh);
   const tbox = opts.targetBox ?? measureVisibleBox(target);
   const tsize = tbox.getSize(new THREE.Vector3());
   const targetSize = opts.fit === 'xz'
@@ -3090,6 +3099,59 @@ export function wrapBundledProp(source, target, opts = {}) {
     tag.position.y = box.max.y + 0.18;
     mesh.add(tag);
   }
+  return mesh;
+}
+
+/** Horizontally mirror dump geometry (knob/latch side) without stretching. */
+export function mirrorImportedX(root) {
+  if (!root) return root;
+  root.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    const geo = child.geometry.index || child.geometry.getAttribute('position')
+      ? child.geometry.clone()
+      : child.geometry;
+    geo.scale(-1, 1, 1);
+    flipGeometryWinding(geo);
+    geo.computeVertexNormals();
+    child.geometry = geo;
+  });
+  return root;
+}
+
+function flipGeometryWinding(geo) {
+  const idx = geo.index;
+  if (idx) {
+    const arr = idx.array;
+    for (let i = 0; i < arr.length; i += 3) {
+      const tmp = arr[i];
+      arr[i] = arr[i + 2];
+      arr[i + 2] = tmp;
+    }
+    idx.needsUpdate = true;
+    return;
+  }
+  const pos = geo.getAttribute('position');
+  if (!pos || pos.itemSize !== 3) return;
+  const src = pos.array;
+  for (let i = 0; i + 8 < src.length; i += 9) {
+    for (let k = 0; k < 3; k += 1) {
+      const a = i + k;
+      const b = i + 6 + k;
+      const tmp = src[a];
+      src[a] = src[b];
+      src[b] = tmp;
+    }
+  }
+  pos.needsUpdate = true;
+}
+
+/** Shift a fitted dump so its visible bbox bottom sits on a world Y plane. */
+export function sitVisibleOnY(mesh, y = 0) {
+  if (!mesh) return mesh;
+  mesh.updateMatrixWorld(true);
+  const box = measureVisibleBox(mesh);
+  if (!Number.isFinite(box.min.y)) return mesh;
+  mesh.position.y += y - box.min.y;
   return mesh;
 }
 

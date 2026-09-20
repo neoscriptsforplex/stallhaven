@@ -29,7 +29,7 @@ import {
   wrapShopPlayer,
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
-import { pointHitsShop } from './layout.js';
+import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y } from './layout.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
@@ -494,6 +494,36 @@ describe('bundled prop swaps', () => {
     assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
   });
 
+  it('mirrors the front door dump so the knob sits on the latch side', async () => {
+    const bundled = await loadFolder('door');
+    setBundledLook('door', bundled);
+    try {
+      const door = buildShopDoor();
+      const leaf = door.getObjectByName('door-leaf');
+      assert.ok(leaf);
+      const xs = [];
+      leaf.updateMatrixWorld(true);
+      leaf.traverse((child) => {
+        if (!child.isMesh || !child.geometry) return;
+        const pos = child.geometry.getAttribute('position');
+        const v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i += 1) {
+          v.fromBufferAttribute(pos, i);
+          child.localToWorld(v);
+          leaf.worldToLocal(v);
+          if (v.y > 0.85 && v.y < 1.4 && Math.abs(v.z) > 0.08) xs.push(v.x);
+        }
+      });
+      assert.ok(xs.length > 0, 'door dump should have a protruding knob');
+      const mean = xs.reduce((sum, x) => sum + x, 0) / xs.length;
+      assert.ok(mean > 0.55, `knob should sit on the latch side, meanX=${mean}`);
+      assert.ok(door.userData.hinge);
+      assert.ok(door.userData.hinge.rotation.y > 1.5);
+    } finally {
+      setBundledLook('door', null);
+    }
+  });
+
   it('fits a bundled dungeon ladder dump to the current rails without stretch', async () => {
     let bundled;
     try {
@@ -510,6 +540,30 @@ describe('bundled prop swaps', () => {
     const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
     const want = measureVisibleBox(target).getSize(new THREE.Vector3());
     assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12);
+  });
+
+  it('yaws the dungeon ladder flat against the west wall and keeps the climb pick', async () => {
+    const bundled = await loadFolder('ladder');
+    setBundledLook('ladder', bundled);
+    try {
+      const ladder = buildDungeonLadder();
+      assert.equal(ladder.name, 'ladder');
+      assert.ok(Math.abs(ladder.rotation.y - Math.PI / 2) < 1e-6);
+      let marked = 0;
+      ladder.traverse((child) => {
+        if (child.userData?.kind === 'ladder') marked += 1;
+      });
+      assert.ok(marked >= 2);
+      const built = buildDungeon();
+      assert.equal(built.ladder?.name, 'ladder');
+      assert.ok(Math.abs(built.ladder.rotation.y - Math.PI / 2) < 1e-6);
+      assert.ok(Math.abs(built.ladder.position.z - 0.4) < 1e-6);
+      built.ladder.updateMatrixWorld(true);
+      const box = measureVisibleBox(built.ladder);
+      assert.ok(box.min.x > -5.5 && box.min.x < -5.2, `ladder should sit inside the west wall, minX=${box.min.x}`);
+    } finally {
+      setBundledLook('ladder', null);
+    }
   });
 
   it('fits a bundled wall torch dump upright with flame light', async () => {
@@ -568,8 +622,60 @@ describe('bundled prop swaps', () => {
         if (child.userData?.kind === 'trapdoor') marked += 1;
       });
       assert.ok(marked >= 2, 'visual hatch and walk-to-fade pick should stay marked');
+      let hatch = null;
+      shop.traverse((child) => {
+        if (child.name === 'trapdoor' && !hatch) hatch = child;
+      });
+      const visual = hatch?.getObjectByName('trapdoor');
+      if (visual) {
+        visual.updateMatrixWorld(true);
+        const box = measureVisibleBox(visual);
+        assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `entrance should sit flush, minY=${box.min.y}`);
+      }
     } finally {
       setBundledLook('trapdoor', null);
+    }
+  });
+
+  it('fits a bundled pottery-oven furnace dump on the shop floor', async () => {
+    const bundled = await loadFolder('furnace');
+    const target = buildFurnace();
+    const fitted = wrapBundledProp(bundled, target, { name: 'furnace', fit: 'height', label: 'Furnace' });
+    assert.equal(fitted.name, 'furnace');
+    assertUniform(fitted);
+    assertGrounded(fitted);
+    setBundledLook('furnace', bundled);
+    try {
+      const furnace = buildFurnace();
+      assert.equal(furnace.name, 'furnace');
+      furnace.position.set(1.2, 0, -2.4);
+      furnace.rotation.y = furnitureVisualYaw('furnace', 0);
+      furnace.updateMatrixWorld(true);
+      const box = measureVisibleBox(furnace);
+      assert.ok(Math.abs(box.min.y - SHOP_FURNITURE_FLOOR_Y) < 0.03, `furnace should sit on the floor, minY=${box.min.y}`);
+      assert.ok(Math.abs(furnace.scale.x - furnace.scale.y) < 1e-6);
+    } finally {
+      setBundledLook('furnace', null);
+    }
+  });
+
+  it('sits a bundled chest on the shop floor after the world y=0 pose', async () => {
+    const bundled = await loadFolder('chest');
+    const procedural = buildChest();
+    const procH = measureVisibleBox(procedural).getSize(new THREE.Vector3()).y;
+    setBundledLook('chest', bundled);
+    try {
+      const chest = buildChest();
+      assert.equal(chest.name, 'chest');
+      const sized = measureVisibleBox(chest);
+      assert.ok(Math.abs((sized.max.y - sized.min.y) - procH) < 0.08, `chest should keep 60% height, ${sized.max.y - sized.min.y} vs ${procH}`);
+      chest.position.set(2.1, 0, -1.4);
+      chest.rotation.y = furnitureVisualYaw('chest', 0);
+      chest.updateMatrixWorld(true);
+      const box = measureVisibleBox(chest);
+      assert.ok(Math.abs(box.min.y - SHOP_FURNITURE_FLOOR_Y) < 0.03, `chest should sit on the floor, minY=${box.min.y}`);
+    } finally {
+      setBundledLook('chest', null);
     }
   });
 
@@ -610,6 +716,7 @@ describe('shop props', () => {
   it('keeps a climbable dungeon ladder pick for the walk-to-fade exit', () => {
     const ladder = buildDungeonLadder();
     assert.equal(ladder.name, 'ladder');
+    assert.ok(Math.abs(ladder.rotation.y - Math.PI / 2) < 1e-6);
     let marked = 0;
     ladder.traverse((child) => {
       if (child.userData?.kind === 'ladder') marked += 1;
@@ -618,6 +725,7 @@ describe('shop props', () => {
     const built = buildDungeon();
     assert.equal(built.ladder?.name, 'ladder');
     assert.ok(Math.abs(built.ladder.position.z - 0.4) < 1e-6);
+    assert.ok(Math.abs(built.ladder.rotation.y - Math.PI / 2) < 1e-6);
   });
 
   it('keeps the shop door hinged open so the front doorway stays walkable', () => {

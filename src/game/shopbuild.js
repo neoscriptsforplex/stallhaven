@@ -4,6 +4,7 @@ import {
   FOUNTAIN,
   ROOM_D,
   ROOM_W,
+  SHOP_FURNITURE_FLOOR_Y,
   cobblePathSpan,
   gardenBedSpots,
   gardenBox,
@@ -23,7 +24,7 @@ import {
 import { METALS } from './catalog.js';
 import { initRatWander } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
-import { getBundledLook, measureVisibleBox, wrapBundledProp } from './models.js';
+import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp } from './models.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.04 });
@@ -908,7 +909,13 @@ export function buildFurnace() {
   const bundled = getBundledLook('furnace');
   if (bundled) {
     const target = buildProceduralFurnace();
-    return wrapBundledProp(bundled, target, { name: 'furnace', fit: 'height', label: 'Furnace', wareY: 'top' });
+    const fitted = wrapBundledProp(bundled, target, { name: 'furnace', fit: 'height', label: 'Furnace', wareY: 'top' });
+    sitVisibleOnY(fitted, SHOP_FURNITURE_FLOOR_Y);
+    const root = new THREE.Group();
+    root.name = 'furnace';
+    root.add(fitted);
+    root.userData.wareY = fitted.userData.wareY;
+    return root;
   }
   return buildProceduralFurnace();
 }
@@ -1443,6 +1450,7 @@ function buildTrapdoor() {
   if (bundled) {
     const fitted = wrapBundledProp(bundled, trapdoorFitTarget(), { name: 'trapdoor', fit: 'max' });
     fitted.name = 'trapdoor';
+    sitVisibleOnY(fitted, 0);
     markTrapdoorMesh(fitted);
     fitted.traverse((child) => {
       if (child.isMesh) markTrapdoorMesh(child);
@@ -1872,6 +1880,12 @@ export function buildDungeon() {
   const ladder = buildDungeonLadder();
   ladder.position.set(-W / 2 + 0.22, 0, 0.4);
   root.add(ladder);
+  ladder.updateMatrixWorld(true);
+  const ladderBox = measureVisibleBox(ladder);
+  if (Number.isFinite(ladderBox.min.x)) {
+    const wallInner = -W / 2 + 0.11;
+    ladder.position.x += wallInner + 0.02 - ladderBox.min.x;
+  }
 
   return { root, grounds, rats, ladder, boulders, size: { w: W, d: D } };
 }
@@ -1940,15 +1954,20 @@ function ladderFitTarget() {
 
 export function buildDungeonLadder() {
   const bundled = getBundledLook('ladder');
+  let ladder;
   if (bundled) {
     const fitted = wrapBundledProp(bundled, ladderFitTarget(), { name: 'ladder', fit: 'max' });
     fitted.name = 'ladder';
     markLadder(fitted);
     fitted.traverse((child) => markLadder(child));
     fitted.add(makeLadderPick());
-    return fitted;
+    ladder = fitted;
+  } else {
+    ladder = buildProceduralDungeonLadder();
   }
-  return buildProceduralDungeonLadder();
+  // Dump and rails are wide in X; yaw so the face sits flat on the west wall.
+  ladder.rotation.y = Math.PI / 2;
+  return ladder;
 }
 
 function makeLadderPick() {

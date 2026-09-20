@@ -9,19 +9,23 @@ export const SHOP_LIGHT = {
   exposure: 1.12,
 };
 
+/** Dungeon base lights vs the previous cave values. Shop base is unchanged. */
+export const DUNGEON_LIGHT_BOOST = 1.5;
 export const DUNGEON_LIGHT = {
-  hemi: 0.46,
-  ambient: 0.06,
+  hemi: 0.46 * DUNGEON_LIGHT_BOOST,
+  ambient: 0.06 * DUNGEON_LIGHT_BOOST,
   fill: 0,
   door: 0,
-  sun: 0.35,
+  sun: 0.35 * DUNGEON_LIGHT_BOOST,
   exposure: 0.94,
 };
 
-/** 100% matches the brighter shop lighting bump. Slider is 50%–150%. */
-export const DEFAULT_BRIGHTNESS = 1;
+/** 100% on the slider — the shop lighting bump. Dungeon compression uses this. */
+export const BRIGHTNESS_NEUTRAL = 1;
 export const BRIGHTNESS_MIN = 0.5;
 export const BRIGHTNESS_MAX = 1.5;
+/** New players / unset settings start at the slider maximum (full bright). */
+export const DEFAULT_BRIGHTNESS = BRIGHTNESS_MAX;
 export const BRIGHTNESS_STORAGE_KEY = 'stallhaven-brightness';
 /** Extra brightness above 100% is compressed in the dungeon so the cave does not wash out. */
 export const DUNGEON_BRIGHTNESS_DAMP = 0.36;
@@ -61,9 +65,9 @@ export function brightnessPercent(value) {
 export function brightnessForScene(mode = 'shop', brightness = DEFAULT_BRIGHTNESS) {
   const b = clampBrightness(brightness);
   if (mode !== 'dungeon') return b;
-  if (b <= DEFAULT_BRIGHTNESS) return b;
-  const extra = (b - DEFAULT_BRIGHTNESS) * DUNGEON_BRIGHTNESS_DAMP;
-  return Math.min(DUNGEON_BRIGHTNESS_CAP, DEFAULT_BRIGHTNESS + extra);
+  if (b <= BRIGHTNESS_NEUTRAL) return b;
+  const extra = (b - BRIGHTNESS_NEUTRAL) * DUNGEON_BRIGHTNESS_DAMP;
+  return Math.min(DUNGEON_BRIGHTNESS_CAP, BRIGHTNESS_NEUTRAL + extra);
 }
 
 export function lightingForScene(mode = 'shop', brightness = DEFAULT_BRIGHTNESS) {

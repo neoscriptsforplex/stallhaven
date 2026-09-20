@@ -458,13 +458,22 @@ export function gardenRockSpots(expansionIds = []) {
     { x: 7.6, z: 1.6, scale: 1.1, side: 'right' },
     { x: -8.35, z: 7.85, scale: 2.35, side: 'left' },
     { x: 8.55, z: 8.35, scale: 2.8, side: 'right' },
-    { x: -5.85, z: 13.15, scale: 2.15, side: 'path' },
-    { x: 6.15, z: 13.45, scale: 2.55, side: 'path' },
     { x: 0.2, z: -7.35, scale: 2.95, side: 'rear' },
   ];
   return spots.filter((spot) => (
-    keepGardenSpot(spot, expansionIds) && gardenSpotClearOfBeds(spot, expansionIds)
+    keepGardenSpot(spot, expansionIds)
+    && gardenSpotClearOfBeds(spot, expansionIds)
+    && gardenRockOnGrass(spot, expansionIds)
   ));
+}
+
+function gardenRockOnGrass(spot, expansionIds = []) {
+  const grass = gardenBox(expansionIds);
+  const pad = Math.max(0.45, 0.28 * (spot.scale ?? 1));
+  return spot.x >= grass.minX + pad
+    && spot.x <= grass.maxX - pad
+    && spot.z >= grass.minZ + pad
+    && spot.z <= grass.maxZ - pad;
 }
 
 export function gardenTrapdoorSpot(expansionIds = []) {

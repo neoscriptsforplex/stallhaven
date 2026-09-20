@@ -295,6 +295,20 @@ describe('layout numbers', () => {
     assert.ok(rocks.some((spot) => spot.scale < 1.2), 'small path rocks should remain');
   });
 
+  it('keeps outdoor rocks on the grass, not the blue void', () => {
+    const grass = gardenBox([]);
+    const rocks = gardenRockSpots([]);
+    assert.ok(rocks.length >= 2);
+    for (const rock of rocks) {
+      const pad = Math.max(0.45, 0.28 * (rock.scale ?? 1));
+      assert.ok(rock.x >= grass.minX + pad - 1e-9, `rock x=${rock.x} off grass`);
+      assert.ok(rock.x <= grass.maxX - pad + 1e-9, `rock x=${rock.x} off grass`);
+      assert.ok(rock.z >= grass.minZ + pad - 1e-9, `rock z=${rock.z} off grass`);
+      assert.ok(rock.z <= grass.maxZ - pad + 1e-9, `rock z=${rock.z} off grass`);
+    }
+    assert.equal(rocks.some((spot) => spot.z > 12.8), false);
+  });
+
   it('snaps extra shelves to a wall grid instead of the floor', () => {
     const back = snapToWallGrid(0.13, -2.9, []);
     assert.ok(Math.abs(back.z + 3.18 + 0.04) < 1e-6 || Math.abs(back.z + 3.22) < 0.08);

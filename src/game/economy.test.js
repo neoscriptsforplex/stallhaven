@@ -349,7 +349,7 @@ describe('save and load', () => {
     assert.equal(state.fullscreen, false);
     assert.ok(state.music.volume > 0);
     assert.equal(state.skybox, 'blue');
-    assert.equal(state.brightness, 1);
+    assert.equal(state.brightness, 1.5);
     assert.equal(state.chefHat, false);
     assert.equal(state.shopXp, 0);
     assert.equal(state.shopLevel, 1);

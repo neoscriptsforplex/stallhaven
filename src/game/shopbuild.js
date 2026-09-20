@@ -22,6 +22,7 @@ import {
   wallVineMounts,
 } from './layout.js';
 import { METALS } from './catalog.js';
+import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
 import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp } from './models.js';
@@ -303,12 +304,17 @@ function buildProceduralTorch() {
   return group;
 }
 
-function addWallTorch(root, x, y, z, rotY = 0) {
+function addWallTorch(root, x, y, z, rotY = 0, glowMul = 1) {
   const torch = buildTorch();
   torch.position.set(x, y, z);
   torch.rotation.y = rotY;
   // Procedural sconces lean off the wall. The dumped torch stays upright.
   if (!getBundledLook('torch')) torch.rotation.z = 0.55;
+  if (glowMul !== 1) {
+    torch.traverse((child) => {
+      if (child.isLight) child.intensity *= glowMul;
+    });
+  }
   root.add(torch);
   return torch;
 }
@@ -1339,6 +1345,7 @@ function addGarden(root, cells, expansionIds = []) {
     const rock = buildBoulder(spot.scale ?? 1);
     rock.position.set(spot.x, 0, spot.z);
     rock.rotation.y = rand() * Math.PI * 2;
+    sitVisibleOnY(rock, 0);
     root.add(rock);
   }
   const hatch = gardenTrapdoorSpot(expansionIds);
@@ -1715,11 +1722,11 @@ function buildMineBoulder(spot) {
   group.rotation.y = spot.rot ?? 0;
   const target = buildProceduralOreRock(spot);
   const bundled = getBundledLook(`ore-${spot.id}`);
-  if (bundled) {
-    group.add(wrapBundledProp(bundled, target, { name: `ore-${spot.id}`, fit: 'max' }));
-  } else {
-    for (const child of target.children.slice()) group.add(child);
-  }
+  const visual = bundled
+    ? wrapBundledProp(bundled, target, { name: `ore-${spot.id}`, fit: 'max' })
+    : target;
+  group.add(visual);
+  sitVisibleOnY(visual, 0);
   if (spot.essence) attachEssenceGlow(group);
   attachBoulderPick(group, spot);
   return group;
@@ -1848,10 +1855,10 @@ export function buildDungeon() {
     root.add(mesh);
   }
 
-  addWallTorch(root, -W / 2 + 0.18, 1.7, -2.2, Math.PI / 2);
-  addWallTorch(root, -W / 2 + 0.18, 1.7, 2.2, Math.PI / 2);
-  addWallTorch(root, W / 2 - 0.18, 1.7, -2.2, -Math.PI / 2);
-  addWallTorch(root, W / 2 - 0.18, 1.7, 2.2, -Math.PI / 2);
+  addWallTorch(root, -W / 2 + 0.18, 1.7, -2.2, Math.PI / 2, DUNGEON_LIGHT_BOOST);
+  addWallTorch(root, -W / 2 + 0.18, 1.7, 2.2, Math.PI / 2, DUNGEON_LIGHT_BOOST);
+  addWallTorch(root, W / 2 - 0.18, 1.7, -2.2, -Math.PI / 2, DUNGEON_LIGHT_BOOST);
+  addWallTorch(root, W / 2 - 0.18, 1.7, 2.2, -Math.PI / 2, DUNGEON_LIGHT_BOOST);
 
   const cobweb = () => {
     const group = new THREE.Group();

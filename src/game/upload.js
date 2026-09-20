@@ -142,6 +142,7 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'ore-steel', folder: 'dungeon-rocks/steel-rocks' },
   { id: 'ore-mithril', folder: 'dungeon-rocks/mithril-rocks' },
   { id: 'ore-adamant', folder: 'dungeon-rocks/adamant-rocks' },
+  { id: 'ore-runite', folder: 'dungeon-rocks/rune-rocks' },
   { id: 'ore-dragon', folder: 'dungeon-rocks/dragon-rocks' },
   { id: 'ore-essence', folder: 'dungeon-rocks/essence' },
   ...recipeList()

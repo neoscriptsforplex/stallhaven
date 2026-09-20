@@ -364,13 +364,12 @@ describe('bundled prop swaps', () => {
     for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
-    for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-dragon', 'ore-essence']) {
+    for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-runite', 'ore-dragon', 'ore-essence']) {
       assert.ok(ids.includes(id), id);
     }
     for (const id of ['food-bread', 'food-pizza', 'food-cake', 'food-pie', 'food-fish-pie', 'food-lobster', 'food-chocolate-cake', 'food-monkfish', 'food-curry', 'food-shark', 'food-summer-pie', 'food-anglerfish']) {
       assert.ok(ids.includes(id), id);
     }
-    assert.equal(ids.includes('ore-runite'), false);
     assert.ok(ids.includes('goblin'));
   });
 
@@ -730,13 +729,13 @@ describe('bundled prop swaps', () => {
     assert.equal(byId['ore-steel'], 'dungeon-rocks/steel-rocks');
     assert.equal(byId['ore-mithril'], 'dungeon-rocks/mithril-rocks');
     assert.equal(byId['ore-adamant'], 'dungeon-rocks/adamant-rocks');
+    assert.equal(byId['ore-runite'], 'dungeon-rocks/rune-rocks');
     assert.equal(byId['ore-dragon'], 'dungeon-rocks/dragon-rocks');
     assert.equal(byId['ore-essence'], 'dungeon-rocks/essence');
     assert.equal(byId['food-bread'], 'food/bread');
     assert.equal(byId['food-chocolate-cake'], 'food/chocolate-cake');
     assert.equal(byId['food-fish-pie'], 'food/fish-pie');
     assert.equal(byId['food-summer-pie'], 'food/summer-pie');
-    assert.equal(byId['ore-runite'], undefined);
   });
 
   it('fits bundled food dumps to the current plate size by filename slug', async () => {
@@ -782,7 +781,6 @@ describe('bundled prop swaps', () => {
         if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'steel') steelPick += 1;
       });
       assert.ok(names.includes('ore-steel'));
-      assert.equal(names.includes('ore-runite'), false);
       assert.ok(steelPick >= 1);
       const spot = DUNGEON_BOULDERS.find((item) => item.id === 'steel');
       assert.equal(spot?.name, 'Steel Ore');
@@ -833,6 +831,41 @@ describe('bundled prop swaps', () => {
     } finally {
       setBundledLook('ore-bronze', null);
       setBundledLook('ore-essence', null);
+    }
+  });
+
+  it('sits every dungeon ore rock on the floor plane', async () => {
+    const folders = {
+      bronze: 'dungeon-rocks/bronze-rocks',
+      iron: 'dungeon-rocks/iron-rocks',
+      steel: 'dungeon-rocks/steel-rocks',
+      mithril: 'dungeon-rocks/mithril-rocks',
+      adamant: 'dungeon-rocks/adamant-rocks',
+      dragon: 'dungeon-rocks/dragon-rocks',
+      essence: 'dungeon-rocks/essence',
+    };
+    for (const [id, folder] of Object.entries(folders)) {
+      try {
+        setBundledLook(`ore-${id}`, await loadFolder(folder));
+      } catch {
+        // Missing dump stays procedural and still has to sit on the floor.
+      }
+    }
+    try {
+      const built = buildDungeon();
+      assert.equal(built.boulders.length, DUNGEON_BOULDERS.length);
+      for (const boulder of built.boulders) {
+        const visual = boulder.children.find((child) => child.name?.startsWith('ore-'));
+        assert.ok(visual, boulder.name);
+        visual.updateMatrixWorld(true);
+        const box = measureVisibleBox(visual);
+        assert.ok(
+          box.min.y > -0.05 && box.min.y < 0.08,
+          `${boulder.name} should sit on the floor, minY=${box.min.y}`,
+        );
+      }
+    } finally {
+      for (const id of Object.keys(folders)) setBundledLook(`ore-${id}`, null);
     }
   });
 });

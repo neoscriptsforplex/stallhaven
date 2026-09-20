@@ -32,17 +32,18 @@ export const WALL_THICK = 0.16;
 export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
+/** Upright chest facing from before the bad X-axis tip. */
+export const CHEST_UPRIGHT_YAW = Math.PI;
+/** 90° clockwise around world +Y (Three.js Y-up). */
+export const CHEST_YAW_CLOCKWISE = -Math.PI / 2;
 /**
  * Start-only visual yaw around world +Y. Applied to the placed mesh and pick
  * (including async dump swaps), not stored in furniture.rot so queue / saves
  * stay on the gameplay facing.
- * Three.js Y-up: −π/2 is 90° counter-clockwise when viewed from above.
  */
 export const FURNITURE_START_YAW = {
-  // Upright on the floor (no X pitch / Z roll). Then +90° yaw around world +Y
-  // (same sign as the furniture Rotate button) from the previous 180° door-wall
-  // facing, so the latch turns into the room instead of into the back wall.
-  chest: Math.PI + Math.PI / 2,
+  // Upright floor sit, then 90° clockwise. No pitch/roll.
+  chest: CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE,
   range: -Math.PI / 2,
   furnace: -Math.PI / 2,
   counter: Math.PI,

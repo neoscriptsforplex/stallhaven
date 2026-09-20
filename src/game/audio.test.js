@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BUNDLED_MUSIC_TRACKS } from './audio.js';
+import { BUNDLED_MUSIC_TRACKS, isLooping, setLoop, toggleLoop } from './audio.js';
 
 describe('bundled music', () => {
   it('ships fifteen OSRS tracks in alphabetical playlist order', () => {
@@ -30,5 +30,13 @@ describe('bundled music', () => {
     for (const name of BUNDLED_MUSIC_TRACKS) {
       assert.equal(existsSync(join(dir, `${name}.ogg`)), true, name);
     }
+  });
+
+  it('toggles a persisted loop flag without needing an audio element', () => {
+    assert.equal(isLooping(), false);
+    assert.equal(setLoop(true), true);
+    assert.equal(isLooping(), true);
+    assert.equal(toggleLoop(), false);
+    assert.equal(isLooping(), false);
   });
 });

@@ -6,8 +6,19 @@ const _box = new THREE.Box3();
 const _center = new THREE.Vector3();
 const _sphere = new THREE.Sphere();
 
+export function isRunePreview(id) {
+  const recipe = RECIPES[id];
+  return recipe?.category === 'rune' || recipe?.shape === 'rune';
+}
+
+function poseRuneForFrontView(object) {
+  if (!object) return;
+  object.rotation.x = -Math.PI / 2;
+  object.updateMatrixWorld(true);
+}
+
 /** Frame a craft-preview camera so the full item sits in view with margin. */
-export function frameCraftPreview(object, camera, margin = 1.42, cached = null) {
+export function frameCraftPreview(object, camera, margin = 1.42, cached = null, opts = {}) {
   if (!camera) return null;
   let center = cached?.center;
   let radius = cached?.radius;
@@ -24,12 +35,16 @@ export function frameCraftPreview(object, camera, margin = 1.42, cached = null) 
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * Math.max(camera.aspect, 0.25));
   const limit = Math.min(vFov, hFov);
   const dist = (radius * margin) / Math.tan(limit / 2);
-  camera.position.set(center.x + dist * 0.42, center.y + dist * 0.02, center.z + dist * 0.88);
+  if (opts.view === 'front') {
+    camera.position.set(center.x, center.y, center.z + dist);
+  } else {
+    camera.position.set(center.x + dist * 0.42, center.y + dist * 0.02, center.z + dist * 0.88);
+  }
   camera.near = Math.max(0.02, dist / 50);
   camera.far = Math.max(12, dist * 8);
   camera.lookAt(center);
   camera.updateProjectionMatrix();
-  return { center, radius, dist };
+  return { center, radius, dist, view: opts.view === 'front' ? 'front' : 'default' };
 }
 
 export function createCraftPreview(canvas) {
@@ -49,6 +64,11 @@ export function createCraftPreview(canvas) {
   let mesh = null;
   let recipeId = null;
   let frame = null;
+  let runeFront = false;
+
+  function previewOpts() {
+    return runeFront ? { view: 'front' } : {};
+  }
 
   function fit() {
     const w = Math.max(1, canvas.clientWidth || canvas.width || 180);
@@ -56,7 +76,7 @@ export function createCraftPreview(canvas) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    if (frame) frameCraftPreview(mesh, camera, 1.42, frame);
+    if (frame) frameCraftPreview(mesh, camera, 1.42, frame, previewOpts());
   }
 
   function show(id) {
@@ -71,15 +91,21 @@ export function createCraftPreview(canvas) {
       mesh = null;
     }
     frame = null;
+    runeFront = false;
     if (!next) return;
     mesh = buildWare(next);
     mesh.position.set(0, 0, 0);
+    runeFront = isRunePreview(next);
+    if (runeFront) poseRuneForFrontView(mesh);
     scene.add(mesh);
-    frame = frameCraftPreview(mesh, camera);
+    frame = frameCraftPreview(mesh, camera, 1.42, null, previewOpts());
   }
 
   function tick(dt) {
-    if (mesh) mesh.rotation.y += dt * 0.85;
+    if (mesh) {
+      if (runeFront) mesh.rotation.x = -Math.PI / 2;
+      mesh.rotation.y += dt * 0.85;
+    }
     fit();
     renderer.render(scene, camera);
   }

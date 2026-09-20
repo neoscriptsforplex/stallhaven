@@ -40,6 +40,7 @@ import {
   padById,
   rotatePose,
   snapToFloor,
+  snapGridSpan,
   snapToWallGrid,
   walkFloors,
   wallVineMounts,
@@ -237,6 +238,21 @@ describe('layout numbers', () => {
     assert.ok(Math.abs(side.x - 1.4) < 1e-9);
     assert.ok(Math.abs(along.z - 1.4) < 1e-9);
     assert.notEqual(along.z, side.z);
+  });
+
+  it('snaps floor furniture onto cells that reach the interior walls', () => {
+    const floors = walkFloors([]);
+    const shop = roomFloor(0, 0);
+    const { start: minX, end: maxX } = snapGridSpan(shop.minX, shop.maxX);
+    const { start: minZ, end: maxZ } = snapGridSpan(shop.minZ, shop.maxZ);
+    assert.ok(minX <= shop.minX + 1e-9);
+    assert.ok(maxX >= shop.maxX - 1e-9);
+    assert.ok(minZ <= shop.minZ + 1e-9);
+    assert.ok(maxZ >= shop.maxZ - 1e-9);
+    const left = snapToFloor(shop.minX, 0, floors);
+    const back = snapToFloor(0, shop.minZ, floors);
+    assert.ok(Math.abs(left.x - shop.minX) <= 0.2 + 1e-6);
+    assert.ok(Math.abs(back.z - shop.minZ) <= 0.2 + 1e-6);
   });
 
   it('keeps side and rear expansion floors walkable through doorways', () => {

@@ -79,6 +79,8 @@ import {
   ownsWheel,
   placeFromChest,
   placeOnDisplay,
+  nextFurnitureCost,
+  removePlacedFurniture,
   reducedSalePrice,
   restock,
   sellToCustomer,
@@ -321,6 +323,14 @@ describe('save and load', () => {
     assert.equal(other.materialAcc.bronze, 0.4);
     assert.equal(other.chest.bronze_scimitar, 1);
     assert.equal(other.music.volume, state.music.volume);
+    assert.equal(other.music.loop, false);
+    state.music.loop = true;
+    state.music.track = 'Newbie Melody';
+    const withLoop = serializeState(state);
+    const looped = createState();
+    assert.equal(applyState(looped, withLoop), true);
+    assert.equal(looped.music.loop, true);
+    assert.equal(looped.music.track, 'Newbie Melody');
     assert.equal(other.skybox, 'black');
     assert.equal(other.brightness, 1.25);
     assert.equal(other.chefHat, true);
@@ -1012,6 +1022,31 @@ describe('build furniture', () => {
     assert.equal(applyState(next, saved), true);
     assert.equal(next.boughtFurniture.shelf, 2);
     assert.equal(next.displays.filter((d) => d.kind === 'shelf').length, starterShelves + 2);
+  });
+
+  it('deletes a shelf and lets the included first three be replaced for free', () => {
+    const state = createState();
+    const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
+    assert.ok(shelfIndex >= 0);
+    state.chest.bread = 1;
+    assert.equal(placeOnDisplay(state, 'bread', shelfIndex, 0), true);
+    assert.equal(removePlacedFurniture(state, shelfIndex), true);
+    assert.equal(state.displays[shelfIndex].removed, true);
+    assert.equal(state.chest.bread, 1);
+    assert.equal(nextFurnitureCost(state, 'shelf'), 0);
+    assert.equal(canBuyFurniture(state, 'shelf'), true);
+    assert.equal(buyFurniture(state, 'shelf', { x: 0, z: -3.22, rot: 0 }), true);
+    assert.equal(state.boughtFurniture.shelf, 0);
+    assert.equal(state.displays.at(-1).bought, false);
+    assert.equal(nextFurnitureCost(state, 'shelf'), 500);
+    state.gold = 500;
+    assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.22, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.shelf, 1);
+    const extraIndex = state.displays.length - 1;
+    assert.equal(removePlacedFurniture(state, extraIndex), true);
+    assert.equal(state.boughtFurniture.shelf, 0);
+    assert.equal(nextFurnitureCost(state, 'shelf'), 500);
   });
 
   it('does not count starter tables or mannequins as paid extras in an old save', () => {

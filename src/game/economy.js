@@ -262,7 +262,7 @@ export function createState() {
     selectedDisplay: 0,
     wareLooks: {},
     fullscreen: false,
-    music: { volume: DEFAULT_MUSIC_VOLUME },
+    music: { volume: DEFAULT_MUSIC_VOLUME, loop: false, track: '' },
     boughtFurniture: emptyBoughtFurniture(),
     shopXp: 0,
     shopLevel: 1,
@@ -520,22 +520,7 @@ export function backWallShelfIndex() {
 export function clearBackWallShelf(state) {
   const index = backWallShelfIndex();
   if (index < 0) return false;
-  const display = state.displays[index];
-  if (!display || display.removed) return false;
-  const ids = [];
-  if (Array.isArray(display.shelfSlots)) {
-    for (const id of display.shelfSlots) {
-      if (id) ids.push(id);
-    }
-  } else if (display.ware?.recipeId) {
-    ids.push(display.ware.recipeId);
-  }
-  for (const id of ids) addToChest(state, id);
-  display.ware = null;
-  display.slots = emptySlots();
-  display.shelfSlots = emptyShelfSlots();
-  display.removed = true;
-  return true;
+  return removePlacedFurniture(state, index);
 }
 
 export function canUpgradeChest(state) {
@@ -649,7 +634,25 @@ export function boughtFurnitureCount(state, type) {
   return Math.max(0, state.boughtFurniture?.[type] ?? 0);
 }
 
+export function includedFurnitureCount(type) {
+  const kind = furnitureKindForType(type);
+  return SHOP.displays.filter((spot) => (spot.kind ?? 'table') === kind).length;
+}
+
+export function liveFurnitureCount(state, type) {
+  const kind = furnitureKindForType(type);
+  return (state.displays ?? []).filter((display, index) => (
+    !display?.removed && displayKind(index, state) === kind
+  )).length;
+}
+
 export function nextFurnitureCost(state, type) {
+  if (type === 'shelf') {
+    const live = liveFurnitureCount(state, 'shelf');
+    const included = includedFurnitureCount('shelf');
+    if (live < included) return 0;
+    return furnitureBuyCost(Math.max(0, live - included));
+  }
   return furnitureBuyCost(boughtFurnitureCount(state, type));
 }
 
@@ -672,13 +675,16 @@ export function buyFurniture(state, type, pose) {
   const cost = nextFurnitureCost(state, type);
   state.gold -= cost;
   if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
-  state.boughtFurniture[type] = boughtFurnitureCount(state, type) + 1;
-  const n = state.boughtFurniture[type];
+  const paidExtra = cost > 0;
+  if (paidExtra) {
+    state.boughtFurniture[type] = boughtFurnitureCount(state, type) + 1;
+  }
+  const n = liveFurnitureCount(state, type) + 1;
   const label = furnitureLabelForType(type);
   state.displays.push(emptyDisplay({
     kind,
-    name: `${label} ${n}`,
-    bought: true,
+    name: paidExtra ? `${label} ${n}` : label,
+    bought: paidExtra,
   }));
   if (!state.furniture.displays) state.furniture.displays = defaultFurniture().displays;
   state.furniture.displays.push({
@@ -687,6 +693,41 @@ export function buyFurniture(state, type, pose) {
     rot: pose.rot ?? FURNITURE_FORWARD,
   });
   state.selectedDisplay = state.displays.length - 1;
+  return true;
+}
+
+function returnDisplayWares(state, display) {
+  const ids = [];
+  if (Array.isArray(display.shelfSlots)) {
+    for (const id of display.shelfSlots) {
+      if (id) ids.push(id);
+    }
+  } else {
+    for (const id of Object.values(display.slots ?? {})) {
+      if (id) ids.push(id);
+    }
+    if (display.ware?.recipeId) ids.push(display.ware.recipeId);
+  }
+  for (const id of ids) addToChest(state, id);
+  display.ware = null;
+  display.slots = emptySlots();
+  display.shelfSlots = display.kind === 'shelf' ? emptyShelfSlots() : null;
+}
+
+export function removePlacedFurniture(state, index) {
+  const display = state.displays[index];
+  if (!display || display.removed) return false;
+  if (displayKind(index, state) !== 'shelf') return false;
+  returnDisplayWares(state, display);
+  display.removed = true;
+  if (display.bought) {
+    if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
+    state.boughtFurniture.shelf = Math.max(0, boughtFurnitureCount(state, 'shelf') - 1);
+  }
+  if (state.selectedDisplay === index) {
+    const next = state.displays.findIndex((item) => !item.removed);
+    state.selectedDisplay = next >= 0 ? next : 0;
+  }
   return true;
 }
 
@@ -990,7 +1031,11 @@ export function serializeState(state) {
     expansions: [...(state.expansions ?? [])],
     furniture,
     fullscreen: Boolean(state.fullscreen),
-    music: { volume: Number.isFinite(state.music?.volume) ? state.music.volume : DEFAULT_MUSIC_VOLUME },
+    music: {
+      volume: Number.isFinite(state.music?.volume) ? state.music.volume : DEFAULT_MUSIC_VOLUME,
+      loop: Boolean(state.music?.loop),
+      track: typeof state.music?.track === 'string' ? state.music.track : '',
+    },
     shopXp: Math.max(0, Math.round(state.shopXp ?? 0)),
     shopLevel: shopProgress(state.shopXp ?? 0).level,
     skybox: skyboxId(state.skybox),
@@ -1119,6 +1164,8 @@ export function applyState(state, data) {
     if (typeof volume === 'number' && Number.isFinite(volume)) {
       next.music.volume = Math.min(1, Math.max(0, volume));
     }
+    if (typeof data.music.loop === 'boolean') next.music.loop = data.music.loop;
+    if (typeof data.music.track === 'string') next.music.track = data.music.track;
   }
   if (typeof data.shopXp === 'number' && Number.isFinite(data.shopXp)) {
     next.shopXp = Math.max(0, Math.round(data.shopXp));

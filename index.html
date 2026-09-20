@@ -65,8 +65,8 @@
         <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back. In the dungeon, left-click an Essence boulder or an ore rock to walk over, swing a pickaxe, and fill a Mining bar. Each fill grants 5 Essence or 5 ore of that tier (Bronze through Dragon). Ore rocks share an olive-brown jagged body; only the vein changes colour (bronze copper, iron grey, steel light grey, mithril blue, adamant green, runite light blue, dragon red). Essence stays pale with a light-blue glow. Right-click a boulder to read its name (Essence, Bronze Ore, Runite Ore, …). Ores and Essence do not restock for gold or refill on their own.</p>
         <p>Click the anvil to smith Melee, Magic, Ranged, or Tools. Ranged has Weapons, Armour, and Ammo (arrows and cannonballs). Magic has Weapons, Armour, and Runes. Tools has Hatchet and Pickaxe (Bronze through Dragon, including Runite). Weapons, armour, and tools use metal bars. Each craft row has 1×, 5×, and Max — those count recipe actions (one arrow craft still makes 20). Cancel under the spinning preview stops a run and returns leftover actions (finished pieces stay). Place a furnace from Upgrade (free) to smelt ores into bars. Higher bars unlock after enough smelts of the previous tier. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Place a cooking range from Upgrade (free) for Food. Click a placed cauldron for Potions — the window matches the anvil (recipes on the left, preview on the right, materials along the bottom). Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
-        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Runes and arrows (and cannonballs) can sit on tables or on any of the four shelf slots. Right-click furniture for Move or Rotate — wares travel with the piece. The counter only moves from a right-click.</p>
-        <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist of included tracks — Shuffle, Play, Pause, Skip, and Stop — and you can upload more MP3, WAV, or OGG files. The cog beside it opens Settings for the skybox, player look, and cheat codes. Upload a .glb/.gltf, or multi-select an .obj with its .mtl (and maps), as Furniture, Ware, Player, or Customer. Clear uploads restores the default player, customers, and furniture. A custom Player mesh uses the same walk cycle as the stock keeper (leg and arm swing, or a bob if the file has no limbs) and still swings a pickaxe when you mine.</p>
+        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Runes and arrows (and cannonballs) can sit on tables or on any of the four shelf slots. Right-click furniture for Move or Rotate — wares travel with the piece. Right-click a wall shelf for Delete; the first three shelves are included, so deleting one lets you place a replacement for free up to three. The counter only moves from a right-click.</p>
+        <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist of included tracks — they start on load (or on the first click if the browser blocks autoplay), with Shuffle, Loop, Play, Pause, Skip, and Stop — and you can upload more MP3, WAV, or OGG files. The cog beside it opens Settings for the skybox, a Player Avatar: Customize panel, and cheat codes. Upload a .glb/.gltf, or multi-select an .obj with its .mtl (and maps), as Furniture, Ware, Player, or Customer. Clear uploads restores the default player, customers, and furniture. A custom Player mesh uses the same walk cycle as the stock keeper (leg and arm swing, or a bob if the file has no limbs) and still swings a pickaxe when you mine.</p>
         <button type="button" data-dismiss>Close</button>
       </div>
     </div>
@@ -223,7 +223,7 @@
       </article>
       <article class="build-item">
         <h3>Shelf</h3>
-        <p>Buy another wall shelf. Place it on the wall grid. The starting three shelves are included; extras cost 500g, then ×3.</p>
+        <p>Buy another wall shelf. Place it on the wall grid. The starting three shelves are included; extras cost 500g, then ×3. Delete a shelf from its right-click menu — a deleted included shelf can be replaced for free until three are placed.</p>
         <p data-shelf-status class="meta">First 3 shelves are included. The next costs 500g.</p>
         <button type="button" data-shelf-buy>Buy · 500 gp</button>
       </article>
@@ -302,7 +302,21 @@
         <span data-brightness-label>150%</span>
       </label>
       <p class="meta">Overall shop lighting. New shops start at 150% (slider max). The dungeon stays a bit darker at high values so it does not wash out.</p>
-      <h3>Player look</h3>
+      <h3>Player Avatar</h3>
+      <p class="meta">Hair, shirt, legs, boots, and face hair save with the shop.</p>
+      <button type="button" data-look-open>Player Avatar: Customize</button>
+      <h3>Cheats</h3>
+      <p class="meta">Type a code and press Enter. Codes are not case-sensitive.</p>
+      <form data-cheat-form class="cheat-form">
+        <input type="text" data-cheat-code autocomplete="off" spellcheck="false" placeholder="Enter code" aria-label="Cheat code" />
+        <button type="submit">Enter</button>
+      </form>
+      <p data-cheat-note class="craft-note" hidden></p>
+      <button type="button" class="ghost" data-settings-close>Close</button>
+    </aside>
+
+    <aside id="look-dock" class="expand-dock" hidden>
+      <h2>Player Avatar</h2>
       <p class="meta" data-look-note>Hair, shirt, legs, boots, and face hair save with the shop.</p>
       <p class="look-label">Hair</p>
       <div class="skybox-grid" data-look="hair"></div>
@@ -314,14 +328,10 @@
       <div class="skybox-grid" data-look="boots"></div>
       <p class="look-label">Face hair</p>
       <div class="skybox-grid" data-look="faceHair"></div>
-      <h3>Cheats</h3>
-      <p class="meta">Type a code and press Enter. Codes are not case-sensitive.</p>
-      <form data-cheat-form class="cheat-form">
-        <input type="text" data-cheat-code autocomplete="off" spellcheck="false" placeholder="Enter code" aria-label="Cheat code" />
-        <button type="submit">Enter</button>
-      </form>
-      <p data-cheat-note class="craft-note" hidden></p>
-      <button type="button" class="ghost" data-settings-close>Close</button>
+      <div class="row furn-row">
+        <button type="button" data-look-back>Back to Settings</button>
+        <button type="button" class="ghost" data-look-close>Close</button>
+      </div>
     </aside>
 
     <aside id="music-dock" class="expand-dock" hidden>
@@ -329,6 +339,7 @@
       <div class="tabs">
         <button type="button" class="tab is-on" data-music-tab="play">Play</button>
         <button type="button" class="tab" data-music-tab="playlist">Playlist</button>
+        <button type="button" class="tab" data-music-loop>Loop</button>
       </div>
       <div data-music-pane="play">
         <p>Upload MP3, WAV, or OGG files. Several tracks can sit in the playlist.</p>
@@ -414,6 +425,7 @@
       <button type="button" data-furn-upgrade hidden>Upgrade Chest</button>
       <button type="button" data-furn-display hidden>Display item…</button>
       <button type="button" data-furn-fill hidden>Fill</button>
+      <button type="button" data-furn-delete hidden>Delete</button>
       <button type="button" data-furn-move>Move Furniture</button>
       <button type="button" data-furn-rotate>Rotate 15°</button>
       <button type="button" class="ghost" data-furn-close>Close</button>

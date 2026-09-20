@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import './canvas-mock.js';
 import * as THREE from 'three';
-import { frameCraftPreview } from './craftpreview.js';
+import { frameCraftPreview, isRunePreview } from './craftpreview.js';
 import { buildWare } from './models.js';
 
 describe('craft preview framing', () => {
@@ -23,5 +23,25 @@ describe('craft preview framing', () => {
       const aim = camera.position.clone().addScaledVector(dir, framed.dist);
       assert.ok(Math.abs(aim.y - center.y) < framed.radius * 0.25, `${id} should aim at the item center`);
     }
+  });
+
+  it('frames runes from the front so the glyph face is visible', () => {
+    assert.equal(isRunePreview('air_rune'), true);
+    assert.equal(isRunePreview('bronze_sword'), false);
+    const camera = new THREE.PerspectiveCamera(38, 1.15, 0.05, 20);
+    const ware = buildWare('air_rune');
+    ware.rotation.x = -Math.PI / 2;
+    ware.updateMatrixWorld(true);
+    const framed = frameCraftPreview(ware, camera, 1.42, null, { view: 'front' });
+    assert.ok(framed);
+    assert.equal(framed.view, 'front');
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    assert.ok(Math.abs(dir.z) > Math.abs(dir.y), 'rune camera should look forward at the face, not down');
+    assert.ok(Math.abs(camera.position.y - framed.center.y) < framed.radius * 0.35);
+    const sword = buildWare('bronze_sword');
+    const other = new THREE.PerspectiveCamera(38, 1.15, 0.05, 20);
+    frameCraftPreview(sword, other);
+    assert.ok(other.position.x > other.position.y * 0.5, 'non-rune preview keeps the three-quarter camera');
   });
 });

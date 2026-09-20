@@ -29,6 +29,7 @@ import {
   FURNITURE_FORWARD,
   FURNITURE_ROT_STEP,
   FURNITURE_SNAP,
+  snapGridSpan,
   cloneFurniture,
   furnitureStartYaw,
   furnitureVisualYaw,
@@ -485,15 +486,13 @@ export function createWorld(canvas, state, opts = {}) {
     const positions = [];
     const y = 0.108;
     for (const rect of floors) {
-      const minX = Math.ceil((rect.minX + 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
-      const maxX = Math.floor((rect.maxX - 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
-      const minZ = Math.ceil((rect.minZ + 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
-      const maxZ = Math.floor((rect.maxZ - 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
+      const { start: minX, end: maxX } = snapGridSpan(rect.minX, rect.maxX);
+      const { start: minZ, end: maxZ } = snapGridSpan(rect.minZ, rect.maxZ);
       for (let x = minX; x <= maxX + 1e-6; x += FURNITURE_SNAP) {
-        positions.push(x, y, minZ, x, y, maxZ);
+        positions.push(x, y, rect.minZ, x, y, rect.maxZ);
       }
       for (let z = minZ; z <= maxZ + 1e-6; z += FURNITURE_SNAP) {
-        positions.push(minX, y, z, maxX, y, z);
+        positions.push(rect.minX, y, z, rect.maxX, y, z);
       }
     }
     const geo = new THREE.BufferGeometry();
@@ -2018,6 +2017,10 @@ export function createWorld(canvas, state, opts = {}) {
       }
       applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
       syncLighting(sceneMode);
+    },
+    refreshFurniture() {
+      applyAllPoses();
+      syncDisplays();
     },
     setChestOpen(open) {
       chestOpen = Boolean(open);

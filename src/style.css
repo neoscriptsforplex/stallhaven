@@ -910,7 +910,8 @@ body.modal-open #view {
   color: var(--gold);
 }
 
-[data-music-shuffle].is-on {
+[data-music-shuffle].is-on,
+[data-music-loop].is-on {
   border-color: var(--gold);
   background: linear-gradient(#8a5a30, #5a3518);
 }
@@ -1030,6 +1031,11 @@ body.modal-open #view {
 
 .settings-bright input {
   width: 100%;
+}
+
+[data-look-open] {
+  width: 100%;
+  margin: 6px 0 12px;
 }
 
 .cheat-form {

@@ -75,6 +75,14 @@ describe('shop navigation', () => {
     assert.equal(overlap, 'That spot overlaps other furniture.');
     const clear = placementBlocked({ x: -2.2, z: 0.4, rot: 0 }, 'table', [], floors, { checkAisle: false });
     assert.equal(clear, null);
+    const againstWall = placementBlocked(
+      { x: FLOOR.minX + 0.08, z: 0.2, rot: 0 },
+      'chest',
+      [],
+      floors,
+      { checkAisle: false },
+    );
+    assert.equal(againstWall, null);
   });
 
   it('walks from behind the counter onto the outdoor path and to the trapdoor', () => {

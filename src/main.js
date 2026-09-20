@@ -59,7 +59,7 @@ async function bootGame() {
       console.warn('Bundled music skipped:', err?.message || err);
       return [];
     }),
-  ]).then(([bundledPlayer, bundledLooks]) => {
+  ]).then(async ([bundledPlayer, bundledLooks]) => {
     try {
       setBundledLooks(bundledLooks);
       world.applyBundledDefaults?.(bundledPlayer);
@@ -71,6 +71,7 @@ async function bootGame() {
       console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
     }
     hud.render(performance.now() / 1000);
+    await hud.tryStartMusic?.();
   }).catch((err) => {
     console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
   });

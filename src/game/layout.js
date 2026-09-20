@@ -25,6 +25,8 @@ export const CHEST_UPGRADE_MULT = 3;
 
 export const MATERIAL_CAP = 250;
 export const FURNITURE_SNAP = 0.2;
+/** How far a floor snap/grid cell may sit inside the wall faces. */
+export const FLOOR_SNAP_MARGIN = 0.08;
 export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
@@ -747,7 +749,14 @@ export function pointOnFloors(x, z, floors, pad = 0) {
   ));
 }
 
-export function snapToFloor(x, z, floors, margin = 0.55) {
+/** Inclusive snap coordinates that reach the wall faces of a floor span. */
+export function snapGridSpan(min, max, snap = FURNITURE_SNAP) {
+  const start = Math.floor(min / snap) * snap;
+  const end = Math.ceil(max / snap) * snap;
+  return { start, end };
+}
+
+export function snapToFloor(x, z, floors, margin = FLOOR_SNAP_MARGIN) {
   const sx = Math.round(x / FURNITURE_SNAP) * FURNITURE_SNAP;
   const sz = Math.round(z / FURNITURE_SNAP) * FURNITURE_SNAP;
   if (pointOnFloors(sx, sz, floors, margin)) return { x: sx, z: sz };

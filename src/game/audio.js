@@ -34,6 +34,10 @@ const playlist = [];
 let currentIndex = -1;
 let serial = 1;
 let shuffle = false;
+let loopTrack = false;
+let autoplayArmed = false;
+let autoplayCancelled = false;
+const DEFAULT_AUTOPLAY_TRACK = 'Newbie Melody';
 
 function audio() {
   if (ctx) return ctx;
@@ -87,6 +91,27 @@ export function isShuffle() {
   return shuffle;
 }
 
+export function isLooping() {
+  return loopTrack;
+}
+
+export function setLoop(on) {
+  loopTrack = Boolean(on);
+  if (bg) {
+    bg.loop = loopTrack;
+    if (!loopTrack) bindEndedHandler();
+  }
+  return loopTrack;
+}
+
+export function toggleLoop() {
+  return setLoop(!loopTrack);
+}
+
+export function cancelMusicAutoplay() {
+  autoplayCancelled = true;
+}
+
 export function setShuffle(on) {
   shuffle = Boolean(on);
   return shuffle;
@@ -119,6 +144,18 @@ function stopCurrent(resetTime = true) {
   if (resetTime) bg.currentTime = 0;
 }
 
+function bindEndedHandler() {
+  if (!bg) return;
+  bg.onended = () => {
+    if (loopTrack) return;
+    if (playlist.length === 0) return;
+    const next = shuffle && playlist.length > 1
+      ? pickShuffledIndex(currentIndex)
+      : (currentIndex + 1) % playlist.length;
+    playTrackAt(next).catch(() => {});
+  };
+}
+
 function bindTrack(index) {
   const track = playlist[index];
   if (!track) {
@@ -128,15 +165,9 @@ function bindTrack(index) {
   }
   currentIndex = index;
   bg = track.audio;
-  bg.loop = false;
+  bg.loop = loopTrack;
   bg.volume = volume;
-  bg.onended = () => {
-    if (playlist.length === 0) return;
-    const next = shuffle && playlist.length > 1
-      ? pickShuffledIndex(currentIndex)
-      : (currentIndex + 1) % playlist.length;
-    playTrackAt(next).catch(() => {});
-  };
+  bindEndedHandler();
   return track;
 }
 
@@ -249,6 +280,7 @@ export function pauseMusic() {
 }
 
 export function stopMusic() {
+  cancelMusicAutoplay();
   stopCurrent(true);
 }
 
@@ -321,4 +353,47 @@ export async function loadBundledMusic() {
     added.push(await addMusicUrl(url, name, { autoplay: false }));
   }
   return added;
+}
+
+function playlistIndexByName(name) {
+  if (!name) return -1;
+  return playlist.findIndex((track) => track.name === name);
+}
+
+function armGestureAutoplay(index) {
+  if (autoplayArmed || typeof window === 'undefined') return;
+  autoplayArmed = true;
+  const resume = async () => {
+    window.removeEventListener('pointerdown', resume);
+    window.removeEventListener('keydown', resume);
+    window.removeEventListener('touchstart', resume);
+    if (autoplayCancelled) return;
+    const ac = audio();
+    if (ac?.state === 'suspended') await ac.resume().catch(() => {});
+    await playTrackAt(index).catch(() => {});
+  };
+  window.addEventListener('pointerdown', resume, { once: true });
+  window.addEventListener('keydown', resume, { once: true });
+  window.addEventListener('touchstart', resume, { once: true });
+}
+
+/** Start bundled/playlist music on boot. Skips when muted; arms a first-gesture retry if autoplay is blocked. */
+export async function startMusicOnLoad({
+  volume: nextVolume,
+  muted = false,
+  track = '',
+  loop = false,
+} = {}) {
+  if (nextVolume != null) setMusicVolume(nextVolume);
+  setLoop(loop);
+  if (muted || getMusicVolume() <= 0 || !playlist.length) {
+    return { played: false, reason: 'muted' };
+  }
+  autoplayCancelled = false;
+  let index = playlistIndexByName(track);
+  if (index < 0) index = playlistIndexByName(DEFAULT_AUTOPLAY_TRACK);
+  if (index < 0) index = 0;
+  const played = await playTrackAt(index);
+  if (!played) armGestureAutoplay(index);
+  return { played, track: getMusicTrackName() };
 }

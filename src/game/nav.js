@@ -155,7 +155,7 @@ export function placementBlocked(pose, kind, obstacles, floors, { checkAisle = t
     if (!pointOnFloors(pose.x, pose.z, floors, -0.35)) {
       return 'That spot is off the shop wall.';
     }
-  } else if (!pointOnFloors(pose.x, pose.z, floors, 0.28)) {
+  } else if (!pointOnFloors(pose.x, pose.z, floors, 0.06)) {
     return 'That spot is off the shop floor.';
   }
   if (checkAisle && kind !== 'counter' && rectHitsAisle(pose.x, pose.z, span.hw, span.hd)) {

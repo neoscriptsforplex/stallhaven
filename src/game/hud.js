@@ -32,6 +32,7 @@ import {
   getMusicTrackName,
   getMusicVolume,
   getPlaylist,
+  isLooping,
   isMusicPlaying,
   isShuffle,
   movePlaylistTrack,
@@ -41,8 +42,11 @@ import {
   playTrackAt,
   removePlaylistTrack,
   setMusicVolume,
+  setLoop,
   skipTrack,
+  startMusicOnLoad,
   stopMusic,
+  toggleLoop,
   toggleShuffle,
 } from './audio.js';
 import {
@@ -75,11 +79,14 @@ import {
   hasStock,
   isMastered,
   isUnlocked,
+  liveFurnitureCount,
+  includedFurnitureCount,
   nextFurnitureCost,
   ownsCauldron,
   ownsStation,
   placeFromChest,
   pushLog,
+  removePlacedFurniture,
   restock,
   offerChoices,
   placeOnDisplay,
@@ -142,6 +149,7 @@ export function bindHud(root, state, world) {
   const potionModal = document.querySelector('#potion-modal');
   const musicDock = document.querySelector('#music-dock');
   const settingsDock = document.querySelector('#settings-dock');
+  const lookDock = document.querySelector('#look-dock');
   const settingsBtn = document.querySelector('#settings-btn');
   const furnMenu = document.querySelector('#furn-menu');
   const inspectPop = document.querySelector('#inspect-pop');
@@ -531,7 +539,12 @@ export function bindHud(root, state, world) {
     if (musicDock) musicDock.hidden = true;
   }
 
+  function closeLookDock() {
+    if (lookDock) lookDock.hidden = true;
+  }
+
   function closeSettingsDock() {
+    closeLookDock();
     if (settingsDock) settingsDock.hidden = true;
   }
 
@@ -1214,6 +1227,11 @@ export function bindHud(root, state, world) {
     if (displayBtn) displayBtn.hidden = !canDisplay;
     if (fillBtn) fillBtn.hidden = !canFill;
     if (upgradeBtn) upgradeBtn.hidden = target.id !== 'chest';
+    const deleteBtn = furnMenu.querySelector('[data-furn-delete]');
+    const canDelete = target.id === 'display'
+      && displayKind(target.index, state) === 'shelf'
+      && !state.displays[target.index]?.removed;
+    if (deleteBtn) deleteBtn.hidden = !canDelete;
     furnMenu.hidden = false;
     const x = Math.min(window.innerWidth - 230, Math.max(8, clientX ?? 24));
     const y = Math.min(window.innerHeight - 220, Math.max(8, clientY ?? 80));
@@ -1410,16 +1428,23 @@ export function bindHud(root, state, world) {
       const label = furnitureLabelForType(type);
       const bought = state.boughtFurniture?.[type] ?? 0;
       const extra = type === 'shelf'
-        ? (bought === 0
-          ? `First 3 shelves are included. The next costs ${formatGold(cost)}g.`
-          : `Next shelf costs ${formatGold(cost)}g (${bought} bought).`)
+        ? (() => {
+          const live = liveFurnitureCount(state, 'shelf');
+          const included = includedFurnitureCount('shelf');
+          if (live < included) {
+            return `${live} of ${included} included shelves are placed. Replacement is free.`;
+          }
+          return bought === 0
+            ? `First ${included} shelves are included. The next costs ${formatGold(cost)}g.`
+            : `Next shelf costs ${formatGold(cost)}g (${bought} bought).`;
+        })()
         : (bought === 0
           ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
           : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`);
       itemStatus.textContent = extra;
       itemStatus.classList.remove('craft-note');
       itemBuy.disabled = false;
-      itemBuy.textContent = `Buy · ${formatGold(cost)} gp`;
+      itemBuy.textContent = cost === 0 ? 'Place · Free' : `Buy · ${formatGold(cost)} gp`;
     }
   }
 
@@ -1621,6 +1646,18 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     if (target?.id === 'display') openFillPicker(target);
   });
+  furnMenu.querySelector('[data-furn-delete]')?.addEventListener('click', () => {
+    const target = furnTarget;
+    hideFurnMenu();
+    if (target?.id !== 'display') return;
+    if (!removePlacedFurniture(state, target.index)) return;
+    playClick('ui');
+    pushLog(state, 'Removed the wall shelf. Its wall cell is free.');
+    world.refreshFurniture?.();
+    world.refreshSelection?.(true);
+    paintBuild();
+    render(performance.now() / 1000);
+  });
   furnMenu.querySelector('[data-furn-use]').addEventListener('click', () => {
     const target = furnTarget;
     hideFurnMenu();
@@ -1746,12 +1783,14 @@ export function bindHud(root, state, world) {
     const tracks = getPlaylist();
     const track = getMusicTrackName();
     const shuffleBtn = musicDock.querySelector('[data-music-shuffle]');
+    const loopBtn = musicDock.querySelector('[data-music-loop]');
     if (nameEl) {
       nameEl.textContent = track
         ? `${isMusicPlaying() ? 'Playing' : 'Paused'}: ${track}`
         : 'No track loaded. Upload MP3, WAV, or OGG files.';
     }
     if (shuffleBtn) shuffleBtn.classList.toggle('is-on', isShuffle());
+    if (loopBtn) loopBtn.classList.toggle('is-on', isLooping());
     if (vol) vol.value = String(Math.round((state.music?.volume ?? getMusicVolume()) * 100));
     if (list) {
       if (!tracks.length) {
@@ -1799,6 +1838,13 @@ export function bindHud(root, state, world) {
     if (musicDock) musicDock.hidden = false;
   }
 
+  function persistMusic() {
+    if (!state.music) state.music = { volume: DEFAULT_MUSIC_VOLUME, loop: false, track: '' };
+    state.music.volume = getMusicVolume();
+    state.music.loop = isLooping();
+    state.music.track = getMusicTrackName() || state.music.track || '';
+  }
+
   musicBtn?.addEventListener('click', () => {
     if (musicDock?.hidden === false) closeMusicDock();
     else openMusic();
@@ -1842,29 +1888,39 @@ export function bindHud(root, state, world) {
       return;
     }
     await playMusic();
+    persistMusic();
     paintMusic();
   });
   musicDock?.querySelector('[data-music-pause]')?.addEventListener('click', () => {
     pauseMusic();
+    persistMusic();
     paintMusic();
   });
   musicDock?.querySelector('[data-music-shuffle]')?.addEventListener('click', () => {
     toggleShuffle();
     paintMusic();
   });
+  musicDock?.querySelector('[data-music-loop]')?.addEventListener('click', () => {
+    toggleLoop();
+    persistMusic();
+    paintMusic();
+  });
   musicDock?.querySelector('[data-music-stop]')?.addEventListener('click', () => {
     stopMusic();
+    persistMusic();
     paintMusic();
   });
   musicDock?.querySelector('[data-music-skip]')?.addEventListener('click', async () => {
     await skipTrack();
+    persistMusic();
     paintMusic();
   });
   musicDock?.querySelector('[data-music-volume]')?.addEventListener('input', (event) => {
     const volume = Number(event.target.value) / 100;
     setMusicVolume(volume);
-    if (!state.music) state.music = { volume: DEFAULT_MUSIC_VOLUME };
+    if (!state.music) state.music = { volume: DEFAULT_MUSIC_VOLUME, loop: false, track: '' };
     state.music.volume = volume;
+    persistMusic();
   });
   musicDock?.querySelector('[data-playlist]')?.addEventListener('click', async (event) => {
     const playBtn = event.target.closest('[data-play-track]');
@@ -1875,9 +1931,11 @@ export function bindHud(root, state, world) {
     if (up) movePlaylistTrack(Number(up.dataset.moveUp), Number(up.dataset.moveUp) - 1);
     if (down) movePlaylistTrack(Number(down.dataset.moveDown), Number(down.dataset.moveDown) + 1);
     if (remove) removePlaylistTrack(Number(remove.dataset.removeTrack));
+    persistMusic();
     paintMusic();
   });
   setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
+  setLoop(Boolean(state.music?.loop));
 
   function lookOptions(slot) {
     if (slot === 'hair') return HAIR_STYLES;
@@ -1885,10 +1943,15 @@ export function bindHud(root, state, world) {
     return PLAYER_COLORS[slot] ?? [];
   }
 
+  function lookRoot() {
+    return lookDock ?? settingsDock;
+  }
+
   function fillLookGrids() {
-    if (!settingsDock) return;
+    const root = lookRoot();
+    if (!root) return;
     for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
-      const row = settingsDock.querySelector(`[data-look="${slot}"]`);
+      const row = root.querySelector(`[data-look="${slot}"]`);
       if (!row || row.dataset.ready) continue;
       row.innerHTML = lookOptions(slot).map((item) => (
         `<button type="button" data-look-id="${item.id}">${item.label}</button>`
@@ -1905,29 +1968,26 @@ export function bindHud(root, state, world) {
         if (applied === false) {
           state.appearance = next;
         }
+        paintLook();
         paintSettings();
         render(performance.now() / 1000);
       });
     }
   }
 
-  function paintSettings() {
-    if (!settingsDock) return;
+  function paintLook() {
+    const root = lookRoot();
+    if (!root) return;
     fillLookGrids();
-    const current = state.skybox ?? 'blue';
-    for (const btn of settingsDock.querySelectorAll('[data-skybox]')) {
-      btn.classList.toggle('is-on', btn.dataset.skybox === current);
-    }
-    paintBrightness();
     const look = normalizeAppearance(state.appearance);
     for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
-      const row = settingsDock.querySelector(`[data-look="${slot}"]`);
+      const row = root.querySelector(`[data-look="${slot}"]`);
       if (!row) continue;
       for (const btn of row.querySelectorAll('[data-look-id]')) {
         btn.classList.toggle('is-on', btn.dataset.lookId === look[slot]);
       }
     }
-    const note = settingsDock.querySelector('[data-look-note]');
+    const note = root.querySelector('[data-look-note]');
     if (note) {
       note.textContent = world.hasCustomPlayer?.()
         ? 'A custom player mesh is active. Walking still works; hair and colour customizer may not apply until you clear the upload.'
@@ -1935,6 +1995,31 @@ export function bindHud(root, state, world) {
           ? 'The default adventurer is a baked mesh; hair and colour customizer does not change it.'
           : 'Hair, shirt, legs, boots, and face hair save with the shop.';
     }
+  }
+
+  function paintSettings() {
+    if (!settingsDock) return;
+    const current = state.skybox ?? 'blue';
+    for (const btn of settingsDock.querySelectorAll('[data-skybox]')) {
+      btn.classList.toggle('is-on', btn.dataset.skybox === current);
+    }
+    paintBrightness();
+  }
+
+  function openLookDock() {
+    closeBuild();
+    closeExpand();
+    closeMusicDock();
+    hideFurnMenu();
+    paintLook();
+    if (settingsDock) settingsDock.hidden = true;
+    if (lookDock) lookDock.hidden = false;
+  }
+
+  function backToSettings() {
+    closeLookDock();
+    paintSettings();
+    if (settingsDock) settingsDock.hidden = false;
   }
 
   function openSettings() {
@@ -1947,10 +2032,13 @@ export function bindHud(root, state, world) {
   }
 
   settingsBtn?.addEventListener('click', () => {
-    if (settingsDock?.hidden === false) closeSettingsDock();
+    if (settingsDock?.hidden === false || lookDock?.hidden === false) closeSettingsDock();
     else openSettings();
   });
   settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
+  settingsDock?.querySelector('[data-look-open]')?.addEventListener('click', openLookDock);
+  lookDock?.querySelector('[data-look-back]')?.addEventListener('click', backToSettings);
+  lookDock?.querySelector('[data-look-close]')?.addEventListener('click', closeSettingsDock);
   settingsDock?.querySelector('[data-skybox-list]')?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-skybox]');
     if (!btn) return;
@@ -2103,6 +2191,7 @@ export function bindHud(root, state, world) {
         world.syncDisplays();
         world.refreshSelection(true);
         setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
+        setLoop(Boolean(state.music?.loop));
         writeStoredBrightness(state.brightness ?? DEFAULT_BRIGHTNESS);
         world.setBrightness?.(state.brightness ?? DEFAULT_BRIGHTNESS);
         paintCrafts();
@@ -2305,5 +2394,17 @@ export function bindHud(root, state, world) {
     }
   }
 
-  return { render, openChest, openTrade, openCraft, openOfferPicker, selectOfferItem };
+  async function tryStartMusic() {
+    const result = await startMusicOnLoad({
+      volume: state.music?.volume ?? DEFAULT_MUSIC_VOLUME,
+      muted: (state.music?.volume ?? DEFAULT_MUSIC_VOLUME) <= 0,
+      track: state.music?.track ?? '',
+      loop: Boolean(state.music?.loop),
+    });
+    persistMusic();
+    paintMusic();
+    return result;
+  }
+
+  return { render, openChest, openTrade, openCraft, openOfferPicker, selectOfferItem, tryStartMusic };
 }

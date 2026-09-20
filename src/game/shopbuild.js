@@ -1671,9 +1671,15 @@ const ORE_VEIN_COLOR = {
   dragon: 0xd41e1e,
 };
 
-/** Mineable rocks: olive-brown body; vein colour marks the tier. Essence glows separately. */
+/** Visible top of the dungeon cobble slab. Ore rocks sit on this plane. */
+export const DUNGEON_FLOOR_Y = 0.02;
+
+/** Previous essence xz — a second skeleton slump sits here after essence moved to the cave middle. */
+export const ESSENCE_OLD_XZ = { x: 0.2, z: 3.15 };
+
+/** Mineable rocks: olive-brown body; vein colour marks the tier. */
 export const DUNGEON_BOULDERS = [
-  { id: 'essence', materialId: 'essence', name: 'Essence', x: 0.2, z: 3.15, rot: 0.25, rock: 0xb8babf, vein: 0xe8d8ff, essence: true },
+  { id: 'essence', materialId: 'essence', name: 'Essence', x: 0, z: 0, rot: 0.25, scale: 2, rock: 0xb8babf, vein: 0xe8d8ff, essence: true },
   { id: 'bronze', materialId: 'bronze', name: 'Bronze Ore', x: -3.3, z: -3.15, rot: 0.5, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.bronze },
   { id: 'iron', materialId: 'iron', name: 'Iron Ore', x: 1.4, z: -3.15, rot: -0.3, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.iron },
   { id: 'steel', materialId: 'steel', name: 'Steel Ore', x: 4.05, z: -1.5, rot: 0.8, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.steel },
@@ -1698,28 +1704,10 @@ function shadeHex(hex, factor) {
   return color.getHex();
 }
 
-function attachEssenceGlow(group) {
-  const aura = new THREE.Mesh(
-    new THREE.SphereGeometry(0.68, 18, 14),
-    new THREE.MeshBasicMaterial({
-      color: 0x9ad4ff,
-      transparent: true,
-      opacity: 0.14,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-  aura.position.y = 0.34;
-  aura.scale.set(1.05, 0.86, 1.02);
-  group.add(aura);
-  const glow = new THREE.PointLight(0x9ad4ff, 0.62, 3.4, 2);
-  glow.position.set(0, 0.42, 0);
-  group.add(glow);
-}
-
 function attachBoulderPick(group, spot) {
-  const pick = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.05, 1.35), pickMat());
-  pick.position.y = 0.48;
+  const s = spot.scale ?? 1;
+  const pick = new THREE.Mesh(new THREE.BoxGeometry(1.35 * s, 1.05 * s, 1.35 * s), pickMat());
+  pick.position.y = 0.48 * s;
   pick.userData.kind = 'boulder';
   pick.userData.materialId = spot.materialId;
   pick.userData.name = spot.name;
@@ -1728,19 +1716,41 @@ function attachBoulderPick(group, spot) {
   group.add(pick);
 }
 
+function stripEmissive(root) {
+  root?.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      if (mat.emissive) mat.emissive.setHex(0x000000);
+      if ('emissiveIntensity' in mat) mat.emissiveIntensity = 0;
+      if (mat.emissiveMap) mat.emissiveMap = null;
+    }
+  });
+}
+
+function oreFitTarget(spot) {
+  const target = buildProceduralOreRock(spot);
+  const scale = spot.scale ?? 1;
+  if (scale !== 1) {
+    target.scale.setScalar(scale);
+    target.updateMatrixWorld(true);
+  }
+  return target;
+}
+
 function buildMineBoulder(spot) {
   const group = new THREE.Group();
   group.name = `boulder-${spot.id}`;
   group.position.set(spot.x, 0, spot.z);
   group.rotation.y = spot.rot ?? 0;
-  const target = buildProceduralOreRock(spot);
+  const target = oreFitTarget(spot);
   const bundled = getBundledLook(`ore-${spot.id}`);
   const visual = bundled
     ? wrapBundledProp(bundled, target, { name: `ore-${spot.id}`, fit: 'max' })
     : target;
+  if (spot.essence) stripEmissive(visual);
   group.add(visual);
-  sitVisibleOnY(visual, 0);
-  if (spot.essence) attachEssenceGlow(group);
+  sitVisibleOnY(visual, DUNGEON_FLOOR_Y);
   attachBoulderPick(group, spot);
   return group;
 }
@@ -1752,9 +1762,7 @@ function buildProceduralOreRock(spot) {
   const rock = new THREE.MeshStandardMaterial({
     color: rockHex,
     roughness: 0.94,
-    metalness: spot.essence ? 0.08 : 0.12,
-    emissive: spot.essence ? 0x6aa8d8 : 0x000000,
-    emissiveIntensity: spot.essence ? 0.12 : 0,
+    metalness: 0.12,
   });
   const mottled = new THREE.MeshStandardMaterial({
     color: shadeHex(rockHex, 0.72),
@@ -1763,10 +1771,10 @@ function buildProceduralOreRock(spot) {
   });
   const vein = new THREE.MeshStandardMaterial({
     color: spot.vein,
-    roughness: spot.essence ? 0.35 : 0.55,
-    metalness: spot.essence ? 0.32 : 0.16,
-    emissive: spot.vein,
-    emissiveIntensity: spot.essence ? 0.32 : 0.22,
+    roughness: 0.55,
+    metalness: 0.16,
+    emissive: spot.essence ? 0x000000 : spot.vein,
+    emissiveIntensity: spot.essence ? 0 : 0.22,
   });
   const body = addShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), rock));
   body.scale.set(1.35, 0.72, 1.15);
@@ -1807,6 +1815,7 @@ export const DUNGEON_REMAINS = [
   { kind: 'slump', x: -1.1, z: -3.4, rot: 2.1 },
   { kind: 'slump', x: 4.6, z: -2.8, rot: -1.2 },
   { kind: 'slump', x: -4.5, z: 2.6, rot: 0.8 },
+  { kind: 'slump', x: ESSENCE_OLD_XZ.x, z: ESSENCE_OLD_XZ.z, rot: 1.35 },
 ];
 
 function slumpFitTarget() {
@@ -1840,6 +1849,7 @@ export function buildDungeon() {
   const W = 11;
   const D = 9;
   const H = 3.4;
+  /** Top face of the cobble slab (0.12 thick, centered at y=-0.04). */
   const floor = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(W, 0.12, D),
     cobbleMat(6.5, 5.2),
@@ -1912,9 +1922,15 @@ export function buildDungeon() {
   });
 
   const rats = [];
-  for (let i = 0; i < 4; i += 1) {
+  const ratStarts = [
+    [-2.8, 1.8],
+    [-2.6, -1.9],
+    [2.7, 1.6],
+    [2.8, -1.8],
+  ];
+  for (let i = 0; i < ratStarts.length; i += 1) {
     const rat = buildRat();
-    rat.position.set(-2 + i * 1.1, 0.06, 1.2 - i * 0.6);
+    rat.position.set(ratStarts[i][0], 0.06, ratStarts[i][1]);
     initRatWander(rat, i);
     root.add(rat);
     rats.push(rat);

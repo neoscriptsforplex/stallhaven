@@ -29,10 +29,11 @@ import {
   wrapBundledProp,
   wrapImportedCharacter,
   wrapShopPlayer,
+  sitVisibleOnY,
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y } from './layout.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, ESSENCE_OLD_XZ, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -846,7 +847,7 @@ describe('bundled prop swaps', () => {
     }
   });
 
-  it('fits dungeon ore dumps by folder tier and keeps essence glow plus mine picks', async () => {
+  it('fits dungeon ore dumps by folder tier and keeps mine picks without essence glow', async () => {
     const bronze = await loadFolder('dungeon-rocks/bronze-rocks');
     const essence = await loadFolder('dungeon-rocks/essence');
     setBundledLook('ore-bronze', bronze);
@@ -857,17 +858,27 @@ describe('bundled prop swaps', () => {
       let bronzePick = 0;
       let essencePick = 0;
       let essenceLight = 0;
+      let essenceEmissive = 0;
       built.root.traverse((child) => {
         if (child.name) names.push(child.name);
         if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'bronze') bronzePick += 1;
         if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'essence') essencePick += 1;
-        if (child.isLight && child.parent?.name === 'boulder-essence') essenceLight += 1;
+        let essenceParent = child;
+        while (essenceParent && essenceParent.name !== 'boulder-essence') essenceParent = essenceParent.parent;
+        if (essenceParent) {
+          if (child.isLight) essenceLight += 1;
+          const mats = child.isMesh
+            ? (Array.isArray(child.material) ? child.material : [child.material])
+            : [];
+          if (mats.some((mat) => (mat?.emissiveIntensity ?? 0) > 0.01)) essenceEmissive += 1;
+        }
       });
       assert.ok(names.includes('ore-bronze'));
       assert.ok(names.includes('ore-essence'));
       assert.ok(bronzePick >= 1);
       assert.ok(essencePick >= 1);
-      assert.ok(essenceLight >= 1);
+      assert.equal(essenceLight, 0);
+      assert.equal(essenceEmissive, 0);
       assert.equal(DUNGEON_BOULDERS.some((spot) => spot.id === 'steel'), true);
       assert.equal(DUNGEON_BOULDERS.some((spot) => spot.id === 'runite'), true);
     } finally {
@@ -903,13 +914,86 @@ describe('bundled prop swaps', () => {
         visual.updateMatrixWorld(true);
         const box = measureVisibleBox(visual);
         assert.ok(
-          box.min.y > -0.05 && box.min.y < 0.08,
+          Math.abs(box.min.y - DUNGEON_FLOOR_Y) < 0.02,
           `${boulder.name} should sit on the floor, minY=${box.min.y}`,
         );
       }
     } finally {
       for (const id of Object.keys(folders)) setBundledLook(`ore-${id}`, null);
     }
+  });
+
+  it('doubles essence size in the dungeon middle and seats a skeleton at the old spot', async () => {
+    const essenceSpot = DUNGEON_BOULDERS.find((item) => item.id === 'essence');
+    const adamant = DUNGEON_BOULDERS.find((item) => item.id === 'adamant');
+    assert.equal(essenceSpot?.scale, 2);
+    assert.ok(Math.abs(essenceSpot.x) < 1e-6);
+    assert.ok(Math.abs(essenceSpot.z) < 1e-6);
+    assert.ok(DUNGEON_REMAINS.some((spot) => (
+      Math.abs(spot.x - ESSENCE_OLD_XZ.x) < 1e-6 && Math.abs(spot.z - ESSENCE_OLD_XZ.z) < 1e-6
+    )));
+    assert.ok(Math.hypot(essenceSpot.x - adamant.x, essenceSpot.z - adamant.z) > 2.4);
+    for (const other of DUNGEON_BOULDERS.filter((item) => item.id !== 'essence')) {
+      const dist = Math.hypot(essenceSpot.x - other.x, essenceSpot.z - other.z);
+      assert.ok(dist > 2.4, `${other.id} too close to essence (${dist})`);
+    }
+    try {
+      setBundledLook('ore-essence', await loadFolder('dungeon-rocks/essence'));
+      setBundledLook('ore-bronze', await loadFolder('dungeon-rocks/bronze-rocks'));
+      setBundledLook('skeleton', await loadFolder('skeleton'));
+    } catch {
+      // Procedural fallback still has to keep layout and 2× size.
+    }
+    try {
+      const built = buildDungeon();
+      const essence = built.boulders.find((item) => item.name === 'boulder-essence');
+      const bronze = built.boulders.find((item) => item.name === 'boulder-bronze');
+      assert.ok(essence && bronze);
+      assert.ok(Math.abs(essence.position.x) < 1e-6);
+      assert.ok(Math.abs(essence.position.z) < 1e-6);
+      const essenceBox = measureVisibleBox(essence.children.find((child) => child.name === 'ore-essence'));
+      const bronzeBox = measureVisibleBox(bronze.children.find((child) => child.name === 'ore-bronze'));
+      const essenceSize = essenceBox.getSize(new THREE.Vector3());
+      const bronzeSize = bronzeBox.getSize(new THREE.Vector3());
+      const essenceMax = Math.max(essenceSize.x, essenceSize.y, essenceSize.z);
+      const bronzeMax = Math.max(bronzeSize.x, bronzeSize.y, bronzeSize.z);
+      assert.ok(essenceMax > bronzeMax * 1.6, `essence ${essenceMax} should be ~2× bronze ${bronzeMax}`);
+      assert.ok(Math.abs(essenceBox.min.y - DUNGEON_FLOOR_Y) < 0.02, `essence minY=${essenceBox.min.y}`);
+      let slumps = 0;
+      let oldSpotSlump = 0;
+      built.root.traverse((child) => {
+        if (child.name !== 'skeleton') return;
+        slumps += 1;
+        if (Math.hypot(child.position.x - ESSENCE_OLD_XZ.x, child.position.z - ESSENCE_OLD_XZ.z) < 0.05) {
+          oldSpotSlump += 1;
+        }
+      });
+      if (slumps) {
+        assert.equal(slumps, DUNGEON_REMAINS.length);
+        assert.equal(oldSpotSlump, 1);
+      }
+      let essencePick = 0;
+      built.root.traverse((child) => {
+        if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'essence') essencePick += 1;
+      });
+      assert.ok(essencePick >= 1);
+    } finally {
+      setBundledLook('ore-essence', null);
+      setBundledLook('ore-bronze', null);
+      setBundledLook('skeleton', null);
+    }
+  });
+
+  it('sits a uniformly scaled dump on a world floor plane', () => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2));
+    mesh.scale.setScalar(0.05);
+    mesh.position.set(0, 0.8, 0);
+    const root = new THREE.Group();
+    root.add(mesh);
+    sitVisibleOnY(mesh, DUNGEON_FLOOR_Y);
+    mesh.updateMatrixWorld(true);
+    const box = measureVisibleBox(mesh);
+    assert.ok(Math.abs(box.min.y - DUNGEON_FLOOR_Y) < 0.005, `minY=${box.min.y}`);
   });
 });
 

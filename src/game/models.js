@@ -3239,7 +3239,13 @@ export function sitVisibleOnY(mesh, y = 0) {
   mesh.updateMatrixWorld(true);
   const box = measureVisibleBox(mesh);
   if (!Number.isFinite(box.min.y)) return mesh;
-  mesh.position.y += y - box.min.y;
+  const dy = y - box.min.y;
+  if (Math.abs(dy) < 1e-9) return mesh;
+  const world = new THREE.Vector3();
+  mesh.getWorldPosition(world);
+  world.y += dy;
+  if (mesh.parent) mesh.parent.worldToLocal(world);
+  mesh.position.copy(world);
   return mesh;
 }
 

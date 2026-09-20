@@ -95,6 +95,8 @@ export const FOUNTAIN = { x: 0, z: 8.85, radius: 0.7, apron: 1.42 };
 export const PATH_HALF_W = 0.72;
 export const PATH_START_Z = 4.22;
 export const TRAPDOOR = { x: 3.35, z: 9.55 };
+/** Keep lawn blades off the dark hatch opening; rim grass on the rock can stay. */
+export const TRAPDOOR_HOLE_CLEAR = 0.38;
 /** Shop plank / station floor plane. Bundled chests sit on this, not at y=0. */
 export const SHOP_FURNITURE_FLOOR_Y = 0.09;
 
@@ -548,6 +550,10 @@ function gardenRockOnGrass(spot, expansionIds = []) {
 export function gardenTrapdoorSpot(expansionIds = []) {
   const spot = { ...TRAPDOOR, side: 'path' };
   return keepGardenSpot(spot, expansionIds) ? spot : null;
+}
+
+export function pointHitsTrapdoor(x, z, pad = TRAPDOOR_HOLE_CLEAR) {
+  return Math.hypot(x - TRAPDOOR.x, z - TRAPDOOR.z) < pad;
 }
 
 export const GARDEN_BED_SPOTS = [

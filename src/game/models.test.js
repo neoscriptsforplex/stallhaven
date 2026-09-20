@@ -33,7 +33,7 @@ import {
   ANVIL_WORLD_SCALE,
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
-import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y } from './layout.js';
+import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, ESSENCE_OLD_XZ, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
@@ -685,6 +685,25 @@ describe('bundled prop swaps', () => {
     }
   });
 
+  it('keeps lawn blades out of the dungeon entrance hole', () => {
+    const shop = buildShop([]).root;
+    const dummy = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    let blades = 0;
+    let inHole = 0;
+    shop.traverse((child) => {
+      if (child.name !== 'grass' || !child.isInstancedMesh) return;
+      for (let i = 0; i < child.count; i += 1) {
+        child.getMatrixAt(i, dummy);
+        pos.setFromMatrixPosition(dummy);
+        blades += 1;
+        if (Math.hypot(pos.x - TRAPDOOR.x, pos.z - TRAPDOOR.z) < TRAPDOOR_HOLE_CLEAR) inHole += 1;
+      }
+    });
+    assert.ok(blades > 100, `lawn should still have blades, got ${blades}`);
+    assert.equal(inHole, 0, `grass should not cover the hatch opening, inHole=${inHole}`);
+  });
+
   it('fits a bundled pottery-oven furnace dump on the shop floor', async () => {
     const bundled = await loadFolder('furnace');
     const target = buildFurnace();
@@ -911,7 +930,11 @@ describe('bundled prop swaps', () => {
           const mats = child.isMesh
             ? (Array.isArray(child.material) ? child.material : [child.material])
             : [];
-          if (mats.some((mat) => (mat?.emissiveIntensity ?? 0) > 0.01)) essenceEmissive += 1;
+          if (mats.some((mat) => {
+            const intensity = mat?.emissiveIntensity ?? 0;
+            const glow = mat?.emissive && (mat.emissive.r + mat.emissive.g + mat.emissive.b) > 0.01;
+            return intensity > 0.01 || glow;
+          })) essenceEmissive += 1;
         }
       });
       assert.ok(names.includes('ore-bronze'));

@@ -14,6 +14,7 @@ import {
   gardenTreeSpots,
   keepFountain,
   keepGardenSpot,
+  pointHitsTrapdoor,
   neighborsOf,
   occupiedCells,
   padConnects,
@@ -1586,6 +1587,7 @@ function addLushGrass(root, grass, expansionIds, rand) {
       const x = cluster.x + (rand() - 0.5) * 0.4;
       const z = cluster.z + (rand() - 0.5) * 0.4;
       if (!keepGardenSpot({ x, z, side: 'edge' }, expansionIds)) continue;
+      if (pointHitsTrapdoor(x, z)) continue;
       const h = (0.14 + rand() * 0.46) * cluster.scale;
       dummy.position.set(x, 0, z);
       dummy.rotation.set((rand() - 0.5) * 0.38, rand() * Math.PI * 2, (rand() - 0.5) * 0.48);
@@ -1766,15 +1768,22 @@ function attachBoulderPick(group, spot) {
 }
 
 function stripEmissive(root) {
+  const lights = [];
   root?.traverse((child) => {
+    if (child.isLight) lights.push(child);
     if (!child.isMesh || !child.material) return;
     const mats = Array.isArray(child.material) ? child.material : [child.material];
-    for (const mat of mats) {
-      if (mat.emissive) mat.emissive.setHex(0x000000);
-      if ('emissiveIntensity' in mat) mat.emissiveIntensity = 0;
-      if (mat.emissiveMap) mat.emissiveMap = null;
-    }
+    const next = mats.map((mat) => {
+      const copy = mat.clone();
+      if (copy.emissive) copy.emissive.setHex(0x000000);
+      if ('emissiveIntensity' in copy) copy.emissiveIntensity = 0;
+      copy.emissiveMap = null;
+      if ('envMapIntensity' in copy) copy.envMapIntensity = 0;
+      return copy;
+    });
+    child.material = Array.isArray(child.material) ? next : next[0];
   });
+  for (const light of lights) light.parent?.remove(light);
 }
 
 function oreFitTarget(spot) {
@@ -1797,10 +1806,10 @@ function buildMineBoulder(spot) {
   const visual = bundled
     ? wrapBundledProp(bundled, target, { name: `ore-${spot.id}`, fit: 'max' })
     : target;
-  if (spot.essence) stripEmissive(visual);
   group.add(visual);
   sitVisibleOnY(visual, DUNGEON_FLOOR_Y);
   attachBoulderPick(group, spot);
+  if (spot.essence) stripEmissive(group);
   return group;
 }
 

@@ -29,6 +29,9 @@ import {
   gardenRockRadius,
   gardenTrapdoorSpot,
   gardenBedSpots,
+  pointHitsTrapdoor,
+  TRAPDOOR,
+  TRAPDOOR_HOLE_CLEAR,
   gardenGrassClusters,
   gardenBox,
   cobblePathSpan,
@@ -236,6 +239,12 @@ describe('layout numbers', () => {
     assert.equal(left.some((spot) => spot.side === 'left' || spot.side === 'front-left'), false);
     const leftRocks = gardenRockSpots(['left']);
     assert.equal(leftRocks.some((spot) => spot.side === 'left'), false);
+  });
+
+  it('treats the dungeon hatch opening as a grass-free hole', () => {
+    assert.equal(pointHitsTrapdoor(TRAPDOOR.x, TRAPDOOR.z), true);
+    assert.equal(pointHitsTrapdoor(TRAPDOOR.x + TRAPDOOR_HOLE_CLEAR + 0.02, TRAPDOOR.z), false);
+    assert.ok(gardenTrapdoorSpot([]));
   });
 
   it('snaps furniture on both floor axes, not only sideways', () => {

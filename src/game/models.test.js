@@ -34,7 +34,7 @@ import {
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y } from './layout.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, ESSENCE_OLD_XZ, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, ESSENCE_OLD_XZ, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -386,7 +386,7 @@ describe('bundled prop swaps', () => {
     for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-runite', 'ore-dragon', 'ore-essence']) {
       assert.ok(ids.includes(id), id);
     }
-    for (const id of ['food-bread', 'food-pizza', 'food-cake', 'food-pie', 'food-fish-pie', 'food-lobster', 'food-chocolate-cake', 'food-monkfish', 'food-curry', 'food-shark', 'food-summer-pie', 'food-anglerfish']) {
+    for (const id of ['food-bread', 'food-pizza', 'food-cake', 'food-pie', 'food-fish-pie', 'food-salmon', 'food-lobster', 'food-chocolate-cake', 'food-monkfish', 'food-curry', 'food-shark', 'food-summer-pie', 'food-anglerfish']) {
       assert.ok(ids.includes(id), id);
     }
     assert.ok(ids.includes('goblin'));
@@ -635,8 +635,10 @@ describe('bundled prop swaps', () => {
         const box = measureVisibleBox(mount);
         const tip = glow.getWorldPosition(new THREE.Vector3());
         const mid = (box.min.y + box.max.y) / 2;
+        const height = box.max.y - box.min.y;
         assert.ok(tip.y > mid, `glow should sit at the flame tip, y=${tip.y} mid=${mid}`);
-        assert.ok(Math.abs(tip.y - box.max.y) < 0.16, `glow should be at the top, y=${tip.y} max=${box.max.y}`);
+        assert.ok(tip.y > box.min.y + height * 0.85, `glow should be in the top of the torch, y=${tip.y} box=${box.min.y}..${box.max.y}`);
+        assert.ok(Math.abs(tip.y - box.max.y) < 0.08, `glow should be at the top, y=${tip.y} max=${box.max.y}`);
       }
       const origin = [];
       shop.traverse((child) => {
@@ -762,6 +764,7 @@ describe('bundled prop swaps', () => {
     assert.equal(byId['ore-dragon'], 'dungeon-rocks/dragon-rocks');
     assert.equal(byId['ore-essence'], 'dungeon-rocks/essence');
     assert.equal(byId['food-bread'], 'food/bread');
+    assert.equal(byId['food-salmon'], 'food/salmon');
     assert.equal(byId['food-chocolate-cake'], 'food/chocolate-cake');
     assert.equal(byId['food-fish-pie'], 'food/fish-pie');
     assert.equal(byId['food-summer-pie'], 'food/summer-pie');
@@ -773,6 +776,7 @@ describe('bundled prop swaps', () => {
       ['chocolate_cake', 'food/chocolate-cake'],
       ['fish_pie', 'food/fish-pie'],
       ['pizza', 'food/pizza'],
+      ['salmon', 'food/salmon'],
     ];
     for (const [recipeId, folder] of samples) {
       const bundled = await loadFolder(folder);
@@ -792,8 +796,8 @@ describe('bundled prop swaps', () => {
         setBundledLook(lookId, null);
       }
     }
-    const salmon = buildWare('salmon');
-    assert.equal(salmon.getObjectByName('food-salmon'), undefined);
+    const salmonObj = readFileSync(join(modelsRoot, 'food/salmon/salmon.obj'), 'utf8');
+    assert.match(salmonObj, /Raw salmon/i);
   });
 
   it('fits a Tin-labelled steel-rocks dump to the current steel boulder', async () => {
@@ -1086,6 +1090,34 @@ describe('shop props', () => {
     const box = measureVisibleBox(range);
     assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `range should sit on the floor, minY=${box.min.y}`);
     assert.ok(box.max.y > 1.8, `range should be 2× tall, maxY=${box.max.y}`);
+  });
+
+  it('hides the dumped cooking-range wooden plate under the floor', async () => {
+    const bundled = await loadFolder('range');
+    setBundledLook('range', bundled);
+    try {
+      const range = buildRange();
+      const box = measureVisibleBox(range);
+      const height = box.max.y - box.min.y;
+      const sink = height * RANGE_PLATE_FRAC;
+      assert.ok(sink > 0.08, `plate should be thick enough to hide, sink=${sink}`);
+      assert.ok(Math.abs(box.min.y + sink) < 0.04, `plate bottom should sit sink below floor, minY=${box.min.y}`);
+      assert.ok(box.min.y < -0.08, `brown plate should be under the boards, minY=${box.min.y}`);
+      assert.ok(box.max.y > 1.6, `stove body should stay above the floor, maxY=${box.max.y}`);
+    } finally {
+      setBundledLook('range', null);
+    }
+  });
+
+  it('doubles the spinning wheel uniformly and keeps it on the floor', () => {
+    assert.equal(WHEEL_WORLD_SCALE, 2);
+    const wheel = buildSpinningWheel();
+    assert.ok(Math.abs(wheel.scale.x - wheel.scale.y) < 1e-6);
+    assert.ok(Math.abs(wheel.scale.y - wheel.scale.z) < 1e-6);
+    assert.ok(Math.abs(wheel.scale.x - WHEEL_WORLD_SCALE) < 1e-6);
+    const box = measureVisibleBox(wheel);
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `wheel should sit on the floor, minY=${box.min.y}`);
+    assert.ok(box.max.y > 1.2, `wheel should be 2× tall, maxY=${box.max.y}`);
   });
 
   it('keeps shop tables at the previous size on the floor', () => {

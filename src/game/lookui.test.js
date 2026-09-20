@@ -14,10 +14,17 @@ function slice(html, startId, endId) {
 describe('player look UI', () => {
   const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../index.html'), 'utf8');
 
+  it('covers the canvas with a black loading bar until models are ready', () => {
+    assert.match(html, /id="boot-cover"/);
+    assert.match(html, /data-boot-bar/);
+    assert.match(html, /data-boot-label/);
+  });
+
   it('keeps Settings to a Player Avatar Customize button, not look grids', () => {
     const settings = slice(html, 'id="settings-dock"', 'id="look-dock"');
     assert.match(settings, /<h3>Player Avatar<\/h3>/);
-    assert.match(settings, /data-look-open>Player Avatar: Customize</);
+    assert.match(settings, /data-dungeon-brightness/);
+    assert.match(settings, /Dungeon brightness/);
     assert.equal(settings.includes('data-look="hair"'), false);
     assert.equal(settings.includes('data-look="shirt"'), false);
     assert.equal(settings.includes('data-look="legs"'), false);

@@ -88,12 +88,14 @@ import {
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
-import { applySceneLighting, clampBrightness } from './lighting.js';
+import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
 const CAM_YAW_SPEED = 2.175;
 const CAM_PITCH_SPEED = 1.425;
+const CAM_ORBIT_YAW = 0.0055;
+const CAM_ORBIT_PITCH = 0.0036;
 const CAM_ZOOM_STEP = 0.38;
 const CAM_MIN_DISTANCE = 2.05;
 const CAM_MAX_DISTANCE = 25.8;
@@ -167,6 +169,7 @@ export function createWorld(canvas, state, opts = {}) {
   };
   const camLook = new THREE.Vector3(SHOP.keeper.x, 0.95, SHOP.keeper.z);
   const camHeld = { left: false, right: false, up: false, down: false };
+  let camDrag = null;
   camera.position.set(SHOP.cameraStart.x, SHOP.cameraStart.y, SHOP.cameraStart.z);
   camera.lookAt(camLook);
 
@@ -192,6 +195,7 @@ export function createWorld(canvas, state, opts = {}) {
   const shopFill = new THREE.PointLight(0xffe8c4, 0.48, 16, 2);
   shopFill.position.set(0, 2.55, -0.35);
   scene.add(shopFill);
+  let dungeon = null;
 
   function syncLighting(mode = sceneMode) {
     applySceneLighting({
@@ -201,7 +205,12 @@ export function createWorld(canvas, state, opts = {}) {
       door: doorLight,
       sun,
       renderer,
-    }, mode, state.brightness);
+    }, mode, state.brightness, state.dungeonBrightness);
+    const torchMul = clampDungeonBrightness(state.dungeonBrightness);
+    dungeon?.root?.traverse((child) => {
+      if (!child.isLight || child.userData.baseIntensity == null) return;
+      child.intensity = child.userData.baseIntensity * torchMul;
+    });
   }
   syncLighting('shop');
 
@@ -289,7 +298,6 @@ export function createWorld(canvas, state, opts = {}) {
   const clouds = buildClouds();
   scene.add(clouds);
   let sceneMode = 'shop';
-  let dungeon = null;
   let pendingUse = null;
   let mining = null;
   let lastPlaceClickAt = 0;
@@ -1001,6 +1009,12 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   renderer.domElement.addEventListener('pointerdown', (event) => {
+    if (event.button === 1) {
+      event.preventDefault();
+      camDrag = { x: event.clientX, y: event.clientY };
+      renderer.domElement.setPointerCapture?.(event.pointerId);
+      return;
+    }
     if (event.button !== 0) return;
     pointerDown.x = event.clientX;
     pointerDown.y = event.clientY;
@@ -1245,9 +1259,31 @@ export function createWorld(canvas, state, opts = {}) {
   });
 
   renderer.domElement.addEventListener('pointermove', (event) => {
+    if (camDrag) {
+      const dx = event.clientX - camDrag.x;
+      const dy = event.clientY - camDrag.y;
+      camDrag = { x: event.clientX, y: event.clientY };
+      cam.yaw -= dx * CAM_ORBIT_YAW;
+      cam.pitch -= dy * CAM_ORBIT_PITCH;
+      clampCam();
+      return;
+    }
     if (!moveTarget) return;
     const point = floorPointFromEvent(event);
     if (point) previewFurnitureAt(point.x, point.z);
+  });
+
+  renderer.domElement.addEventListener('pointerup', (event) => {
+    if (event.button === 1) camDrag = null;
+  });
+  renderer.domElement.addEventListener('pointercancel', () => {
+    camDrag = null;
+  });
+  renderer.domElement.addEventListener('auxclick', (event) => {
+    if (event.button === 1) event.preventDefault();
+  });
+  renderer.domElement.addEventListener('mousedown', (event) => {
+    if (event.button === 1) event.preventDefault();
   });
 
   renderer.domElement.addEventListener('contextmenu', (event) => {
@@ -2187,6 +2223,11 @@ export function createWorld(canvas, state, opts = {}) {
       state.brightness = clampBrightness(value);
       syncLighting(sceneMode);
       return state.brightness;
+    },
+    setDungeonBrightness(value) {
+      state.dungeonBrightness = clampDungeonBrightness(value);
+      syncLighting(sceneMode);
+      return state.dungeonBrightness;
     },
     setChefHat(on) {
       state.chefHat = Boolean(on);

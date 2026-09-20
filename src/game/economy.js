@@ -59,8 +59,11 @@ import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_MIN,
   DEFAULT_BRIGHTNESS,
+  DEFAULT_DUNGEON_BRIGHTNESS,
   clampBrightness,
+  clampDungeonBrightness,
   readStoredBrightness,
+  readStoredDungeonBrightness,
 } from './lighting.js';
 
 export {
@@ -268,6 +271,7 @@ export function createState() {
     shopLevel: 1,
     skybox: DEFAULT_SKYBOX,
     brightness: readStoredBrightness(),
+    dungeonBrightness: readStoredDungeonBrightness(),
     chefHat: false,
     appearance: defaultAppearance(),
     playTime: 0,
@@ -1040,6 +1044,7 @@ export function serializeState(state) {
     shopLevel: shopProgress(state.shopXp ?? 0).level,
     skybox: skyboxId(state.skybox),
     brightness: clampBrightness(state.brightness),
+    dungeonBrightness: clampDungeonBrightness(state.dungeonBrightness),
     chefHat: Boolean(state.chefHat),
     appearance: normalizeAppearance(state.appearance),
     playTime: Math.max(0, Number(state.playTime) || 0),
@@ -1175,6 +1180,9 @@ export function applyState(state, data) {
   next.brightness = data.brightness != null
     ? clampBrightness(data.brightness)
     : DEFAULT_BRIGHTNESS;
+  next.dungeonBrightness = data.dungeonBrightness != null
+    ? clampDungeonBrightness(data.dungeonBrightness)
+    : DEFAULT_DUNGEON_BRIGHTNESS;
   if (typeof data.chefHat === 'boolean') next.chefHat = data.chefHat;
   next.appearance = normalizeAppearance(data.appearance);
   if (typeof data.playTime === 'number' && Number.isFinite(data.playTime)) {
@@ -1241,6 +1249,7 @@ export function applyState(state, data) {
   state.shopLevel = next.shopLevel;
   state.skybox = next.skybox;
   state.brightness = next.brightness;
+  state.dungeonBrightness = next.dungeonBrightness;
   state.chefHat = next.chefHat;
   state.appearance = next.appearance;
   state.playTime = next.playTime;

@@ -261,7 +261,7 @@ function flameMat() {
 export function buildTorch() {
   const bundled = getBundledLook('torch');
   if (bundled) {
-    const fitted = wrapBundledProp(bundled, buildProceduralTorch(), {
+    const fitted = wrapBundledProp(bundled, buildProceduralTorchBody(), {
       name: 'torch',
       fit: 'max',
       rotateZ: Math.PI / 2,
@@ -270,7 +270,9 @@ export function buildTorch() {
     attachTorchFx(fitted);
     return fitted;
   }
-  return buildProceduralTorch();
+  const group = buildProceduralTorchBody();
+  attachTorchFx(group);
+  return group;
 }
 
 function localPointAtWorld(mesh, worldPoint) {
@@ -278,26 +280,42 @@ function localPointAtWorld(mesh, worldPoint) {
   return mesh.worldToLocal(worldPoint.clone());
 }
 
+/**
+ * PointLight + ember sit in an inverse-scaled holder at the visible tip so a
+ * tiny dumped torch scale cannot pull the bloom down the shaft.
+ */
 function attachTorchFx(mesh) {
   mesh.updateMatrixWorld(true);
   const box = measureVisibleBox(mesh);
   const tipWorld = new THREE.Vector3(
     (box.min.x + box.max.x) / 2,
-    (Number.isFinite(box.max.y) ? box.max.y : 0.42) + 0.04,
+    Number.isFinite(box.max.y) ? box.max.y : 0.42,
     (box.min.z + box.max.z) / 2,
   );
-  const tipLocal = localPointAtWorld(mesh, tipWorld);
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 7), flameMat());
-  flame.name = 'torch-flame';
-  flame.position.copy(tipLocal);
-  mesh.add(flame);
-  const glow = new THREE.PointLight(0xff9a3a, 1.15, 4.5, 2);
+  const holder = new THREE.Group();
+  holder.name = 'torch-fx';
+  holder.position.copy(localPointAtWorld(mesh, tipWorld));
+  const worldScale = new THREE.Vector3();
+  mesh.getWorldScale(worldScale);
+  const s = Math.max(Math.abs(worldScale.x), 1e-8);
+  holder.scale.setScalar(1 / s);
+  mesh.add(holder);
+
+  if (!mesh.getObjectByName('torch-flame')) {
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 7), flameMat());
+    flame.name = 'torch-flame';
+    flame.position.y = 0.04;
+    holder.add(flame);
+  }
+
+  const glow = new THREE.PointLight(0xff9a3a, 1.55, 1.9, 2);
   glow.name = 'torch-glow';
-  glow.position.copy(localPointAtWorld(mesh, tipWorld.clone().setY(tipWorld.y + 0.02)));
-  mesh.add(glow);
+  // Slightly above the tip and toward local −Z (wall-facing on typical mounts).
+  glow.position.set(0, 0.05, -0.03);
+  holder.add(glow);
 }
 
-function buildProceduralTorch() {
+function buildProceduralTorchBody() {
   const group = new THREE.Group();
   group.name = 'torch';
   const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, 0.42, 6), wood(0x5a3a22)));
@@ -310,10 +328,12 @@ function buildProceduralTorch() {
   flame.name = 'torch-flame';
   flame.position.y = 0.42;
   group.add(flame);
-  const glow = new THREE.PointLight(0xff9a3a, 1.15, 4.5, 2);
-  glow.name = 'torch-glow';
-  glow.position.y = 0.5;
-  group.add(glow);
+  return group;
+}
+
+function buildProceduralTorch() {
+  const group = buildProceduralTorchBody();
+  attachTorchFx(group);
   return group;
 }
 
@@ -323,11 +343,11 @@ function addWallTorch(root, x, y, z, rotY = 0, glowMul = 1) {
   torch.rotation.y = rotY;
   // Procedural sconces lean off the wall. The dumped torch stays upright.
   if (!getBundledLook('torch')) torch.rotation.z = 0.55;
-  if (glowMul !== 1) {
-    torch.traverse((child) => {
-      if (child.isLight) child.intensity *= glowMul;
-    });
-  }
+  torch.traverse((child) => {
+    if (!child.isLight) return;
+    if (glowMul !== 1) child.intensity *= glowMul;
+    child.userData.baseIntensity = child.intensity;
+  });
   root.add(torch);
   return torch;
 }
@@ -811,6 +831,8 @@ function addWallVines(root, center) {
 
 /** Uniform world scale vs the baked range (dump or procedural) after size-match. */
 export const RANGE_WORLD_SCALE = 2;
+/** Dump wooden plate is Y 0–16 of the 224-tall Cooking range mesh. */
+export const RANGE_PLATE_FRAC = 16 / 224;
 
 function applyRangeWorldScale(mesh) {
   mesh.scale.multiplyScalar(RANGE_WORLD_SCALE);
@@ -821,11 +843,26 @@ function applyRangeWorldScale(mesh) {
   return mesh;
 }
 
+/** Drop the dump so the brown base plate sits under the floorboards. */
+function sinkRangePlate(mesh) {
+  mesh.updateMatrixWorld(true);
+  const box = measureVisibleBox(mesh);
+  const height = box.max.y - box.min.y;
+  if (!Number.isFinite(height) || height <= 0) return mesh;
+  mesh.position.y -= height * RANGE_PLATE_FRAC;
+  return mesh;
+}
+
 export function buildRange() {
   const bundled = getBundledLook('range');
   const target = applyRangeWorldScale(buildProceduralRange());
   if (bundled) {
-    return wrapBundledProp(bundled, target, { name: 'range', fit: 'height', label: 'Range', wareY: 'top' });
+    return sinkRangePlate(wrapBundledProp(bundled, target, {
+      name: 'range',
+      fit: 'height',
+      label: 'Range',
+      wareY: 'top',
+    }));
   }
   return target;
 }
@@ -976,10 +1013,22 @@ function buildProceduralFurnace() {
   return group;
 }
 
+/** Uniform world scale vs the baked spinning wheel after size-match. */
+export const WHEEL_WORLD_SCALE = 2;
+
+function applyWheelWorldScale(mesh) {
+  mesh.scale.multiplyScalar(WHEEL_WORLD_SCALE);
+  mesh.updateMatrixWorld(true);
+  const box = measureVisibleBox(mesh);
+  if (Number.isFinite(box.min.y)) mesh.position.y -= box.min.y;
+  if (mesh.userData.wareY != null) mesh.userData.wareY *= WHEEL_WORLD_SCALE;
+  return mesh;
+}
+
 export function buildSpinningWheel() {
   const bundled = getBundledLook('wheel');
   if (bundled) {
-    const target = buildProceduralSpinningWheel();
+    const target = applyWheelWorldScale(buildProceduralSpinningWheel());
     const fitted = wrapBundledProp(bundled, target, {
       name: 'wheel',
       fit: 'max',
@@ -992,7 +1041,7 @@ export function buildSpinningWheel() {
     fitted.userData.spinWheel = spinner;
     return fitted;
   }
-  return buildProceduralSpinningWheel();
+  return applyWheelWorldScale(buildProceduralSpinningWheel());
 }
 
 function buildProceduralSpinningWheel() {

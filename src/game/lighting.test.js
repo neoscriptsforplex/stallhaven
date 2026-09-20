@@ -7,13 +7,19 @@ import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_NEUTRAL,
   DEFAULT_BRIGHTNESS,
+  DEFAULT_DUNGEON_BRIGHTNESS,
+  DUNGEON_BRIGHTNESS_MAX,
   applySceneLighting,
   brightnessForScene,
   brightnessPercent,
   clampBrightness,
+  clampDungeonBrightness,
+  dungeonBrightnessPercent,
   lightingForScene,
   readStoredBrightness,
+  readStoredDungeonBrightness,
   writeStoredBrightness,
+  writeStoredDungeonBrightness,
 } from './lighting.js';
 
 describe('scene lighting', () => {
@@ -34,7 +40,7 @@ describe('scene lighting', () => {
     assert.ok(
       DUNGEON_LIGHT.hemi * DUNGEON_LIGHT.exposure < SHOP_LIGHT.hemi * SHOP_LIGHT.exposure,
     );
-    assert.ok(lightingForScene('dungeon', BRIGHTNESS_NEUTRAL).exposure < lightingForScene('shop', BRIGHTNESS_NEUTRAL).exposure);
+    assert.ok(lightingForScene('dungeon', BRIGHTNESS_NEUTRAL, 1).exposure < lightingForScene('shop', BRIGHTNESS_NEUTRAL).exposure);
   });
 
   it('writes shop and dungeon intensities onto the live lights', () => {
@@ -49,7 +55,7 @@ describe('scene lighting', () => {
     applySceneLighting(lights, 'shop', BRIGHTNESS_NEUTRAL);
     assert.equal(lights.hemi.intensity, SHOP_LIGHT.hemi);
     assert.equal(lights.fill.intensity, SHOP_LIGHT.fill);
-    applySceneLighting(lights, 'dungeon', BRIGHTNESS_NEUTRAL);
+    applySceneLighting(lights, 'dungeon', BRIGHTNESS_NEUTRAL, 1);
     assert.equal(lights.hemi.intensity, DUNGEON_LIGHT.hemi);
     assert.equal(lights.fill.intensity, 0);
     assert.equal(lights.door.intensity, 0);
@@ -78,20 +84,22 @@ describe('scene lighting', () => {
     }
   });
 
-  it('uses 100% brightness as the current shop bump and damps dungeon highs', () => {
+  it('uses 100% brightness as the current shop bump and a separate dungeon slider', () => {
     assert.equal(clampBrightness(0.2), 0.5);
     assert.equal(clampBrightness(2), 1.5);
+    assert.equal(clampDungeonBrightness(-1), 0);
+    assert.equal(clampDungeonBrightness(2), 1.5);
+    assert.equal(DEFAULT_DUNGEON_BRIGHTNESS, DUNGEON_BRIGHTNESS_MAX);
+    assert.equal(dungeonBrightnessPercent(undefined), 150);
     assert.equal(brightnessForScene('shop', 1), 1);
-    assert.equal(brightnessForScene('dungeon', 1), 1);
+    assert.equal(brightnessForScene('dungeon', 1.5, 1), 1);
     assert.equal(brightnessForScene('shop', 1.5), 1.5);
-    assert.ok(brightnessForScene('dungeon', 1.5) < 1.5);
-    assert.ok(brightnessForScene('dungeon', 1.5) <= 1.12);
-    const shopHigh = lightingForScene('shop', 1.5);
-    const dungeonHigh = lightingForScene('dungeon', 1.5);
+    assert.equal(brightnessForScene('dungeon', 0.5, 1.5), 1.5);
+    const shopHigh = lightingForScene('shop', 1.5, 1);
+    const dungeonHigh = lightingForScene('dungeon', 0.5, 1.5);
     assert.ok(shopHigh.hemi > SHOP_LIGHT.hemi);
-    assert.ok(dungeonHigh.hemi < DUNGEON_LIGHT.hemi * 1.5);
-    assert.ok(dungeonHigh.exposure < DUNGEON_LIGHT.exposure * 1.5);
-    const shopNeutral = lightingForScene('shop', BRIGHTNESS_NEUTRAL);
+    assert.ok(Math.abs(dungeonHigh.hemi - DUNGEON_LIGHT.hemi * 1.5) < 1e-9);
+    const shopNeutral = lightingForScene('shop', BRIGHTNESS_NEUTRAL, 1);
     assert.equal(shopNeutral.hemi, SHOP_LIGHT.hemi);
     assert.equal(shopNeutral.exposure, SHOP_LIGHT.exposure);
     assert.equal(DUNGEON_LIGHT_BOOST, 2.5);
@@ -99,5 +107,19 @@ describe('scene lighting', () => {
     assert.ok(Math.abs(DUNGEON_LIGHT.ambient - 0.06 * DUNGEON_LIGHT_BOOST) < 1e-9);
     assert.equal(SHOP_LIGHT.hemi, 1.14);
     assert.equal(SHOP_LIGHT.ambient, 0.24);
+    const store = {};
+    const previous = globalThis.localStorage;
+    globalThis.localStorage = {
+      getItem: (key) => (Object.hasOwn(store, key) ? store[key] : null),
+      setItem: (key, value) => { store[key] = String(value); },
+    };
+    try {
+      assert.equal(readStoredDungeonBrightness(), DEFAULT_DUNGEON_BRIGHTNESS);
+      writeStoredDungeonBrightness(0.8);
+      assert.equal(readStoredDungeonBrightness(), 0.8);
+    } finally {
+      if (previous === undefined) delete globalThis.localStorage;
+      else globalThis.localStorage = previous;
+    }
   });
 });

@@ -10,7 +10,7 @@ export const STATION_HIT = {
   range: { w: 2.4, h: 3.3, d: 2.2, pickY: 1.6, floorR: 1.55 },
   furnace: { w: 1.28, h: 1.7, d: 1.2, pickY: 0.8, floorR: 1.05 },
   cauldron: { w: 1.15, h: 1.55, d: 1.15, pickY: 0.74, floorR: 1.0 },
-  wheel: { w: 1.2, h: 1.6, d: 1.15, pickY: 0.74, floorR: 1.0 },
+  wheel: { w: 1.85, h: 2.4, d: 1.8, pickY: 1.1, floorR: 1.35 },
   boulder: { w: 1.4, h: 1.2, d: 1.4, pickY: 0.52, floorR: 1.15 },
 };
 

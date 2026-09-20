@@ -119,7 +119,11 @@ import { createCraftPreview } from './craftpreview.js';
 import {
   brightnessPercent,
   clampBrightness,
+  clampDungeonBrightness,
+  dungeonBrightnessPercent,
   writeStoredBrightness,
+  writeStoredDungeonBrightness,
+  DEFAULT_DUNGEON_BRIGHTNESS,
 } from './lighting.js';
 
 export function bindHud(root, state, world) {
@@ -2062,6 +2066,14 @@ export function bindHud(root, state, world) {
       slider.setAttribute('aria-valuenow', String(pct));
     }
     if (label) label.textContent = `${pct}%`;
+    const dungeonSlider = settingsDock?.querySelector('[data-dungeon-brightness]');
+    const dungeonLabel = settingsDock?.querySelector('[data-dungeon-brightness-label]');
+    const dungeonPct = dungeonBrightnessPercent(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
+    if (dungeonSlider) {
+      dungeonSlider.value = String(dungeonPct);
+      dungeonSlider.setAttribute('aria-valuenow', String(dungeonPct));
+    }
+    if (dungeonLabel) dungeonLabel.textContent = `${dungeonPct}%`;
   }
 
   function applyBrightnessFromSlider(raw) {
@@ -2072,8 +2084,19 @@ export function bindHud(root, state, world) {
     paintBrightness();
   }
 
+  function applyDungeonBrightnessFromSlider(raw) {
+    const next = clampDungeonBrightness(Number(raw) / 100);
+    state.dungeonBrightness = next;
+    writeStoredDungeonBrightness(next);
+    world.setDungeonBrightness?.(next);
+    paintBrightness();
+  }
+
   settingsDock?.querySelector('[data-brightness]')?.addEventListener('input', (event) => {
     applyBrightnessFromSlider(event.target.value);
+  });
+  settingsDock?.querySelector('[data-dungeon-brightness]')?.addEventListener('input', (event) => {
+    applyDungeonBrightnessFromSlider(event.target.value);
   });
   settingsDock?.querySelector('[data-cheat-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -2199,7 +2222,9 @@ export function bindHud(root, state, world) {
         setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
         setLoop(Boolean(state.music?.loop));
         writeStoredBrightness(state.brightness ?? DEFAULT_BRIGHTNESS);
+        writeStoredDungeonBrightness(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
         world.setBrightness?.(state.brightness ?? DEFAULT_BRIGHTNESS);
+        world.setDungeonBrightness?.(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
         paintCrafts();
         paintMusic();
         paintSettings();

@@ -1048,6 +1048,37 @@ body.modal-open #view {
   width: 100%;
 }
 
+#boot-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  background: #050403;
+  color: #e6d3b2;
+  font: 600 0.95rem Georgia, serif;
+}
+
+#boot-cover[hidden] {
+  display: none;
+}
+
+.boot-track {
+  width: min(22rem, 72vw);
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid #8a6a3b;
+  background: #1a140e;
+}
+
+.boot-bar {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(#f0d27a, #c49a48);
+}
+
 [data-look-open] {
   width: 100%;
   margin: 6px 0 12px;

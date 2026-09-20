@@ -18,6 +18,10 @@
   </head>
   <body>
     <canvas id="view" aria-label="Rune Craft shop floor"></canvas>
+    <div id="boot-cover" role="status" aria-live="polite">
+      <p data-boot-label>Loading models…</p>
+      <div class="boot-track"><div class="boot-bar" data-boot-bar></div></div>
+    </div>
 
     <aside id="save-bar" aria-label="Save and load">
       <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
@@ -301,7 +305,13 @@
         <input type="range" data-brightness min="50" max="150" value="150" step="5" aria-valuemin="50" aria-valuemax="150" aria-valuenow="150" aria-label="Scene brightness" />
         <span data-brightness-label>150%</span>
       </label>
-      <p class="meta">Overall shop lighting. New shops start at 150% (slider max). The dungeon stays a bit darker at high values so it does not wash out.</p>
+      <p class="meta">Shop and outdoor lighting. New shops start at 150% (slider max).</p>
+      <label class="settings-bright">
+        Dungeon brightness
+        <input type="range" data-dungeon-brightness min="0" max="150" value="150" step="5" aria-valuemin="0" aria-valuemax="150" aria-valuenow="150" aria-label="Dungeon brightness" />
+        <span data-dungeon-brightness-label>150%</span>
+      </label>
+      <p class="meta">Cave lighting only. 100% is the dungeon baseline; new shops start at 150% (slider max). Does not change the shop.</p>
       <h3>Player Avatar</h3>
       <p class="meta">Hair, shirt, legs, boots, and face hair save with the shop.</p>
       <button type="button" data-look-open>Player Avatar: Customize</button>

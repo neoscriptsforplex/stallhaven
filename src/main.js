@@ -10,6 +10,9 @@ import { normalizeImported, setBundledLooks } from './game/models.js';
 const canvas = document.querySelector('#view');
 const hudRoot = document.querySelector('#hud');
 const fallback = document.querySelector('#nowebgl');
+const bootCover = document.querySelector('#boot-cover');
+const bootBar = bootCover?.querySelector('[data-boot-bar]');
+const bootLabel = bootCover?.querySelector('[data-boot-label]');
 
 function hasWebGL() {
   try {
@@ -20,7 +23,19 @@ function hasWebGL() {
   }
 }
 
+function setBootProgress(done, total, text) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  if (bootBar) bootBar.style.width = `${pct}%`;
+  if (bootLabel) bootLabel.textContent = text ?? `Loading models… ${pct}%`;
+}
+
+function hideBootCover() {
+  if (!bootCover) return;
+  bootCover.hidden = true;
+}
+
 if (!hasWebGL()) {
+  hideBootCover();
   fallback.hidden = false;
 } else {
   bootGame();
@@ -28,15 +43,40 @@ if (!hasWebGL()) {
 
 async function bootGame() {
   const state = createState();
-    pushLog(state, 'Rune Craft is open. Craft into the chest, then trade at the counter.');
-  // Build the procedural shop first so a dumped OBJ/MTL cannot blank the canvas.
-  const world = createWorld(canvas, state, { bundledPlayer: null });
+  pushLog(state, 'Rune Craft is open. Craft into the chest, then trade at the counter.');
+  setBootProgress(0, 1, 'Loading models…');
+
+  let bundledPlayer = null;
+  let bundledLooks = {};
+  try {
+    const [player, looks] = await Promise.all([
+      loadBundledPlayerScene().catch((err) => {
+        console.warn('Bundled player skipped:', err?.message || err);
+        return null;
+      }),
+      loadBundledLooks((done, total) => {
+        setBootProgress(done, total, `Loading models… ${done} / ${total}`);
+      }),
+      loadBundledMusic().catch((err) => {
+        console.warn('Bundled music skipped:', err?.message || err);
+        return [];
+      }),
+    ]);
+    bundledPlayer = player;
+    bundledLooks = looks ?? {};
+    setBundledLooks(bundledLooks);
+    setBootProgress(1, 1, 'Building shop…');
+  } catch (err) {
+    console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
+  }
+
+  const world = createWorld(canvas, state, { bundledPlayer });
   window.stallhaven = {
     world,
     state,
     bundled: {
-      player: false,
-      looks: [],
+      player: Boolean(bundledPlayer),
+      looks: Object.keys(bundledLooks ?? {}),
     },
   };
   const hud = bindHud(hudRoot, state, world);
@@ -48,33 +88,10 @@ async function bootGame() {
     world,
     onChange: () => hud.render(performance.now() / 1000),
   });
-
-  Promise.all([
-    loadBundledPlayerScene().catch((err) => {
-      console.warn('Bundled player skipped:', err?.message || err);
-      return null;
-    }),
-    loadBundledLooks(),
-    loadBundledMusic().catch((err) => {
-      console.warn('Bundled music skipped:', err?.message || err);
-      return [];
-    }),
-  ]).then(async ([bundledPlayer, bundledLooks]) => {
-    try {
-      setBundledLooks(bundledLooks);
-      world.applyBundledDefaults?.(bundledPlayer);
-      window.stallhaven.bundled = {
-        player: Boolean(bundledPlayer),
-        looks: Object.keys(bundledLooks ?? {}),
-      };
-    } catch (err) {
-      console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
-    }
-    hud.render(performance.now() / 1000);
-    await hud.tryStartMusic?.();
-  }).catch((err) => {
-    console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
-  });
+  world.tick(0, performance.now() / 1000);
+  hud.render(performance.now() / 1000);
+  hideBootCover();
+  await hud.tryStartMusic?.();
 
   loadModels().then(async (records) => {
     for (const record of records) {

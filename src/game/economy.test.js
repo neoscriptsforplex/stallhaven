@@ -310,6 +310,7 @@ describe('save and load', () => {
     state.materialAcc.bronze = 0.4;
     state.skybox = 'black';
     state.brightness = 1.25;
+    state.dungeonBrightness = 0.8;
     state.chefHat = true;
     const saved = serializeState(state);
     const other = createState();
@@ -333,6 +334,7 @@ describe('save and load', () => {
     assert.equal(looped.music.track, 'Newbie Melody');
     assert.equal(other.skybox, 'black');
     assert.equal(other.brightness, 1.25);
+    assert.equal(other.dungeonBrightness, 0.8);
     assert.equal(other.chefHat, true);
     assert.ok(other.shopXp > 0);
     assert.equal(other.shopLevel, shopProgress(other.shopXp).level);
@@ -360,6 +362,7 @@ describe('save and load', () => {
     assert.ok(state.music.volume > 0);
     assert.equal(state.skybox, 'blue');
     assert.equal(state.brightness, 1.5);
+    assert.equal(state.dungeonBrightness, 1.5);
     assert.equal(state.chefHat, false);
     assert.equal(state.shopXp, 0);
     assert.equal(state.shopLevel, 1);

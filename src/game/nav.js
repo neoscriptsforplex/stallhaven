@@ -74,7 +74,13 @@ export function shopObstacles(shop = SHOP, furniture = null) {
   }
   if (poses.cauldron) blocks.push(blockFromPose(yaw('cauldron', poses.cauldron), 0.32, 0.32));
   if (poses.furnace) blocks.push(blockFromPose(yaw('furnace', poses.furnace), 0.4, 0.36));
-  if (poses.wheel) blocks.push(blockFromPose(yaw('wheel', poses.wheel), 0.36, 0.32));
+  if (poses.wheel) {
+    blocks.push(blockFromPose(
+      yaw('wheel', poses.wheel),
+      furnitureHalfSize('wheel').hw,
+      furnitureHalfSize('wheel').hd,
+    ));
+  }
   const displayPoses = poses.displays ?? [];
   const kinds = furniture?.displayKinds;
   const removed = furniture?.displayRemoved;

@@ -289,12 +289,19 @@ export async function loadBundledPropScene(folder) {
   throw lastErr ?? new Error(`Missing bundled ${folder} model.`);
 }
 
-export async function loadBundledLooks() {
+export async function loadBundledLooks(onProgress) {
   await resolveBundledModelRoot();
+  const total = BUNDLED_PROP_FOLDERS.length;
+  let done = 0;
   const entries = await Promise.all(BUNDLED_PROP_FOLDERS.map(async ({ id, folder }) => {
     try {
-      return [id, await loadBundledPropScene(folder)];
+      const scene = await loadBundledPropScene(folder);
+      done += 1;
+      onProgress?.(done, total, id);
+      return [id, scene];
     } catch (err) {
+      done += 1;
+      onProgress?.(done, total, id);
       if (err?.code !== 'MISSING_MODEL') {
         console.warn(`Bundled ${id} model skipped:`, err?.message || err);
       }

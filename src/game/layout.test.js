@@ -95,6 +95,8 @@ describe('layout numbers', () => {
   });
 
   it('yaws the chest 180° toward the front-door wall, and range/furnace −90° at start only', () => {
+    // Gameplay yaw still faces the door. The bundled chest dump is pitched −90°
+    // around X (clockwise) in wrapBundledProp so the lid stands correctly.
     assert.ok(Math.abs(FURNITURE_START_YAW.chest - Math.PI) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.range - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.furnace - (-Math.PI / 2)) < 1e-9);

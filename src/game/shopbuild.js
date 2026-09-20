@@ -273,16 +273,27 @@ export function buildTorch() {
   return buildProceduralTorch();
 }
 
+function localPointAtWorld(mesh, worldPoint) {
+  mesh.updateMatrixWorld(true);
+  return mesh.worldToLocal(worldPoint.clone());
+}
+
 function attachTorchFx(mesh) {
+  mesh.updateMatrixWorld(true);
   const box = measureVisibleBox(mesh);
-  const tipY = Number.isFinite(box.max.y) ? box.max.y : 0.42;
+  const tipWorld = new THREE.Vector3(
+    (box.min.x + box.max.x) / 2,
+    (Number.isFinite(box.max.y) ? box.max.y : 0.42) + 0.04,
+    (box.min.z + box.max.z) / 2,
+  );
+  const tipLocal = localPointAtWorld(mesh, tipWorld);
   const flame = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 7), flameMat());
   flame.name = 'torch-flame';
-  flame.position.y = tipY + 0.04;
+  flame.position.copy(tipLocal);
   mesh.add(flame);
   const glow = new THREE.PointLight(0xff9a3a, 1.15, 4.5, 2);
   glow.name = 'torch-glow';
-  glow.position.y = tipY + 0.02;
+  glow.position.copy(localPointAtWorld(mesh, tipWorld.clone().setY(tipWorld.y + 0.02)));
   mesh.add(glow);
 }
 
@@ -296,10 +307,12 @@ function buildProceduralTorch() {
   wrap.position.y = 0.3;
   group.add(wrap);
   const flame = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 7), flameMat()));
+  flame.name = 'torch-flame';
   flame.position.y = 0.42;
   group.add(flame);
   const glow = new THREE.PointLight(0xff9a3a, 1.15, 4.5, 2);
-  glow.position.y = 0.46;
+  glow.name = 'torch-glow';
+  glow.position.y = 0.5;
   group.add(glow);
   return group;
 }
@@ -1666,7 +1679,7 @@ export const DUNGEON_BOULDERS = [
   { id: 'steel', materialId: 'steel', name: 'Steel Ore', x: 4.05, z: -1.5, rot: 0.8, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.steel },
   { id: 'mithril', materialId: 'mithril', name: 'Mithril Ore', x: 4.05, z: 2.15, rot: -0.6, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.mithril },
   { id: 'adamant', materialId: 'adamant', name: 'Adamant Ore', x: -1.5, z: 3.15, rot: 1.1, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.adamant },
-  { id: 'runite', materialId: 'runite', name: 'Runite Ore', x: -4.05, z: 1.7, rot: 0.2, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.runite },
+  { id: 'runite', materialId: 'runite', name: 'Runite', x: -4.05, z: 1.7, rot: 0.2, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.runite },
   { id: 'dragon', materialId: 'dragon', name: 'Dragon Ore', x: -4.05, z: -1.35, rot: -0.9, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.dragon },
 ];
 

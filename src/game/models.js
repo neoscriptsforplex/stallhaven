@@ -2064,7 +2064,12 @@ export function buildChest() {
   const bundled = getBundledLook('chest');
   if (bundled) {
     const target = buildProceduralChest();
-    const fitted = wrapBundledProp(bundled, target, { name: 'chest', fit: 'height', label: 'Chest' });
+    const fitted = wrapBundledProp(bundled, target, {
+      name: 'chest',
+      fit: 'height',
+      label: 'Chest',
+      rotateX: -Math.PI / 2,
+    });
     fitted.userData.lid = fitted.userData.lid ?? null;
     sitVisibleOnY(fitted, SHOP_FURNITURE_FLOOR_Y);
     const root = new THREE.Group();

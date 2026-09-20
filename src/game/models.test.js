@@ -610,6 +610,14 @@ describe('bundled prop swaps', () => {
       assert.ok(mounts.length >= 8);
       for (const mount of mounts) {
         assert.ok(Math.abs(mount.rotation.z) < 0.05, `torch should stay upright, z=${mount.rotation.z}`);
+        const glow = mount.getObjectByName('torch-glow');
+        assert.ok(glow, 'torch-glow');
+        mount.updateMatrixWorld(true);
+        const box = measureVisibleBox(mount);
+        const tip = glow.getWorldPosition(new THREE.Vector3());
+        const mid = (box.min.y + box.max.y) / 2;
+        assert.ok(tip.y > mid, `glow should sit at the flame tip, y=${tip.y} mid=${mid}`);
+        assert.ok(Math.abs(tip.y - box.max.y) < 0.16, `glow should be at the top, y=${tip.y} max=${box.max.y}`);
       }
       const origin = [];
       shop.traverse((child) => {
@@ -784,9 +792,43 @@ describe('bundled prop swaps', () => {
       assert.ok(steelPick >= 1);
       const spot = DUNGEON_BOULDERS.find((item) => item.id === 'steel');
       assert.equal(spot?.name, 'Steel Ore');
-      assert.equal(DUNGEON_BOULDERS.find((item) => item.id === 'runite')?.name, 'Runite Ore');
+      assert.equal(DUNGEON_BOULDERS.find((item) => item.id === 'runite')?.name, 'Runite');
     } finally {
       setBundledLook('ore-steel', null);
+    }
+  });
+
+  it('fits a Mithril-labelled rune-rocks dump as Runite and keeps that display name', async () => {
+    const objText = readFileSync(join(modelsRoot, 'dungeon-rocks/rune-rocks/rune-rocks.obj'), 'utf8');
+    assert.match(objText, /Mithril rocks/i);
+    const target = buildDungeon().boulders.find((item) => item.name === 'boulder-runite');
+    assert.ok(target);
+    const want = measureVisibleBox(target.children.find((child) => child.name === 'ore-runite')).getSize(new THREE.Vector3());
+    const runite = await loadFolder('dungeon-rocks/rune-rocks');
+    setBundledLook('ore-runite', runite);
+    try {
+      const built = buildDungeon();
+      const names = [];
+      let runitePick = 0;
+      built.root.traverse((child) => {
+        if (child.name) names.push(child.name);
+        if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'runite') runitePick += 1;
+      });
+      assert.ok(names.includes('ore-runite'));
+      assert.ok(runitePick >= 1);
+      const spot = DUNGEON_BOULDERS.find((item) => item.id === 'runite');
+      assert.equal(spot?.name, 'Runite');
+      assert.notEqual(spot?.name, 'Rune Ore');
+      const visual = built.boulders.find((item) => item.name === 'boulder-runite')?.children.find((child) => child.name === 'ore-runite');
+      assert.ok(visual);
+      assertUniform(visual);
+      const got = measureVisibleBox(visual).getSize(new THREE.Vector3());
+      assert.ok(
+        Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12,
+        `runite size ${Math.max(got.x, got.y, got.z)} vs ${Math.max(want.x, want.y, want.z)}`,
+      );
+    } finally {
+      setBundledLook('ore-runite', null);
     }
   });
 
@@ -841,6 +883,7 @@ describe('bundled prop swaps', () => {
       steel: 'dungeon-rocks/steel-rocks',
       mithril: 'dungeon-rocks/mithril-rocks',
       adamant: 'dungeon-rocks/adamant-rocks',
+      runite: 'dungeon-rocks/rune-rocks',
       dragon: 'dungeon-rocks/dragon-rocks',
       essence: 'dungeon-rocks/essence',
     };

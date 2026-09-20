@@ -51,7 +51,9 @@ import {
   doorwayFloor,
   roomCenter,
   roomFloor,
+  roomInteriorFloor,
   roomPlaceFloor,
+  SHELF_FROM_WALL,
   ORIGIN_FLOOR,
 } from './layout.js';
 import { FLOOR, isWalkable, shopObstacles } from './nav.js';
@@ -258,10 +260,14 @@ describe('layout numbers', () => {
     assert.ok(maxX >= shop.maxX - 1e-9);
     assert.ok(minZ <= shop.minZ + 1e-9);
     assert.ok(maxZ >= shop.maxZ - 1e-9);
+    const interior = roomInteriorFloor(0, 0);
     const left = snapToFloor(shop.minX, 0, floors);
     const back = snapToFloor(0, shop.minZ, floors);
+    const front = snapToFloor(0, shop.maxZ, floors);
     assert.ok(Math.abs(left.x - shop.minX) <= 0.2 + 1e-6, `left snap ${left.x} vs wall ${shop.minX}`);
     assert.ok(Math.abs(back.z - shop.minZ) <= 0.2 + 1e-6, `back snap ${back.z} vs wall ${shop.minZ}`);
+    assert.ok(Math.abs(back.z - interior.minZ) <= 0.05 + 1e-6, `back snap ${back.z} vs interior ${interior.minZ}`);
+    assert.ok(Math.abs(front.z - interior.maxZ) <= 0.05 + 1e-6, `front snap ${front.z} vs interior ${interior.maxZ}`);
     assert.ok(left.x < ORIGIN_FLOOR.minX, 'edge cells must sit past the old inset floor');
     assert.ok(back.z < ORIGIN_FLOOR.minZ, 'edge cells must sit past the old inset floor');
   });
@@ -348,12 +354,21 @@ describe('layout numbers', () => {
   });
 
   it('snaps extra shelves to a wall grid instead of the floor', () => {
+    const interior = roomInteriorFloor(0, 0);
     const back = snapToWallGrid(0.13, -2.9, []);
-    assert.ok(Math.abs(back.z + 3.18 + 0.04) < 1e-6 || Math.abs(back.z + 3.22) < 0.08);
-    assert.ok(Math.abs(back.rot) < 1e-6);
+    const front = snapToWallGrid(0.13, 3.0, []);
     const side = snapToWallGrid(-3.5, 0.11, []);
-    assert.ok(Math.abs(side.x + 3.72 + 0.04) < 0.08 || Math.abs(side.x + 3.76) < 0.12);
+    assert.ok(Math.abs(back.z - (interior.minZ + SHELF_FROM_WALL)) < 1e-6);
+    assert.ok(Math.abs(back.rot) < 1e-6);
+    assert.ok(Math.abs(front.z - (interior.maxZ - SHELF_FROM_WALL)) < 1e-6);
+    assert.ok(Math.abs(Math.abs(front.rot) - Math.PI) < 1e-6);
+    assert.ok(Math.abs(side.x - (interior.minX + SHELF_FROM_WALL)) < 1e-6);
     assert.ok(Math.abs(Math.abs(side.rot) - Math.PI / 2) < 1e-6);
+    for (const id of ['shelf-left', 'shelf-right', 'shelf-center']) {
+      const spot = SHOP.displays.find((d) => d.id === id);
+      assert.ok(spot, id);
+      assert.ok(Math.abs(spot.z - back.z) < 1e-9, `${id} should sit on the back-wall mount`);
+    }
   });
 
   it('lists furnace and range as free upgrade stations and shelves in the furniture shop', () => {

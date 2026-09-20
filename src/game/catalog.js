@@ -146,8 +146,8 @@ export const METALS = [
 ];
 
 export const DHIDE = [
-  { id: 'blue', name: 'Blue', tint: 0x2a4a8a },
   { id: 'green', name: 'Green', tint: 0x2d6a32 },
+  { id: 'blue', name: 'Blue', tint: 0x2a4a8a },
   { id: 'red', name: 'Red', tint: 0x8a2424 },
   { id: 'black', name: 'Black', tint: 0x1c1c1c },
 ];
@@ -774,7 +774,7 @@ export function pickPilgrimCiv(rand = Math.random) {
 export const CUSTOMERS = {
   pilgrim: {
     id: 'pilgrim',
-    name: 'Pilgrim',
+    name: 'Adventurer',
     combatClass: null,
     prefers: [
       ...FOOD_LINE.map((food) => food.id),
@@ -792,7 +792,7 @@ export const CUSTOMERS = {
   },
   mercenary: {
     id: 'mercenary',
-    name: 'Mercenary',
+    name: 'Guard',
     combatClass: 'melee',
     prefers: Object.values(RECIPES)
       .filter((recipe) => (
@@ -830,7 +830,7 @@ export const CUSTOMERS = {
   },
   hedgemage: {
     id: 'hedgemage',
-    name: 'Hedge Mage',
+    name: 'Wizard',
     combatClass: 'magic',
     prefers: Object.values(RECIPES)
       .filter((recipe) => recipe.combatClass === 'magic' || ['magic_potion', 'prayer_potion'].includes(recipe.id))
@@ -874,11 +874,11 @@ export const SHOP = {
   displays: [
     { id: 'left-front', name: 'Left Front Table', x: -2.95, z: 2.08, kind: 'table' },
     { id: 'right-front', name: 'Right Front Table', x: 2.95, z: 2.08, kind: 'table' },
-    { id: 'shelf-left', name: 'Left Wall Shelf', x: -2.48, z: -3.22, kind: 'shelf' },
-    { id: 'shelf-right', name: 'Right Wall Shelf', x: 2.48, z: -3.22, kind: 'shelf' },
+    { id: 'shelf-left', name: 'Left Wall Shelf', x: -2.48, z: -3.11, kind: 'shelf' },
+    { id: 'shelf-right', name: 'Right Wall Shelf', x: 2.48, z: -3.11, kind: 'shelf' },
     { id: 'stand-left', name: 'Left Armour Stand', x: -1.58, z: 2.68, kind: 'stand' },
     { id: 'stand-right', name: 'Right Armour Stand', x: 1.58, z: 2.68, kind: 'stand' },
-    { id: 'shelf-center', name: 'Back Wall Shelf', x: 0, z: -3.22, kind: 'shelf' },
+    { id: 'shelf-center', name: 'Back Wall Shelf', x: 0, z: -3.11, kind: 'shelf' },
   ],
   cameraStart: { x: -0.15, y: 3.35, z: 2.85 },
   cameraTarget: { x: -0.85, y: 0.95, z: -1.35 },

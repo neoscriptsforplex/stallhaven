@@ -252,11 +252,11 @@ describe('unlock lines', () => {
     assert.equal(unlockNeed(6), 70);
   });
 
-  it('keeps bronze, staff, blue d hide, and bread unlocked on a new shop', () => {
+  it('keeps bronze, staff, green d hide, and bread unlocked on a new shop', () => {
     const state = createState();
     assert.equal(isUnlocked(state, 'bronze_sword'), true);
     assert.equal(isUnlocked(state, 'staff'), true);
-    assert.equal(isUnlocked(state, 'blue_dhide_body'), true);
+    assert.equal(isUnlocked(state, 'green_dhide_body'), true);
     assert.equal(isUnlocked(state, 'bread'), false);
     placeStation(state, 'range');
     assert.equal(isUnlocked(state, 'bread'), true);
@@ -268,7 +268,7 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
     assert.equal(isUnlocked(state, 'mystic_staff'), false);
-    assert.equal(isUnlocked(state, 'green_dhide_body'), false);
+    assert.equal(isUnlocked(state, 'blue_dhide_body'), false);
     assert.equal(isUnlocked(state, 'pizza'), false);
     assert.equal(isUnlocked(state, 'salmon'), false);
     assert.equal(isUnlocked(state, 'cake'), false);
@@ -519,6 +519,11 @@ describe('catalog', () => {
     assert.equal(recipes.filter((r) => r.category === 'rune').length, 4);
     assert.equal(recipes.filter((r) => r.combatClass === 'tools').length, 14);
     assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 20);
+    assert.equal(RECIPES.green_dhide_coif.name, "Green D'hide Coif");
+    assert.equal(RECIPES.green_dhide_body.previousId, null);
+    assert.equal(RECIPES.blue_dhide_body.previousId, 'green_dhide_body');
+    assert.equal(RECIPES.green_dhide_body.tier, 1);
+    assert.equal(RECIPES.blue_dhide_body.tier, 2);
     assert.equal(RECIPES.blue_dhide_coif.name, "Blue D'hide Coif");
     assert.equal(RECIPES.black_dhide_coif.slot, 'helm');
     assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
@@ -1009,12 +1014,12 @@ describe('build furniture', () => {
     assert.equal(canBuyFurniture(state, 'shelf'), false);
     state.gold = 500;
     assert.equal(canBuyFurniture(state, 'shelf'), true);
-    assert.equal(buyFurniture(state, 'shelf', { x: 0, z: -3.22, rot: 0 }), true);
+    assert.equal(buyFurniture(state, 'shelf', { x: 0, z: -3.11, rot: 0 }), true);
     assert.equal(state.gold, 0);
     assert.equal(state.boughtFurniture.shelf, 1);
     assert.equal(state.displays.at(-1).kind, 'shelf');
     state.gold = 1500;
-    assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.22, rot: 0 }), true);
+    assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.11, rot: 0 }), true);
     assert.equal(state.gold, 0);
     assert.equal(state.boughtFurniture.shelf, 2);
     const saved = serializeState(state);
@@ -1035,12 +1040,12 @@ describe('build furniture', () => {
     assert.equal(state.chest.bread, 1);
     assert.equal(nextFurnitureCost(state, 'shelf'), 0);
     assert.equal(canBuyFurniture(state, 'shelf'), true);
-    assert.equal(buyFurniture(state, 'shelf', { x: 0, z: -3.22, rot: 0 }), true);
+    assert.equal(buyFurniture(state, 'shelf', { x: 0, z: -3.11, rot: 0 }), true);
     assert.equal(state.boughtFurniture.shelf, 0);
     assert.equal(state.displays.at(-1).bought, false);
     assert.equal(nextFurnitureCost(state, 'shelf'), 500);
     state.gold = 500;
-    assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.22, rot: 0 }), true);
+    assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.11, rot: 0 }), true);
     assert.equal(state.gold, 0);
     assert.equal(state.boughtFurniture.shelf, 1);
     const extraIndex = state.displays.length - 1;
@@ -1588,6 +1593,9 @@ describe('customer look packs', () => {
     assert.equal(CUSTOMERS.ranger.look, 'ranger');
     assert.equal(CUSTOMERS.mercenary.look, 'mercenary');
     assert.equal(CUSTOMERS.pilgrim.look, 'pilgrim');
+    assert.equal(CUSTOMERS.pilgrim.name, 'Adventurer');
+    assert.equal(CUSTOMERS.mercenary.name, 'Guard');
+    assert.equal(CUSTOMERS.hedgemage.name, 'Wizard');
   });
 });
 

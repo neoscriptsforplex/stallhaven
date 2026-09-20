@@ -81,8 +81,13 @@ export const FURNITURE_SHOP = [
   { type: 'mannequin', kind: 'stand', label: 'Mannequin' },
   { type: 'shelf', kind: 'shelf', label: 'Shelf' },
 ];
-/** How far a wall shelf sits past the floor edge, toward the wall. */
+/** How far a wall shelf sits past the walk-floor edge, toward the wall. */
 export const SHELF_WALL_OUTSET = 0.04;
+/**
+ * Depth from an interior wall face to a flush wall-shelf origin.
+ * Matches the existing side-wall sit (walk-floor edge + SHELF_WALL_OUTSET).
+ */
+export const SHELF_FROM_WALL = 0.26;
 export const TREE_BED_CLEAR = 1.7;
 
 export const GRASS_PAD = 9;
@@ -154,8 +159,8 @@ export function roomFloor(gx, gz) {
   };
 }
 
-/** Interior wall faces of a room — the wooden floor reaches here. */
-export function roomPlaceFloor(gx = 0, gz = 0) {
+/** True interior wall faces of a room (stone inner plane, before snap expansion). */
+export function roomInteriorFloor(gx = 0, gz = 0) {
   const c = roomCenter(gx, gz);
   const inset = WALL_THICK / 2;
   return {
@@ -164,6 +169,31 @@ export function roomPlaceFloor(gx = 0, gz = 0) {
     minZ: c.z - ROOM_D / 2 + inset,
     maxZ: c.z + ROOM_D / 2 - inset,
   };
+}
+
+/**
+ * If the inward 0.2 snap cell leaves a visible strip to the wall, include the
+ * next outward cell so the placement grid meets the wall the way the X sides do.
+ */
+function snapEdgeToWall(min, max, snap = FURNITURE_SNAP) {
+  const lo = Math.ceil(min / snap - 1e-9) * snap;
+  const hi = Math.floor(max / snap + 1e-9) * snap;
+  const gap = snap * 0.25;
+  return {
+    min: (lo - min > gap) ? lo - snap : min,
+    max: (max - hi > gap) ? hi + snap : max,
+  };
+}
+
+function expandRectToSnapWalls(rect, snap = FURNITURE_SNAP) {
+  const x = snapEdgeToWall(rect.minX, rect.maxX, snap);
+  const z = snapEdgeToWall(rect.minZ, rect.maxZ, snap);
+  return { minX: x.min, maxX: x.max, minZ: z.min, maxZ: z.max };
+}
+
+/** Placeable floor + snap grid, spanning to interior wall faces. */
+export function roomPlaceFloor(gx = 0, gz = 0) {
+  return expandRectToSnapWalls(roomInteriorFloor(gx, gz));
 }
 
 /** How far a room-seam walk rect overlaps each room. Must exceed 2× player radius. */
@@ -642,98 +672,53 @@ function pushWallMount(mounts, {
 export function wallShelfMounts(expansionIds = []) {
   const mounts = [];
   for (const cell of occupiedCells(expansionIds)) {
-    const floor = roomFloor(cell.gx, cell.gz);
+    const interior = roomInteriorFloor(cell.gx, cell.gz);
     const neigh = neighborsOf(cell.gx, cell.gz, expansionIds);
-    const midX = (floor.minX + floor.maxX) / 2;
-    const midZ = (floor.minZ + floor.maxZ) / 2;
-    if (!neigh.back) {
-      pushWallMount(mounts, {
+    const midX = (interior.minX + interior.maxX) / 2;
+    const midZ = (interior.minZ + interior.maxZ) / 2;
+    const walls = [
+      {
         wall: 'back',
         axis: 'x',
         along0: midX,
-        minAlong: floor.minX + SHELF_WALL_END_PAD,
-        maxAlong: floor.maxX - SHELF_WALL_END_PAD,
-        z: floor.minZ - SHELF_WALL_OUTSET,
+        minAlong: interior.minX + SHELF_WALL_END_PAD,
+        maxAlong: interior.maxX - SHELF_WALL_END_PAD,
+        z: interior.minZ + SHELF_FROM_WALL,
         rot: 0,
-      });
-    } else {
-      pushWallMount(mounts, {
-        wall: 'back',
-        axis: 'x',
-        along0: midX,
-        minAlong: floor.minX + SHELF_WALL_END_PAD,
-        maxAlong: floor.maxX - SHELF_WALL_END_PAD,
-        z: floor.minZ - SHELF_WALL_OUTSET,
-        rot: 0,
-        doorAlong: midX,
-      });
-    }
-    if (!neigh.front) {
-      pushWallMount(mounts, {
+        doorAlong: neigh.back ? midX : null,
+      },
+      {
         wall: 'front',
         axis: 'x',
         along0: midX,
-        minAlong: floor.minX + SHELF_WALL_END_PAD,
-        maxAlong: floor.maxX - SHELF_WALL_END_PAD,
-        z: floor.maxZ + SHELF_WALL_OUTSET,
+        minAlong: interior.minX + SHELF_WALL_END_PAD,
+        maxAlong: interior.maxX - SHELF_WALL_END_PAD,
+        z: interior.maxZ - SHELF_FROM_WALL,
         rot: Math.PI,
-      });
-    } else {
-      pushWallMount(mounts, {
-        wall: 'front',
-        axis: 'x',
-        along0: midX,
-        minAlong: floor.minX + SHELF_WALL_END_PAD,
-        maxAlong: floor.maxX - SHELF_WALL_END_PAD,
-        z: floor.maxZ + SHELF_WALL_OUTSET,
-        rot: Math.PI,
-        doorAlong: midX,
-      });
-    }
-    if (!neigh.left) {
-      pushWallMount(mounts, {
+        doorAlong: neigh.front ? midX : null,
+      },
+      {
         wall: 'left',
         axis: 'z',
         along0: midZ,
-        minAlong: floor.minZ + SHELF_WALL_END_PAD,
-        maxAlong: floor.maxZ - SHELF_WALL_END_PAD,
-        x: floor.minX - SHELF_WALL_OUTSET,
+        minAlong: interior.minZ + SHELF_WALL_END_PAD,
+        maxAlong: interior.maxZ - SHELF_WALL_END_PAD,
+        x: interior.minX + SHELF_FROM_WALL,
         rot: Math.PI / 2,
-      });
-    } else {
-      pushWallMount(mounts, {
-        wall: 'left',
-        axis: 'z',
-        along0: midZ,
-        minAlong: floor.minZ + SHELF_WALL_END_PAD,
-        maxAlong: floor.maxZ - SHELF_WALL_END_PAD,
-        x: floor.minX - SHELF_WALL_OUTSET,
-        rot: Math.PI / 2,
-        doorAlong: midZ,
-      });
-    }
-    if (!neigh.right) {
-      pushWallMount(mounts, {
+        doorAlong: neigh.left ? midZ : null,
+      },
+      {
         wall: 'right',
         axis: 'z',
         along0: midZ,
-        minAlong: floor.minZ + SHELF_WALL_END_PAD,
-        maxAlong: floor.maxZ - SHELF_WALL_END_PAD,
-        x: floor.maxX + SHELF_WALL_OUTSET,
+        minAlong: interior.minZ + SHELF_WALL_END_PAD,
+        maxAlong: interior.maxZ - SHELF_WALL_END_PAD,
+        x: interior.maxX - SHELF_FROM_WALL,
         rot: -Math.PI / 2,
-      });
-    } else {
-      pushWallMount(mounts, {
-        wall: 'right',
-        axis: 'z',
-        along0: midZ,
-        minAlong: floor.minZ + SHELF_WALL_END_PAD,
-        maxAlong: floor.maxZ - SHELF_WALL_END_PAD,
-        x: floor.maxX + SHELF_WALL_OUTSET,
-        rot: -Math.PI / 2,
-        doorAlong: midZ,
-      });
-    }
+        doorAlong: neigh.right ? midZ : null,
+      },
+    ];
+    for (const spec of walls) pushWallMount(mounts, spec);
   }
   return mounts;
 }

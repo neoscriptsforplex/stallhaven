@@ -224,6 +224,32 @@ function cellWorld(ix, iz) {
   return { x: ix * CELL, z: iz * CELL };
 }
 
+/** A* cells must be walkable; a walkable world point can still round onto a blocked cell. */
+function toWalkableCell(x, z, obstacles, radius, floors) {
+  const [ix0, iz0] = toCell(x, z);
+  if (isWalkable(ix0 * CELL, iz0 * CELL, obstacles, radius, floors)) return [ix0, iz0];
+  let best = null;
+  let bestD = Infinity;
+  for (let ring = 1; ring <= 4; ring += 1) {
+    for (let dx = -ring; dx <= ring; dx += 1) {
+      for (let dz = -ring; dz <= ring; dz += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== ring) continue;
+        const ix = ix0 + dx;
+        const iz = iz0 + dz;
+        const world = cellWorld(ix, iz);
+        if (!isWalkable(world.x, world.z, obstacles, radius, floors)) continue;
+        const dist = Math.hypot(world.x - x, world.z - z);
+        if (dist < bestD) {
+          best = [ix, iz];
+          bestD = dist;
+        }
+      }
+    }
+    if (best) return best;
+  }
+  return [ix0, iz0];
+}
+
 function smoothPath(start, points, obstacles, radius, floors) {
   if (!points.length) return [];
   const out = [];
@@ -250,8 +276,8 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
   if (!goal) return [];
   if (hasLineOfSight(start, goal, obstacles, radius, floors)) return [goal];
 
-  const [sx, sz] = toCell(start.x, start.z);
-  const [gx, gz] = toCell(goal.x, goal.z);
+  const [sx, sz] = toWalkableCell(start.x, start.z, obstacles, radius, floors);
+  const [gx, gz] = toWalkableCell(goal.x, goal.z, obstacles, radius, floors);
   const startKey = `${sx},${sz}`;
   const goalKey = `${gx},${gz}`;
   const open = [{ ix: sx, iz: sz, g: 0, f: Math.hypot(gx - sx, gz - sz) }];

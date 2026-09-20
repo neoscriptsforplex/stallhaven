@@ -63,7 +63,7 @@ Robes: Magic, Mystic, Battlemage, Lunar, Ancient. Each set has Hat, Robe Top, Ro
 
 ### Tools
 
-Anvil **Tools** tab: **Hatchet** and **Pickaxe**, same seven metals (Bronze through Dragon, including **Runite**). Each craft uses 1 matching **bar**. Mercenaries and rangers may ask for them. They display on tables, not armour stands.
+Anvil **Tools** tab: **Hatchet** and **Pickaxe**, same seven metals (Bronze through Dragon, including **Runite**). Each craft uses 1 matching **bar**. Guards and rangers may ask for them. They display on tables, not armour stands.
 
 ### Range
 
@@ -71,13 +71,13 @@ Same seven metals for Shortbow, Longbow, Crossbow, Knives, Thrown Axe.
 
 Bows and crossbows also need **Bow String** (spun from Flax) plus logs.
 
-**Ammo** (Ranged sub-tab): metal **Arrows** (Bronze through Dragon; Runite Arrows match Runite Bar). One craft makes **20** arrows for 1 matching bar + 1 Logs. **Cannonballs** are a single Steel Bar recipe (not a metal ladder) that also makes 20, sellable to rangers and mercenaries.
+**Ammo** (Ranged sub-tab): metal **Arrows** (Bronze through Dragon; Runite Arrows match Runite Bar). One craft makes **20** arrows for 1 matching bar + 1 Logs. **Cannonballs** are a single Steel Bar recipe (not a metal ladder) that also makes 20, sellable to rangers and guards.
 
-Dragonhide armour in Blue, Green, Red, Black: Body, Chaps, Vambraces, Boots.
+Dragonhide armour in Green, Blue, Red, Black: Body, Chaps, Vambraces, Boots.
 
 ### Runes
 
-Anvil **Magic → Runes**. Grey discs with coloured marks, crafted from **Essence**. Unlock Air → Earth → Water → Fire on the same 20 / 30 / +10 ladder. Air starts unlocked and sells for **20g**; Earth 28g, Water 36g, Fire 48g. Hedge mages and other travelers may ask for them. They display on tables and wall shelves.
+Anvil **Magic → Runes**. Grey discs with coloured marks, crafted from **Essence**. Unlock Air → Earth → Water → Fire on the same 20 / 30 / +10 ladder. Air starts unlocked and sells for **20g**; Earth 28g, Water 36g, Fire 48g. Wizards and other travelers may ask for them. They display on tables and wall shelves.
 
 ### Food
 

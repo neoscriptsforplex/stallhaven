@@ -1104,7 +1104,7 @@ export function applyState(state, data) {
     if (savedFurnitureDisplays) {
       savedFurnitureDisplays = [
         ...savedFurnitureDisplays.slice(0, OLD_DEFAULT_DISPLAYS),
-        { x: 0, z: -3.22, rot: 0 },
+        { x: 0, z: -3.11, rot: 0 },
         ...savedFurnitureDisplays.slice(OLD_DEFAULT_DISPLAYS),
       ];
     }

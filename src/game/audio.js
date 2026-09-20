@@ -37,10 +37,32 @@ let shuffle = false;
 let loopTrack = false;
 let autoplayArmed = false;
 let autoplayCancelled = false;
-const DEFAULT_AUTOPLAY_TRACK = 'Newbie Melody';
+export const DEFAULT_AUTOPLAY_TRACK = 'Newbie Melody';
+
+function makeAudioElement(url, { preload = 'auto' } = {}) {
+  const audioEl = new Audio(url);
+  audioEl.preload = preload;
+  audioEl.playsInline = true;
+  audioEl.setAttribute?.('playsinline', '');
+  audioEl.setAttribute?.('webkit-playsinline', '');
+  return audioEl;
+}
+
+async function resumeAudioContext() {
+  const ac = audio();
+  if (ac?.state === 'suspended') {
+    try {
+      await ac.resume();
+    } catch {
+      // Autoplay policies can keep AudioContext suspended until a gesture.
+    }
+  }
+  return ac;
+}
 
 function audio() {
   if (ctx) return ctx;
+  if (typeof window === 'undefined') return null;
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
   ctx = new AC();
@@ -175,9 +197,13 @@ export async function playTrackAt(index) {
   if (index < 0 || index >= playlist.length) return false;
   stopCurrent();
   bindTrack(index);
+  if (!bg) return false;
+  bg.playsInline = true;
+  bg.volume = volume;
+  await resumeAudioContext();
   try {
     await bg.play();
-    return true;
+    return Boolean(bg && !bg.paused);
   } catch {
     return false;
   }
@@ -207,8 +233,7 @@ export async function addMusicFiles(files) {
       continue;
     }
     const url = URL.createObjectURL(file);
-    const audioEl = new Audio(url);
-    audioEl.preload = 'auto';
+    const audioEl = makeAudioElement(url, { preload: 'auto' });
     const track = {
       id: `track-${serial}`,
       name: file.name || `Track ${serial}`,
@@ -266,9 +291,13 @@ export async function playMusic() {
     return playTrackAt(0);
   }
   bindTrack(currentIndex);
+  if (!bg) return false;
+  bg.playsInline = true;
+  bg.volume = volume;
+  await resumeAudioContext();
   try {
     await bg.play();
-    return true;
+    return Boolean(bg && !bg.paused);
   } catch {
     return false;
   }
@@ -317,8 +346,7 @@ function bundledMusicBases() {
 }
 
 export async function addMusicUrl(url, name, { revoke = false, autoplay = false } = {}) {
-  const audioEl = new Audio(url);
-  audioEl.preload = 'metadata';
+  const audioEl = makeAudioElement(url, { preload: 'metadata' });
   const track = {
     id: `track-${serial}`,
     name: name || `Track ${serial}`,
@@ -363,18 +391,18 @@ function playlistIndexByName(name) {
 function armGestureAutoplay(index) {
   if (autoplayArmed || typeof window === 'undefined') return;
   autoplayArmed = true;
-  const resume = async () => {
+  const resume = async (event) => {
     window.removeEventListener('pointerdown', resume);
     window.removeEventListener('keydown', resume);
     window.removeEventListener('touchstart', resume);
     if (autoplayCancelled) return;
-    const ac = audio();
-    if (ac?.state === 'suspended') await ac.resume().catch(() => {});
+    await resumeAudioContext();
     await playTrackAt(index).catch(() => {});
+    void event;
   };
-  window.addEventListener('pointerdown', resume, { once: true });
-  window.addEventListener('keydown', resume, { once: true });
-  window.addEventListener('touchstart', resume, { once: true });
+  window.addEventListener('pointerdown', resume, { once: true, capture: true });
+  window.addEventListener('keydown', resume, { once: true, capture: true });
+  window.addEventListener('touchstart', resume, { once: true, capture: true, passive: true });
 }
 
 /** Start bundled/playlist music on boot. Skips when muted; arms a first-gesture retry if autoplay is blocked. */
@@ -386,14 +414,28 @@ export async function startMusicOnLoad({
 } = {}) {
   if (nextVolume != null) setMusicVolume(nextVolume);
   setLoop(loop);
-  if (muted || getMusicVolume() <= 0 || !playlist.length) {
-    return { played: false, reason: 'muted' };
+  if (!playlist.length) {
+    return { played: false, reason: 'empty' };
+  }
+  if (muted || getMusicVolume() <= 0) {
+    return { played: false, reason: 'muted', track: track || DEFAULT_AUTOPLAY_TRACK };
   }
   autoplayCancelled = false;
+  autoplayArmed = false;
   let index = playlistIndexByName(track);
   if (index < 0) index = playlistIndexByName(DEFAULT_AUTOPLAY_TRACK);
   if (index < 0) index = 0;
   const played = await playTrackAt(index);
   if (!played) armGestureAutoplay(index);
-  return { played, track: getMusicTrackName() };
+  return { played, track: getMusicTrackName(), reason: played ? 'playing' : 'gesture' };
+}
+
+/** Test-only: drop playlist/autoplay state between cases. */
+export function resetMusicForTests() {
+  autoplayArmed = false;
+  autoplayCancelled = false;
+  clearMusic();
+  volume = 0.75;
+  shuffle = false;
+  loopTrack = false;
 }

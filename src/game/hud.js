@@ -2395,10 +2395,12 @@ export function bindHud(root, state, world) {
   }
 
   async function tryStartMusic() {
+    const savedVolume = state.music?.volume ?? DEFAULT_MUSIC_VOLUME;
+    const savedTrack = state.music?.track ?? '';
     const result = await startMusicOnLoad({
-      volume: state.music?.volume ?? DEFAULT_MUSIC_VOLUME,
-      muted: (state.music?.volume ?? DEFAULT_MUSIC_VOLUME) <= 0,
-      track: state.music?.track ?? '',
+      volume: savedVolume,
+      muted: savedVolume <= 0,
+      track: savedTrack,
       loop: Boolean(state.music?.loop),
     });
     persistMusic();

@@ -719,6 +719,8 @@ describe('bundled prop swaps', () => {
       chest.updateMatrixWorld(true);
       const box = measureVisibleBox(chest);
       assert.ok(Math.abs(box.min.y - SHOP_FURNITURE_FLOOR_Y) < 0.03, `chest should sit on the floor, minY=${box.min.y}`);
+      assert.ok(Math.abs(chest.rotation.x) < 1e-8, 'chest stays unpitched');
+      assert.ok(Math.abs(chest.rotation.z) < 1e-8, 'chest stays unrolled');
     } finally {
       setBundledLook('chest', null);
     }

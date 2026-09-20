@@ -106,6 +106,19 @@ function drawDot(ctx, pt, r, fill, stroke) {
   }
 }
 
+/** Outdoor trapdoor / dungeon entrance. Same visual weight as the fountain circle. */
+export const TRAPDOOR_MARKER_RADIUS = 5;
+
+function drawTrapdoorMarker(ctx, pt) {
+  const r = TRAPDOOR_MARKER_RADIUS;
+  drawDot(ctx, pt, r, '#5a3a22', '#d8c4a0');
+  ctx.fillStyle = '#7a5530';
+  ctx.fillRect(pt.x - r * 0.45, pt.y - r * 0.45, r * 0.9, r * 0.9);
+  ctx.strokeStyle = '#3a2414';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(pt.x - r * 0.45, pt.y - r * 0.45, r * 0.9, r * 0.9);
+}
+
 export function drawMinimap(ctx, snap) {
   const size = ctx.canvas.width;
   const bounds = snap.bounds ?? shopMapBounds(snap.expansions ?? []);
@@ -140,9 +153,7 @@ export function drawMinimap(ctx, snap) {
 
   const fountain = toMap(FOUNTAIN.x, FOUNTAIN.z);
   drawDot(ctx, fountain, 5, '#6a8aa8', '#d8e8f0');
-  const hatch = toMap(TRAPDOOR.x, TRAPDOOR.z);
-  ctx.fillStyle = '#5a3a22';
-  ctx.fillRect(hatch.x - 3, hatch.y - 3, 6, 6);
+  drawTrapdoorMarker(ctx, toMap(TRAPDOOR.x, TRAPDOOR.z));
 
   const counter = toMap(SHOP.counter.x, SHOP.counter.z);
   ctx.fillStyle = '#6a4220';

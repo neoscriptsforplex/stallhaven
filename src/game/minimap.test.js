@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import {
   MAP_ZOOM_MAX,
   MAP_ZOOM_MIN,
+  TRAPDOOR_MARKER_RADIUS,
   clampMapZoom,
   mapToWorld,
   shopMapBounds,
   worldToMap,
 } from './minimap.js';
+import { FOUNTAIN, TRAPDOOR } from './layout.js';
 
 describe('minimap', () => {
   it('round-trips world points through canvas pixels, including yaw and zoom', () => {
@@ -44,5 +46,17 @@ describe('minimap', () => {
     assert.equal(clampMapZoom(0), MAP_ZOOM_MIN);
     assert.equal(clampMapZoom(99), MAP_ZOOM_MAX);
     assert.equal(clampMapZoom(Number.NaN), 1);
+  });
+
+  it('places a fountain-sized trapdoor marker at the outdoor hatch', () => {
+    const bounds = shopMapBounds([]);
+    const size = 196;
+    const hatch = worldToMap(TRAPDOOR.x, TRAPDOOR.z, bounds, size, 0);
+    const fountain = worldToMap(FOUNTAIN.x, FOUNTAIN.z, bounds, size, 0);
+    const back = mapToWorld(hatch.x, hatch.y, bounds, size, 0);
+    assert.ok(Math.abs(back.x - TRAPDOOR.x) < 1e-6);
+    assert.ok(Math.abs(back.z - TRAPDOOR.z) < 1e-6);
+    assert.equal(TRAPDOOR_MARKER_RADIUS, 5);
+    assert.ok(Math.hypot(hatch.x - fountain.x, hatch.y - fountain.y) > 8);
   });
 });

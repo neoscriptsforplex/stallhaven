@@ -2068,7 +2068,6 @@ export function buildChest() {
       name: 'chest',
       fit: 'height',
       label: 'Chest',
-      rotateX: -Math.PI / 2,
     });
     fitted.userData.lid = fitted.userData.lid ?? null;
     sitVisibleOnY(fitted, SHOP_FURNITURE_FLOOR_Y);

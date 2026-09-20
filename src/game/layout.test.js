@@ -98,15 +98,14 @@ describe('layout numbers', () => {
     assert.equal(occupiedCells(['left', 'back']).length, 3);
   });
 
-  it('yaws the chest 180° toward the front-door wall, and range/furnace −90° at start only', () => {
-    // Gameplay yaw still faces the door. The bundled chest dump is pitched −90°
-    // around X (clockwise) in wrapBundledProp so the lid stands correctly.
-    assert.ok(Math.abs(FURNITURE_START_YAW.chest - Math.PI) < 1e-9);
+  it('yaws the chest 90° clockwise from the upright door-wall facing, and range/furnace −90° at start only', () => {
+    // Gameplay yaw still uses furniture.rot. The bundled chest stays upright (no X pitch).
+    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (Math.PI + Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.range - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.furnace - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.counter - Math.PI) < 1e-9);
     assert.equal(FURNITURE_START_YAW.anvil, undefined);
-    assert.ok(Math.abs(furnitureVisualYaw('chest', 0) - Math.PI) < 1e-9);
+    assert.ok(Math.abs(furnitureVisualYaw('chest', 0) - (Math.PI + Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('range', FURNITURE_ROT_STEP) - (-Math.PI / 2 + FURNITURE_ROT_STEP)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('furnace', 0) - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('counter', 0) - Math.PI) < 1e-9);

@@ -39,7 +39,9 @@ export const FURNITURE_FORWARD = 0;
  * Three.js Y-up: −π/2 is 90° counter-clockwise when viewed from above.
  */
 export const FURNITURE_START_YAW = {
-  chest: Math.PI,
+  // Upright sit, then +90° yaw (same axis as placeable rotate) from the
+  // previous 180° door-wall facing. No pitch/roll — the dump stays flat.
+  chest: Math.PI + Math.PI / 2,
   range: -Math.PI / 2,
   furnace: -Math.PI / 2,
   counter: Math.PI,

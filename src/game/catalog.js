@@ -862,7 +862,7 @@ export const SHOP = {
   outside: { x: 0, z: 5.55 },
   counter: { x: 0, z: -1.72 },
   keeper: { x: -0.48, z: -2.52 },
-  // Side walls stay open for doubled tables. Back wall: anvil left, chest right.
+  // Side walls keep the starter tables. Back wall: anvil left, chest right.
   // Furnace and cooking range start unplaced; Upgrade previews them on open floor.
   anvil: { x: -2.55, z: -2.22 },
   chest: { x: 2.55, z: -2.22 },
@@ -872,8 +872,8 @@ export const SHOP = {
   wheel: { x: 1.2, z: 0.8 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [
-    { id: 'left-front', name: 'Left Front Table', x: -2.32, z: 1.25, kind: 'table' },
-    { id: 'right-front', name: 'Right Front Table', x: 2.32, z: 1.25, kind: 'table' },
+    { id: 'left-front', name: 'Left Front Table', x: -2.95, z: 2.08, kind: 'table' },
+    { id: 'right-front', name: 'Right Front Table', x: 2.95, z: 2.08, kind: 'table' },
     { id: 'shelf-left', name: 'Left Wall Shelf', x: -2.48, z: -3.22, kind: 'shelf' },
     { id: 'shelf-right', name: 'Right Wall Shelf', x: 2.48, z: -3.22, kind: 'shelf' },
     { id: 'stand-left', name: 'Left Armour Stand', x: -1.58, z: 2.68, kind: 'stand' },

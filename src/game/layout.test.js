@@ -311,7 +311,7 @@ describe('layout numbers', () => {
     assert.equal(furnitureBuyCost(1), 1500);
     assert.ok(FURNITURE_SHOP.some((item) => item.type === 'shelf' && item.kind === 'shelf'));
     const table = furnitureHalfSize('table');
-    assert.ok(table.hw > 1.2);
-    assert.ok(table.hd > 0.7);
+    assert.equal(table.hw, 0.76);
+    assert.equal(table.hd, 0.51);
   });
 });

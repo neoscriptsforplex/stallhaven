@@ -139,10 +139,17 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'rune-fire', folder: 'runes/fire' },
   { id: 'ore-bronze', folder: 'dungeon-rocks/bronze-rocks' },
   { id: 'ore-iron', folder: 'dungeon-rocks/iron-rocks' },
+  { id: 'ore-steel', folder: 'dungeon-rocks/steel-rocks' },
   { id: 'ore-mithril', folder: 'dungeon-rocks/mithril-rocks' },
   { id: 'ore-adamant', folder: 'dungeon-rocks/adamant-rocks' },
   { id: 'ore-dragon', folder: 'dungeon-rocks/dragon-rocks' },
   { id: 'ore-essence', folder: 'dungeon-rocks/essence' },
+  ...recipeList()
+    .filter((recipe) => recipe.category === 'food')
+    .map((recipe) => {
+      const slug = String(recipe.id).replaceAll('_', '-');
+      return { id: `food-${slug}`, folder: `food/${slug}` };
+    }),
 ];
 
 export async function parseBundledPlayerBuffers(objBuffer, mtlBuffer) {

@@ -238,7 +238,7 @@ export function furnitureHalfSize(kind) {
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
   if (kind === 'stand') return { hw: 0.36, hd: 0.36 };
-  return { hw: 1.38, hd: 0.88 };
+  return { hw: 0.76, hd: 0.51 };
 }
 
 /** Axis-aligned footprint after start yaw + gameplay rot. */

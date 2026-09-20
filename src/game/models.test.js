@@ -25,7 +25,7 @@ import {
   updateMinePose,
   updateWalkPose,
   setBundledLook,
-  TABLE_WORLD_SCALE,
+  buildWare,
   wrapBundledProp,
   wrapImportedCharacter,
   wrapShopPlayer,
@@ -364,10 +364,12 @@ describe('bundled prop swaps', () => {
     for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
-    for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-mithril', 'ore-adamant', 'ore-dragon', 'ore-essence']) {
+    for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-dragon', 'ore-essence']) {
       assert.ok(ids.includes(id), id);
     }
-    assert.equal(ids.includes('ore-steel'), false);
+    for (const id of ['food-bread', 'food-pizza', 'food-cake', 'food-pie', 'food-fish-pie', 'food-lobster', 'food-chocolate-cake', 'food-monkfish', 'food-curry', 'food-shark', 'food-summer-pie', 'food-anglerfish']) {
+      assert.ok(ids.includes(id), id);
+    }
     assert.equal(ids.includes('ore-runite'), false);
     assert.ok(ids.includes('goblin'));
   });
@@ -725,10 +727,69 @@ describe('bundled prop swaps', () => {
     assert.equal(byId['rune-fire'], 'runes/fire');
     assert.equal(byId['ore-bronze'], 'dungeon-rocks/bronze-rocks');
     assert.equal(byId['ore-iron'], 'dungeon-rocks/iron-rocks');
+    assert.equal(byId['ore-steel'], 'dungeon-rocks/steel-rocks');
     assert.equal(byId['ore-mithril'], 'dungeon-rocks/mithril-rocks');
     assert.equal(byId['ore-adamant'], 'dungeon-rocks/adamant-rocks');
     assert.equal(byId['ore-dragon'], 'dungeon-rocks/dragon-rocks');
     assert.equal(byId['ore-essence'], 'dungeon-rocks/essence');
+    assert.equal(byId['food-bread'], 'food/bread');
+    assert.equal(byId['food-chocolate-cake'], 'food/chocolate-cake');
+    assert.equal(byId['food-fish-pie'], 'food/fish-pie');
+    assert.equal(byId['food-summer-pie'], 'food/summer-pie');
+    assert.equal(byId['ore-runite'], undefined);
+  });
+
+  it('fits bundled food dumps to the current plate size by filename slug', async () => {
+    const samples = [
+      ['bread', 'food/bread'],
+      ['chocolate_cake', 'food/chocolate-cake'],
+      ['fish_pie', 'food/fish-pie'],
+      ['pizza', 'food/pizza'],
+    ];
+    for (const [recipeId, folder] of samples) {
+      const bundled = await loadFolder(folder);
+      const lookId = `food-${recipeId.replaceAll('_', '-')}`;
+      const want = measureVisibleBox(buildWare(recipeId)).getSize(new THREE.Vector3());
+      setBundledLook(lookId, bundled);
+      try {
+        const ware = buildWare(recipeId);
+        assert.ok(ware.getObjectByName(lookId), recipeId);
+        assertUniform(ware.getObjectByName(lookId));
+        const got = measureVisibleBox(ware).getSize(new THREE.Vector3());
+        assert.ok(
+          Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.08,
+          `${recipeId} size ${Math.max(got.x, got.y, got.z)} vs ${Math.max(want.x, want.y, want.z)}`,
+        );
+      } finally {
+        setBundledLook(lookId, null);
+      }
+    }
+    const salmon = buildWare('salmon');
+    assert.equal(salmon.getObjectByName('food-salmon'), undefined);
+  });
+
+  it('fits a Tin-labelled steel-rocks dump to the current steel boulder', async () => {
+    const objText = readFileSync(join(modelsRoot, 'dungeon-rocks/steel-rocks/steel-rocks.obj'), 'utf8');
+    assert.match(objText, /Tin rocks/i);
+    const steel = await loadFolder('dungeon-rocks/steel-rocks');
+    setBundledLook('ore-steel', steel);
+    try {
+      const built = buildDungeon();
+      const names = [];
+      let steelPick = 0;
+      built.root.traverse((child) => {
+        if (child.name) names.push(child.name);
+        if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'steel') steelPick += 1;
+      });
+      assert.ok(names.includes('ore-steel'));
+      assert.equal(names.includes('ore-runite'), false);
+      assert.ok(steelPick >= 1);
+      const spot = DUNGEON_BOULDERS.find((item) => item.id === 'steel');
+      assert.equal(spot?.name, 'Steel Ore');
+      assert.equal(DUNGEON_BOULDERS.find((item) => item.id === 'runite')?.name, 'Runite Ore');
+    } finally {
+      setBundledLook('ore-steel', null);
+    }
   });
 
   it('fits nested rune dumps to the current disc size without stretch', async () => {
@@ -834,16 +895,13 @@ describe('shop props', () => {
     assert.ok(box.max.y > 1.8, `range should be 2× tall, maxY=${box.max.y}`);
   });
 
-  it('doubles shop tables uniformly and keeps them on the floor', () => {
-    assert.equal(TABLE_WORLD_SCALE, 2);
+  it('keeps shop tables at the previous size on the floor', () => {
     const table = buildDefaultTable();
-    assert.ok(Math.abs(table.scale.x - table.scale.y) < 1e-6);
-    assert.ok(Math.abs(table.scale.y - table.scale.z) < 1e-6);
     const box = measureVisibleBox(table);
     assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `table should sit on the floor, minY=${box.min.y}`);
     const size = box.getSize(new THREE.Vector3());
-    assert.ok(size.x > 2.4, `table should be 2× wide, x=${size.x}`);
-    assert.ok(size.z > 1.5, `table should be 2× deep, z=${size.z}`);
+    assert.ok(size.x > 1.2 && size.x < 1.6, `table should keep the pre-2× width, x=${size.x}`);
+    assert.ok(size.z > 0.7 && size.z < 1.1, `table should keep the pre-2× depth, z=${size.z}`);
   });
 
   it('scales the chest to 60% and keeps it on the floor', () => {

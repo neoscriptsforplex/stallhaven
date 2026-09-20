@@ -326,24 +326,12 @@ function buildProceduralCounter() {
 }
 
 export function buildDefaultTable() {
-  const target = applyTableWorldScale(buildProceduralTable());
   const bundled = getBundledLook('table');
   if (bundled) {
+    const target = buildProceduralTable();
     return wrapBundledProp(bundled, target, { name: 'table', fit: 'xz', wareY: 'top' });
   }
-  return target;
-}
-
-/** Uniform world scale vs the baked table after size-match. */
-export const TABLE_WORLD_SCALE = 2;
-
-function applyTableWorldScale(mesh) {
-  mesh.scale.multiplyScalar(TABLE_WORLD_SCALE);
-  mesh.updateMatrixWorld(true);
-  const box = measureVisibleBox(mesh);
-  if (Number.isFinite(box.min.y)) mesh.position.y -= box.min.y;
-  if (mesh.userData.wareY != null) mesh.userData.wareY *= TABLE_WORLD_SCALE;
-  return mesh;
+  return buildProceduralTable();
 }
 
 function buildProceduralTable() {
@@ -1182,24 +1170,12 @@ export function buildWare(recipeId) {
     dhide_chaps: () => addChaps(group, tint),
     dhide_vambraces: () => addVambraces(group, tint),
     dhide_boots: () => addBoots(group, tint, false),
-    bread: () => addBread(group, tint),
-    pizza: () => addPizza(group, tint),
-    cake: () => addCake(group, tint),
-    pie: () => addPie(group, tint, 0xb45a4a),
-    fish_pie: () => addPie(group, tint, 0x7a9aaa),
-    salmon: () => addFish(group, tint, 1),
-    lobster: () => addLobster(group, tint),
-    chocolate_cake: () => addCake(group, tint, 0x3a2218),
-    monkfish: () => addFish(group, tint, 1.12),
-    curry: () => addCurry(group, tint),
-    shark: () => addFish(group, tint, 1.35),
-    summer_pie: () => addPie(group, tint, 0xe8a04a),
-    anglerfish: () => addFish(group, tint, 1.22, true),
     potion: () => addPotion(group, tint),
     bar: () => addMetalBar(group, tint),
     bow_string: () => addBowStringCoil(group, tint),
   };
-  if (builders[shape]) builders[shape]();
+  if (recipe?.category === 'food') addFoodWare(group, recipe);
+  else if (builders[shape]) builders[shape]();
   else {
     const lump = addShadow(new THREE.Mesh(
       new THREE.BoxGeometry(0.28, 0.18, 0.22),
@@ -1679,6 +1655,56 @@ function addCannonballs(group, tint) {
     const ball = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.055 * s, 10, 8), steel));
     ball.position.set(x, y, z);
     group.add(ball);
+  }
+}
+
+function foodLookId(recipeId) {
+  return `food-${String(recipeId ?? '').replaceAll('_', '-')}`;
+}
+
+function addFoodWare(group, recipe) {
+  const lookId = foodLookId(recipe?.id);
+  const bundled = getBundledLook(lookId);
+  if (bundled) {
+    const target = buildProceduralFood(recipe);
+    group.add(wrapBundledProp(bundled, target, { name: lookId, fit: 'max' }));
+    return;
+  }
+  addProceduralFood(group, recipe);
+}
+
+function buildProceduralFood(recipe) {
+  const group = new THREE.Group();
+  addProceduralFood(group, recipe);
+  return group;
+}
+
+function addProceduralFood(group, recipe) {
+  const tint = recipe?.tint ?? 0x888888;
+  const shape = recipe?.shape ?? recipe?.id;
+  const builders = {
+    bread: () => addBread(group, tint),
+    pizza: () => addPizza(group, tint),
+    cake: () => addCake(group, tint),
+    pie: () => addPie(group, tint, 0xb45a4a),
+    fish_pie: () => addPie(group, tint, 0x7a9aaa),
+    salmon: () => addFish(group, tint, 1),
+    lobster: () => addLobster(group, tint),
+    chocolate_cake: () => addCake(group, tint, 0x3a2218),
+    monkfish: () => addFish(group, tint, 1.12),
+    curry: () => addCurry(group, tint),
+    shark: () => addFish(group, tint, 1.35),
+    summer_pie: () => addPie(group, tint, 0xe8a04a),
+    anglerfish: () => addFish(group, tint, 1.22, true),
+  };
+  if (builders[shape]) builders[shape]();
+  else {
+    const lump = addShadow(new THREE.Mesh(
+      new THREE.BoxGeometry(0.28, 0.18, 0.22),
+      new THREE.MeshStandardMaterial({ color: tint, roughness: 0.6 }),
+    ));
+    lump.position.y = 0.1;
+    group.add(lump);
   }
 }
 

@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHOP } from './catalog.js';
 import { createState } from './economy.js';
-import { gardenTrapdoorSpot } from './layout.js';
+import { defaultFurniture, gardenTrapdoorSpot } from './layout.js';
 import {
   FLOOR,
   isWalkable,
@@ -15,7 +15,7 @@ import {
 } from './nav.js';
 
 describe('shop navigation', () => {
-  const obstacles = shopObstacles();
+  const obstacles = shopObstacles(SHOP, defaultFurniture());
 
   it('lets the shopkeeper stand behind the counter', () => {
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, obstacles), true);
@@ -54,6 +54,8 @@ describe('shop navigation', () => {
       assert.equal(isWalkable(slot.x, slot.z, obstacles), true);
       assert.ok(slot.z > SHOP.counter.z);
     }
+    const live = queueSlot(0, SHOP, defaultFurniture().counter);
+    assert.ok(live.z > defaultFurniture().counter.z);
   });
 
   it('leaves the back corners behind the anvil and chest unblocked', () => {

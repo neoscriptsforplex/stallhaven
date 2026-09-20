@@ -292,6 +292,7 @@ describe('save and load', () => {
     state.furniture.anvil.x = -2.4;
     state.materialAcc.bronze = 0.4;
     state.skybox = 'black';
+    state.brightness = 1.25;
     state.chefHat = true;
     const saved = serializeState(state);
     const other = createState();
@@ -306,6 +307,7 @@ describe('save and load', () => {
     assert.equal(other.chest.bronze_scimitar, 1);
     assert.equal(other.music.volume, state.music.volume);
     assert.equal(other.skybox, 'black');
+    assert.equal(other.brightness, 1.25);
     assert.equal(other.chefHat, true);
     assert.ok(other.shopXp > 0);
     assert.equal(other.shopLevel, shopProgress(other.shopXp).level);
@@ -331,6 +333,7 @@ describe('save and load', () => {
     assert.equal(state.fullscreen, false);
     assert.ok(state.music.volume > 0);
     assert.equal(state.skybox, 'blue');
+    assert.equal(state.brightness, 1);
     assert.equal(state.chefHat, false);
     assert.equal(state.shopXp, 0);
     assert.equal(state.shopLevel, 1);
@@ -536,9 +539,9 @@ describe('catalog', () => {
     }
   });
 
-  it('keeps at least four display spots plus shelves and armour stands', () => {
-    assert.ok(SHOP.displays.length >= 4);
-    assert.ok(SHOP.displays.filter((d) => d.kind === 'table').length >= 4);
+  it('keeps two side-wall tables plus shelves and armour stands', () => {
+    assert.equal(SHOP.displays.length, 7);
+    assert.equal(SHOP.displays.filter((d) => d.kind === 'table').length, 2);
     assert.ok(SHOP.displays.some((d) => d.kind === 'shelf'));
     assert.ok(SHOP.displays.some((d) => d.kind === 'stand'));
   });
@@ -553,7 +556,7 @@ describe('catalog', () => {
     assert.equal(rectHitsAisle(SHOP.anvil.x, SHOP.anvil.z, 0.48, 0.4, QUEUE_AISLE), false);
     assert.equal(rectHitsAisle(SHOP.furnace.x, SHOP.furnace.z, 0.4, 0.36, QUEUE_AISLE), false);
     assert.equal(rectHitsAisle(SHOP.chest.x, SHOP.chest.z, 0.54, 0.41, QUEUE_AISLE), false);
-    assert.equal(rectHitsAisle(SHOP.range.x, SHOP.range.z, 0.34, 0.28, QUEUE_AISLE), false);
+    assert.equal(rectHitsAisle(SHOP.range.x, SHOP.range.z, 0.68, 0.56, QUEUE_AISLE), false);
   });
 
   it('lines travelers up in front of the counter', () => {
@@ -564,14 +567,11 @@ describe('catalog', () => {
     assert.equal(front.x, SHOP.queue.x);
   });
 
-  it('lines tables up in two columns and keeps armour stands out of the corners', () => {
+  it('keeps one table on each side wall and armour stands out of the corners', () => {
     const tables = SHOP.displays.filter((d) => d.kind === 'table');
-    const leftX = tables.filter((d) => d.x < 0).map((d) => d.x);
-    const rightX = tables.filter((d) => d.x > 0).map((d) => d.x);
-    assert.ok(leftX.length >= 2);
-    assert.ok(rightX.length >= 2);
-    assert.ok(leftX.every((x) => x === leftX[0]));
-    assert.ok(rightX.every((x) => x === rightX[0]));
+    assert.equal(tables.length, 2);
+    assert.ok(tables.some((d) => d.x < 0));
+    assert.ok(tables.some((d) => d.x > 0));
     for (const stand of SHOP.displays.filter((d) => d.kind === 'stand')) {
       assert.ok(Math.abs(stand.x) < 2.2, stand.name);
       assert.ok(stand.z > 2, stand.name);
@@ -963,8 +963,9 @@ describe('build furniture', () => {
   it('does not count starter tables or mannequins as paid extras in an old save', () => {
     const state = createState();
     assert.equal(applyState(state, {
+      version: 8,
       gold: 500,
-      displays: Array.from({ length: OLD_DEFAULT_DISPLAYS }, () => ({ ware: null })),
+      displays: Array.from({ length: SHOP.displays.length }, () => ({ ware: null })),
     }), true);
     assert.equal(state.boughtFurniture.table, 0);
     assert.equal(state.boughtFurniture.mannequin, 0);
@@ -1051,13 +1052,18 @@ describe('center wall shelf save migration', () => {
         chest: { x: 2.98, z: -2.42, rot: 0 },
         range: { x: 1.92, z: -2.22, rot: 0 },
         displays: [
-          ...SHOP.displays.slice(0, 8).map((spot) => ({ x: spot.x, z: spot.z, rot: 0 })),
+          ...Array.from({ length: OLD_DEFAULT_DISPLAYS }, (_, i) => ({
+            x: SHOP.displays[i]?.x ?? (i % 2 ? 2.95 : -2.95),
+            z: SHOP.displays[i]?.z ?? 0.35,
+            rot: 0,
+          })),
           { x: 0.4, z: 0.2, rot: 0 },
         ],
       },
       boughtFurniture: { table: 1, mannequin: 0 },
     }), true);
-    assert.equal(state.displays.length, SHOP.displays.length + 1);
+    assert.ok(state.displays.length >= SHOP.displays.length + 1);
+    assert.ok(state.displays.some((d) => d.bought && d.kind === 'table'));
     const center = SHOP.displays.findIndex((d) => d.id === 'shelf-center');
     assert.ok(center >= 0);
     assert.equal(state.displays[center].kind, 'shelf');
@@ -1068,12 +1074,13 @@ describe('center wall shelf save migration', () => {
 });
 
 describe('default display order', () => {
-  it('appends the extra back-wall shelf after the original eight displays', () => {
-    assert.equal(SHOP.displays.length, 9);
-    assert.equal(SHOP.displays[6].id, 'stand-left');
-    assert.equal(SHOP.displays[7].id, 'stand-right');
-    assert.equal(SHOP.displays[8].id, 'shelf-center');
-    assert.equal(SHOP.displays[8].kind, 'shelf');
+  it('keeps the back-wall shelf after dropping two mid-wall tables', () => {
+    assert.equal(SHOP.displays.length, 7);
+    assert.equal(SHOP.displays[4].id, 'stand-left');
+    assert.equal(SHOP.displays[5].id, 'stand-right');
+    assert.equal(SHOP.displays[6].id, 'shelf-center');
+    assert.equal(SHOP.displays[6].kind, 'shelf');
+    assert.equal(SHOP.displays.some((d) => d.id === 'left-mid' || d.id === 'right-mid'), false);
   });
 });
 
@@ -1419,9 +1426,9 @@ describe('dungeon sky and remains', () => {
     assert.equal(skyIdForScene('dungeon', 'peach'), 'dark-grey');
     assert.equal(skyIdForScene('shop', 'peach'), 'peach');
     assert.equal(skyIdForScene('shop', 'nope'), 'blue');
-    assert.ok(DUNGEON_REMAINS.length >= 8);
-    assert.ok(DUNGEON_REMAINS.some((spot) => spot.kind === 'slump'));
-    assert.ok(DUNGEON_REMAINS.some((spot) => spot.kind === 'pile'));
+    assert.ok(DUNGEON_REMAINS.length >= 3);
+    assert.ok(DUNGEON_REMAINS.every((spot) => spot.kind === 'slump'));
+    assert.equal(DUNGEON_REMAINS.some((spot) => spot.kind === 'pile' || spot.kind === 'scatter'), false);
     assert.equal(DUNGEON_BOULDERS.length, 8);
     assert.deepEqual(DUNGEON_BOULDERS.map((spot) => spot.materialId), [
       'essence', 'bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon',

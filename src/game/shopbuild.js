@@ -4,6 +4,7 @@ import {
   FOUNTAIN,
   ROOM_D,
   ROOM_W,
+  SHOP_FURNITURE_FLOOR_Y,
   cobblePathSpan,
   gardenBedSpots,
   gardenBox,
@@ -23,7 +24,7 @@ import {
 import { METALS } from './catalog.js';
 import { initRatWander } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
-import { getBundledLook, measureVisibleBox, wrapBundledProp } from './models.js';
+import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp } from './models.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.04 });
@@ -257,6 +258,30 @@ function flameMat() {
 }
 
 export function buildTorch() {
+  const bundled = getBundledLook('torch');
+  if (bundled) {
+    const fitted = wrapBundledProp(bundled, buildProceduralTorch(), { name: 'torch', fit: 'max' });
+    fitted.name = 'torch';
+    attachTorchFx(fitted);
+    return fitted;
+  }
+  return buildProceduralTorch();
+}
+
+function attachTorchFx(mesh) {
+  const box = measureVisibleBox(mesh);
+  const tipY = Number.isFinite(box.max.y) ? box.max.y : 0.42;
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 7), flameMat());
+  flame.name = 'torch-flame';
+  flame.position.y = tipY + 0.04;
+  mesh.add(flame);
+  const glow = new THREE.PointLight(0xff9a3a, 1.15, 4.5, 2);
+  glow.name = 'torch-glow';
+  glow.position.y = tipY + 0.02;
+  mesh.add(glow);
+}
+
+function buildProceduralTorch() {
   const group = new THREE.Group();
   group.name = 'torch';
   const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, 0.42, 6), wood(0x5a3a22)));
@@ -278,7 +303,8 @@ function addWallTorch(root, x, y, z, rotY = 0) {
   const torch = buildTorch();
   torch.position.set(x, y, z);
   torch.rotation.y = rotY;
-  torch.rotation.z = 0.55;
+  // Procedural sconces lean off the wall. The dumped torch stays upright.
+  if (!getBundledLook('torch')) torch.rotation.z = 0.55;
   root.add(torch);
   return torch;
 }
@@ -760,13 +786,25 @@ function addWallVines(root, center) {
   });
 }
 
+/** Uniform world scale vs the baked range (dump or procedural) after size-match. */
+export const RANGE_WORLD_SCALE = 2;
+
+function applyRangeWorldScale(mesh) {
+  mesh.scale.multiplyScalar(RANGE_WORLD_SCALE);
+  mesh.updateMatrixWorld(true);
+  const box = measureVisibleBox(mesh);
+  if (Number.isFinite(box.min.y)) mesh.position.y -= box.min.y;
+  if (mesh.userData.wareY != null) mesh.userData.wareY *= RANGE_WORLD_SCALE;
+  return mesh;
+}
+
 export function buildRange() {
   const bundled = getBundledLook('range');
+  const target = applyRangeWorldScale(buildProceduralRange());
   if (bundled) {
-    const target = buildProceduralRange();
     return wrapBundledProp(bundled, target, { name: 'range', fit: 'height', label: 'Range', wareY: 'top' });
   }
-  return buildProceduralRange();
+  return target;
 }
 
 function buildProceduralRange() {
@@ -812,6 +850,15 @@ function buildProceduralRange() {
 }
 
 export function buildCauldron() {
+  const bundled = getBundledLook('cauldron');
+  if (bundled) {
+    const target = buildProceduralCauldron();
+    return wrapBundledProp(bundled, target, { name: 'cauldron', fit: 'max', label: 'Cauldron', wareY: 'top' });
+  }
+  return buildProceduralCauldron();
+}
+
+function buildProceduralCauldron() {
   const group = new THREE.Group();
   group.name = 'cauldron';
   const iron = sootMetal(0x3a4248, 0.5, 0.58);
@@ -862,7 +909,13 @@ export function buildFurnace() {
   const bundled = getBundledLook('furnace');
   if (bundled) {
     const target = buildProceduralFurnace();
-    return wrapBundledProp(bundled, target, { name: 'furnace', fit: 'height', label: 'Furnace', wareY: 'top' });
+    const fitted = wrapBundledProp(bundled, target, { name: 'furnace', fit: 'height', label: 'Furnace', wareY: 'top' });
+    sitVisibleOnY(fitted, SHOP_FURNITURE_FLOOR_Y);
+    const root = new THREE.Group();
+    root.name = 'furnace';
+    root.add(fitted);
+    root.userData.wareY = fitted.userData.wareY;
+    return root;
   }
   return buildProceduralFurnace();
 }
@@ -901,6 +954,25 @@ function buildProceduralFurnace() {
 }
 
 export function buildSpinningWheel() {
+  const bundled = getBundledLook('wheel');
+  if (bundled) {
+    const target = buildProceduralSpinningWheel();
+    const fitted = wrapBundledProp(bundled, target, {
+      name: 'wheel',
+      fit: 'max',
+      label: 'Spinning Wheel',
+      wareY: 'top',
+    });
+    const spinner = new THREE.Group();
+    spinner.name = 'spin-wheel';
+    fitted.add(spinner);
+    fitted.userData.spinWheel = spinner;
+    return fitted;
+  }
+  return buildProceduralSpinningWheel();
+}
+
+function buildProceduralSpinningWheel() {
   const group = new THREE.Group();
   group.name = 'wheel';
   const oak = woodSurface(0x6b4423, 0.86, 0.8, 1.1, 4211);
@@ -1183,12 +1255,6 @@ function addGardenBed(root, x, z, rand) {
   const flowers = buildFlowerCluster(rand);
   flowers.position.set(x, 0.08, z);
   root.add(flowers);
-  const bush = addShadow(new THREE.Mesh(
-    new THREE.SphereGeometry(0.28, 8, 6),
-    new THREE.MeshStandardMaterial({ color: 0x2f6a32, roughness: 0.9 }),
-  ));
-  bush.position.set(x + 0.45, 0.28, z + 0.15);
-  root.add(bush);
 }
 
 function buildFlowerCluster(rand) {
@@ -1363,7 +1429,42 @@ function markTrapdoorMesh(mesh) {
   return mesh;
 }
 
+function trapdoorFitTarget() {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.16, 0.95));
+  mesh.position.y = 0.08;
+  return mesh;
+}
+
+function attachTrapdoorPick(root) {
+  const pick = markTrapdoorMesh(new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 1.2, 2.2),
+    pickMat(),
+  ));
+  pick.position.y = 0.55;
+  root.add(pick);
+  return pick;
+}
+
 function buildTrapdoor() {
+  const bundled = getBundledLook('trapdoor');
+  if (bundled) {
+    const fitted = wrapBundledProp(bundled, trapdoorFitTarget(), { name: 'trapdoor', fit: 'max' });
+    fitted.name = 'trapdoor';
+    sitVisibleOnY(fitted, 0);
+    markTrapdoorMesh(fitted);
+    fitted.traverse((child) => {
+      if (child.isMesh) markTrapdoorMesh(child);
+    });
+    const group = new THREE.Group();
+    group.name = 'trapdoor';
+    group.add(fitted);
+    attachTrapdoorPick(group);
+    return group;
+  }
+  return buildProceduralTrapdoor();
+}
+
+function buildProceduralTrapdoor() {
   const group = new THREE.Group();
   group.name = 'trapdoor';
   const frame = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.95), wood(0x3f2716)));
@@ -1379,12 +1480,7 @@ function buildTrapdoor() {
   const ring = addShadow(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 10), metal(0xb08a3c)));
   ring.position.set(0, 0.12, 0.22);
   group.add(ring);
-  const pick = markTrapdoorMesh(new THREE.Mesh(
-    new THREE.BoxGeometry(2.2, 1.2, 2.2),
-    pickMat(),
-  ));
-  pick.position.y = 0.55;
-  group.add(pick);
+  attachTrapdoorPick(group);
   return group;
 }
 
@@ -1663,100 +1759,33 @@ function buildMineBoulder(spot) {
   return group;
 }
 
-/** Extra skulls, slumped skeletons, and bone piles around the dungeon floor. */
+/** Dumped skeleton slumps only — no procedural white skull / loose-bone clutter. */
 export const DUNGEON_REMAINS = [
-  { kind: 'pile', x: 1.6, z: -1.4, rot: 0.1 },
-  { kind: 'pile', x: -2.6, z: 2.7, rot: 1.3 },
-  { kind: 'pile', x: 3.9, z: 3.1, rot: -0.6 },
   { kind: 'slump', x: -1.1, z: -3.4, rot: 2.1 },
   { kind: 'slump', x: 4.6, z: -2.8, rot: -1.2 },
   { kind: 'slump', x: -4.5, z: 2.6, rot: 0.8 },
-  { kind: 'scatter', x: 0.9, z: 2.4, rot: 0.4 },
-  { kind: 'scatter', x: 3.1, z: -0.6, rot: 1.7 },
-  { kind: 'scatter', x: -3.6, z: -2.2, rot: -0.5 },
 ];
 
-function boneMat() {
-  return new THREE.MeshStandardMaterial({ color: 0xe8dcc4, roughness: 0.7 });
-}
-
-function addBonePile(root, x, z, rot = 0) {
-  const bone = boneMat();
-  const skull = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), bone));
-  skull.position.set(x, 0.12, z);
-  skull.scale.set(1, 0.85, 1.15);
-  skull.rotation.y = rot;
-  root.add(skull);
-  const jaw = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.08), bone));
-  jaw.position.set(x + Math.sin(rot) * 0.12, 0.04, z + Math.cos(rot) * 0.12);
-  root.add(jaw);
-  for (const [dx, dz, r] of [[-0.25, -0.15, 0.6], [0.25, 0.2, -0.4], [-0.1, 0.35, 1.2], [0.35, -0.15, 0.2]]) {
-    const rib = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.32, 6), bone));
-    rib.position.set(x + dx, 0.08, z + dz);
-    rib.rotation.z = r;
-    rib.rotation.x = 1.1;
-    root.add(rib);
-  }
+function slumpFitTarget() {
+  const body = new THREE.Group();
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.3));
+  box.position.y = 0.25;
+  body.add(box);
+  return body;
 }
 
 function addSlumpedSkeleton(root, x, z, rot = 0) {
   const bundled = getBundledLook('skeleton');
-  if (bundled) {
-    const mesh = wrapBundledProp(bundled, buildProceduralSlump(), { name: 'skeleton', fit: 'height' });
-    mesh.position.set(x, 0, z);
-    mesh.rotation.y = rot;
-    root.add(mesh);
-    return;
-  }
-  const body = buildProceduralSlump();
-  body.position.set(x, 0, z);
-  body.rotation.y = rot;
-  root.add(body);
-}
-
-function buildProceduralSlump() {
-  const bone = boneMat();
-  const body = new THREE.Group();
-  body.name = 'skeleton';
-  const skull = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), bone));
-  skull.position.set(0.02, 0.42, 0.08);
-  skull.scale.set(1, 0.88, 1.1);
-  skull.rotation.z = 0.45;
-  body.add(skull);
-  const torso = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.36, 7), bone));
-  torso.position.set(0, 0.22, 0);
-  torso.rotation.z = 1.15;
-  body.add(torso);
-  for (const [sx, sy, sz, r] of [[-0.08, 0.16, 0.04, 0.8], [0.1, 0.12, -0.02, -0.5], [0.16, 0.08, 0.08, 1.4]]) {
-    const bonePiece = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.28, 6), bone));
-    bonePiece.position.set(sx, sy, sz);
-    bonePiece.rotation.set(1.05, 0, r);
-    body.add(bonePiece);
-  }
-  return body;
-}
-
-function addScatteredBones(root, x, z, rot = 0) {
-  const bone = boneMat();
-  const skull = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 7), bone));
-  skull.position.set(x, 0.09, z);
-  skull.rotation.y = rot;
-  skull.rotation.z = 0.6;
-  root.add(skull);
-  for (const [dx, dz, r] of [[0.22, -0.12, 0.3], [-0.18, 0.2, -0.8], [0.08, 0.28, 1.6]]) {
-    const fem = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.02, 0.26, 6), bone));
-    fem.position.set(x + dx, 0.06, z + dz);
-    fem.rotation.z = r + rot;
-    fem.rotation.x = 1.2;
-    root.add(fem);
-  }
+  if (!bundled) return;
+  const mesh = wrapBundledProp(bundled, slumpFitTarget(), { name: 'skeleton', fit: 'height' });
+  mesh.position.set(x, 0, z);
+  mesh.rotation.y = rot;
+  root.add(mesh);
 }
 
 function addDungeonRemains(root) {
   for (const spot of DUNGEON_REMAINS) {
-    if (spot.kind === 'slump') addSlumpedSkeleton(root, spot.x, spot.z, spot.rot);
-    else if (spot.kind === 'scatter') addScatteredBones(root, spot.x, spot.z, spot.rot);
-    else addBonePile(root, spot.x, spot.z, spot.rot);
+    addSlumpedSkeleton(root, spot.x, spot.z, spot.rot);
   }
 }
 
@@ -1851,6 +1880,12 @@ export function buildDungeon() {
   const ladder = buildDungeonLadder();
   ladder.position.set(-W / 2 + 0.22, 0, 0.4);
   root.add(ladder);
+  ladder.updateMatrixWorld(true);
+  const ladderBox = measureVisibleBox(ladder);
+  if (Number.isFinite(ladderBox.min.x)) {
+    const wallInner = -W / 2 + 0.11;
+    ladder.position.x += wallInner + 0.02 - ladderBox.min.x;
+  }
 
   return { root, grounds, rats, ladder, boulders, size: { w: W, d: D } };
 }
@@ -1906,30 +1941,59 @@ function buildProceduralRat() {
   return group;
 }
 
-function buildDungeonLadder() {
-  const group = new THREE.Group();
-  group.name = 'ladder';
-  const rail = wood(0x5a3a22);
-  const mark = (mesh) => {
-    mesh.userData.kind = 'ladder';
-    return mesh;
-  };
-  for (const x of [-0.18, 0.18]) {
-    const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.05), rail));
-    post.position.set(x, 1.3, 0);
-    group.add(mark(post));
+function markLadder(mesh) {
+  mesh.userData.kind = 'ladder';
+  return mesh;
+}
+
+function ladderFitTarget() {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.41, 2.6, 0.1));
+  mesh.position.y = 1.3;
+  return mesh;
+}
+
+export function buildDungeonLadder() {
+  const bundled = getBundledLook('ladder');
+  let ladder;
+  if (bundled) {
+    const fitted = wrapBundledProp(bundled, ladderFitTarget(), { name: 'ladder', fit: 'max' });
+    fitted.name = 'ladder';
+    markLadder(fitted);
+    fitted.traverse((child) => markLadder(child));
+    fitted.add(makeLadderPick());
+    ladder = fitted;
+  } else {
+    ladder = buildProceduralDungeonLadder();
   }
-  for (let i = 0; i < 8; i += 1) {
-    const rung = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.04, 0.05), rail));
-    rung.position.set(0, 0.28 + i * 0.3, 0.02);
-    group.add(mark(rung));
-  }
-  const pick = mark(new THREE.Mesh(
+  // Dump and rails are wide in X; yaw so the face sits flat on the west wall.
+  ladder.rotation.y = Math.PI / 2;
+  return ladder;
+}
+
+function makeLadderPick() {
+  const pick = markLadder(new THREE.Mesh(
     new THREE.BoxGeometry(1.1, 2.8, 0.7),
     pickMat(),
   ));
   pick.position.set(0, 1.3, 0.12);
-  group.add(pick);
+  return pick;
+}
+
+function buildProceduralDungeonLadder() {
+  const group = new THREE.Group();
+  group.name = 'ladder';
+  const rail = wood(0x5a3a22);
+  for (const x of [-0.18, 0.18]) {
+    const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.05), rail));
+    post.position.set(x, 1.3, 0);
+    group.add(markLadder(post));
+  }
+  for (let i = 0; i < 8; i += 1) {
+    const rung = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.04, 0.05), rail));
+    rung.position.set(0, 0.28 + i * 0.3, 0.02);
+    group.add(markLadder(rung));
+  }
+  group.add(makeLadderPick());
   return group;
 }
 

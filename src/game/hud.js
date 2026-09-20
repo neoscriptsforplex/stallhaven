@@ -67,6 +67,7 @@ import {
   craftBlockReason,
   craftDuration,
   craftProgress,
+  DEFAULT_BRIGHTNESS,
   DEFAULT_MUSIC_VOLUME,
   discardFromChest,
   fillStandFromRecipe,
@@ -108,6 +109,11 @@ import { clampMapZoom, drawMinimap, mapToWorld, shopMapBounds } from './minimap.
 import { boulderInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
+import {
+  brightnessPercent,
+  clampBrightness,
+  writeStoredBrightness,
+} from './lighting.js';
 
 export function bindHud(root, state, world) {
   const goldEl = root.querySelector('#gold');
@@ -1897,6 +1903,7 @@ export function bindHud(root, state, world) {
     for (const btn of settingsDock.querySelectorAll('[data-skybox]')) {
       btn.classList.toggle('is-on', btn.dataset.skybox === current);
     }
+    paintBrightness();
     const look = normalizeAppearance(state.appearance);
     for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
       const row = settingsDock.querySelector(`[data-look="${slot}"]`);
@@ -1935,6 +1942,29 @@ export function bindHud(root, state, world) {
     const id = SKYBOXES.some((item) => item.id === btn.dataset.skybox) ? btn.dataset.skybox : 'blue';
     world.setSkybox(id);
     paintSettings();
+  });
+
+  function paintBrightness() {
+    const slider = settingsDock?.querySelector('[data-brightness]');
+    const label = settingsDock?.querySelector('[data-brightness-label]');
+    const pct = brightnessPercent(state.brightness ?? DEFAULT_BRIGHTNESS);
+    if (slider) {
+      slider.value = String(pct);
+      slider.setAttribute('aria-valuenow', String(pct));
+    }
+    if (label) label.textContent = `${pct}%`;
+  }
+
+  function applyBrightnessFromSlider(raw) {
+    const next = clampBrightness(Number(raw) / 100);
+    state.brightness = next;
+    writeStoredBrightness(next);
+    world.setBrightness?.(next);
+    paintBrightness();
+  }
+
+  settingsDock?.querySelector('[data-brightness]')?.addEventListener('input', (event) => {
+    applyBrightnessFromSlider(event.target.value);
   });
   settingsDock?.querySelector('[data-cheat-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -2058,6 +2088,8 @@ export function bindHud(root, state, world) {
         world.syncDisplays();
         world.refreshSelection(true);
         setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
+        writeStoredBrightness(state.brightness ?? DEFAULT_BRIGHTNESS);
+        world.setBrightness?.(state.brightness ?? DEFAULT_BRIGHTNESS);
         paintCrafts();
         paintMusic();
         paintSettings();

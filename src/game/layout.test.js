@@ -44,12 +44,15 @@ import {
   snapGridSpan,
   snapToWallGrid,
   walkFloors,
+  placeFloors,
   wallVineMounts,
   outdoorWalkFloors,
   playerWalkFloors,
   doorwayFloor,
   roomCenter,
   roomFloor,
+  roomPlaceFloor,
+  ORIGIN_FLOOR,
 } from './layout.js';
 import { FLOOR, isWalkable, shopObstacles } from './nav.js';
 import { SHOP } from './catalog.js';
@@ -244,8 +247,12 @@ describe('layout numbers', () => {
   });
 
   it('snaps floor furniture onto cells that reach the interior walls', () => {
-    const floors = walkFloors([]);
-    const shop = roomFloor(0, 0);
+    const floors = placeFloors([]);
+    const shop = roomPlaceFloor(0, 0);
+    assert.ok(shop.minX < ORIGIN_FLOOR.minX);
+    assert.ok(shop.maxX > ORIGIN_FLOOR.maxX);
+    assert.ok(shop.minZ < ORIGIN_FLOOR.minZ);
+    assert.ok(shop.maxZ > ORIGIN_FLOOR.maxZ);
     const { start: minX, end: maxX } = snapGridSpan(shop.minX, shop.maxX);
     const { start: minZ, end: maxZ } = snapGridSpan(shop.minZ, shop.maxZ);
     assert.ok(minX <= shop.minX + 1e-9);
@@ -254,8 +261,10 @@ describe('layout numbers', () => {
     assert.ok(maxZ >= shop.maxZ - 1e-9);
     const left = snapToFloor(shop.minX, 0, floors);
     const back = snapToFloor(0, shop.minZ, floors);
-    assert.ok(Math.abs(left.x - shop.minX) <= 0.2 + 1e-6);
-    assert.ok(Math.abs(back.z - shop.minZ) <= 0.2 + 1e-6);
+    assert.ok(Math.abs(left.x - shop.minX) <= 0.2 + 1e-6, `left snap ${left.x} vs wall ${shop.minX}`);
+    assert.ok(Math.abs(back.z - shop.minZ) <= 0.2 + 1e-6, `back snap ${back.z} vs wall ${shop.minZ}`);
+    assert.ok(left.x < ORIGIN_FLOOR.minX, 'edge cells must sit past the old inset floor');
+    assert.ok(back.z < ORIGIN_FLOOR.minZ, 'edge cells must sit past the old inset floor');
   });
 
   it('keeps side and rear expansion floors walkable through doorways', () => {

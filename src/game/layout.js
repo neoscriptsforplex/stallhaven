@@ -26,7 +26,9 @@ export const CHEST_UPGRADE_MULT = 3;
 export const MATERIAL_CAP = 250;
 export const FURNITURE_SNAP = 0.2;
 /** How far a floor snap/grid cell may sit inside the wall faces. */
-export const FLOOR_SNAP_MARGIN = 0.08;
+export const FLOOR_SNAP_MARGIN = 0;
+/** Stone wall thickness; interior faces sit half of this inside ROOM_W / ROOM_D. */
+export const WALL_THICK = 0.16;
 export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
@@ -150,13 +152,23 @@ export function roomFloor(gx, gz) {
   };
 }
 
+/** Interior wall faces of a room — the wooden floor reaches here. */
+export function roomPlaceFloor(gx = 0, gz = 0) {
+  const c = roomCenter(gx, gz);
+  const inset = WALL_THICK / 2;
+  return {
+    minX: c.x - ROOM_W / 2 + inset,
+    maxX: c.x + ROOM_W / 2 - inset,
+    minZ: c.z - ROOM_D / 2 + inset,
+    maxZ: c.z + ROOM_D / 2 - inset,
+  };
+}
+
 /** How far a room-seam walk rect overlaps each room. Must exceed 2× player radius. */
 export const DOORWAY_WALK_OVERLAP = 0.75;
 const ROOM_SEAM_INSET = 0.18;
 
-export function doorwayFloor(a, b) {
-  const fa = roomFloor(a.gx, a.gz);
-  const fb = roomFloor(b.gx, b.gz);
+function doorwayBetween(fa, fb, a, b) {
   if (a.gx === b.gx && Math.abs(a.gz - b.gz) === 1) {
     const north = a.gz > b.gz ? fa : fb;
     const south = a.gz > b.gz ? fb : fa;
@@ -180,16 +192,34 @@ export function doorwayFloor(a, b) {
   return null;
 }
 
-export function walkFloors(expansionIds = []) {
+export function doorwayFloor(a, b) {
+  return doorwayBetween(roomFloor(a.gx, a.gz), roomFloor(b.gx, b.gz), a, b);
+}
+
+function floorsForCells(expansionIds, roomFn) {
   const cells = occupiedCells(expansionIds);
-  const floors = cells.map((cell) => roomFloor(cell.gx, cell.gz));
+  const floors = cells.map((cell) => roomFn(cell.gx, cell.gz));
   for (let i = 0; i < cells.length; i += 1) {
     for (let j = i + 1; j < cells.length; j += 1) {
-      const door = doorwayFloor(cells[i], cells[j]);
+      const door = doorwayBetween(
+        roomFn(cells[i].gx, cells[i].gz),
+        roomFn(cells[j].gx, cells[j].gz),
+        cells[i],
+        cells[j],
+      );
       if (door) floors.push(door);
     }
   }
   return floors;
+}
+
+export function walkFloors(expansionIds = []) {
+  return floorsForCells(expansionIds, roomFloor);
+}
+
+/** Placeable floor + snap grid, spanning to interior wall faces. */
+export function placeFloors(expansionIds = []) {
+  return floorsForCells(expansionIds, roomPlaceFloor);
 }
 
 const DOOR_HALF = 1.05;
@@ -768,14 +798,17 @@ export function snapToFloor(x, z, floors, margin = FLOOR_SNAP_MARGIN) {
   let best = null;
   let bestDist = Infinity;
   for (const rect of floors) {
-    const nx = Math.min(rect.maxX - margin, Math.max(rect.minX + margin, sx));
-    const nz = Math.min(rect.maxZ - margin, Math.max(rect.minZ + margin, sz));
-    const dist = Math.hypot(nx - sx, nz - sz);
-    if (dist < bestDist && pointOnFloors(nx, nz, floors, margin * 0.5)) {
-      best = {
-        x: Math.round(nx / FURNITURE_SNAP) * FURNITURE_SNAP,
-        z: Math.round(nz / FURNITURE_SNAP) * FURNITURE_SNAP,
-      };
+    const loX = Math.ceil((rect.minX + margin) / FURNITURE_SNAP - 1e-9) * FURNITURE_SNAP;
+    const hiX = Math.floor((rect.maxX - margin) / FURNITURE_SNAP + 1e-9) * FURNITURE_SNAP;
+    const loZ = Math.ceil((rect.minZ + margin) / FURNITURE_SNAP - 1e-9) * FURNITURE_SNAP;
+    const hiZ = Math.floor((rect.maxZ - margin) / FURNITURE_SNAP + 1e-9) * FURNITURE_SNAP;
+    if (loX > hiX || loZ > hiZ) continue;
+    const qx = Math.min(hiX, Math.max(loX, sx));
+    const qz = Math.min(hiZ, Math.max(loZ, sz));
+    if (!pointOnFloors(qx, qz, floors, margin)) continue;
+    const dist = Math.hypot(qx - x, qz - z);
+    if (dist < bestDist) {
+      best = { x: qx, z: qz };
       bestDist = dist;
     }
   }

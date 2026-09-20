@@ -40,6 +40,7 @@ import {
   pointOnFloors,
   snapToFloor,
   snapToWallGrid,
+  placeFloors,
   walkFloors,
 } from './layout.js';
 import {
@@ -210,6 +211,7 @@ export function createWorld(canvas, state, opts = {}) {
   let groundGroup = null;
   let padGroup = null;
   let floors = walkFloors(state.expansions ?? []);
+  let placeRects = placeFloors(state.expansions ?? []);
   let playerFloors = playerWalkFloors(state.expansions ?? []);
   const obstacles = liveObstacles(state);
   let expandMode = false;
@@ -244,6 +246,7 @@ export function createWorld(canvas, state, opts = {}) {
     scene.add(groundGroup);
     scene.add(padGroup);
     floors = floorsForState(state);
+    placeRects = placeFloors(state.expansions ?? []);
     playerFloors = playerWalkFloors(state.expansions ?? []);
     rebuildNav();
     rebuildSnapGrid();
@@ -485,14 +488,16 @@ export function createWorld(canvas, state, opts = {}) {
     });
     const positions = [];
     const y = 0.108;
-    for (const rect of floors) {
+    for (const rect of placeRects) {
       const { start: minX, end: maxX } = snapGridSpan(rect.minX, rect.maxX);
       const { start: minZ, end: maxZ } = snapGridSpan(rect.minZ, rect.maxZ);
       for (let x = minX; x <= maxX + 1e-6; x += FURNITURE_SNAP) {
-        positions.push(x, y, rect.minZ, x, y, rect.maxZ);
+        const gx = Math.min(rect.maxX, Math.max(rect.minX, x));
+        positions.push(gx, y, rect.minZ, gx, y, rect.maxZ);
       }
       for (let z = minZ; z <= maxZ + 1e-6; z += FURNITURE_SNAP) {
-        positions.push(rect.minX, y, z, rect.maxX, y, z);
+        const gz = Math.min(rect.maxZ, Math.max(rect.minZ, z));
+        positions.push(rect.minX, y, gz, rect.maxX, y, gz);
       }
     }
     const geo = new THREE.BufferGeometry();
@@ -536,7 +541,7 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = placeKindOf(moveTarget);
     const snapped = kind === 'shelf'
       ? snapToWallGrid(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
-      : snapToFloor(x, z, floors);
+      : snapToFloor(x, z, placeRects);
     const pose = poseOf(moveTarget);
     if (!pose) return snapped;
     pose.x = snapped.x;
@@ -1027,7 +1032,7 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = placeKindOf(target);
     const skip = target.id === 'display' ? { id: 'display', index: target.index } : { id: target.id };
     const blocks = liveObstacles(state, SHOP, skip);
-    return placementBlocked(pose, kind, blocks, floors, { checkAisle: kind !== 'counter' });
+    return placementBlocked(pose, kind, blocks, placeRects, { checkAisle: kind !== 'counter' });
   }
 
   function visualPlacePose() {
@@ -2079,7 +2084,7 @@ export function createWorld(canvas, state, opts = {}) {
     },
     beginPlaceUnlock(id) {
       const home = SHOP[id] ?? SHOP.cauldron;
-      const start = snapToFloor(home.x, home.z, floors);
+      const start = snapToFloor(home.x, home.z, placeRects);
       placeDraft = { id, x: start.x, z: start.z, rot: FURNITURE_FORWARD };
       moveTarget = { id };
       placeNeedsConfirm = true;
@@ -2094,7 +2099,7 @@ export function createWorld(canvas, state, opts = {}) {
     beginPlaceFurniture(kind) {
       const start = kind === 'shelf'
         ? snapToWallGrid(0, -3.22, state.expansions ?? [])
-        : snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, floors);
+        : snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, placeRects);
       const index = displays.length;
       const spot = {
         id: `new-${kind}-${index}`,

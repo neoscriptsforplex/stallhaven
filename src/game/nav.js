@@ -11,6 +11,7 @@ import {
   pointOnFloors,
   rotatedFootprint,
   walkFloors,
+  FLOOR_SNAP_MARGIN,
 } from './layout.js';
 
 export const FLOOR = { minX: -3.72, maxX: 3.72, minZ: -3.18, maxZ: 3.28 };
@@ -155,7 +156,7 @@ export function placementBlocked(pose, kind, obstacles, floors, { checkAisle = t
     if (!pointOnFloors(pose.x, pose.z, floors, -0.35)) {
       return 'That spot is off the shop wall.';
     }
-  } else if (!pointOnFloors(pose.x, pose.z, floors, 0.06)) {
+  } else if (!pointOnFloors(pose.x, pose.z, floors, FLOOR_SNAP_MARGIN)) {
     return 'That spot is off the shop floor.';
   }
   if (checkAisle && kind !== 'counter' && rectHitsAisle(pose.x, pose.z, span.hw, span.hd)) {

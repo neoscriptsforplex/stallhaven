@@ -157,6 +157,7 @@ export function bindHud(root, state, world) {
   const settingsBtn = document.querySelector('#settings-btn');
   const furnMenu = document.querySelector('#furn-menu');
   const inspectPop = document.querySelector('#inspect-pop');
+  let inspectTarget = null;
   const minimap = document.querySelector('#minimap');
   const minimapWrap = document.querySelector('.minimap-wrap');
   const mapZoomIn = document.querySelector('[data-map-zoom="in"]');
@@ -515,6 +516,7 @@ export function bindHud(root, state, world) {
 
   function hideInspect() {
     if (inspectPop) inspectPop.hidden = true;
+    inspectTarget = null;
   }
 
   function hideFurnMenu() {
@@ -523,10 +525,13 @@ export function bindHud(root, state, world) {
     hideInspect();
   }
 
-  function showInspect(materialId, clientX, clientY) {
+  function showInspect(materialId, clientX, clientY, pose) {
     if (!inspectPop) return;
     furnMenu.hidden = true;
     furnTarget = null;
+    inspectTarget = materialId
+      ? { materialId, x: pose?.x, z: pose?.z }
+      : null;
     const info = boulderInspect(materialId);
     const nameEl = inspectPop.querySelector('[data-inspect-name]');
     const blurbEl = inspectPop.querySelector('[data-inspect-blurb]');
@@ -534,7 +539,7 @@ export function bindHud(root, state, world) {
     if (blurbEl) blurbEl.textContent = info.blurb;
     inspectPop.hidden = false;
     const x = Math.min(window.innerWidth - 250, Math.max(8, clientX ?? 24));
-    const y = Math.min(window.innerHeight - 140, Math.max(8, clientY ?? 80));
+    const y = Math.min(window.innerHeight - 180, Math.max(8, clientY ?? 80));
     inspectPop.style.left = `${x}px`;
     inspectPop.style.top = `${y}px`;
   }
@@ -1630,6 +1635,11 @@ export function bindHud(root, state, world) {
   });
 
   inspectPop?.querySelector('[data-inspect-close]')?.addEventListener('click', hideInspect);
+  inspectPop?.querySelector('[data-inspect-mine]')?.addEventListener('click', () => {
+    const target = inspectTarget;
+    hideInspect();
+    if (target?.materialId) world.useBoulder?.(target);
+  });
   inspectPop?.addEventListener('click', (event) => {
     if (event.target === inspectPop) hideInspect();
   });
@@ -2142,7 +2152,7 @@ export function bindHud(root, state, world) {
   world.onPick((event) => {
     if (event.type !== 'furn-menu') hideFurnMenu();
     if (event.type === 'boulder-inspect') {
-      showInspect(event.materialId, event.clientX, event.clientY);
+      showInspect(event.materialId, event.clientX, event.clientY, event);
     }
     if (event.type === 'chest') openChest();
     if (event.type === 'anvil') openCraft('anvil');

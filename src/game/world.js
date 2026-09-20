@@ -1306,6 +1306,8 @@ export function createWorld(canvas, state, opts = {}) {
         type: 'boulder-inspect',
         materialId: data.materialId,
         name: data.name,
+        x: data.x,
+        z: data.z,
         clientX: event.clientX,
         clientY: event.clientY,
       });
@@ -2074,6 +2076,10 @@ export function createWorld(canvas, state, opts = {}) {
     },
     onPick(handler) {
       pickHandler = handler;
+    },
+    useBoulder(pose) {
+      if (!pose?.materialId) return;
+      queueUse('boulder', { x: pose.x, z: pose.z, materialId: pose.materialId });
     },
     getCustomer(id) {
       return customers.find((c) => c.id === id) ?? null;

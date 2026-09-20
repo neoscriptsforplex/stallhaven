@@ -45,6 +45,14 @@ describe('player look UI', () => {
     assert.equal(settings.includes('data-look="faceHair"'), false);
   });
 
+  it('puts Mine above Close on dungeon rock inspect', () => {
+    const pop = slice(html, 'id="inspect-pop"', 'id="furn-menu"');
+    const mine = pop.indexOf('data-inspect-mine');
+    const close = pop.indexOf('data-inspect-close');
+    assert.ok(mine >= 0 && close > mine, 'Mine should sit above Close');
+    assert.match(pop, />Mine</);
+  });
+
   it('opens a dedicated customize dock with every look slot and a back path', () => {
     const look = slice(html, 'id="look-dock"', 'id="music-dock"');
     assert.match(look, /id="look-dock"/);

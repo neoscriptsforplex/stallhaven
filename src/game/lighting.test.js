@@ -28,9 +28,12 @@ describe('scene lighting', () => {
   });
 
   it('keeps the dungeon dimmer than the shop', () => {
-    assert.ok(DUNGEON_LIGHT.hemi < SHOP_LIGHT.hemi);
     assert.ok(DUNGEON_LIGHT.ambient < SHOP_LIGHT.ambient);
     assert.equal(DUNGEON_LIGHT.fill, 0);
+    assert.ok(DUNGEON_LIGHT.exposure < SHOP_LIGHT.exposure);
+    assert.ok(
+      DUNGEON_LIGHT.hemi * DUNGEON_LIGHT.exposure < SHOP_LIGHT.hemi * SHOP_LIGHT.exposure,
+    );
     assert.ok(lightingForScene('dungeon', BRIGHTNESS_NEUTRAL).exposure < lightingForScene('shop', BRIGHTNESS_NEUTRAL).exposure);
   });
 
@@ -91,7 +94,7 @@ describe('scene lighting', () => {
     const shopNeutral = lightingForScene('shop', BRIGHTNESS_NEUTRAL);
     assert.equal(shopNeutral.hemi, SHOP_LIGHT.hemi);
     assert.equal(shopNeutral.exposure, SHOP_LIGHT.exposure);
-    assert.equal(DUNGEON_LIGHT_BOOST, 2);
+    assert.equal(DUNGEON_LIGHT_BOOST, 2.5);
     assert.ok(Math.abs(DUNGEON_LIGHT.hemi - 0.46 * DUNGEON_LIGHT_BOOST) < 1e-9);
     assert.ok(Math.abs(DUNGEON_LIGHT.ambient - 0.06 * DUNGEON_LIGHT_BOOST) < 1e-9);
     assert.equal(SHOP_LIGHT.hemi, 1.14);

@@ -1,11 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHOP } from './catalog.js';
-import { createState } from './economy.js';
-import { defaultFurniture, gardenTrapdoorSpot } from './layout.js';
+import { createState, removePlacedFurniture } from './economy.js';
+import { defaultFurniture, gardenTrapdoorSpot, walkFloors } from './layout.js';
 import {
   FLOOR,
   isWalkable,
+  liveObstacles,
   nearestWalkable,
   placementBlocked,
   planPlayerWalk,
@@ -83,6 +84,19 @@ describe('shop navigation', () => {
       { checkAisle: false },
     );
     assert.equal(againstWall, null);
+  });
+
+  it('frees a deleted shelf wall cell for a replacement', () => {
+    const state = createState();
+    const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
+    assert.ok(shelfIndex >= 0);
+    const pose = state.furniture.displays[shelfIndex];
+    const floors = walkFloors([]);
+    const occupied = placementBlocked(pose, 'shelf', liveObstacles(state), floors, { checkAisle: false });
+    assert.equal(occupied, 'That spot overlaps other furniture.');
+    assert.equal(removePlacedFurniture(state, shelfIndex), true);
+    const free = placementBlocked(pose, 'shelf', liveObstacles(state), floors, { checkAisle: false });
+    assert.equal(free, null);
   });
 
   it('walks from behind the counter onto the outdoor path and to the trapdoor', () => {

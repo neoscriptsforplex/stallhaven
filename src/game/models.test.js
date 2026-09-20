@@ -216,6 +216,23 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(expanded > origin);
   });
 
+  it('lights every dungeon wall with wall torches', () => {
+    const built = buildDungeon();
+    const walls = { west: 0, east: 0, north: 0, south: 0 };
+    built.root.traverse((child) => {
+      if (child.name !== 'torch') return;
+      const { x, z } = child.position;
+      if (x < -built.size.w / 2 + 0.5) walls.west += 1;
+      else if (x > built.size.w / 2 - 0.5) walls.east += 1;
+      else if (z < -built.size.d / 2 + 0.5) walls.north += 1;
+      else if (z > built.size.d / 2 - 0.5) walls.south += 1;
+    });
+    assert.ok(walls.west >= 2, `west ${walls.west}`);
+    assert.ok(walls.east >= 2, `east ${walls.east}`);
+    assert.ok(walls.north >= 2, `north ${walls.north}`);
+    assert.ok(walls.south >= 2, `south ${walls.south}`);
+  });
+
   it('pours water from the fountain spout', () => {
     const shop = buildShop([]).root;
     let fountain = null;

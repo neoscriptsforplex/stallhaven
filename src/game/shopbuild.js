@@ -1841,6 +1841,24 @@ function addDungeonRemains(root) {
   }
 }
 
+function addDungeonWallTorches(root, W = 11, D = 9) {
+  const y = 1.7;
+  const inset = 0.18;
+  const mounts = [
+    { x: -W / 2 + inset, z: -2.2, rot: Math.PI / 2 },
+    { x: -W / 2 + inset, z: 2.2, rot: Math.PI / 2 },
+    { x: W / 2 - inset, z: -2.2, rot: -Math.PI / 2 },
+    { x: W / 2 - inset, z: 2.2, rot: -Math.PI / 2 },
+    { x: -3, z: -D / 2 + inset, rot: 0 },
+    { x: 3, z: -D / 2 + inset, rot: 0 },
+    { x: -3, z: D / 2 - inset, rot: Math.PI },
+    { x: 3, z: D / 2 - inset, rot: Math.PI },
+  ];
+  for (const mount of mounts) {
+    addWallTorch(root, mount.x, y, mount.z, mount.rot, DUNGEON_LIGHT_BOOST);
+  }
+}
+
 export function buildDungeon() {
   const root = new THREE.Group();
   root.name = 'dungeon';
@@ -1878,10 +1896,7 @@ export function buildDungeon() {
     root.add(mesh);
   }
 
-  addWallTorch(root, -W / 2 + 0.18, 1.7, -2.2, Math.PI / 2, DUNGEON_LIGHT_BOOST);
-  addWallTorch(root, -W / 2 + 0.18, 1.7, 2.2, Math.PI / 2, DUNGEON_LIGHT_BOOST);
-  addWallTorch(root, W / 2 - 0.18, 1.7, -2.2, -Math.PI / 2, DUNGEON_LIGHT_BOOST);
-  addWallTorch(root, W / 2 - 0.18, 1.7, 2.2, -Math.PI / 2, DUNGEON_LIGHT_BOOST);
+  addDungeonWallTorches(root);
 
   const cobweb = () => {
     const group = new THREE.Group();

@@ -10,6 +10,7 @@ import {
   TRAPDOOR,
   cobblePathSpan,
   gardenBox,
+  gardenTrapdoorSpot,
   roomCenter,
   roomFloor,
 } from './layout.js';
@@ -108,8 +109,101 @@ function drawDot(ctx, pt, r, fill, stroke) {
 
 /** Outdoor trapdoor / dungeon entrance. Same visual weight as the fountain circle. */
 export const TRAPDOOR_MARKER_RADIUS = 5;
+export const TRAPDOOR_MARKER_FILE = 'minimap/trapdoor.png';
 
-function drawTrapdoorMarker(ctx, pt) {
+const BLACK_PUNCH = 24;
+let trapdoorIcon = null;
+let trapdoorIconTried = false;
+
+export function trapdoorMarkerUrls() {
+  let envBase = './';
+  try {
+    const raw = import.meta.env.BASE_URL || './';
+    envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  } catch {
+    envBase = './';
+  }
+  const roots = [`${envBase}minimap/`, `${envBase}public/minimap/`];
+  if (envBase !== './') roots.push('./minimap/', './public/minimap/');
+  return [...new Set(roots)].map((root) => `${root}trapdoor.png`);
+}
+
+function punchNearBlackBackdrop(img) {
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  if (!w || !h || typeof document === 'undefined') return img;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext?.('2d', { willReadFrequently: true });
+  if (!ctx?.drawImage || !ctx.getImageData) return img;
+  ctx.drawImage(img, 0, 0);
+  let imageData;
+  try {
+    imageData = ctx.getImageData(0, 0, w, h);
+  } catch {
+    return img;
+  }
+  const data = imageData.data;
+  const seen = new Uint8Array(w * h);
+  const stack = [];
+  const enqueue = (x, y) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    const i = y * w + x;
+    if (seen[i]) return;
+    seen[i] = 1;
+    const p = i * 4;
+    if (data[p + 3] > 0 && data[p] + data[p + 1] + data[p + 2] < BLACK_PUNCH) stack.push(i);
+  };
+  for (let x = 0; x < w; x += 1) {
+    enqueue(x, 0);
+    enqueue(x, h - 1);
+  }
+  for (let y = 0; y < h; y += 1) {
+    enqueue(0, y);
+    enqueue(w - 1, y);
+  }
+  while (stack.length) {
+    const i = stack.pop();
+    const x = i % w;
+    const y = (i - x) / w;
+    data[i * 4 + 3] = 0;
+    enqueue(x - 1, y);
+    enqueue(x + 1, y);
+    enqueue(x, y - 1);
+    enqueue(x, y + 1);
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
+function ensureTrapdoorIcon() {
+  if (trapdoorIcon) return trapdoorIcon;
+  if (trapdoorIconTried) return null;
+  trapdoorIconTried = true;
+  if (typeof Image !== 'function') return null;
+  try {
+    const urls = trapdoorMarkerUrls();
+    const img = new Image();
+    let next = 0;
+    const tryNext = () => {
+      if (next >= urls.length) return;
+      img.src = urls[next];
+      next += 1;
+    };
+    img.decoding = 'async';
+    img.onload = () => {
+      trapdoorIcon = punchNearBlackBackdrop(img);
+    };
+    img.onerror = tryNext;
+    tryNext();
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function drawTrapdoorFallback(ctx, pt) {
   const r = TRAPDOOR_MARKER_RADIUS;
   drawDot(ctx, pt, r, '#5a3a22', '#d8c4a0');
   ctx.fillStyle = '#7a5530';
@@ -117,6 +211,17 @@ function drawTrapdoorMarker(ctx, pt) {
   ctx.strokeStyle = '#3a2414';
   ctx.lineWidth = 1;
   ctx.strokeRect(pt.x - r * 0.45, pt.y - r * 0.45, r * 0.9, r * 0.9);
+}
+
+function drawTrapdoorMarker(ctx, pt) {
+  ensureTrapdoorIcon();
+  const icon = trapdoorIcon;
+  const size = TRAPDOOR_MARKER_RADIUS * 2;
+  if (icon) {
+    ctx.drawImage(icon, pt.x - size / 2, pt.y - size / 2, size, size);
+    return;
+  }
+  drawTrapdoorFallback(ctx, pt);
 }
 
 export function drawMinimap(ctx, snap) {
@@ -153,7 +258,8 @@ export function drawMinimap(ctx, snap) {
 
   const fountain = toMap(FOUNTAIN.x, FOUNTAIN.z);
   drawDot(ctx, fountain, 5, '#6a8aa8', '#d8e8f0');
-  drawTrapdoorMarker(ctx, toMap(TRAPDOOR.x, TRAPDOOR.z));
+  const hatch = gardenTrapdoorSpot(snap.expansions ?? []) ?? TRAPDOOR;
+  drawTrapdoorMarker(ctx, toMap(hatch.x, hatch.z));
 
   const counter = toMap(SHOP.counter.x, SHOP.counter.z);
   ctx.fillStyle = '#6a4220';

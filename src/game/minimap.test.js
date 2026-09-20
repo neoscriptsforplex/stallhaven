@@ -1,12 +1,17 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   MAP_ZOOM_MAX,
   MAP_ZOOM_MIN,
+  TRAPDOOR_MARKER_FILE,
   TRAPDOOR_MARKER_RADIUS,
   clampMapZoom,
   mapToWorld,
   shopMapBounds,
+  trapdoorMarkerUrls,
   worldToMap,
 } from './minimap.js';
 import { FOUNTAIN, TRAPDOOR } from './layout.js';
@@ -58,5 +63,15 @@ describe('minimap', () => {
     assert.ok(Math.abs(back.z - TRAPDOOR.z) < 1e-6);
     assert.equal(TRAPDOOR_MARKER_RADIUS, 5);
     assert.ok(Math.hypot(hatch.x - fountain.x, hatch.y - fountain.y) > 8);
+  });
+
+  it('ships a dungeon-entrance icon and looks it up from public/minimap', () => {
+    const pngPath = join(dirname(fileURLToPath(import.meta.url)), '../../public', TRAPDOOR_MARKER_FILE);
+    const png = readFileSync(pngPath);
+    assert.deepEqual([...png.slice(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    assert.ok(png.length > 100);
+    const urls = trapdoorMarkerUrls();
+    assert.ok(urls.some((url) => url.endsWith('minimap/trapdoor.png')));
+    assert.ok(urls.some((url) => url.includes('public/minimap/trapdoor.png')));
   });
 });

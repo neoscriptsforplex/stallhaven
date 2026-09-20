@@ -1207,6 +1207,51 @@ describe('ores, appearance, king, and chest bin', () => {
     assert.equal(MATERIALS.string, undefined);
   });
 
+  it('keeps Adamantite on rock and ore labels only', () => {
+    assert.equal(MATERIALS.adamant.name, 'Adamantite');
+    assert.equal(MATERIALS.adamant_bar.name, 'Adamant Bar');
+    assert.equal(METALS.find((metal) => metal.id === 'adamant')?.name, 'Adamant');
+    assert.equal(boulderInspect('adamant').name, 'Adamantite');
+    assert.notEqual(boulderInspect('adamant').name, 'Adamant Ore');
+
+    const adamantRecipes = recipeList().filter(
+      (recipe) => recipe.id === 'smelt_adamant' || recipe.id.startsWith('adamant_'),
+    );
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'weapon'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'armour'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'ammo'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'hatchet'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'pickaxe'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'smelt'));
+    assert.ok(adamantRecipes.length > 8, 'expected a full Adamant gear ladder');
+    for (const recipe of adamantRecipes) {
+      assert.equal(recipe.name.startsWith('Adamant '), true, `${recipe.id} should stay Adamant …`);
+      assert.equal(recipe.name.includes('Adamantite'), false, recipe.id);
+    }
+    assert.equal(RECIPES.smelt_adamant.name, 'Adamant Bar');
+    assert.equal(RECIPES.adamant_hatchet.name, 'Adamant Hatchet');
+    assert.equal(RECIPES.adamant_pickaxe.name, 'Adamant Pickaxe');
+    assert.equal(RECIPES.adamant_arrows.name, 'Adamant Arrows');
+
+    for (const recipe of recipeList()) {
+      assert.equal(recipe.name.includes('Adamantite'), false, recipe.id);
+    }
+    for (const material of Object.values(MATERIALS)) {
+      if (material.id === 'adamant') {
+        assert.equal(material.name, 'Adamantite');
+        continue;
+      }
+      assert.equal(material.name.includes('Adamantite'), false, material.id);
+    }
+
+    assert.match(costLabel(RECIPES.smelt_adamant), /Adamantite/);
+    assert.doesNotMatch(costLabel(RECIPES.adamant_dagger), /Adamantite/);
+    assert.match(costLabel(RECIPES.adamant_dagger), /Adamant Bar/);
+    assert.doesNotMatch(costLabel(RECIPES.adamant_hatchet), /Adamantite/);
+    assert.doesNotMatch(costLabel(RECIPES.adamant_pickaxe), /Adamantite/);
+    assert.doesNotMatch(costLabel(RECIPES.adamant_arrows), /Adamantite/);
+  });
+
   it('lists peach among skyboxes', () => {
     assert.ok(SKYBOXES.some((item) => item.id === 'peach'));
     assert.equal(SKYBOXES.find((item) => item.id === 'blue').id, 'blue');

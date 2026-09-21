@@ -1406,7 +1406,7 @@ export function bindHud(root, state, world) {
       } else {
         itemStatus.textContent = station.cost > 0
           ? `Costs ${formatGold(station.cost)} gp.`
-          : 'Free. Place it on the floor snap grid, then confirm.';
+          : 'Free.';
         itemStatus.classList.remove('craft-note');
         itemBuy.disabled = !canBuyStation(state, station.id);
         itemBuy.textContent = station.cost > 0

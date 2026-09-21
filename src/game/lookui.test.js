@@ -12,12 +12,27 @@ function slice(html, startId, endId) {
 }
 
 describe('player look UI', () => {
-  const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../index.html'), 'utf8');
+  const root = dirname(fileURLToPath(import.meta.url));
+  const html = readFileSync(join(root, '../../index.html'), 'utf8');
+  const hud = readFileSync(join(root, 'hud.js'), 'utf8');
 
   it('covers the canvas with a black loading bar until models are ready', () => {
     assert.match(html, /id="boot-cover"/);
     assert.match(html, /data-boot-bar/);
     assert.match(html, /data-boot-label/);
+  });
+
+  it('states furnace and range place/cost once on Upgrade cards', () => {
+    const build = slice(html, 'id="build-dock"', 'id="place-dock"');
+    const furnace = build.slice(build.indexOf('Furnace'), build.indexOf('Cooking Range'));
+    const range = build.slice(build.indexOf('Cooking Range'), build.indexOf('Spinning Wheel'));
+    assert.equal((furnace.match(/Place it on the floor snap grid/g) ?? []).length, 1);
+    assert.equal((range.match(/Place it on the floor snap grid/g) ?? []).length, 1);
+    assert.match(furnace, /data-furnace-status class="meta">Free\.</);
+    assert.match(range, /data-range-status class="meta">Free\.</);
+    assert.equal(furnace.includes('Free. Place it on the floor snap grid, then confirm.'), false);
+    assert.equal(range.includes('Free. Place it on the floor snap grid, then confirm.'), false);
+    assert.equal(hud.includes('Free. Place it on the floor snap grid, then confirm.'), false);
   });
 
   it('does not show old buyer class names in Help', () => {

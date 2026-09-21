@@ -1,4 +1,4 @@
-# Rune Craft - A Runescape Fan Game
+# Rune Craft - A Runescape Tycoon Fan Game
 
 A free browser game.
 

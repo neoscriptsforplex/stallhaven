@@ -36,6 +36,7 @@ import {
   SHELF_SLOT_COUNT,
   SHELF_SLOT_LABELS,
   offerClassOf,
+  customerName,
   defaultAppearance,
 } from './catalog.js';
 import {
@@ -545,6 +546,24 @@ describe('catalog', () => {
     assert.equal(RECIPES.green_dhide_body.tier, 1);
     assert.equal(RECIPES.blue_dhide_body.tier, 2);
     assert.equal(RECIPES.blue_dhide_coif.name, "Blue D'hide Coif");
+    for (const piece of ['coif', 'body', 'chaps', 'vambraces', 'boots']) {
+      const green = RECIPES[`green_dhide_${piece}`];
+      const blue = RECIPES[`blue_dhide_${piece}`];
+      const red = RECIPES[`red_dhide_${piece}`];
+      assert.ok(green && blue && red, piece);
+      assert.equal(green.tier, 1, `${piece} green tier`);
+      assert.equal(blue.tier, 2, `${piece} blue tier`);
+      assert.equal(green.previousId, null);
+      assert.equal(blue.previousId, `green_dhide_${piece}`);
+      assert.equal(red.previousId, `blue_dhide_${piece}`);
+      assert.ok(green.price < blue.price, `${piece} green should sell below blue`);
+      assert.ok(green.time < blue.time, `${piece} green should craft faster than blue`);
+      assert.ok((green.cost?.gold ?? 0) < (blue.cost?.gold ?? 0), `${piece} green gold cost`);
+      assert.equal(green.unlockNeed, 0);
+      assert.equal(blue.unlockNeed, 20);
+      assert.equal(isUnlocked(createState(), green.id), true);
+      assert.equal(isUnlocked(createState(), blue.id), false);
+    }
     assert.equal(RECIPES.black_dhide_coif.slot, 'helm');
     assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
     assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
@@ -1714,6 +1733,12 @@ describe('customer look packs', () => {
     assert.equal(CUSTOMERS.pilgrim.name, 'Adventurer');
     assert.equal(CUSTOMERS.mercenary.name, 'Guard');
     assert.equal(CUSTOMERS.hedgemage.name, 'Wizard');
+    assert.equal(customerName('pilgrim'), 'Adventurer');
+    assert.equal(customerName('mercenary'), 'Guard');
+    assert.equal(customerName('hedgemage'), 'Wizard');
+    assert.equal(customerName('pilgrim', { plural: true }), 'Adventurers');
+    assert.equal(customerName('mercenary', { plural: true }), 'Guards');
+    assert.equal(customerName('hedgemage', { plural: true }), 'Wizards');
   });
 });
 

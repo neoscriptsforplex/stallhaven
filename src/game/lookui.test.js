@@ -20,6 +20,13 @@ describe('player look UI', () => {
     assert.match(html, /data-boot-label/);
   });
 
+  it('does not show old buyer class names in Help', () => {
+    const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
+    assert.equal(help.includes('Pilgrim'), false);
+    assert.equal(help.includes('Mercenary'), false);
+    assert.equal(help.includes('Hedge Mage'), false);
+  });
+
   it('names dungeon adamant rocks Adamantite in Help, not Adamant Ore', () => {
     const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
     assert.match(help, /Adamantite/);

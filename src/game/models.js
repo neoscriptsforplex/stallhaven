@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   CUSTOMERS,
+  customerName,
   pickMageRobes,
   pickMercenaryPlate,
   pickPilgrimCiv,
@@ -2787,7 +2788,7 @@ export function buildAdventurer(typeId, opts = {}) {
   const dress = CUSTOMER_LOOKS[lookId] ?? dressPilgrim;
   const labelY = dress(group, { type, pose, rand, typeId, set: lookSet }) ?? pose.headTop + 0.24;
 
-  const label = makeNameSprite(type.name);
+  const label = makeNameSprite(customerName(typeId));
   label.position.y = labelY;
   group.add(label);
 

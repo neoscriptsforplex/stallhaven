@@ -775,6 +775,7 @@ export const CUSTOMERS = {
   pilgrim: {
     id: 'pilgrim',
     name: 'Adventurer',
+    namePlural: 'Adventurers',
     combatClass: null,
     prefers: [
       ...FOOD_LINE.map((food) => food.id),
@@ -793,6 +794,7 @@ export const CUSTOMERS = {
   mercenary: {
     id: 'mercenary',
     name: 'Guard',
+    namePlural: 'Guards',
     combatClass: 'melee',
     prefers: Object.values(RECIPES)
       .filter((recipe) => (
@@ -812,6 +814,7 @@ export const CUSTOMERS = {
   ranger: {
     id: 'ranger',
     name: 'Ranger',
+    namePlural: 'Rangers',
     combatClass: 'range',
     prefers: Object.values(RECIPES)
       .filter((recipe) => (
@@ -831,6 +834,7 @@ export const CUSTOMERS = {
   hedgemage: {
     id: 'hedgemage',
     name: 'Wizard',
+    namePlural: 'Wizards',
     combatClass: 'magic',
     prefers: Object.values(RECIPES)
       .filter((recipe) => recipe.combatClass === 'magic' || ['magic_potion', 'prayer_potion'].includes(recipe.id))
@@ -1085,6 +1089,14 @@ export function offerClassLabel(cls) {
   if (cls === 'food') return 'Food';
   if (cls === 'potion') return 'Potion';
   return 'matching';
+}
+
+/** Player-facing buyer label. Internal ids (pilgrim / mercenary / hedgemage) stay for saves. */
+export function customerName(id, { plural = false } = {}) {
+  const customer = CUSTOMERS[id];
+  if (!customer) return id;
+  if (plural) return customer.namePlural ?? `${customer.name}s`;
+  return customer.name;
 }
 
 export function classLabel(combatClass, category = null) {

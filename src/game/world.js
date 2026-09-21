@@ -21,6 +21,7 @@ import {
   emptyShelfSlots,
   mostExpensiveChestId,
   scheduleKingRoald,
+  customerName,
   shelfSlotPoses,
   SHELF_SLOT_COUNT,
 } from './catalog.js';
@@ -1758,7 +1759,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (typeId === 'kingroald') {
       pushLog(state, `King Roald arrives, seeking ${RECIPES[request.recipeId].name}.`);
     } else {
-      pushLog(state, `${CUSTOMERS[typeId].name} looks around for ${RECIPES[request.recipeId].name}.`);
+      pushLog(state, `${customerName(typeId)} looks around for ${RECIPES[request.recipeId].name}.`);
     }
   }
 
@@ -1862,7 +1863,7 @@ export function createWorld(canvas, state, opts = {}) {
           actor.id === tradingId ? 0xf0d27a : have ? 0x8ecf4a : 0xe8b45a,
         );
         if (now >= actor.waitUntil) {
-          pushLog(state, `${CUSTOMERS[actor.typeId].name} grows tired and leaves.`);
+          pushLog(state, `${customerName(actor.typeId)} grows tired and leaves.`);
           dismissCustomer(actor, false);
         }
       } else if (actor.state === 'leave') {

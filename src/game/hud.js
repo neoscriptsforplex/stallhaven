@@ -1,7 +1,6 @@
 import {
   ANVIL_TABS,
   anvilSubtabsForTab,
-  CUSTOMERS,
   FACE_HAIR,
   HAIR_STYLES,
   MATERIALS,
@@ -12,6 +11,7 @@ import {
   anvilTabForRecipe,
   classLabel,
   costLabel,
+  customerName,
   defaultAppearance,
   displayKind,
   formatGold,
@@ -883,7 +883,7 @@ export function bindHud(root, state, world) {
     const have = hasStock(state, actor.requestRecipeId);
     const offer = actor.offer;
     const offerMat = offer ? MATERIALS[offer.materialId] : null;
-    tradeModal.querySelector('[data-trade-title]').textContent = CUSTOMERS[actor.typeId].name;
+    tradeModal.querySelector('[data-trade-title]').textContent = customerName(actor.typeId);
     tradeModal.querySelector('[data-trade-want]').textContent = `Wants ${recipe.name}.`;
     tradeModal.querySelector('[data-trade-offer]').textContent = `Offers ${formatGold(actor.offerGold)}g.`;
     const haveEl = tradeModal.querySelector('[data-trade-have]');
@@ -1009,7 +1009,7 @@ export function bindHud(root, state, world) {
       return;
     }
     playClick('trade');
-    pushLog(state, `Sold ${RECIPES[recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${formatGold(paid)}g.`);
+    pushLog(state, `Sold ${RECIPES[recipeId].name} to ${customerName(actor.typeId)} for ${formatGold(paid)}g.`);
     world.sellToActor(actor);
     world.syncDisplays();
     closeTrade();
@@ -1019,7 +1019,7 @@ export function bindHud(root, state, world) {
   tradeModal.querySelector('[data-trade-refuse]').addEventListener('click', () => {
     const actor = tradeActor && world.getCustomer(tradeActor.id);
     if (actor) {
-      pushLog(state, `You refuse ${CUSTOMERS[actor.typeId].name}.`);
+      pushLog(state, `You refuse ${customerName(actor.typeId)}.`);
       world.refuseActor(actor);
     }
     closeTrade();
@@ -1032,7 +1032,7 @@ export function bindHud(root, state, world) {
     if (buyFromCustomer(state, actor.offer.materialId, actor.offer.price)) {
       playClick('trade');
       const mat = MATERIALS[actor.offer.materialId];
-      pushLog(state, `Bought ${mat.name} from ${CUSTOMERS[actor.typeId].name} for ${formatGold(actor.offer.price)}g.`);
+      pushLog(state, `Bought ${mat.name} from ${customerName(actor.typeId)} for ${formatGold(actor.offer.price)}g.`);
       world.buyFromActor(actor);
       closeTrade();
       render(performance.now() / 1000);
@@ -1132,7 +1132,7 @@ export function bindHud(root, state, world) {
       return;
     }
     playClick('trade');
-    pushLog(state, `Offered ${RECIPES[choice.recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${formatGold(paid)}g (reduced from ${formatGold(choice.listPrice)}g).`);
+    pushLog(state, `Offered ${RECIPES[choice.recipeId].name} to ${customerName(actor.typeId)} for ${formatGold(paid)}g (reduced from ${formatGold(choice.listPrice)}g).`);
     actor.requestRecipeId = choice.recipeId;
     world.sellToActor(actor);
     world.syncDisplays();

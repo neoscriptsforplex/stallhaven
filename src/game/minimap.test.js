@@ -63,7 +63,7 @@ describe('minimap', () => {
     assert.ok(Math.abs(back.z - TRAPDOOR.z) < 1e-6);
     assert.equal(TRAPDOOR_MARKER_RADIUS, 5);
     assert.ok(Math.hypot(hatch.x - fountain.x, hatch.y - fountain.y) > 8);
-    assert.ok(TRAPDOOR.x < 0, 'marker follows the hatch on the left of the path');
+    assert.ok(TRAPDOOR.x > 0, 'marker follows the hatch on the right of the path');
   });
 
   it('ships a dungeon-entrance icon and looks it up from public/minimap', () => {

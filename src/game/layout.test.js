@@ -256,7 +256,7 @@ describe('layout numbers', () => {
   });
 
   it('treats the dungeon hatch opening as a grass-free hole', () => {
-    assert.ok(TRAPDOOR.x < -PATH_HALF_W, 'hatch sits on the left of the cobble path');
+    assert.ok(TRAPDOOR.x > PATH_HALF_W, 'hatch sits on the right of the cobble path');
     assert.equal(pointHitsTrapdoor(TRAPDOOR.x, TRAPDOOR.z), true);
     assert.equal(pointHitsTrapdoor(TRAPDOOR.x + TRAPDOOR_HOLE_CLEAR + 0.02, TRAPDOOR.z), false);
     assert.ok(gardenTrapdoorSpot([]));

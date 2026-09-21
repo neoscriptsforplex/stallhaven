@@ -25,13 +25,20 @@ function hasWebGL() {
 
 function setBootProgress(done, total, text) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  if (bootBar) bootBar.style.width = `${pct}%`;
+  if (bootBar) {
+    bootBar.style.width = `${Math.max(8, pct)}%`;
+    if (total > 0) bootBar.classList.add('is-progress');
+  }
   if (bootLabel) bootLabel.textContent = text ?? `Loading models… ${pct}%`;
 }
 
 function hideBootCover() {
+  document.documentElement.classList.remove('is-booting');
   if (!bootCover) return;
-  bootCover.hidden = true;
+  bootCover.classList.add('is-leaving');
+  window.setTimeout(() => {
+    bootCover.hidden = true;
+  }, 380);
 }
 
 if (!hasWebGL()) {
@@ -90,6 +97,8 @@ async function bootGame() {
   });
   world.tick(0, performance.now() / 1000);
   hud.render(performance.now() / 1000);
+  setBootProgress(1, 1, 'Ready.');
+  await new Promise((resolve) => requestAnimationFrame(() => resolve()));
   hideBootCover();
   await hud.tryStartMusic?.();
 

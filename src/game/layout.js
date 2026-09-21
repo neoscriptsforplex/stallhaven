@@ -48,8 +48,9 @@ export const CHEST_YAW_CLOCKWISE = furnitureRotateDelta('chest') * 6;
  * stay on the gameplay facing.
  */
 export const FURNITURE_START_YAW = {
-  // Latch (dump local −X) faces the counter / room center from the right-back pad.
-  // Two 90° furniture-Rotate turns from the upright door-wall yaw. No pitch/roll.
+  // First-load screenshot: right-back pad, long axis along X, gold latch into
+  // the room toward the counter (dump local −X at visual yaw 0). Same +Y axis
+  // as furniture Rotate. Two 90° Rotate turns from the upright door-wall yaw.
   chest: CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE * 2,
   range: -Math.PI / 2,
   furnace: -Math.PI / 2,
@@ -103,7 +104,7 @@ export const GRASS_PAD = 9;
 export const FOUNTAIN = { x: 0, z: 8.85, radius: 0.7, apron: 1.42 };
 export const PATH_HALF_W = 0.72;
 export const PATH_START_Z = 4.22;
-export const TRAPDOOR = { x: -3.35, z: 9.55 };
+export const TRAPDOOR = { x: 3.35, z: 9.55 };
 /** Keep lawn blades off the dark hatch opening; rim grass on the rock can stay. */
 export const TRAPDOOR_HOLE_CLEAR = 0.38;
 /** Shop plank / station floor plane. Bundled chests sit on this, not at y=0. */

@@ -1,11 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="is-booting">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rune Craft</title>
     <meta name="description" content="Rune Craft. Craft gear into a chest, then trade with travelers at the counter." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%236b4423' width='64' height='64' rx='10'/%3E%3Cpath fill='%23e8c37a' d='M12 40h40v8H12z'/%3E%3Cpath fill='%238b4336' d='M8 20h48l-6 12H14z'/%3E%3C/svg%3E" />
+    <style>
+      html.is-booting, html.is-booting body { background: #050403; }
+      html.is-booting #view,
+      html.is-booting #hud,
+      html.is-booting #save-bar { visibility: hidden !important; }
+    </style>
     <link rel="stylesheet" href="./src/style.css" />
     <script type="importmap">
       {

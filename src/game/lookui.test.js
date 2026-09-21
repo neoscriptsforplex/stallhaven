@@ -14,6 +14,8 @@ function slice(html, startId, endId) {
 describe('player look UI', () => {
   const root = dirname(fileURLToPath(import.meta.url));
   const html = readFileSync(join(root, '../../index.html'), 'utf8');
+  const css = readFileSync(join(root, '../style.css'), 'utf8');
+  const main = readFileSync(join(root, '../main.js'), 'utf8');
   const hud = readFileSync(join(root, 'hud.js'), 'utf8');
 
   it('documents middle-mouse orbit next to the existing arrow-key rotate', () => {
@@ -23,9 +25,18 @@ describe('player look UI', () => {
   });
 
   it('covers the canvas with a black loading bar until models are ready', () => {
+    assert.match(html, /class="is-booting"/);
     assert.match(html, /id="boot-cover"/);
     assert.match(html, /data-boot-bar/);
     assert.match(html, /data-boot-label/);
+    assert.match(html, /html.is-booting #view/);
+    assert.match(css, /#boot-cover\.is-leaving/);
+    assert.match(css, /@keyframes boot-slide/);
+    assert.match(main, /classList.remove\('is-booting'\)/);
+    assert.match(main, /requestAnimationFrame/);
+    assert.match(main, /setBundledLooks/);
+    assert.ok(main.indexOf('setBundledLooks') < main.indexOf('createWorld'));
+    assert.ok(main.indexOf('world.tick') < main.indexOf('hideBootCover'));
   });
 
   it('labels the shop placement panel Build, not Upgrade', () => {

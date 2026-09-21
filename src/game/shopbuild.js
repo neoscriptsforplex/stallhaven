@@ -110,6 +110,67 @@ function cobbleMap() {
 
 const COBBLE_U = 4.2 / ROOM_W;
 const COBBLE_V = 2.6 / 2.7;
+/** Path-only UV scale: cobbles read about 3× smaller than the wall stone. */
+export const PATH_COBBLE_SCALE = 3;
+const PATH_COBBLE_U = COBBLE_U * PATH_COBBLE_SCALE;
+
+let cachedGrass = null;
+
+function grassGroundMap() {
+  if (cachedGrass) return cachedGrass.clone();
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#4a6e32';
+  ctx.fillRect(0, 0, 256, 256);
+  let seed = 11027;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+  const blobs = [
+    ['#6a9a3a', 70],
+    ['#3d6a2c', 55],
+    ['#5c8234', 50],
+    ['#8a7a3a', 28],
+    ['#6b5428', 18],
+    ['#c4a06a', 12],
+  ];
+  for (const [color, count] of blobs) {
+    ctx.fillStyle = color;
+    for (let i = 0; i < count; i += 1) {
+      const x = rand() * 256;
+      const y = rand() * 256;
+      const r = 8 + rand() * 28;
+      ctx.globalAlpha = 0.22 + rand() * 0.38;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * (0.55 + rand() * 0.7), rand() * Math.PI, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  cachedGrass = tex;
+  return tex.clone();
+}
+
+function grassGroundMat(width, depth) {
+  const map = grassGroundMap();
+  const span = Math.max(width, depth, 1);
+  map.repeat.set(span * 0.22, span * 0.22);
+  return new THREE.MeshStandardMaterial({
+    map,
+    color: 0xffffff,
+    roughness: 1,
+    metalness: 0,
+  });
+}
 
 function cobbleMat(repeatX, repeatY, offsetX = 0, offsetY = 0) {
   const map = cobbleMap();
@@ -1380,10 +1441,13 @@ function addGarden(root, cells, expansionIds = []) {
     box.maxZ = Math.max(box.maxZ, c.z + ROOM_D / 2);
   }
   const grass = gardenBox(expansionIds);
+  const grassW = grass.maxX - grass.minX;
+  const grassD = grass.maxZ - grass.minZ;
   const grassMesh = addShadow(new THREE.Mesh(
-    new THREE.PlaneGeometry(grass.maxX - grass.minX, grass.maxZ - grass.minZ),
-    new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 }),
+    new THREE.PlaneGeometry(grassW, grassD),
+    grassGroundMat(grassW, grassD),
   ));
+  grassMesh.name = 'grass-ground';
   grassMesh.rotation.x = -Math.PI / 2;
   grassMesh.position.set((grass.minX + grass.maxX) / 2, -0.02, (grass.minZ + grass.maxZ) / 2);
   grassMesh.userData.kind = 'ground';
@@ -1444,7 +1508,7 @@ function addPathRect(root, minX, maxX, minZ, maxZ) {
   if (w < 0.05 || d < 0.05) return;
   const mesh = addShadow(new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
-    cobbleMat(w * COBBLE_U, d * COBBLE_U),
+    cobbleMat(w * PATH_COBBLE_U, d * PATH_COBBLE_U),
   ));
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set((minX + maxX) / 2, -0.008, (minZ + maxZ) / 2);
@@ -1464,7 +1528,7 @@ function addCobblePath(root, expansionIds = []) {
     addPathRect(root, span.minX, span.maxX, FOUNTAIN.z + apron, span.maxZ);
     const ring = addShadow(new THREE.Mesh(
       new THREE.RingGeometry(FOUNTAIN.radius + 0.04, apron, 28),
-      cobbleMat(apron * 2 * COBBLE_U, apron * 2 * COBBLE_U),
+      cobbleMat(apron * 2 * PATH_COBBLE_U, apron * 2 * PATH_COBBLE_U),
     ));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(FOUNTAIN.x, -0.006, FOUNTAIN.z);

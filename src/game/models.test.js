@@ -35,7 +35,7 @@ import {
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, ESSENCE_OLD_XZ, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -157,6 +157,21 @@ describe('outdoor and dungeon extras', () => {
     });
     assert.equal(ivorySpheres, 0);
     assert.equal(namedSkeleton, 0);
+  });
+
+  it('paints outdoor grass as mottled greens with dry tan patches', () => {
+    const shop = buildShop([]).root;
+    let ground = null;
+    shop.traverse((child) => {
+      if (child.name === 'grass-ground') ground = child;
+    });
+    assert.ok(ground, 'garden should have a grass ground plane');
+    assert.ok(ground.material?.map, 'grass ground should use a mottled texture, not a flat color');
+    assert.ok((ground.material.map.repeat?.x ?? 0) > 1);
+  });
+
+  it('tiles the cobble path about 3× finer than the wall stone scale', () => {
+    assert.equal(PATH_COBBLE_SCALE, 3);
   });
 
   it('instances many grass blades and clears them inside a left expansion', () => {

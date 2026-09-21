@@ -402,11 +402,12 @@ describe('save and load', () => {
       gold: 0,
       furniture: {
         ...defaults,
-        chest: { x: 2.55, z: -2.22, rot: 0 },
+        chest: { x: 2.55, z: -2.22, rot: Math.PI / 2 },
       },
     }), true);
     assert.ok(Math.abs(state.furniture.chest.x - SHOP.chest.x) < 1e-6);
     assert.ok(Math.abs(state.furniture.chest.z - SHOP.chest.z) < 1e-6);
+    assert.equal(state.furniture.chest.rot, 0);
     assert.ok(state.furniture.chest.x > 3.4);
   });
 });

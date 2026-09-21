@@ -48,10 +48,9 @@ export const CHEST_YAW_CLOCKWISE = furnitureRotateDelta('chest') * 6;
  * stay on the gameplay facing.
  */
 export const FURNITURE_START_YAW = {
-  // Flush on the right stone wall: dump latch (local −X) faces the counter.
-  // Same +Y axis as furniture Rotate. Visual yaw 0 (two 90° Rotate turns
-  // from the upright door-wall yaw).
-  chest: CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE * 2,
+  // Right-wall load screenshot: one 90° furniture-Rotate turn from the
+  // upright door-wall yaw. Same +Y axis, no pitch. Front into the shop.
+  chest: CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE,
   range: -Math.PI / 2,
   furnace: -Math.PI / 2,
   counter: Math.PI,

@@ -1260,7 +1260,7 @@ export function applyState(state, data) {
         if (oldStarterPads.some((pad) => (
           Math.abs(pose.x - pad.x) < 1e-6 && Math.abs(pose.z - pad.z) < 1e-6
         ))) {
-          return { ...pose, x: defaults.chest.x, z: defaults.chest.z };
+          return { x: defaults.chest.x, z: defaults.chest.z, rot: FURNITURE_FORWARD };
         }
         return pose;
       })(),

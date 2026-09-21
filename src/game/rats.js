@@ -2,6 +2,19 @@
 
 export const RAT_BOUNDS = { minX: -4.35, maxX: 4.35, minZ: -3.35, maxZ: 3.35 };
 
+/**
+ * Dump snout faces local +X. Bake this yaw so +Z is forward, matching the
+ * procedural rat and wander heading (Math.atan2(dx, dz)).
+ */
+export const RAT_DUMP_YAW = -Math.PI / 2;
+
+/** Extra yaw on the wander root after the mesh faces +Z. Keep 0 unless a pack needs it. */
+export const RAT_FACE_YAW = 0;
+
+export function ratHeading(dx, dz) {
+  return Math.atan2(dx, dz) + RAT_FACE_YAW;
+}
+
 export function randomRatGoal(rng = Math.random) {
   return {
     x: RAT_BOUNDS.minX + rng() * (RAT_BOUNDS.maxX - RAT_BOUNDS.minX),
@@ -45,7 +58,7 @@ export function stepRatWander(rat, dt, now, rng = Math.random) {
   rat.position.z += dz * t;
   rat.position.x = Math.min(RAT_BOUNDS.maxX, Math.max(RAT_BOUNDS.minX, rat.position.x));
   rat.position.z = Math.min(RAT_BOUNDS.maxZ, Math.max(RAT_BOUNDS.minZ, rat.position.z));
-  rat.rotation.y = Math.atan2(dx, dz);
+  rat.rotation.y = ratHeading(dx, dz);
   rat.position.y = 0.06 + Math.abs(Math.sin(now * 11 + wander.speed * 4)) * 0.018;
   return rat;
 }

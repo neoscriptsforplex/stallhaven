@@ -34,6 +34,7 @@ import {
 } from './models.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
+import { RAT_DUMP_YAW } from './rats.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, ESSENCE_OLD_XZ, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
@@ -782,6 +783,25 @@ describe('bundled prop swaps', () => {
       });
     } finally {
       setBundledLook('chest', null);
+    }
+  });
+
+  it('bakes the bundled rat dump so the snout faces +Z with wander heading', async () => {
+    const bundled = await loadFolder('rat');
+    const target = buildRat();
+    const raw = wrapBundledProp(bundled, target, { name: 'rat', fit: 'max' });
+    const faced = wrapBundledProp(bundled, target, { name: 'rat', fit: 'max', rotateY: RAT_DUMP_YAW });
+    const rawSize = measureVisibleBox(raw).getSize(new THREE.Vector3());
+    const facedSize = measureVisibleBox(faced).getSize(new THREE.Vector3());
+    assert.ok(rawSize.x > rawSize.z, `dump length should start on X, got ${rawSize.x} x ${rawSize.z}`);
+    assert.ok(facedSize.z > facedSize.x, `baked dump should run along Z, got ${facedSize.x} x ${facedSize.z}`);
+    setBundledLook('rat', bundled);
+    try {
+      const live = buildRat();
+      const liveSize = measureVisibleBox(live).getSize(new THREE.Vector3());
+      assert.ok(liveSize.z > liveSize.x, `live rat should face +Z, got ${liveSize.x} x ${liveSize.z}`);
+    } finally {
+      setBundledLook('rat', null);
     }
   });
 

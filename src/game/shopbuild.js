@@ -24,7 +24,7 @@ import {
 } from './layout.js';
 import { METALS } from './catalog.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
-import { initRatWander } from './rats.js';
+import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
 import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp } from './models.js';
 
@@ -2069,7 +2069,7 @@ export function buildRat() {
   const bundled = getBundledLook('rat');
   if (bundled) {
     const target = buildProceduralRat();
-    return wrapBundledProp(bundled, target, { name: 'rat', fit: 'max' });
+    return wrapBundledProp(bundled, target, { name: 'rat', fit: 'max', rotateY: RAT_DUMP_YAW });
   }
   return buildProceduralRat();
 }

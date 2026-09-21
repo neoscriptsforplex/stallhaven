@@ -314,16 +314,16 @@ export function craftBlockReason(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 'Unknown recipe.';
   if (recipe.category === 'potion' && !ownsCauldron(state)) {
-    return 'Place a cauldron from Upgrade to brew potions.';
+    return 'Place a cauldron from Build to brew potions.';
   }
   if (recipe.category === 'food' && !ownsRange(state)) {
-    return 'Place a cooking range from Upgrade to bake food.';
+    return 'Place a cooking range from Build to bake food.';
   }
   if (recipe.category === 'smelt' && !ownsFurnace(state)) {
-    return 'Place a furnace from Upgrade to smelt ores into bars.';
+    return 'Place a furnace from Build to smelt ores into bars.';
   }
   if (recipe.category === 'spin' && !ownsWheel(state)) {
-    return 'Place a spinning wheel from Upgrade to spin flax into bow string.';
+    return 'Place a spinning wheel from Build to spin flax into bow string.';
   }
   if (!isUnlocked(state, recipeId)) {
     const remain = unlockRemaining(state, recipeId);

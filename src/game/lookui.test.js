@@ -16,13 +16,30 @@ describe('player look UI', () => {
   const html = readFileSync(join(root, '../../index.html'), 'utf8');
   const hud = readFileSync(join(root, 'hud.js'), 'utf8');
 
+  it('documents middle-mouse orbit next to the existing arrow-key rotate', () => {
+    const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
+    assert.match(help, /middle mouse button and drag/);
+    assert.match(help, /arrow keys/);
+  });
+
   it('covers the canvas with a black loading bar until models are ready', () => {
     assert.match(html, /id="boot-cover"/);
     assert.match(html, /data-boot-bar/);
     assert.match(html, /data-boot-label/);
   });
 
-  it('states furnace and range place/cost once on Upgrade cards', () => {
+  it('labels the shop placement panel Build, not Upgrade', () => {
+    assert.match(html, /id="build-btn"[^>]*>Build</);
+    assert.match(html, /id="build-btn"[^>]*aria-label="Build"/);
+    const build = slice(html, 'id="build-dock"', 'id="place-dock"');
+    assert.match(build, /<h2>Build<\/h2>/);
+    assert.equal(build.includes('<h2>Upgrade</h2>'), false);
+    const chest = slice(html, 'id="chest-upgrade-modal"', 'id="expand-dock"');
+    assert.match(chest, /<h2>Upgrade Chest<\/h2>/);
+    assert.match(chest, /data-upgrade-buy>Upgrade</);
+  });
+
+  it('states furnace and range place/cost once on Build cards', () => {
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
     const furnace = build.slice(build.indexOf('Furnace'), build.indexOf('Cooking Range'));
     const range = build.slice(build.indexOf('Cooking Range'), build.indexOf('Spinning Wheel'));

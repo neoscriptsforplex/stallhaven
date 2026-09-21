@@ -1048,7 +1048,7 @@ export function bindHud(root, state, world) {
     const recipe = RECIPES[actor.requestRecipeId];
     const craftNote = tradeModal.querySelector('[data-trade-craft-note]');
     if (recipe?.category === 'potion' && !ownsCauldron(state)) {
-      const msg = 'Place a cauldron from Upgrade to brew potions.';
+      const msg = 'Place a cauldron from Build to brew potions.';
       if (craftNote) {
         craftNote.hidden = false;
         craftNote.textContent = msg;

@@ -854,7 +854,7 @@ describe('cauldron unlock', () => {
   it('brews potions only after a cauldron is placed, using herbs and water', () => {
     const state = createState();
     assert.match(craftBlockReason(state, 'strength_potion'), /cauldron/i);
-    assert.match(craftBlockReason(state, 'strength_potion'), /Upgrade/);
+    assert.match(craftBlockReason(state, 'strength_potion'), /Build/);
     assert.equal(canCraft(state, 'strength_potion'), false);
     assert.equal(isUnlocked(state, 'prayer_potion'), false);
     state.gold = CAULDRON_COST;

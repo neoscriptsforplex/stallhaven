@@ -35,6 +35,7 @@ import {
   pointHitsTrapdoor,
   TRAPDOOR,
   TRAPDOOR_HOLE_CLEAR,
+  PATH_HALF_W,
   gardenGrassClusters,
   gardenBox,
   cobblePathSpan,
@@ -108,21 +109,22 @@ describe('layout numbers', () => {
     assert.equal(occupiedCells(['left', 'back']).length, 3);
   });
 
-  it('yaws the chest 90° clockwise from the upright door-wall facing, and range/furnace −90° at start only', () => {
+  it('yaws the chest latch into the room toward the counter, and range/furnace −90° at start only', () => {
     // Gameplay yaw still uses furniture.rot. Start yaw is around +Y only — never X pitch.
+    const wrapTau = (yaw) => ((yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
     assert.equal(CHEST_UPRIGHT_YAW, Math.PI);
     assert.equal(furnitureRotateDelta('chest'), FURNITURE_ROT_STEP);
     assert.equal(furnitureRotateDelta('anvil'), FURNITURE_ROT_STEP);
     assert.ok(Math.abs(furnitureRotateDelta('shelf') - Math.PI / 2) < 1e-9);
     assert.ok(Math.abs(CHEST_YAW_CLOCKWISE - furnitureRotateDelta('chest') * 6) < 1e-9);
     assert.ok(Math.abs(CHEST_YAW_CLOCKWISE - Math.PI / 2) < 1e-9);
-    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE)) < 1e-9);
-    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (Math.PI + Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE * 2)) < 1e-9);
+    assert.ok(Math.abs(wrapTau(FURNITURE_START_YAW.chest) - 0) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.range - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.furnace - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.counter - Math.PI) < 1e-9);
     assert.equal(FURNITURE_START_YAW.anvil, undefined);
-    assert.ok(Math.abs(furnitureVisualYaw('chest', 0) - (Math.PI + Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(wrapTau(furnitureVisualYaw('chest', 0)) - 0) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('range', FURNITURE_ROT_STEP) - (-Math.PI / 2 + FURNITURE_ROT_STEP)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('furnace', 0) - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('counter', 0) - Math.PI) < 1e-9);
@@ -254,9 +256,11 @@ describe('layout numbers', () => {
   });
 
   it('treats the dungeon hatch opening as a grass-free hole', () => {
+    assert.ok(TRAPDOOR.x < -PATH_HALF_W, 'hatch sits on the left of the cobble path');
     assert.equal(pointHitsTrapdoor(TRAPDOOR.x, TRAPDOOR.z), true);
     assert.equal(pointHitsTrapdoor(TRAPDOOR.x + TRAPDOOR_HOLE_CLEAR + 0.02, TRAPDOOR.z), false);
     assert.ok(gardenTrapdoorSpot([]));
+    assert.equal(gardenTrapdoorSpot([]).x, TRAPDOOR.x);
   });
 
   it('snaps furniture on both floor axes, not only sideways', () => {

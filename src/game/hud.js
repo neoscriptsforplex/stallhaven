@@ -15,6 +15,7 @@ import {
   formatGold,
   isAmmoRecipe,
   isCraftedMaterial,
+  isCraftOreId,
   isMinedMaterial,
   materialList,
   normalizeAppearance,
@@ -334,8 +335,14 @@ export function bindHud(root, state, world) {
     container.dataset.ready = '1';
     container.addEventListener('click', (event) => {
       const btn = event.target.closest('[data-restock]');
-      if (!btn) return;
-      if (restock(state, btn.dataset.restock)) render(performance.now() / 1000);
+      if (btn) {
+        if (restock(state, btn.dataset.restock)) render(performance.now() / 1000);
+        return;
+      }
+      const matEl = event.target.closest('[data-mat]');
+      if (matEl && isCraftOreId(matEl.dataset.mat) && !craftModal.hidden) {
+        showPreview(matEl.dataset.mat);
+      }
     });
   }
   fillMats(matsEl);
@@ -383,7 +390,7 @@ export function bindHud(root, state, world) {
   function showPreview(recipeId) {
     const recipe = RECIPES[recipeId];
     if (craftPreview) craftPreview.show(recipeId);
-    const label = recipe?.name ?? 'Select or hover a recipe.';
+    const label = recipe?.name ?? MATERIALS[recipeId]?.name ?? 'Select or hover a recipe.';
     const craftName = craftModal.querySelector('[data-craft-preview-name]');
     if (craftName) craftName.textContent = label;
     syncQtyHint(recipeId);

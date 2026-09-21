@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import { BUYER_PACK_FOLDERS, recipeList } from './catalog.js';
+import { BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, recipeList } from './catalog.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
 import { UPLOADS_CLEARED, clearModels, saveModel } from './storage.js';
 import { normalizeImported } from './models.js';
@@ -260,6 +260,7 @@ export const BUNDLED_PROP_FOLDERS = [
       const slug = String(recipe.id).replaceAll('_', '-');
       return { id: `food-${slug}`, folder: `food/${slug}` };
     }),
+  ...CRAFT_ORE_FOLDERS,
   ...BUYER_PACK_FOLDERS,
 ];
 

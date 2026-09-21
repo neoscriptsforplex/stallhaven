@@ -37,7 +37,7 @@ import {
   BUYER_FIT_HEIGHT,
   ANVIL_WORLD_SCALE,
 } from './models.js';
-import { BUYER_PACKS, BUYER_PACK_FOLDERS } from './catalog.js';
+import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
@@ -448,6 +448,9 @@ describe('bundled prop swaps', () => {
       assert.ok(ids.includes(id), id);
     }
     for (const id of ['food-bread', 'food-pizza', 'food-cake', 'food-pie', 'food-fish-pie', 'food-salmon', 'food-lobster', 'food-chocolate-cake', 'food-monkfish', 'food-curry', 'food-shark', 'food-summer-pie', 'food-anglerfish']) {
+      assert.ok(ids.includes(id), id);
+    }
+    for (const id of ['craft-ore-bronze', 'craft-ore-iron', 'craft-ore-steel', 'craft-ore-mithril', 'craft-ore-adamant', 'craft-ore-runite', 'craft-ore-dragon']) {
       assert.ok(ids.includes(id), id);
     }
     for (const item of BUYER_PACK_FOLDERS) {
@@ -963,6 +966,13 @@ describe('bundled prop swaps', () => {
     assert.equal(byId['ore-runite'], 'dungeon-rocks/rune-rocks');
     assert.equal(byId['ore-dragon'], 'dungeon-rocks/dragon-rocks');
     assert.equal(byId['ore-essence'], 'dungeon-rocks/essence');
+    assert.equal(byId['craft-ore-bronze'], 'ores/bronze-ore');
+    assert.equal(byId['craft-ore-iron'], 'ores/iron-ore');
+    assert.equal(byId['craft-ore-steel'], 'ores/steel-ore');
+    assert.equal(byId['craft-ore-mithril'], 'ores/mithril-ore');
+    assert.equal(byId['craft-ore-adamant'], 'ores/adamantite-ore');
+    assert.equal(byId['craft-ore-runite'], 'ores/runite-ore');
+    assert.equal(byId['craft-ore-dragon'], 'ores/dragon-ore');
     assert.equal(byId['food-bread'], 'food/bread');
     assert.equal(byId['food-salmon'], 'food/salmon');
     assert.equal(byId['food-chocolate-cake'], 'food/chocolate-cake');
@@ -998,6 +1008,45 @@ describe('bundled prop swaps', () => {
     }
     const salmonObj = readFileSync(join(modelsRoot, 'food/salmon/salmon.obj'), 'utf8');
     assert.match(salmonObj, /Raw salmon/i);
+  });
+
+  it('fits craft-screen ore dumps to the current lump without touching dungeon rocks', async () => {
+    assert.equal(craftOreFolder('adamant'), 'ores/adamantite-ore');
+    assert.equal(CRAFT_ORE_FOLDERS.length, 7);
+    const dungeonById = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    assert.equal(dungeonById['ore-bronze'], 'dungeon-rocks/bronze-rocks');
+    const samples = [
+      ['bronze', 'ores/bronze-ore'],
+      ['iron', 'ores/iron-ore'],
+      ['steel', 'ores/steel-ore'],
+      ['mithril', 'ores/mithril-ore'],
+      ['adamant', 'ores/adamantite-ore'],
+      ['runite', 'ores/runite-ore'],
+      ['dragon', 'ores/dragon-ore'],
+    ];
+    for (const [metalId, folder] of samples) {
+      const lookId = craftOreLookId(metalId);
+      assert.equal(dungeonById[lookId], folder);
+      const slug = folder.split('/').pop();
+      assert.equal(existsSync(join(modelsRoot, folder, `${slug}.obj`)), true, `${folder}.obj`);
+      assert.equal(existsSync(join(modelsRoot, folder, `${slug}.mtl`)), true, `${folder}.mtl`);
+      const bundled = await loadFolder(folder);
+      const want = measureVisibleBox(buildWare(metalId)).getSize(new THREE.Vector3());
+      setBundledLook(lookId, bundled);
+      try {
+        const ware = buildWare(metalId);
+        assert.ok(ware.getObjectByName(lookId), metalId);
+        assertUniform(ware.getObjectByName(lookId));
+        const got = measureVisibleBox(ware).getSize(new THREE.Vector3());
+        assert.ok(
+          Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.08,
+          `${metalId} size ${Math.max(got.x, got.y, got.z)} vs ${Math.max(want.x, want.y, want.z)}`,
+        );
+      } finally {
+        setBundledLook(lookId, null);
+      }
+    }
+    assert.equal(existsSync(join(modelsRoot, 'ores/adamant-ore/adamant-ore.obj')), true);
   });
 
   it('fits a Tin-labelled steel-rocks dump to the current steel boulder', async () => {

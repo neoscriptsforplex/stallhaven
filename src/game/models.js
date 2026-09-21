@@ -3,6 +3,8 @@ import {
   BUYER_PACKS,
   CUSTOMERS,
   customerName,
+  craftOreLookId,
+  isCraftOreId,
   pickMageRobes,
   pickMercenaryPlate,
   pickPilgrimCiv,
@@ -1160,6 +1162,11 @@ export function buildWare(recipeId) {
   const recipe = RECIPES[recipeId];
   const group = new THREE.Group();
   group.name = recipeId;
+  if (!recipe && isCraftOreId(recipeId)) {
+    addOreWare(group, recipeId);
+    group.userData.recipeId = recipeId;
+    return group;
+  }
   const shape = recipe?.shape;
   const tint = recipe?.tint ?? 0x888888;
   const builders = {
@@ -1693,6 +1700,28 @@ function addCannonballs(group, tint) {
 
 function foodLookId(recipeId) {
   return `food-${String(recipeId ?? '').replaceAll('_', '-')}`;
+}
+
+function buildProceduralOreLump(tint = 0x888888) {
+  const group = new THREE.Group();
+  const lump = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.18, 0.22),
+    new THREE.MeshStandardMaterial({ color: tint, roughness: 0.6 }),
+  ));
+  lump.position.y = 0.1;
+  group.add(lump);
+  return group;
+}
+
+function addOreWare(group, metalId) {
+  const lookId = craftOreLookId(metalId);
+  const bundled = getBundledLook(lookId);
+  const tint = RECIPES[`smelt_${metalId}`]?.tint ?? 0x888888;
+  if (bundled) {
+    group.add(wrapBundledProp(bundled, buildProceduralOreLump(tint), { name: lookId, fit: 'max' }));
+    return;
+  }
+  group.add(buildProceduralOreLump(tint));
 }
 
 function addFoodWare(group, recipe) {

@@ -1019,6 +1019,25 @@ export function isMinedMaterial(materialId) {
   return materialId === 'essence' || METALS.some((metal) => metal.id === materialId);
 }
 
+/** Craft/inventory/smelt preview dumps for ore items — not dungeon rock props. */
+export function isCraftOreId(materialId) {
+  return METALS.some((metal) => metal.id === materialId);
+}
+
+export function craftOreLookId(metalId) {
+  return `craft-ore-${metalId}`;
+}
+
+export function craftOreFolder(metalId) {
+  if (metalId === 'adamant') return 'ores/adamantite-ore';
+  return `ores/${metalId}-ore`;
+}
+
+export const CRAFT_ORE_FOLDERS = METALS.map((metal) => ({
+  id: craftOreLookId(metal.id),
+  folder: craftOreFolder(metal.id),
+}));
+
 export function isAmmoRecipe(recipe) {
   return recipe?.category === 'ammo';
 }

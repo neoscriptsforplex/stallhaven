@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RECIPES } from './catalog.js';
+import { RECIPES, isCraftOreId } from './catalog.js';
 import { buildWare } from './models.js';
 
 const _box = new THREE.Box3();
@@ -92,7 +92,7 @@ export function createCraftPreview(canvas) {
   }
 
   function show(id) {
-    const next = RECIPES[id] ? id : null;
+    const next = RECIPES[id] || isCraftOreId(id) ? id : null;
     if (next === recipeId) return;
     recipeId = next;
     if (mesh) {

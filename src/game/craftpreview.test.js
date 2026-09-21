@@ -49,4 +49,14 @@ describe('craft preview framing', () => {
     frameCraftPreview(sword, other);
     assert.ok(other.position.x > other.position.y * 0.5, 'non-rune preview keeps the three-quarter camera');
   });
+
+  it('frames craft-screen ore dumps with the default three-quarter camera', () => {
+    const camera = new THREE.PerspectiveCamera(38, 1.15, 0.05, 20);
+    const ware = buildWare('bronze');
+    const framed = frameCraftPreview(ware, camera);
+    assert.ok(framed);
+    assert.equal(framed.view, 'default');
+    assert.ok(camera.position.x > camera.position.y * 0.5, 'ore preview keeps the three-quarter camera');
+    assert.equal(isRunePreview('bronze'), false);
+  });
 });

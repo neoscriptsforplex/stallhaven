@@ -14,7 +14,7 @@ import {
   trapdoorMarkerUrls,
   worldToMap,
 } from './minimap.js';
-import { FOUNTAIN, TRAPDOOR } from './layout.js';
+import { FOUNTAIN, PATH_HALF_W, TRAPDOOR } from './layout.js';
 
 describe('minimap', () => {
   it('round-trips world points through canvas pixels, including yaw and zoom', () => {
@@ -69,14 +69,21 @@ describe('minimap', () => {
   it('places a fountain-sized trapdoor marker at the outdoor hatch', () => {
     const bounds = shopMapBounds([]);
     const size = 196;
-    const hatch = worldToMap(TRAPDOOR.x, TRAPDOOR.z, bounds, size, 0);
-    const fountain = worldToMap(FOUNTAIN.x, FOUNTAIN.z, bounds, size, 0);
-    const back = mapToWorld(hatch.x, hatch.y, bounds, size, 0);
-    assert.ok(Math.abs(back.x - TRAPDOOR.x) < 1e-6);
-    assert.ok(Math.abs(back.z - TRAPDOOR.z) < 1e-6);
+    const camYaw = -0.06;
+    for (const yaw of [0, camYaw]) {
+      const path = worldToMap(0, TRAPDOOR.z, bounds, size, yaw);
+      const hatch = worldToMap(TRAPDOOR.x, TRAPDOOR.z, bounds, size, yaw);
+      const fountain = worldToMap(FOUNTAIN.x, FOUNTAIN.z, bounds, size, yaw);
+      const back = mapToWorld(hatch.x, hatch.y, bounds, size, yaw);
+      assert.ok(Math.abs(back.x - TRAPDOOR.x) < 1e-6, `round-trip x yaw=${yaw}`);
+      assert.ok(Math.abs(back.z - TRAPDOOR.z) < 1e-6, `round-trip z yaw=${yaw}`);
+      assert.ok(Math.hypot(hatch.x - fountain.x, hatch.y - fountain.y) > 8);
+      assert.ok(hatch.x > path.x, `icon stays on the hatch side of the path, yaw=${yaw}`);
+      assert.ok(Math.abs(hatch.y - path.y) < 4, `icon stays at hatch depth, yaw=${yaw}`);
+    }
     assert.equal(TRAPDOOR_MARKER_RADIUS, 5);
-    assert.ok(Math.hypot(hatch.x - fountain.x, hatch.y - fountain.y) > 8);
-    assert.ok(TRAPDOOR.x > 0, 'marker follows the hatch on the right of the path');
+    assert.ok(TRAPDOOR.x > PATH_HALF_W, 'world hatch sits on the right of the cobble path');
+    assert.ok(TRAPDOOR.x > 0, 'do not mirror the entrance onto −X for the marker');
   });
 
   it('ships a dungeon-entrance icon and looks it up from public/minimap', () => {

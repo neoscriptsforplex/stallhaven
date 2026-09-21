@@ -259,6 +259,8 @@ export function drawMinimap(ctx, snap) {
   const fountain = toMap(FOUNTAIN.x, FOUNTAIN.z);
   drawDot(ctx, fountain, 5, '#6a8aa8', '#d8e8f0');
   const hatch = gardenTrapdoorSpot(snap.expansions ?? []) ?? TRAPDOOR;
+  // World hatch sits on +X (right of the cobble path). Project that same
+  // point — do not mirror X — so the icon sits on the entrance like the fountain.
   drawTrapdoorMarker(ctx, toMap(hatch.x, hatch.z));
 
   const counter = toMap(SHOP.counter.x, SHOP.counter.z);

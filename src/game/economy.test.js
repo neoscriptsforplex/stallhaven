@@ -986,7 +986,7 @@ describe('furnace and spinning wheel', () => {
     assert.equal(expected.z, SHOP.furnace.z);
   });
 
-  it('places a free cooking range from Upgrade before food unlocks', () => {
+  it('places a free cooking range from Build before food unlocks', () => {
     const state = createState();
     assert.equal(ownsRange(state), false);
     assert.equal(canBuyRange(state), true);

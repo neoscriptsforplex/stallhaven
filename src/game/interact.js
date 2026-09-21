@@ -32,8 +32,12 @@ const APPROACH_OFFSETS = [
 ];
 
 const APPROACH_DIST = 0.85;
+const STAND_FRONT = new Set(['counter', 'chest']);
 
-/** Local +Z is the cook-face / door on the range dump. Prefer that side first. */
+/**
+ * Local +Z is the cook-face on the range, the shopkeeper side of the counter,
+ * and the latch/front of the chest (into the room from the right-wall pad).
+ */
 function facingApproachOffsets(kind, pose) {
   const yaw = furnitureVisualYaw(kind, pose?.rot ?? 0);
   const fx = Math.sin(yaw);
@@ -86,8 +90,8 @@ export function stationAtFloor(x, z, furniture = {}) {
 
 export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, kind = null) {
   if (!pose) return { action: 'none' };
-  if (kind === 'counter') {
-    const offsets = facingApproachOffsets('counter', pose);
+  if (STAND_FRONT.has(kind)) {
+    const offsets = facingApproachOffsets(kind, pose);
     const stand = { x: pose.x + offsets[0][0], z: pose.z + offsets[0][1] };
     if (isNearPoint(from, stand, 0.5)) return { action: 'open', dest: stand };
     for (const [dx, dz] of offsets) {

@@ -130,6 +130,21 @@ describe('station walk-then-open', () => {
     assert.equal(already.action, 'open');
   });
 
+  it('walks to the chest latch-front, not into the stone wall', () => {
+    const state = createState();
+    const chest = state.furniture.chest;
+    const plan = resolveStationUse(
+      { x: 0, z: 0 },
+      chest,
+      state,
+      undefined,
+      'chest',
+    );
+    assert.equal(plan.action, 'walk');
+    assert.ok(plan.dest.x < chest.x - 0.4, 'stand in front of the latch, into the room');
+    assert.ok(Math.abs(plan.dest.z - chest.z) < 0.35, 'not along the back wall');
+  });
+
   it('treats dungeon boulders as walk-then-use rocks', () => {
     assert.equal(USE_KINDS.has('boulder'), true);
     assert.ok(STATION_HIT.boulder.w >= 1.2);

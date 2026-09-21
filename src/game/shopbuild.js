@@ -2063,11 +2063,14 @@ export function buildDungeon() {
 
 export function buildRat() {
   const bundled = getBundledLook('rat');
-  if (bundled) {
-    const target = buildProceduralRat();
-    return wrapBundledProp(bundled, target, { name: 'rat', fit: 'max', rotateY: RAT_DUMP_YAW });
-  }
-  return buildProceduralRat();
+  const visual = bundled
+    ? wrapBundledProp(bundled, buildProceduralRat(), { name: 'rat-mesh', fit: 'max', rotateY: RAT_DUMP_YAW })
+    : buildProceduralRat();
+  // Wander yaw lives on the root so dump facing stays baked on the child.
+  const root = new THREE.Group();
+  root.name = 'rat';
+  root.add(visual);
+  return root;
 }
 
 function buildProceduralRat() {

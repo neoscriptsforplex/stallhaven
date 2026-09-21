@@ -52,7 +52,7 @@ function sanitizeObjText(objText) {
   return objText;
 }
 
-function parseObjBuffer(buffer, sidecars = {}) {
+function parseObjBuffer(buffer, sidecars = {}, name = '') {
   const objText = sanitizeObjText(decodeText(buffer));
   if (!objText.trim()) throw new Error('That .obj file is empty.');
   const { urls, revoke } = sidecarMap(sidecars);
@@ -66,7 +66,7 @@ function parseObjBuffer(buffer, sidecars = {}) {
   revokeTimer.unref?.();
 
   const objLoader = new OBJLoader(manager);
-  const mtlEntry = Object.entries(sidecars).find(([name]) => name.toLowerCase().endsWith('.mtl'));
+  const mtlEntry = Object.entries(sidecars).find(([fileName]) => fileName.toLowerCase().endsWith('.mtl'));
   if (mtlEntry) {
     try {
       const mtlLoader = new MTLLoader(manager);
@@ -80,6 +80,9 @@ function parseObjBuffer(buffer, sidecars = {}) {
   const group = objLoader.parse(objText);
   if (!hasMesh(group)) throw new Error('That .obj has no mesh.');
   dropUnusableMaps(group);
+  if (isDungeonRockDump(name) || isDungeonRockDump(mtlEntry?.[0])) {
+    prepareDungeonRockMaterials(group);
+  }
   return group;
 }
 
@@ -101,6 +104,81 @@ function dropUnusableMaps(root) {
   });
 }
 
+/** sRGB albedo lift so dump Kd colors read under cave lights, nearer Blender. */
+export const DUNGEON_ROCK_ALBEDO_LIFT = 2;
+/** Extra sRGB floor — Blender's studio/world fill; keeps dark verts from sinking. */
+export const DUNGEON_ROCK_AMBIENT = 0.08;
+/** Fraction of lifted albedo copied to emissive so cave shadows still show Kd. */
+export const DUNGEON_ROCK_EMIT = 0.25;
+
+const DUNGEON_ROCK_FILE = /^(bronze|iron|steel|mithril|adamant|rune|dragon)-rocks$|^essence$/i;
+
+export function isDungeonRockFolder(folder = '') {
+  return String(folder).replace(/\\/g, '/').toLowerCase().includes('dungeon-rocks/');
+}
+
+export function isDungeonRockDump(nameOrFolder = '') {
+  const normalized = String(nameOrFolder).replace(/\\/g, '/').toLowerCase();
+  if (normalized.includes('dungeon-rocks/')) return true;
+  const base = basename(normalized).replace(/\.(obj|mtl)$/i, '');
+  return DUNGEON_ROCK_FILE.test(base);
+}
+
+function liftDungeonRockColor(color) {
+  const srgb = color.clone();
+  if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
+  srgb.r = Math.min(1, srgb.r * DUNGEON_ROCK_ALBEDO_LIFT + DUNGEON_ROCK_AMBIENT);
+  srgb.g = Math.min(1, srgb.g * DUNGEON_ROCK_ALBEDO_LIFT + DUNGEON_ROCK_AMBIENT);
+  srgb.b = Math.min(1, srgb.b * DUNGEON_ROCK_ALBEDO_LIFT + DUNGEON_ROCK_AMBIENT);
+  if (typeof srgb.convertSRGBToLinear === 'function') srgb.convertSRGBToLinear();
+  return srgb;
+}
+
+function dumpAlbedo(mat) {
+  const color = mat?.color ? mat.color.clone() : new THREE.Color(0x888888);
+  const ka = mat?.emissive;
+  if (ka && (ka.r + ka.g + ka.b) > 0.02) color.add(ka);
+  return liftDungeonRockColor(color);
+}
+
+function mapLooksMissing(map) {
+  if (!map) return true;
+  const img = map.image;
+  return !(img && ((img.width ?? 0) > 0 || img.data));
+}
+
+/** Shared OBJ/MTL tweak for every dungeon-rocks/* dump. Idempotent. */
+export function prepareDungeonRockMaterials(root) {
+  if (!root || root.userData?.dungeonRockLift) return root;
+  root.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    const next = mats.map((mat) => {
+      if (mat?.userData?.dungeonRockLift) return mat;
+      const color = dumpAlbedo(mat);
+      const emit = color.clone().multiplyScalar(DUNGEON_ROCK_EMIT);
+      const std = new THREE.MeshStandardMaterial({
+        name: mat.name,
+        color,
+        emissive: emit,
+        emissiveIntensity: 1,
+        roughness: 0.68,
+        metalness: 0,
+        side: mat.side ?? THREE.FrontSide,
+        vertexColors: Boolean(mat.vertexColors),
+        flatShading: false,
+      });
+      if (mat.map && !mapLooksMissing(mat.map)) std.map = mat.map;
+      if ('envMapIntensity' in std) std.envMapIntensity = 0;
+      std.userData.dungeonRockLift = true;
+      return std;
+    });
+    child.material = Array.isArray(child.material) ? next : next[0];
+  });
+  root.userData.dungeonRockLift = true;
+  return root;
+}
+
 function friendlyParseError(err, kind) {
   const raw = err?.message || String(err || '');
   if (kind === 'obj') return raw || 'Could not parse that .obj file.';
@@ -116,7 +194,7 @@ export function parseModelBuffer(buffer, name, sidecars = {}) {
     const ext = (name || '').toLowerCase();
     if (ext.endsWith('.obj')) {
       try {
-        resolve(parseObjBuffer(buffer, sidecars));
+        resolve(parseObjBuffer(buffer, sidecars, name));
       } catch (err) {
         reject(new Error(friendlyParseError(err, 'obj')));
       }
@@ -292,7 +370,9 @@ async function fetchObjMtl(folder, objFile, mtlFile, rev) {
           }
         }
       }
-      return parseModelBuffer(objBuffer, objFile, sidecars);
+      const scene = await parseModelBuffer(objBuffer, objFile, sidecars);
+      if (isDungeonRockFolder(folder)) prepareDungeonRockMaterials(scene);
+      return scene;
     } catch (err) {
       if (err?.code === 'MISSING_MODEL') {
         lastMissing = err;

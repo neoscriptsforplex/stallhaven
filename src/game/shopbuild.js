@@ -28,6 +28,9 @@ import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
 import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp } from './models.js';
+import { prepareDungeonRockMaterials } from './upload.js';
+
+export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.04 });
@@ -1802,63 +1805,6 @@ function attachBoulderPick(group, spot) {
   group.add(pick);
 }
 
-/** sRGB albedo lift so dump Kd colors read under cave lights, nearer Blender. */
-export const DUNGEON_ROCK_ALBEDO_LIFT = 1.85;
-/** Extra sRGB floor — Blender's studio/world fill; keeps dark bronze verts from sinking. */
-export const DUNGEON_ROCK_AMBIENT = 0.07;
-/** Fraction of lifted albedo copied to emissive so cave shadows still show Kd. */
-export const DUNGEON_ROCK_EMIT = 0.2;
-
-function liftDungeonRockColor(color) {
-  const srgb = color.clone();
-  if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
-  srgb.r = Math.min(1, srgb.r * DUNGEON_ROCK_ALBEDO_LIFT + DUNGEON_ROCK_AMBIENT);
-  srgb.g = Math.min(1, srgb.g * DUNGEON_ROCK_ALBEDO_LIFT + DUNGEON_ROCK_AMBIENT);
-  srgb.b = Math.min(1, srgb.b * DUNGEON_ROCK_ALBEDO_LIFT + DUNGEON_ROCK_AMBIENT);
-  if (typeof srgb.convertSRGBToLinear === 'function') srgb.convertSRGBToLinear();
-  return srgb;
-}
-
-function dumpAlbedo(mat) {
-  const color = mat?.color ? mat.color.clone() : new THREE.Color(0x888888);
-  const ka = mat?.emissive;
-  if (ka && (ka.r + ka.g + ka.b) > 0.02) color.add(ka);
-  return liftDungeonRockColor(color);
-}
-
-function mapLooksMissing(map) {
-  if (!map) return true;
-  const img = map.image;
-  return !(img && ((img.width ?? 0) > 0 || img.data));
-}
-
-/** Shared dump tweak: Standard lighting, drop broken maps, lift Kd/Ka toward Blender. */
-function prepareDungeonRockDump(root) {
-  root?.traverse((child) => {
-    if (!child.isMesh || !child.material) return;
-    const mats = Array.isArray(child.material) ? child.material : [child.material];
-    const next = mats.map((mat) => {
-      const color = dumpAlbedo(mat);
-      const emit = color.clone().multiplyScalar(DUNGEON_ROCK_EMIT);
-      const std = new THREE.MeshStandardMaterial({
-        name: mat.name,
-        color,
-        emissive: emit,
-        emissiveIntensity: 1,
-        roughness: 0.68,
-        metalness: 0,
-        side: mat.side ?? THREE.FrontSide,
-        vertexColors: Boolean(mat.vertexColors),
-        flatShading: false,
-      });
-      if (mat.map && !mapLooksMissing(mat.map)) std.map = mat.map;
-      if ('envMapIntensity' in std) std.envMapIntensity = 0;
-      return std;
-    });
-    child.material = Array.isArray(child.material) ? next : next[0];
-  });
-}
-
 function stripEmissive(root) {
   const lights = [];
   root?.traverse((child) => {
@@ -1898,7 +1844,7 @@ function buildMineBoulder(spot) {
   const visual = bundled
     ? wrapBundledProp(bundled, target, { name: `ore-${spot.id}`, fit: 'max' })
     : target;
-  if (bundled) prepareDungeonRockDump(visual);
+  if (bundled) prepareDungeonRockMaterials(visual);
   group.add(visual);
   sitVisibleOnY(visual, DUNGEON_FLOOR_Y);
   attachBoulderPick(group, spot);

@@ -38,7 +38,7 @@ import {
   ANVIL_WORLD_SCALE,
 } from './models.js';
 import { BUYER_PACKS, BUYER_PACK_FOLDERS } from './catalog.js';
-import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
+import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
@@ -424,7 +424,7 @@ describe('bundled prop swaps', () => {
     const mtl = readFileSync(join(modelsRoot, folder, `${base}.mtl`));
     return parseModelBuffer(
       obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength),
-      `${base}.obj`,
+      `${folder}/${base}.obj`,
       { [`${base}.mtl`]: mtl.buffer.slice(mtl.byteOffset, mtl.byteOffset + mtl.byteLength) },
     );
   }
@@ -1129,10 +1129,56 @@ describe('bundled prop swaps', () => {
       dragon: 'dungeon-rocks/dragon-rocks',
       essence: 'dungeon-rocks/essence',
     };
+    for (const folder of Object.values(folders)) {
+      assert.equal(isDungeonRockDump(folder), true);
+    }
+    assert.equal(isDungeonRockDump('rock'), false);
+    assert.equal(isDungeonRockDump('rock/rock.obj'), false);
+
+    const garden = await loadFolder('rock');
+    assert.equal(garden.userData?.dungeonRockLift, undefined);
+    garden.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of mats) {
+        assert.equal(mat?.userData?.dungeonRockLift, undefined);
+      }
+    });
+
+    const rawAlbedo = {};
     for (const [id, folder] of Object.entries(folders)) {
-      setBundledLook(`ore-${id}`, await loadFolder(folder));
+      const raw = await loadFolder(folder);
+      assert.equal(raw.userData?.dungeonRockLift, true, `${id} should lift at OBJ/MTL load`);
+      prepareDungeonRockMaterials(raw);
+      prepareDungeonRockMaterials(raw);
+      rawAlbedo[id] = { r: 0, g: 0, b: 0, max: 0 };
+      raw.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        assert.ok(mats.every((mat) => mat?.isMeshStandardMaterial && mat.metalness === 0 && mat.userData?.dungeonRockLift));
+        for (const mat of mats) {
+          const c = mat?.color;
+          if (!c) continue;
+          const srgb = c.clone();
+          if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
+          rawAlbedo[id].r = Math.max(rawAlbedo[id].r, srgb.r);
+          rawAlbedo[id].g = Math.max(rawAlbedo[id].g, srgb.g);
+          rawAlbedo[id].b = Math.max(rawAlbedo[id].b, srgb.b);
+          rawAlbedo[id].max = Math.max(rawAlbedo[id].max, srgb.r, srgb.g, srgb.b);
+        }
+      });
+      setBundledLook(`ore-${id}`, raw);
     }
     try {
+      for (const [id, sample] of Object.entries(rawAlbedo)) {
+        assert.ok(sample.max > 0.28, `${id} albedo should read nearer Blender, max=${sample.max}`);
+      }
+      assert.ok(rawAlbedo.bronze.r > rawAlbedo.bronze.b, 'bronze should stay warm');
+      assert.ok(rawAlbedo.adamant.g > rawAlbedo.adamant.r, 'adamantite should stay green');
+      assert.ok(rawAlbedo.mithril.b > rawAlbedo.mithril.r, 'mithril should stay blue');
+      assert.ok(rawAlbedo.runite.b > rawAlbedo.runite.r, 'runite should stay cyan/blue');
+      assert.ok(rawAlbedo.dragon.r > rawAlbedo.bronze.max, 'dragon should stay redder than bronze');
+
       const built = buildDungeon();
       const dragon = built.boulders.find((item) => item.name === 'boulder-dragon');
       const bronze = built.boulders.find((item) => item.name === 'boulder-bronze');
@@ -1140,44 +1186,24 @@ describe('bundled prop swaps', () => {
       let dragonMaps = 0;
       let dragonStd = 0;
       let dragonMeshes = 0;
-      let bronzeMax = 0;
-      let dragonRed = 0;
       dragon.traverse((child) => {
         if (!child.isMesh || child.userData?.kind === 'boulder') return;
         dragonMeshes += 1;
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         if (mats.some((mat) => mat?.map)) dragonMaps += 1;
         if (mats.every((mat) => mat?.isMeshStandardMaterial)) dragonStd += 1;
-        for (const mat of mats) {
-          const c = mat?.color;
-          if (!c) continue;
-          const srgb = c.clone();
-          if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
-          dragonRed = Math.max(dragonRed, srgb.r);
-        }
-      });
-      bronze.traverse((child) => {
-        if (!child.isMesh || child.userData?.kind === 'boulder') return;
-        const mats = Array.isArray(child.material) ? child.material : [child.material];
-        for (const mat of mats) {
-          const c = mat?.color;
-          if (!c) continue;
-          const srgb = c.clone();
-          if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
-          bronzeMax = Math.max(bronzeMax, srgb.r, srgb.g, srgb.b);
-        }
       });
       assert.ok(dragonMeshes >= 1);
       assert.equal(dragonMaps, 0, 'missing .psd maps should not darken dragon rocks');
       assert.equal(dragonStd, dragonMeshes);
-      assert.ok(bronzeMax > 0.28, `bronze albedo should read nearer Blender, max=${bronzeMax}`);
-      assert.ok(dragonRed > bronzeMax, 'dragon should stay redder than bronze');
       for (const boulder of built.boulders) {
         let lifted = 0;
         boulder.traverse((child) => {
           if (!child.isMesh || child.userData?.kind === 'boulder') return;
           const mats = Array.isArray(child.material) ? child.material : [child.material];
-          if (mats.every((mat) => mat?.isMeshStandardMaterial && mat.metalness === 0)) lifted += 1;
+          if (mats.every((mat) => mat?.isMeshStandardMaterial && mat.metalness === 0 && mat.userData?.dungeonRockLift)) {
+            lifted += 1;
+          }
         });
         assert.ok(lifted >= 1, `${boulder.name} should use the shared dungeon-rock material lift`);
       }

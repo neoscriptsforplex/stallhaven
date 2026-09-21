@@ -955,6 +955,8 @@ export function nearestShelfSlot(localX, localY, localZ = 0) {
 
 export const MINE_YIELD = 5;
 export const MINE_DURATION = 3.2;
+export const CHOP_YIELD = 5;
+export const CHOP_DURATION = 3.2;
 
 export function isMinedMaterial(materialId) {
   return materialId === 'essence' || METALS.some((metal) => metal.id === materialId);

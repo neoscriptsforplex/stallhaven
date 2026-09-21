@@ -10,6 +10,7 @@ import {
   isCraftedMaterial,
   isMinedMaterial,
   isMaterialCraft,
+  CHOP_YIELD,
   MINE_YIELD,
   SHOP,
   SHELF_SLOT_COUNT,
@@ -91,6 +92,12 @@ export const DEFAULT_MUSIC_VOLUME = 0.75;
 
 function emptyBoughtFurniture() {
   return { table: 0, mannequin: 0, shelf: 0 };
+}
+
+export const FREE_FURNITURE_REPLACE = 2;
+
+function emptyFreeFurnitureReplace() {
+  return { table: 0, mannequin: 0 };
 }
 
 /** Old saves used ores for smithing. Copy ore counts onto bars so progress is not bricked. */
@@ -268,6 +275,7 @@ export function createState() {
     fullscreen: false,
     music: { volume: DEFAULT_MUSIC_VOLUME, loop: false, track: '' },
     boughtFurniture: emptyBoughtFurniture(),
+    freeFurnitureReplace: emptyFreeFurnitureReplace(),
     shopXp: 0,
     shopLevel: 1,
     skybox: DEFAULT_SKYBOX,
@@ -658,6 +666,9 @@ export function nextFurnitureCost(state, type) {
     if (live < included) return 0;
     return furnitureBuyCost(Math.max(0, live - included));
   }
+  if ((type === 'table' || type === 'mannequin') && (state.freeFurnitureReplace?.[type] ?? 0) > 0) {
+    return 0;
+  }
   return furnitureBuyCost(boughtFurnitureCount(state, type));
 }
 
@@ -680,6 +691,10 @@ export function buyFurniture(state, type, pose) {
   const cost = nextFurnitureCost(state, type);
   state.gold -= cost;
   if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
+  if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
+  if (cost === 0 && (type === 'table' || type === 'mannequin') && state.freeFurnitureReplace[type] > 0) {
+    state.freeFurnitureReplace[type] -= 1;
+  }
   const paidExtra = cost > 0;
   if (paidExtra) {
     state.boughtFurniture[type] = boughtFurnitureCount(state, type) + 1;
@@ -722,12 +737,21 @@ function returnDisplayWares(state, display) {
 export function removePlacedFurniture(state, index) {
   const display = state.displays[index];
   if (!display || display.removed) return false;
-  if (displayKind(index, state) !== 'shelf') return false;
+  const kind = displayKind(index, state);
+  if (kind !== 'shelf' && kind !== 'table' && kind !== 'stand') return false;
   returnDisplayWares(state, display);
   display.removed = true;
+  const type = kind === 'stand' ? 'mannequin' : kind === 'shelf' ? 'shelf' : 'table';
+  if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
   if (display.bought) {
-    if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
-    state.boughtFurniture.shelf = Math.max(0, boughtFurnitureCount(state, 'shelf') - 1);
+    state.boughtFurniture[type] = Math.max(0, boughtFurnitureCount(state, type) - 1);
+  }
+  if (type === 'table' || type === 'mannequin') {
+    if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
+    state.freeFurnitureReplace[type] = Math.min(
+      FREE_FURNITURE_REPLACE,
+      (state.freeFurnitureReplace[type] ?? 0) + 1,
+    );
   }
   if (state.selectedDisplay === index) {
     const next = state.displays.findIndex((item) => !item.removed);
@@ -987,13 +1011,21 @@ export function chestDisplayList(state, kind) {
   return chestList(state).filter((item) => canDisplayOn(kind, item.recipe));
 }
 
-export function grantMinedMaterial(state, materialId, amount = MINE_YIELD) {
-  if (!isMinedMaterial(materialId)) return 0;
+function grantMaterial(state, materialId, amount) {
   const cur = state.materials[materialId] ?? 0;
   const add = Math.min(MATERIAL_CAP - cur, Math.max(0, Math.round(Number(amount) || 0)));
   if (add <= 0) return 0;
   state.materials[materialId] = cur + add;
   return add;
+}
+
+export function grantMinedMaterial(state, materialId, amount = MINE_YIELD) {
+  if (!isMinedMaterial(materialId)) return 0;
+  return grantMaterial(state, materialId, amount);
+}
+
+export function grantChoppedLogs(state, amount = CHOP_YIELD) {
+  return grantMaterial(state, 'logs', amount);
 }
 
 export function placeOnDisplay(state, recipeId, displayIndex = state.selectedDisplay, slotIndex = 0) {
@@ -1067,6 +1099,10 @@ export function serializeState(state) {
       mannequin: boughtFurnitureCount(state, 'mannequin'),
       shelf: boughtFurnitureCount(state, 'shelf'),
     },
+    freeFurnitureReplace: {
+      table: Math.max(0, state.freeFurnitureReplace?.table ?? 0),
+      mannequin: Math.max(0, state.freeFurnitureReplace?.mannequin ?? 0),
+    },
   };
 }
 
@@ -1131,6 +1167,15 @@ export function applyState(state, data) {
     }
   }
   next.boughtFurniture = emptyBoughtFurniture();
+  next.freeFurnitureReplace = emptyFreeFurnitureReplace();
+  if (data.freeFurnitureReplace && typeof data.freeFurnitureReplace === 'object') {
+    for (const type of ['table', 'mannequin']) {
+      const value = data.freeFurnitureReplace[type];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        next.freeFurnitureReplace[type] = Math.max(0, Math.min(FREE_FURNITURE_REPLACE, Math.round(value)));
+      }
+    }
+  }
   if (data.boughtFurniture && typeof data.boughtFurniture === 'object') {
     for (const type of ['table', 'mannequin', 'shelf']) {
       const value = data.boughtFurniture[type];
@@ -1262,6 +1307,7 @@ export function applyState(state, data) {
   state.fullscreen = next.fullscreen;
   state.music = next.music;
   state.boughtFurniture = next.boughtFurniture;
+  state.freeFurnitureReplace = next.freeFurnitureReplace;
   state.shopXp = next.shopXp;
   state.shopLevel = next.shopLevel;
   state.skybox = next.skybox;

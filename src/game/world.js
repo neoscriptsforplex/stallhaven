@@ -15,6 +15,8 @@ import {
   decideRequest,
   displayKind,
   MATERIALS,
+  CHOP_DURATION,
+  CHOP_YIELD,
   MINE_DURATION,
   MINE_YIELD,
   emptySlots,
@@ -25,10 +27,11 @@ import {
   shelfSlotPoses,
   SHELF_SLOT_COUNT,
 } from './catalog.js';
-import { grantMinedMaterial, hasStock, pushLog } from './economy.js';
+import { grantChoppedLogs, grantMinedMaterial, hasStock, pushLog } from './economy.js';
 import {
   FURNITURE_FORWARD,
   FURNITURE_SNAP,
+  MATERIAL_CAP,
   furnitureRotateDelta,
   snapGridLines,
   cloneFurniture,
@@ -36,6 +39,7 @@ import {
   furnitureVisualYaw,
   gardenBox,
   gardenTrapdoorSpot,
+  gardenTreeSpots,
   interiorFloors,
   playerWalkFloors,
   pointHitsShop,
@@ -396,7 +400,7 @@ export function createWorld(canvas, state, opts = {}) {
     slot.pick.visible = owned && !draft;
     if (slot.glow) slot.glow.visible = owned;
     if (!pose) return;
-    slot.mesh.position.set(pose.x, 0, pose.z);
+    slot.mesh.position.set(pose.x, slot.mesh.userData.floorY ?? 0, pose.z);
     const yaw = furnitureVisualYaw(id, pose.rot);
     // Yaw only (same axis as furniture Rotate). Never pitch/roll stations onto a side.
     slot.mesh.rotation.set(0, yaw, 0);
@@ -734,7 +738,7 @@ export function createWorld(canvas, state, opts = {}) {
   function shopUsePicks() {
     const found = [];
     architecture?.traverse((child) => {
-      if (child.userData?.kind === 'trapdoor') found.push(child);
+      if (child.userData?.kind === 'trapdoor' || child.userData?.kind === 'tree') found.push(child);
     });
     return found;
   }
@@ -800,8 +804,27 @@ export function createWorld(canvas, state, opts = {}) {
     mining = {
       materialId,
       name: mat.name,
+      mode: 'mine',
       startedAt: performance.now() / 1000,
       duration: MINE_DURATION,
+      yield: MINE_YIELD,
+      x: pose?.x ?? shopkeeper.position.x,
+      z: pose?.z ?? shopkeeper.position.z,
+    };
+    setHeldTool(shopkeeper, 'pickaxe');
+    if (pose) {
+      shopkeeper.rotation.y = Math.atan2(pose.x - shopkeeper.position.x, pose.z - shopkeeper.position.z);
+    }
+  }
+
+  function startChopping(pose) {
+    mining = {
+      materialId: 'logs',
+      name: 'Tree',
+      mode: 'chop',
+      startedAt: performance.now() / 1000,
+      duration: CHOP_DURATION,
+      yield: CHOP_YIELD,
       x: pose?.x ?? shopkeeper.position.x,
       z: pose?.z ?? shopkeeper.position.z,
     };
@@ -814,10 +837,17 @@ export function createWorld(canvas, state, opts = {}) {
   function tickMining(now) {
     if (!mining) return;
     if (now - mining.startedAt < mining.duration) return;
-    const got = grantMinedMaterial(state, mining.materialId, MINE_YIELD);
+    const amount = mining.yield ?? MINE_YIELD;
+    const got = mining.mode === 'chop'
+      ? grantChoppedLogs(state, amount)
+      : grantMinedMaterial(state, mining.materialId, amount);
     if (got > 0) {
-      pushLog(state, `Mined ${got} ${mining.name}.`);
-      pickHandler?.({ type: 'mined', materialId: mining.materialId, amount: got });
+      pushLog(state, mining.mode === 'chop' ? `Chopped ${got} Logs.` : `Mined ${got} ${mining.name}.`);
+      pickHandler?.({
+        type: mining.mode === 'chop' ? 'chopped' : 'mined',
+        materialId: mining.materialId,
+        amount: got,
+      });
     }
     mining.startedAt = now;
   }
@@ -896,6 +926,11 @@ export function createWorld(canvas, state, opts = {}) {
         playClick('ui');
         return;
       }
+      if (type === 'tree') {
+        startChopping(pose);
+        playClick('ui');
+        return;
+      }
       stopMining();
       pickHandler?.({ type });
       playClick('ui');
@@ -923,6 +958,7 @@ export function createWorld(canvas, state, opts = {}) {
     const { type, materialId, x, z } = pendingUse;
     pendingUse = null;
     if (type === 'boulder') startMining(materialId, { x, z, materialId });
+    else if (type === 'tree') startChopping({ x, z, materialId: 'logs' });
     else pickHandler?.({ type });
   }
 
@@ -1097,11 +1133,12 @@ export function createWorld(canvas, state, opts = {}) {
     return true;
   }
 
-  function rotateFurniturePose(target) {
+  function rotateFurniturePose(target, dir = 1) {
     const pose = poseOf(target);
     if (!pose) return false;
     const kind = placeKindOf(target);
-    const nextRot = (pose.rot ?? FURNITURE_FORWARD) + furnitureRotateDelta(kind);
+    const step = furnitureRotateDelta(kind) * (dir < 0 ? -1 : 1);
+    const nextRot = (pose.rot ?? FURNITURE_FORWARD) + step;
     if (kind === 'shelf') {
       const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot);
       pose.x = snapped.x;
@@ -1195,6 +1232,10 @@ export function createWorld(canvas, state, opts = {}) {
         queueUse('boulder', { x: data.x, z: data.z, materialId: data.materialId });
         return;
       }
+      if (data.kind === 'tree') {
+        queueUse('tree', { x: data.x, z: data.z, materialId: 'logs' });
+        return;
+      }
       if (data.kind === 'chest' && held >= 500) {
         playClick('ui');
         pickHandler?.({ type: 'chest-upgrade' });
@@ -1239,6 +1280,15 @@ export function createWorld(canvas, state, opts = {}) {
       if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 1.7) {
         queueUse('trapdoor', hatch);
         return;
+      }
+      if (sceneMode === 'shop') {
+        const tree = gardenTreeSpots(state.expansions ?? []).find((spot) => (
+          Math.hypot(point.x - spot.x, point.z - spot.z) <= 1.15
+        ));
+        if (tree) {
+          queueUse('tree', { x: tree.x, z: tree.z, materialId: 'logs' });
+          return;
+        }
       }
       if (sceneMode === 'dungeon') {
         const spot = DUNGEON_BOULDERS.find((item) => (
@@ -1314,6 +1364,19 @@ export function createWorld(canvas, state, opts = {}) {
       });
       return;
     }
+    if (data.kind === 'tree') {
+      playClick('ui');
+      pickHandler?.({
+        type: 'tree-inspect',
+        materialId: 'logs',
+        name: 'Tree',
+        x: data.x,
+        z: data.z,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      return;
+    }
     const furn = furnitureIdFromKind(data.kind, data.displayIndex);
     if (!furn) return;
     playClick('ui');
@@ -1336,6 +1399,12 @@ export function createWorld(canvas, state, opts = {}) {
 
   renderer.domElement.addEventListener('wheel', (event) => {
     event.preventDefault();
+    if (moveTarget) {
+      const dir = Math.sign(event.deltaY) || 1;
+      rotateFurniturePose(moveTarget, dir);
+      pickHandler?.({ type: 'furniture-rotate', furniture: moveTarget, dir });
+      return;
+    }
     cam.distance += Math.sign(event.deltaY) * CAM_ZOOM_STEP;
     clampCam();
   }, { passive: false });
@@ -2081,7 +2150,12 @@ export function createWorld(canvas, state, opts = {}) {
       pickHandler = handler;
     },
     useBoulder(pose) {
-      if (!pose?.materialId) return;
+      if (!pose) return;
+      if (pose.kind === 'tree') {
+        queueUse('tree', { x: pose.x, z: pose.z, materialId: 'logs' });
+        return;
+      }
+      if (!pose.materialId) return;
       queueUse('boulder', { x: pose.x, z: pose.z, materialId: pose.materialId });
     },
     getCustomer(id) {
@@ -2193,8 +2267,8 @@ export function createWorld(canvas, state, opts = {}) {
     isPlacingUnlock() {
       return Boolean(placeNeedsConfirm);
     },
-    rotateFurniture(target) {
-      return rotateFurniturePose(target);
+    rotateFurniture(target, dir = 1) {
+      return rotateFurniturePose(target, dir);
     },
     isMovingFurniture() {
       return Boolean(moveTarget);
@@ -2311,11 +2385,16 @@ export function createWorld(canvas, state, opts = {}) {
     getMining(now = performance.now() / 1000) {
       if (!mining) return null;
       const t = Math.min(1, Math.max(0, (now - mining.startedAt) / mining.duration));
+      const want = mining.yield ?? MINE_YIELD;
+      const have = state.materials[mining.materialId] ?? 0;
+      const grant = Math.min(want, Math.max(0, MATERIAL_CAP - have));
       return {
         materialId: mining.materialId,
         name: mining.name,
+        mode: mining.mode ?? 'mine',
+        verb: mining.mode === 'chop' ? 'Chopping' : 'Mining',
         t,
-        yield: MINE_YIELD,
+        yield: grant,
       };
     },
     getMinimapSnapshot() {

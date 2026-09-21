@@ -49,6 +49,18 @@ describe('player look UI', () => {
     assert.match(chest, /data-upgrade-buy>Upgrade</);
   });
 
+  it('lists Build cards furnace-first and names the extra room Shop Expansion', () => {
+    const build = slice(html, 'id="build-dock"', 'id="place-dock"');
+    const order = ['Furnace', 'Cooking Range', 'Spinning Wheel', 'Cauldron', 'Table', 'Shelf', 'Mannequin', 'Shop Expansion'];
+    let last = -1;
+    for (const label of order) {
+      const at = build.indexOf(`<h3>${label}</h3>`);
+      assert.ok(at > last, label);
+      last = at;
+    }
+    assert.equal(build.includes('<h3>Shop Room</h3>'), false);
+  });
+
   it('states furnace and range place/cost once on Build cards', () => {
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
     const furnace = build.slice(build.indexOf('Furnace'), build.indexOf('Cooking Range'));
@@ -100,6 +112,21 @@ describe('player look UI', () => {
     const close = pop.indexOf('data-inspect-close');
     assert.ok(mine >= 0 && close > mine, 'Mine should sit above Close');
     assert.match(pop, />Mine</);
+  });
+
+  it('shows a +N yield under the gather progress bar', () => {
+    const hudBar = slice(html, 'id="active-craft"', 'id="help-modal"');
+    const bar = hudBar.indexOf('data-active-craft-bar');
+    const yieldAt = hudBar.indexOf('data-active-craft-yield');
+    assert.ok(bar >= 0 && yieldAt > bar, 'yield should sit under the bar');
+    assert.match(hud, /mining\.yield/);
+    assert.match(hud, /kind === 'tree' \? 'Chop'/);
+  });
+
+  it('rotates furniture with the wheel while placing', () => {
+    const world = readFileSync(join(root, 'world.js'), 'utf8');
+    assert.match(world, /if \(moveTarget\) \{\s*const dir = Math\.sign\(event\.deltaY\)/);
+    assert.match(world, /rotateFurniturePose\(moveTarget, dir\)/);
   });
 
   it('opens a dedicated customize dock with every look slot and a back path', () => {

@@ -912,6 +912,7 @@ function sinkRangePlate(mesh) {
   const height = box.max.y - box.min.y;
   if (!Number.isFinite(height) || height <= 0) return mesh;
   mesh.position.y -= height * RANGE_PLATE_FRAC;
+  mesh.userData.floorY = mesh.position.y;
   return mesh;
 }
 
@@ -1466,6 +1467,7 @@ function addGarden(root, cells, expansionIds = []) {
     tree.position.set(spot.x, 0, spot.z);
     tree.rotation.y = rand() * Math.PI * 2;
     tree.userData.gardenSide = spot.side;
+    attachTreePick(tree, spot);
     root.add(tree);
   }
   for (const spot of gardenRockSpots(expansionIds)) {
@@ -1804,6 +1806,10 @@ export const DUNGEON_BOULDERS = [
   { id: 'dragon', materialId: 'dragon', name: 'Dragon Ore', x: -4.05, z: -1.35, rot: -0.9, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.dragon },
 ];
 
+export function treeInspect() {
+  return { name: 'Tree', blurb: 'An outdoor pine. Chop it for Logs.' };
+}
+
 export function boulderInspect(materialId) {
   const spot = DUNGEON_BOULDERS.find((item) => item.materialId === materialId);
   if (!spot) return { name: 'Rock', blurb: 'A mineable rock.' };
@@ -1818,6 +1824,17 @@ function shadeHex(hex, factor) {
   const color = new THREE.Color(hex);
   color.multiplyScalar(factor);
   return color.getHex();
+}
+
+function attachTreePick(tree, spot) {
+  const pick = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.7, 0.85), pickMat());
+  pick.position.y = 0.85;
+  pick.userData.kind = 'tree';
+  pick.userData.materialId = 'logs';
+  pick.userData.name = 'Tree';
+  pick.userData.x = spot.x;
+  pick.userData.z = spot.z;
+  tree.add(pick);
 }
 
 function attachBoulderPick(group, spot) {

@@ -63,6 +63,7 @@
         <div id="active-craft" class="active-craft" hidden>
           <p data-active-craft-name>Crafting</p>
           <span class="craft-bar"><i data-active-craft-bar></i></span>
+          <p data-active-craft-yield class="active-craft-yield" hidden>+5</p>
         </div>
       </header>
 
@@ -71,11 +72,11 @@
     <div id="help-modal" class="modal" hidden>
       <div class="sheet">
         <h2>Help</h2>
-        <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the map above the shop XP bar to walk there too; scroll or use +/− to zoom the map. Click the anvil, furnace, range, chest, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. Double-click a highlighted cell to confirm a new table, mannequin, shelf, spinning wheel, furnace, range, or cauldron. Scroll to zoom out for the roof and garden.</p>
-        <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys or hold the middle mouse button and drag to change the angle. Zoom far out to see the roof and garden. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back. In the dungeon, left-click an Essence boulder or an ore rock to walk over, swing a pickaxe, and fill a Mining bar. Each fill grants 5 Essence or 5 ore of that tier (Bronze through Dragon). Ore rocks share an olive-brown jagged body; only the vein changes colour (bronze copper, iron grey, steel light grey, mithril blue, adamantite green, runite light blue, dragon red). Essence stays pale. Right-click a boulder to read its name (Essence, Bronze Ore, Adamantite, Runite, …) and choose Mine. Ores and Essence do not restock for gold or refill on their own.</p>
+        <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the map above the shop XP bar to walk there too; scroll or use +/− to zoom the map. Click the anvil, furnace, range, chest, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. While placing or moving furniture, scroll the wheel to rotate in the same 15° steps as Rotate. Double-click a highlighted cell to confirm a new table, mannequin, shelf, spinning wheel, furnace, range, or cauldron. Scroll to zoom out for the roof and garden when you are not placing furniture.</p>
+        <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys or hold the middle mouse button and drag to change the angle. Zoom far out to see the roof and garden. Click an outdoor tree to walk over and chop Logs — the bar shows +N for each fill, same as mining. Right-click a tree for Chop. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back. In the dungeon, left-click an Essence boulder or an ore rock to walk over, swing a pickaxe, and fill a Mining bar. Each fill grants 5 Essence or 5 ore of that tier (Bronze through Dragon), with +N under the bar. Ore rocks share an olive-brown jagged body; only the vein changes colour (bronze copper, iron grey, steel light grey, mithril blue, adamantite green, runite light blue, dragon red). Essence stays pale. Right-click a boulder to read its name (Essence, Bronze Ore, Adamantite, Runite, …) and choose Mine. Ores and Essence do not restock for gold or refill on their own.</p>
         <p>Click the anvil to smith Melee, Magic, Ranged, or Tools. Ranged has Weapons, Armour, and Ammo (arrows and cannonballs). Magic has Weapons, Armour, and Runes. Tools has Hatchet and Pickaxe (Bronze through Dragon, including Rune). Weapons, armour, and tools use metal bars. Each craft row has 1×, 5×, and Max — those count recipe actions (one arrow craft still makes 20). Cancel under the spinning preview stops a run and returns leftover actions (finished pieces stay). Place a furnace from Build (free) to smelt ores into bars. Higher bars unlock after enough smelts of the previous tier. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Place a cooking range from Build (free) for Food. Click a placed cauldron for Potions — the window matches the anvil (recipes on the left, preview on the right, materials along the bottom). Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
-        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Runes and arrows (and cannonballs) can sit on tables or on any of the four shelf slots. Right-click furniture for Move or Rotate — wares travel with the piece. Right-click a wall shelf for Delete; the first three shelves are included, so deleting one lets you place a replacement for free up to three. The counter only moves from a right-click.</p>
+        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Runes and arrows (and cannonballs) can sit on tables or on any of the four shelf slots. Right-click furniture for Move or Rotate — wares travel with the piece. Right-click a wall shelf, table, or mannequin for Delete. The first three shelves are included, so deleting one lets you place a replacement for free up to three. Up to two deleted tables and two deleted mannequins can be placed again for free. The counter only moves from a right-click.</p>
         <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist of included tracks — they start on load (or on the first click if the browser blocks autoplay), with Shuffle, Loop, Play, Pause, Skip, and Stop — and you can upload more MP3, WAV, or OGG files. The cog beside it opens Settings for the skybox, a Player Avatar: Customize panel, and cheat codes. Upload a .glb/.gltf, or multi-select an .obj with its .mtl (and maps), as Furniture, Ware, Player, or Customer. Clear uploads restores the default player, customers, and furniture. A custom Player mesh uses the same walk cycle as the stock keeper (leg and arm swing, or a bob if the file has no limbs) and still swings a pickaxe when you mine.</p>
         <button type="button" data-dismiss>Close</button>
       </div>
@@ -214,30 +215,6 @@
       <h2>Build</h2>
       <p>Unlockables for the shop. Rooms use the same gold pads as before. A furnace and cooking range are free to place. Bow string needs a spinning wheel. Potion brewing needs a cauldron. Extra tables, mannequins, and shelves use the same 500g then ×3 curve; the first three shelves are included.</p>
       <article class="build-item">
-        <h3>Shop Room</h3>
-        <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
-        <p data-expand-status class="meta">Next room costs 10,000g.</p>
-        <button type="button" data-expand-buy>Place Room</button>
-      </article>
-      <article class="build-item">
-        <h3>Table</h3>
-        <p>Buy another display table. The first extra costs 500g; each further table costs three times the last. Starting tables do not count.</p>
-        <p data-table-status class="meta">First extra table costs 500g.</p>
-        <button type="button" data-table-buy>Buy · 500 gp</button>
-      </article>
-      <article class="build-item">
-        <h3>Mannequin</h3>
-        <p>Buy another armour mannequin. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count.</p>
-        <p data-mannequin-status class="meta">First extra mannequin costs 500g.</p>
-        <button type="button" data-mannequin-buy>Buy · 500 gp</button>
-      </article>
-      <article class="build-item">
-        <h3>Shelf</h3>
-        <p>Buy another wall shelf. Place it on the wall grid. The starting three shelves are included; extras cost 500g, then ×3. Delete a shelf from its right-click menu — a deleted included shelf can be replaced for free until three are placed.</p>
-        <p data-shelf-status class="meta">First 3 shelves are included. The next costs 500g.</p>
-        <button type="button" data-shelf-buy>Buy · 500 gp</button>
-      </article>
-      <article class="build-item">
         <h3>Furnace</h3>
         <p>Smelt ores into metal bars. Place it on the floor snap grid, then confirm. Free.</p>
         <p data-furnace-status class="meta">Free.</p>
@@ -260,6 +237,30 @@
         <p>Unlocks potion crafting. Place it on the floor snap grid, then confirm. Click it afterward to brew.</p>
         <p data-cauldron-status class="meta">Costs 10,000 gp.</p>
         <button type="button" data-cauldron-buy>Buy · 10,000 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Table</h3>
+        <p>Buy another display table. The first extra costs 500g; each further table costs three times the last. Starting tables do not count. Delete up to two tables to replace them for free.</p>
+        <p data-table-status class="meta">First extra table costs 500g.</p>
+        <button type="button" data-table-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Shelf</h3>
+        <p>Buy another wall shelf. Place it on the wall grid. The starting three shelves are included; extras cost 500g, then ×3. Delete a shelf from its right-click menu — a deleted included shelf can be replaced for free until three are placed.</p>
+        <p data-shelf-status class="meta">First 3 shelves are included. The next costs 500g.</p>
+        <button type="button" data-shelf-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Mannequin</h3>
+        <p>Buy another armour mannequin. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count. Delete up to two mannequins to replace them for free.</p>
+        <p data-mannequin-status class="meta">First extra mannequin costs 500g.</p>
+        <button type="button" data-mannequin-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Shop Expansion</h3>
+        <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
+        <p data-expand-status class="meta">Next room costs 10,000g.</p>
+        <button type="button" data-expand-buy>Place Room</button>
       </article>
       <button type="button" class="ghost" data-build-close>Close</button>
     </aside>

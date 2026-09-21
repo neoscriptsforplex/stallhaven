@@ -113,7 +113,7 @@ import {
   STATION_UNLOCKS,
 } from './layout.js';
 import { clampMapZoom, drawMinimap, mapToWorld, shopMapBounds } from './minimap.js';
-import { boulderInspect } from './shopbuild.js';
+import { boulderInspect, treeInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
 import {
@@ -167,6 +167,7 @@ export function bindHud(root, state, world) {
   const shopFade = document.querySelector('#shop-fade');
   const activeCraft = root.querySelector('#active-craft');
   const activeCraftName = activeCraft?.querySelector('[data-active-craft-name]');
+  const activeCraftYield = activeCraft?.querySelector('[data-active-craft-yield]');
   const chestCapEl = document.querySelector('#chest-cap');
   const expandBtn = document.querySelector('#expand-btn');
   const musicBtn = document.querySelector('#music-btn');
@@ -529,14 +530,17 @@ export function bindHud(root, state, world) {
     if (!inspectPop) return;
     furnMenu.hidden = true;
     furnTarget = null;
+    const kind = pose?.kind === 'tree' ? 'tree' : 'boulder';
     inspectTarget = materialId
-      ? { materialId, x: pose?.x, z: pose?.z }
+      ? { materialId, x: pose?.x, z: pose?.z, kind }
       : null;
-    const info = boulderInspect(materialId);
+    const info = kind === 'tree' ? treeInspect() : boulderInspect(materialId);
     const nameEl = inspectPop.querySelector('[data-inspect-name]');
     const blurbEl = inspectPop.querySelector('[data-inspect-blurb]');
+    const mineBtn = inspectPop.querySelector('[data-inspect-mine]');
     if (nameEl) nameEl.textContent = info.name;
     if (blurbEl) blurbEl.textContent = info.blurb;
+    if (mineBtn) mineBtn.textContent = kind === 'tree' ? 'Chop' : 'Mine';
     inspectPop.hidden = false;
     const x = Math.min(window.innerWidth - 250, Math.max(8, clientX ?? 24));
     const y = Math.min(window.innerHeight - 180, Math.max(8, clientY ?? 80));
@@ -1237,8 +1241,9 @@ export function bindHud(root, state, world) {
     if (fillBtn) fillBtn.hidden = !canFill;
     if (upgradeBtn) upgradeBtn.hidden = target.id !== 'chest';
     const deleteBtn = furnMenu.querySelector('[data-furn-delete]');
+    const deleteKind = target.id === 'display' ? displayKind(target.index, state) : null;
     const canDelete = target.id === 'display'
-      && displayKind(target.index, state) === 'shelf'
+      && (deleteKind === 'shelf' || deleteKind === 'table' || deleteKind === 'stand')
       && !state.displays[target.index]?.removed;
     if (deleteBtn) deleteBtn.hidden = !canDelete;
     furnMenu.hidden = false;
@@ -1447,9 +1452,17 @@ export function bindHud(root, state, world) {
             ? `First ${included} shelves are included. The next costs ${formatGold(cost)}g.`
             : `Next shelf costs ${formatGold(cost)}g (${bought} bought).`;
         })()
-        : (bought === 0
-          ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
-          : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`);
+        : (() => {
+          const free = state.freeFurnitureReplace?.[type] ?? 0;
+          if (free > 0 || cost === 0) {
+            return free > 0
+              ? `${free} free replacement${free === 1 ? '' : 's'} left after deleting.`
+              : `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`;
+          }
+          return bought === 0
+            ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
+            : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
+        })();
       itemStatus.textContent = extra;
       itemStatus.classList.remove('craft-note');
       itemBuy.disabled = false;
@@ -1666,7 +1679,11 @@ export function bindHud(root, state, world) {
     if (target?.id !== 'display') return;
     if (!removePlacedFurniture(state, target.index)) return;
     playClick('ui');
-    pushLog(state, 'Removed the wall shelf. Its wall cell is free.');
+    const removedKind = displayKind(target.index, state);
+    const removedLabel = removedKind === 'shelf' ? 'wall shelf'
+      : removedKind === 'stand' ? 'mannequin'
+        : 'table';
+    pushLog(state, `Removed the ${removedLabel}.`);
     world.refreshFurniture?.();
     world.refreshSelection?.(true);
     paintBuild();
@@ -2154,6 +2171,15 @@ export function bindHud(root, state, world) {
     if (event.type === 'boulder-inspect') {
       showInspect(event.materialId, event.clientX, event.clientY, event);
     }
+    if (event.type === 'tree-inspect') {
+      showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'tree' });
+    }
+    if (event.type === 'mined' || event.type === 'chopped') {
+      if (activeCraftYield) {
+        activeCraftYield.classList.add('is-grant');
+        window.setTimeout(() => activeCraftYield.classList.remove('is-grant'), 280);
+      }
+    }
     if (event.type === 'chest') openChest();
     if (event.type === 'anvil') openCraft('anvil');
     if (event.type === 'range') openCraft('range');
@@ -2377,8 +2403,12 @@ export function bindHud(root, state, world) {
       const mining = world.getMining?.(now);
       if (mining) {
         activeCraft.hidden = false;
-        if (activeCraftName) activeCraftName.textContent = `Mining ${mining.name}`;
+        if (activeCraftName) activeCraftName.textContent = `${mining.verb ?? 'Mining'} ${mining.name}`;
         activeCraft.style.setProperty('--t', String(mining.t ?? 0));
+        if (activeCraftYield) {
+          activeCraftYield.hidden = false;
+          activeCraftYield.textContent = `+${mining.yield ?? 0}`;
+        }
       } else if (busyId) {
         const progress = craftProgress(state, busyId, now);
         activeCraft.hidden = false;
@@ -2387,9 +2417,11 @@ export function bindHud(root, state, world) {
           activeCraftName.textContent = `Crafting ${RECIPES[busyId].name}${batch}`;
         }
         activeCraft.style.setProperty('--t', String(progress?.t ?? 0));
+        if (activeCraftYield) activeCraftYield.hidden = true;
       } else {
         activeCraft.hidden = true;
         activeCraft.style.setProperty('--t', '0');
+        if (activeCraftYield) activeCraftYield.hidden = true;
       }
     }
     const chestKey = chestList(state).map((item) => `${item.recipeId}:${item.count}`).join('|');

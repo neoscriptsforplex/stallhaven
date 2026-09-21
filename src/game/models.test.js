@@ -749,6 +749,15 @@ describe('bundled prop swaps', () => {
     assert.equal(inHole, 0, `grass should not cover the hatch opening, inHole=${inHole}`);
   });
 
+  it('gives outdoor trees a chop pick', () => {
+    const shop = buildShop([]).root;
+    let trees = 0;
+    shop.traverse((child) => {
+      if (child.userData?.kind === 'tree' && child.userData?.materialId === 'logs') trees += 1;
+    });
+    assert.ok(trees > 0, `garden trees should be choppable, trees=${trees}`);
+  });
+
   it('fits a bundled pottery-oven furnace dump on the shop floor', async () => {
     const bundled = await loadFolder('furnace');
     const target = buildFurnace();
@@ -783,6 +792,7 @@ describe('bundled prop swaps', () => {
       assert.ok(Math.abs(box.min.y + sink) < 0.04, `plate bottom should sit sink below floor, minY=${box.min.y}`);
       assert.ok(box.min.y < -0.08, `brown plate should be under the boards, minY=${box.min.y}`);
       assert.ok(box.max.y > 1.6, `stove body should stay above the floor, maxY=${box.max.y}`);
+      assert.ok(range.userData.floorY < -0.08, `pose y should keep the sink, floorY=${range.userData.floorY}`);
     } finally {
       setBundledLook('range', null);
     }

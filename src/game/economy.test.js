@@ -31,6 +31,7 @@ import {
   costLabel,
   isAmmoRecipe,
   isMinedMaterial,
+  CHOP_YIELD,
   MINE_YIELD,
   nearestShelfSlot,
   SHELF_SLOT_COUNT,
@@ -61,7 +62,9 @@ import {
   chestCapacity,
   chestCount,
   chestDisplayList,
+  grantChoppedLogs,
   grantMinedMaterial,
+  FREE_FURNITURE_REPLACE,
   chestTotal,
   completeCrafts,
   craftBlockReason,
@@ -800,6 +803,10 @@ describe('material regen', () => {
     assert.equal(grantMinedMaterial(state, 'runite'), 2);
     assert.equal(state.materials.runite, 250);
     assert.equal(grantMinedMaterial(state, 'flour'), 0);
+    assert.equal(CHOP_YIELD, 5);
+    const logsBefore = state.materials.logs;
+    assert.equal(grantChoppedLogs(state), 5);
+    assert.equal(state.materials.logs, logsBefore + 5);
   });
 
   it('does not regenerate or restock metal bars or bow string', () => {
@@ -1106,6 +1113,29 @@ describe('build furniture', () => {
     assert.equal(removePlacedFurniture(state, extraIndex), true);
     assert.equal(state.boughtFurniture.shelf, 0);
     assert.equal(nextFurnitureCost(state, 'shelf'), 500);
+  });
+
+  it('deletes tables and mannequins and allows two free replacements each', () => {
+    const state = createState();
+    const tableIndex = SHOP.displays.findIndex((d) => d.kind === 'table');
+    const standIndex = SHOP.displays.findIndex((d) => d.kind === 'stand');
+    assert.ok(tableIndex >= 0 && standIndex >= 0);
+    assert.equal(FREE_FURNITURE_REPLACE, 2);
+    state.chest.bronze_sword = 1;
+    assert.equal(placeOnDisplay(state, 'bronze_sword', tableIndex), true);
+    assert.equal(removePlacedFurniture(state, tableIndex), true);
+    assert.equal(state.displays[tableIndex].removed, true);
+    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.freeFurnitureReplace.table, 1);
+    assert.equal(nextFurnitureCost(state, 'table'), 0);
+    assert.equal(buyFurniture(state, 'table', { x: 0.2, z: 0.2, rot: 0 }), true);
+    assert.equal(state.freeFurnitureReplace.table, 0);
+    assert.equal(state.displays.at(-1).bought, false);
+    assert.equal(nextFurnitureCost(state, 'table'), 500);
+    assert.equal(removePlacedFurniture(state, standIndex), true);
+    assert.equal(state.freeFurnitureReplace.mannequin, 1);
+    assert.equal(nextFurnitureCost(state, 'mannequin'), 0);
+    assert.equal(removePlacedFurniture(state, standIndex), false);
   });
 
   it('does not count starter tables or mannequins as paid extras in an old save', () => {

@@ -539,6 +539,16 @@ button:disabled {
   color: #f0d9a8;
 }
 
+.active-craft-yield {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  color: #c8e39a;
+}
+
+.active-craft-yield.is-grant {
+  color: #e8f4b8;
+}
+
 .chest-tally {
   margin: 0 0 8px;
   color: var(--gold);

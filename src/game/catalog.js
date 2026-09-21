@@ -217,8 +217,8 @@ export const METALS = [
 ];
 
 export const DHIDE = [
-  { id: 'green', name: 'Green', tint: 0x2d6a32 },
   { id: 'blue', name: 'Blue', tint: 0x2a4a8a },
+  { id: 'green', name: 'Green', tint: 0x2d6a32 },
   { id: 'red', name: 'Red', tint: 0x8a2424 },
   { id: 'black', name: 'Black', tint: 0x1c1c1c },
 ];

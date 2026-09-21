@@ -34,9 +34,8 @@ describe('player look UI', () => {
     assert.match(css, /@keyframes boot-slide/);
     assert.match(main, /classList.remove\('is-booting'\)/);
     assert.match(main, /requestAnimationFrame/);
-    assert.match(main, /setBundledLooks/);
-    assert.ok(main.indexOf('setBundledLooks') < main.indexOf('createWorld'));
-    assert.ok(main.indexOf('world.tick') < main.indexOf('hideBootCover'));
+    assert.match(main, /setBundledLooks\(bundledLooks\)[\s\S]*createWorld\(canvas/);
+    assert.match(main, /world\.tick\(0[\s\S]*hideBootCover\(\)/);
   });
 
   it('labels the shop placement panel Build, not Upgrade', () => {

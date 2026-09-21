@@ -828,7 +828,7 @@ export function createWorld(canvas, state, opts = {}) {
       x: pose?.x ?? shopkeeper.position.x,
       z: pose?.z ?? shopkeeper.position.z,
     };
-    setHeldTool(shopkeeper, 'pickaxe');
+    setHeldTool(shopkeeper, 'hatchet');
     if (pose) {
       shopkeeper.rotation.y = Math.atan2(pose.x - shopkeeper.position.x, pose.z - shopkeeper.position.z);
     }

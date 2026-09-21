@@ -830,12 +830,20 @@ export function buildPickaxe() {
   return group;
 }
 
+export function buildHatchet(tint = 0x8a5a32) {
+  const group = new THREE.Group();
+  group.name = 'hatchet';
+  addHatchet(group, tint);
+  return group;
+}
+
 export function setHeldTool(mesh, tool) {
   const hammers = mesh?.userData?.hammers ?? [];
   for (const part of hammers) {
     if (part) part.visible = tool === 'hammer';
   }
   if (mesh?.userData?.pickaxe) mesh.userData.pickaxe.visible = tool === 'pickaxe';
+  if (mesh?.userData?.hatchet) mesh.userData.hatchet.visible = tool === 'hatchet';
 }
 
 export function updateMinePose(mesh, dt = 0.016, now = 0) {
@@ -941,12 +949,16 @@ export function buildShopkeeper(opts = {}) {
   hammerHead.position.set(0.12, 0.3, 0.04);
   const pickaxe = buildPickaxe();
   pickaxe.visible = false;
+  const hatchet = buildHatchet();
+  hatchet.visible = false;
   const hand = group.userData.hand;
   if (hand) {
     hand.add(hammerHaft);
     hand.add(hammerHead);
     hand.add(pickaxe);
+    hand.add(hatchet);
     poseHeldPickaxe(pickaxe);
+    poseHeldPickaxe(hatchet);
   } else {
     hammerHaft.position.set(pose.handR.x, pose.handR.y + 0.08, pose.handR.z + 0.04);
     group.add(hammerHaft);
@@ -958,11 +970,18 @@ export function buildShopkeeper(opts = {}) {
     pickaxe.position.x += pose.handR.x;
     pickaxe.position.y += pose.handR.y;
     pickaxe.position.z += pose.handR.z;
+    hatchet.position.set(pose.handR.x, pose.handR.y, pose.handR.z);
+    group.add(hatchet);
+    poseHeldPickaxe(hatchet);
+    hatchet.position.x += pose.handR.x;
+    hatchet.position.y += pose.handR.y;
+    hatchet.position.z += pose.handR.z;
   }
   hammerHaft.visible = false;
   hammerHead.visible = false;
   group.userData.hammers = [hammerHaft, hammerHead];
   group.userData.pickaxe = pickaxe;
+  group.userData.hatchet = hatchet;
 
   const chefHat = buildChefHat();
   chefHat.position.y = pose.headTop + 0.02;
@@ -3125,7 +3144,7 @@ export function measureVisibleMeshHeight(root) {
     if (child.userData?.skipWalk) return;
     if (child.material && child.material.visible === false) return;
     const name = child.name || '';
-    if (/pickaxe|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
+    if (/pickaxe|hatchet|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
     box.expandByObject(child);
     any = true;
   });
@@ -3140,6 +3159,7 @@ export function proceduralPlayerFitHeight() {
   if (cachedProceduralHeight) return cachedProceduralHeight;
   const keeper = buildShopkeeper({ chefHat: false });
   if (keeper.userData.pickaxe) keeper.userData.pickaxe.visible = false;
+  if (keeper.userData.hatchet) keeper.userData.hatchet.visible = false;
   for (const hammer of keeper.userData.hammers ?? []) hammer.visible = false;
   if (keeper.userData.chefHat) keeper.userData.chefHat.visible = false;
   cachedProceduralHeight = Math.max(0.9, measureVisibleMeshHeight(keeper));
@@ -3187,7 +3207,7 @@ export function measureVisibleBox(root) {
     if (child.userData?.skipWalk) return;
     if (child.material && child.material.visible === false) return;
     const name = child.name || '';
-    if (/pickaxe|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
+    if (/pickaxe|hatchet|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
     box.expandByObject(child);
     any = true;
   });
@@ -3586,6 +3606,10 @@ function attachImportedGrip(group, mesh, height) {
   pickaxe.visible = false;
   grip.add(pickaxe);
   poseHeldPickaxe(pickaxe);
+  const hatchet = buildHatchet();
+  hatchet.visible = false;
+  grip.add(hatchet);
+  poseHeldPickaxe(hatchet);
   if (handBone) {
     handBone.add(grip);
     grip.position.set(0.035, 0.0, 0.02);
@@ -3602,6 +3626,7 @@ function attachImportedGrip(group, mesh, height) {
   }
   group.userData.hand = grip;
   group.userData.pickaxe = pickaxe;
+  group.userData.hatchet = hatchet;
 }
 
 export function wareTopY(object) {

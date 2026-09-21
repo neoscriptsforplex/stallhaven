@@ -41,7 +41,7 @@ import { BUYER_PACKS, BUYER_PACK_FOLDERS } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -334,6 +334,13 @@ describe('uploaded player walk', () => {
     assert.ok(wrapped.userData.hand);
     assert.equal(wrapped.userData.pickaxe.parent, wrapped.userData.hand);
     setHeldTool(wrapped, 'pickaxe');
+    assert.equal(wrapped.userData.pickaxe.visible, true);
+    assert.ok(wrapped.userData.hatchet);
+    setHeldTool(wrapped, 'hatchet');
+    assert.equal(wrapped.userData.pickaxe.visible, false);
+    assert.equal(wrapped.userData.hatchet.visible, true);
+    setHeldTool(wrapped, 'pickaxe');
+    assert.equal(wrapped.userData.hatchet.visible, false);
     assert.equal(wrapped.userData.pickaxe.visible, true);
     const rest = wrapped.userData.rig.armR.rotation.x;
     updateMinePose(wrapped, 0.2, 0.4);
@@ -1108,10 +1115,23 @@ describe('bundled prop swaps', () => {
     }
   });
 
-  it('lifts dungeon ore dump materials and drops missing maps', async () => {
-    assert.ok(DUNGEON_ROCK_ALBEDO_LIFT > 1);
-    setBundledLook('ore-dragon', await loadFolder('dungeon-rocks/dragon-rocks'));
-    setBundledLook('ore-bronze', await loadFolder('dungeon-rocks/bronze-rocks'));
+  it('lifts every dungeon ore dump toward Blender Kd and drops missing maps', async () => {
+    assert.ok(DUNGEON_ROCK_ALBEDO_LIFT >= 1.7);
+    assert.ok(DUNGEON_ROCK_AMBIENT > 0);
+    assert.ok(DUNGEON_ROCK_EMIT > 0);
+    const folders = {
+      bronze: 'dungeon-rocks/bronze-rocks',
+      iron: 'dungeon-rocks/iron-rocks',
+      steel: 'dungeon-rocks/steel-rocks',
+      mithril: 'dungeon-rocks/mithril-rocks',
+      adamant: 'dungeon-rocks/adamant-rocks',
+      runite: 'dungeon-rocks/rune-rocks',
+      dragon: 'dungeon-rocks/dragon-rocks',
+      essence: 'dungeon-rocks/essence',
+    };
+    for (const [id, folder] of Object.entries(folders)) {
+      setBundledLook(`ore-${id}`, await loadFolder(folder));
+    }
     try {
       const built = buildDungeon();
       const dragon = built.boulders.find((item) => item.name === 'boulder-dragon');
@@ -1121,12 +1141,20 @@ describe('bundled prop swaps', () => {
       let dragonStd = 0;
       let dragonMeshes = 0;
       let bronzeMax = 0;
+      let dragonRed = 0;
       dragon.traverse((child) => {
         if (!child.isMesh || child.userData?.kind === 'boulder') return;
         dragonMeshes += 1;
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         if (mats.some((mat) => mat?.map)) dragonMaps += 1;
         if (mats.every((mat) => mat?.isMeshStandardMaterial)) dragonStd += 1;
+        for (const mat of mats) {
+          const c = mat?.color;
+          if (!c) continue;
+          const srgb = c.clone();
+          if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
+          dragonRed = Math.max(dragonRed, srgb.r);
+        }
       });
       bronze.traverse((child) => {
         if (!child.isMesh || child.userData?.kind === 'boulder') return;
@@ -1142,10 +1170,19 @@ describe('bundled prop swaps', () => {
       assert.ok(dragonMeshes >= 1);
       assert.equal(dragonMaps, 0, 'missing .psd maps should not darken dragon rocks');
       assert.equal(dragonStd, dragonMeshes);
-      assert.ok(bronzeMax > 0.12, `bronze albedo should not sit near black, max=${bronzeMax}`);
+      assert.ok(bronzeMax > 0.28, `bronze albedo should read nearer Blender, max=${bronzeMax}`);
+      assert.ok(dragonRed > bronzeMax, 'dragon should stay redder than bronze');
+      for (const boulder of built.boulders) {
+        let lifted = 0;
+        boulder.traverse((child) => {
+          if (!child.isMesh || child.userData?.kind === 'boulder') return;
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          if (mats.every((mat) => mat?.isMeshStandardMaterial && mat.metalness === 0)) lifted += 1;
+        });
+        assert.ok(lifted >= 1, `${boulder.name} should use the shared dungeon-rock material lift`);
+      }
     } finally {
-      setBundledLook('ore-dragon', null);
-      setBundledLook('ore-bronze', null);
+      for (const id of Object.keys(folders)) setBundledLook(`ore-${id}`, null);
     }
   });
 

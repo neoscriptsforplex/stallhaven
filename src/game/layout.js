@@ -314,7 +314,7 @@ export function stationLabel(id) {
 export function furnitureHalfSize(kind) {
   if (kind === 'cauldron') return { hw: 0.32, hd: 0.32 };
   if (kind === 'furnace') return { hw: 0.4, hd: 0.36 };
-  if (kind === 'wheel') return { hw: 1.44, hd: 1.28 };
+  if (kind === 'wheel') return { hw: 0.72, hd: 0.64 };
   if (kind === 'anvil') return { hw: 0.22, hd: 0.175 };
   if (kind === 'chest') return { hw: 0.3, hd: 0.22 };
   if (kind === 'range') return { hw: 0.68, hd: 0.56 };
@@ -571,6 +571,19 @@ export function gardenTrapdoorSpot(expansionIds = []) {
 
 export function pointHitsTrapdoor(x, z, pad = TRAPDOOR_HOLE_CLEAR) {
   return Math.hypot(x - TRAPDOOR.x, z - TRAPDOOR.z) < pad;
+}
+
+/** True if the segment from (x0,z0) to (x1,z1) comes within `pad` of the hatch. */
+export function segmentHitsTrapdoor(x0, z0, x1, z1, pad = TRAPDOOR_HOLE_CLEAR) {
+  const dx = x1 - x0;
+  const dz = z1 - z0;
+  const len2 = dx * dx + dz * dz;
+  let t = 0;
+  if (len2 > 1e-8) {
+    t = ((TRAPDOOR.x - x0) * dx + (TRAPDOOR.z - z0) * dz) / len2;
+    t = Math.max(0, Math.min(1, t));
+  }
+  return pointHitsTrapdoor(x0 + dx * t, z0 + dz * t, pad);
 }
 
 export const GARDEN_BED_SPOTS = [

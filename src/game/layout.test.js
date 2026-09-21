@@ -33,6 +33,7 @@ import {
   gardenTrapdoorSpot,
   gardenBedSpots,
   pointHitsTrapdoor,
+  segmentHitsTrapdoor,
   TRAPDOOR,
   TRAPDOOR_HOLE_CLEAR,
   PATH_HALF_W,
@@ -143,6 +144,10 @@ describe('layout numbers', () => {
     assert.equal(furniture.cauldron, null);
     assert.equal(furniture.furnace, null);
     assert.equal(furniture.wheel, null);
+  });
+
+  it('keeps the spinning wheel footprint at half the prior 4× live size', () => {
+    assert.deepEqual(furnitureHalfSize('wheel'), { hw: 0.72, hd: 0.64 });
   });
 
   it('sits the starter anvil on the old furnace back-wall pad', () => {
@@ -265,6 +270,8 @@ describe('layout numbers', () => {
     assert.ok(TRAPDOOR_HOLE_CLEAR >= 0.9, 'hole clear must cover leaning lawn blades');
     assert.equal(pointHitsTrapdoor(TRAPDOOR.x, TRAPDOOR.z), true);
     assert.equal(pointHitsTrapdoor(TRAPDOOR.x + TRAPDOOR_HOLE_CLEAR + 0.02, TRAPDOOR.z), false);
+    assert.equal(segmentHitsTrapdoor(TRAPDOOR.x + 0.8, TRAPDOOR.z, TRAPDOOR.x + 0.9, TRAPDOOR.z, 0.55), false);
+    assert.equal(segmentHitsTrapdoor(TRAPDOOR.x + 0.7, TRAPDOOR.z, TRAPDOOR.x, TRAPDOOR.z, 0.55), true);
     assert.ok(gardenTrapdoorSpot([]));
     assert.equal(gardenTrapdoorSpot([]).x, TRAPDOOR.x);
     const nearHatch = gardenGrassClusters([]).filter((c) => (

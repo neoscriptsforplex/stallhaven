@@ -2709,8 +2709,9 @@ export const CUSTOMER_LOOKS = {
   mage: dressMage,
 };
 
-/** Dump snouts face +X; bake so +Z matches customer walk heading. */
-export const BUYER_DUMP_YAW = -Math.PI / 2;
+/** Buyer dumps already face +Z (same as walkToward / idle π toward the counter).
+ * Rats need -π/2 because those snouts start on +X; do not reuse that offset here. */
+export const BUYER_DUMP_YAW = 0;
 export const BUYER_FIT_HEIGHT = 1.65;
 
 const buyerCycle = Object.create(null);
@@ -3426,22 +3427,11 @@ function partitionLimbMeshes(root) {
   return { legsL, legsR, armsL, armsR, box };
 }
 
-function addProxyLimb(parent, x, y, length, name) {
+function addProxyLimb(parent, x, y, _length, name) {
   const pivot = new THREE.Group();
   pivot.name = name;
   pivot.position.set(x, y, 0);
-  const stick = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.018, 0.024, length, 6),
-    new THREE.MeshStandardMaterial({
-      color: 0x2a2218,
-      roughness: 0.9,
-      transparent: true,
-      opacity: 0.42,
-    }),
-  );
-  stick.position.y = -length * 0.45;
-  stick.userData.skipWalk = true;
-  pivot.add(stick);
+  // Invisible pivot only — visible cylinders read as a walk-skeleton wireframe.
   parent.add(pivot);
   return pivot;
 }
@@ -3514,6 +3504,9 @@ export function wrapImportedCharacter(source, opts = {}) {
   group.name = opts.name ?? 'character';
   const mesh = source.clone(true);
   if (opts.rotateY) mesh.rotation.y += opts.rotateY;
+  mesh.traverse((child) => {
+    if (child.isSkeletonHelper || child.type === 'SkeletonHelper') child.visible = false;
+  });
   normalizeImported(mesh, opts.height ?? 1.7, true, { fit: 'height' });
   tintImportedMesh(mesh, opts.tint);
   group.add(mesh);

@@ -15,6 +15,7 @@ import {
   keepFountain,
   keepGardenSpot,
   pointHitsTrapdoor,
+  segmentHitsTrapdoor,
   neighborsOf,
   occupiedCells,
   padConnects,
@@ -1023,9 +1024,9 @@ function buildProceduralFurnace() {
 }
 
 /** Uniform world scale vs the baked spinning wheel after size-match.
- * Live size was already 2× the dump; queued correction is another 2× of that
- * (supersedes a 1.5× request), so 4× the original baked fit. */
-export const WHEEL_WORLD_SCALE = 4;
+ * Live size was 4× the dump (2× of the prior 2× live size). Halve that
+ * in-game size back to 2× the original baked fit. */
+export const WHEEL_WORLD_SCALE = 2;
 
 function applyWheelWorldScale(mesh) {
   mesh.scale.multiplyScalar(WHEEL_WORLD_SCALE);
@@ -1595,6 +1596,7 @@ function addLushGrass(root, grass, expansionIds, rand) {
     }),
   ];
   const dummy = new THREE.Object3D();
+  const tip = new THREE.Vector3();
   const buckets = greens.map(() => []);
   for (const cluster of clusters) {
     const n = cluster.blades;
@@ -1608,6 +1610,8 @@ function addLushGrass(root, grass, expansionIds, rand) {
       dummy.rotation.set((rand() - 0.5) * 0.38, rand() * Math.PI * 2, (rand() - 0.5) * 0.48);
       dummy.scale.set(0.65 + rand() * 0.55, h, 0.65 + rand() * 0.55);
       dummy.updateMatrix();
+      tip.set(0, 1, 0).applyMatrix4(dummy.matrix);
+      if (segmentHitsTrapdoor(x, z, tip.x, tip.z, 0.55)) continue;
       buckets[Math.floor(rand() * buckets.length)].push(dummy.matrix.clone());
     }
   }

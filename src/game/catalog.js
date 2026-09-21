@@ -252,7 +252,7 @@ export const MATERIALS = {
   adamant: { id: 'adamant', name: 'Adamantite', restock: 0, start: 0, tier: 5, regenEvery: 0 },
   runite: { id: 'runite', name: 'Runite Ore', restock: 0, start: 0, tier: 6, regenEvery: 0 },
   dragon: { id: 'dragon', name: 'Dragon Ore', restock: 0, start: 0, tier: 7, regenEvery: 0 },
-  logs: { id: 'logs', name: 'Logs', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  logs: { id: 'logs', name: 'Logs', restock: 0, start: 8, tier: 1, regenEvery: 0 },
   flax: { id: 'flax', name: 'Flax', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
   bow_string: {
     id: 'bow_string',
@@ -580,7 +580,7 @@ RUNE_LINE.forEach((rune, index) => {
     cost: { materials: { essence: 1 }, gold: 0 },
     time: 3 + index,
     price: tierSellPrice(index, { count: RUNE_LINE.length, weight: 0.7 }),
-    buyers: ['hedgemage', 'pilgrim', 'mercenary', 'ranger'],
+    buyers: ['hedgemage'],
     tint: rune.tint,
     shelfItem: true,
   });
@@ -838,19 +838,25 @@ export function pickPilgrimCiv(rand = Math.random) {
   return PILGRIM_CIVILIAN_SETS[Math.max(0, Math.min(PILGRIM_CIVILIAN_SETS.length - 1, i))];
 }
 
+/** Strict class shop list: combat line plus potions that already name this buyer. */
+function prefersFor(customerId, { combatClass = null, categories = [] } = {}) {
+  return Object.values(RECIPES)
+    .filter((recipe) => {
+      if (!recipe.buyers?.includes(customerId)) return false;
+      if (combatClass && recipe.combatClass === combatClass) return true;
+      if (categories.includes(recipe.category)) return true;
+      return false;
+    })
+    .map((recipe) => recipe.id);
+}
+
 export const CUSTOMERS = {
   pilgrim: {
     id: 'pilgrim',
     name: 'Adventurer',
     namePlural: 'Adventurers',
     combatClass: null,
-    prefers: [
-      ...FOOD_LINE.map((food) => food.id),
-      ...FEAST_LINE.map((food) => food.id),
-      'prayer_potion',
-      'energy_potion',
-      ...RUNE_LINE.map((rune) => rune.id),
-    ],
+    prefers: prefersFor('pilgrim', { categories: ['food', 'potion'] }),
     patient: true,
     leaveIfEmpty: false,
     robe: 0xc8b48a,
@@ -863,14 +869,7 @@ export const CUSTOMERS = {
     name: 'Guard',
     namePlural: 'Guards',
     combatClass: 'melee',
-    prefers: Object.values(RECIPES)
-      .filter((recipe) => (
-        recipe.combatClass === 'melee'
-        || recipe.combatClass === 'tools'
-        || recipe.category === 'rune'
-        || ['strength_potion', 'attack_potion', 'anti_poison_potion', 'antifire_potion'].includes(recipe.id)
-      ))
-      .map((recipe) => recipe.id),
+    prefers: prefersFor('mercenary', { combatClass: 'melee', categories: ['potion'] }),
     patient: false,
     leaveIfEmpty: true,
     robe: 0x4a463f,
@@ -883,14 +882,7 @@ export const CUSTOMERS = {
     name: 'Ranger',
     namePlural: 'Rangers',
     combatClass: 'range',
-    prefers: Object.values(RECIPES)
-      .filter((recipe) => (
-        recipe.combatClass === 'range'
-        || recipe.combatClass === 'tools'
-        || recipe.category === 'rune'
-        || ['ranging_potion', 'antifire_potion', 'energy_potion', 'anti_poison_potion'].includes(recipe.id)
-      ))
-      .map((recipe) => recipe.id),
+    prefers: prefersFor('ranger', { combatClass: 'range', categories: ['potion'] }),
     patient: true,
     leaveIfEmpty: false,
     robe: 0x3f4a32,
@@ -903,9 +895,7 @@ export const CUSTOMERS = {
     name: 'Wizard',
     namePlural: 'Wizards',
     combatClass: 'magic',
-    prefers: Object.values(RECIPES)
-      .filter((recipe) => recipe.combatClass === 'magic' || ['magic_potion', 'prayer_potion'].includes(recipe.id))
-      .map((recipe) => recipe.id),
+    prefers: prefersFor('hedgemage', { combatClass: 'magic', categories: ['potion'] }),
     patient: false,
     leaveIfEmpty: false,
     robe: 0x3d5a4c,
@@ -1315,6 +1305,7 @@ export function decideRequest(customerId, rng = Math.random, state = null) {
   const preferred = customer.prefers
     .map((id) => RECIPES[id])
     .filter(Boolean)
+    .filter((recipe) => recipe.buyers?.includes(customerId))
     .filter((recipe) => recipe.category !== 'potion' || Boolean(state?.furniture?.cauldron));
   const unlocked = preferred.filter((recipe) => recipeUnlocked(state, recipe));
   const maxUnlockedPrice = unlocked.reduce((max, recipe) => Math.max(max, recipe.price ?? 0), 0);
@@ -1330,6 +1321,7 @@ export function decideRequest(customerId, rng = Math.random, state = null) {
   const aspire = rng() < ASPIRE_CHANCE && aspirePool.length;
   const pool = aspire ? aspirePool : (unlocked.length ? unlocked : preferred);
   const recipe = pickWeighted(pool, rng);
+  if (!recipe) return null;
   return {
     recipeId: recipe.id,
     gold: recipe.price,

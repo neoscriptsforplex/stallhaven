@@ -70,5 +70,9 @@ if (!globalThis.document?.createElement) {
       if (tag === 'canvas') return new FakeCanvas();
       return { style: {} };
     },
+    createElementNS(_ns, tag) {
+      if (tag === 'canvas') return new FakeCanvas();
+      return { style: {}, width: 0, height: 0 };
+    },
   };
 }

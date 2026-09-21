@@ -629,6 +629,11 @@ button:disabled {
   pointer-events: auto;
 }
 
+#craft-modal,
+#potion-modal {
+  background: rgba(16, 10, 6, 0.18);
+}
+
 #offer-modal {
   z-index: 32;
   pointer-events: auto;

@@ -38,7 +38,7 @@ import {
   ANVIL_WORLD_SCALE,
 } from './models.js';
 import { BUYER_PACKS, BUYER_PACK_FOLDERS } from './catalog.js';
-import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
+import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
@@ -307,6 +307,18 @@ describe('uploaded player walk', () => {
     updateWalkPose(wrapped, true, 0.2, 1);
     assert.notEqual(wrapped.userData.rig.legL.rotation.x, rest);
     assert.ok(wrapped.userData.walkPhase > 0);
+    let visibleSticks = 0;
+    wrapped.traverse((child) => {
+      if (!child.isMesh) return;
+      if (child.isLine || child.isLineSegments || child.isSkinnedMesh?.skeleton && child.material?.wireframe) {
+        visibleSticks += 1;
+      }
+      if (String(child.name || '').startsWith('proxy') && child.visible !== false) visibleSticks += 1;
+      if (child.geometry?.type === 'CylinderGeometry' && child.material?.opacity < 1 && child.visible !== false) {
+        visibleSticks += 1;
+      }
+    });
+    assert.equal(visibleSticks, 0, 'imported walk must not draw skeleton/proxy wireframe');
   });
 
   it('parents a pickaxe to the walk arm and swings it while mining', () => {
@@ -513,6 +525,36 @@ describe('bundled prop swaps', () => {
     const fx = group.userData.fountainWater;
     assert.ok(Math.abs(fx.fallStart - stone.max.y) < 0.02, `stream should start at the spout, ${fx.fallStart} vs ${stone.max.y}`);
     assert.ok(fx.fallStart > fx.fallEnd);
+  });
+
+  it('force-replaces the outdoor fountain with the Blender dump and keeps its footprint', async () => {
+    const objText = readFileSync(join(modelsRoot, 'fountain', 'fountain.obj'), 'utf8');
+    assert.match(objText, /Blender/);
+    assert.match(objText, /Object_Fountain_2026-09-12/);
+    const fountainEntry = BUNDLED_PROP_FOLDERS.find((item) => item.id === 'fountain');
+    assert.equal(fountainEntry?.folder, 'fountain');
+    assert.equal(fountainEntry?.rev, FOUNTAIN_DUMP_REV);
+    const bundled = await loadFolder('fountain');
+    setBundledLook('fountain', bundled);
+    try {
+      const live = buildFountain();
+      const body = live.getObjectByName('fountain-body');
+      assert.ok(body, 'live fountain should wrap the dumped body, not a procedural stand-in');
+      let dumpedMeshes = 0;
+      body.traverse((child) => {
+        if (child.isMesh && (child.geometry?.getAttribute?.('position')?.count ?? 0) > 80) dumpedMeshes += 1;
+      });
+      assert.ok(dumpedMeshes >= 1, `dumped fountain mesh missing, count=${dumpedMeshes}`);
+      const liveBox = measureVisibleBox(live);
+      const liveSize = liveBox.getSize(new THREE.Vector3());
+      setBundledLook('fountain', null);
+      const proc = buildFountain();
+      const procSize = measureVisibleBox(proc).getSize(new THREE.Vector3());
+      assert.ok(Math.abs(liveSize.y - procSize.y) < 0.2, `height should match current fountain, live=${liveSize.y} proc=${procSize.y}`);
+      assert.ok(liveBox.min.y > -0.08 && liveBox.min.y < 0.1, `fountain should sit on the ground, minY=${liveBox.min.y}`);
+    } finally {
+      setBundledLook('fountain', null);
+    }
   });
 
   it('fits a bundled anvil dump to the current anvil bbox without stretch', async () => {
@@ -841,7 +883,7 @@ describe('bundled prop swaps', () => {
     }
   });
 
-  it('fits buyer dumps to humanoid height and bakes walk yaw', async () => {
+  it('fits buyer dumps to humanoid height without a sideways dump yaw', async () => {
     const samples = [
       ['hedgemage', 'buyers/wizard/wizard-level-9'],
       ['pilgrim', 'buyers/adventurer/bob'],
@@ -856,6 +898,7 @@ describe('bundled prop swaps', () => {
       const height = box.max.y - Math.min(0, box.min.y);
       assert.ok(Math.abs(height - BUYER_FIT_HEIGHT) < 0.12, `${typeId} height ${height}`);
       assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `${typeId} feet minY=${box.min.y}`);
+      assert.ok(Math.abs(BUYER_DUMP_YAW) < 1e-6, 'buyer dumps already face +Z');
       assert.ok(Math.abs(wrapped.children[0].rotation.y - BUYER_DUMP_YAW) < 1e-6, `${typeId} dump yaw`);
     }
   });
@@ -1287,15 +1330,15 @@ describe('shop props', () => {
     assert.ok(box.max.y > 1.8, `range should be 2× tall, maxY=${box.max.y}`);
   });
 
-  it('scales the spinning wheel 2× the previous live size and keeps it on the floor', () => {
-    assert.equal(WHEEL_WORLD_SCALE, 4);
+  it('scales the spinning wheel to half the previous 4× live size and keeps it on the floor', () => {
+    assert.equal(WHEEL_WORLD_SCALE, 2);
     const wheel = buildSpinningWheel();
     assert.ok(Math.abs(wheel.scale.x - wheel.scale.y) < 1e-6);
     assert.ok(Math.abs(wheel.scale.y - wheel.scale.z) < 1e-6);
     assert.ok(Math.abs(wheel.scale.x - WHEEL_WORLD_SCALE) < 1e-6);
     const box = measureVisibleBox(wheel);
     assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `wheel should sit on the floor, minY=${box.min.y}`);
-    assert.ok(box.max.y > 2.4, `wheel should be 2× the prior live height, maxY=${box.max.y}`);
+    assert.ok(box.max.y > 1.2 && box.max.y < 2.4, `wheel should be half the prior 4× height, maxY=${box.max.y}`);
   });
 
   it('keeps shop tables at the previous size on the floor', () => {

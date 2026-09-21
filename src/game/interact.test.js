@@ -23,6 +23,14 @@ describe('station walk-then-open', () => {
     assert.ok(STATION_ARRIVE > 1.15);
   });
 
+  it('keeps the spinning wheel click box at half the prior 4× live size', () => {
+    assert.equal(STATION_HIT.wheel.w, 1.85);
+    assert.equal(STATION_HIT.wheel.h, 2.4);
+    assert.equal(STATION_HIT.wheel.d, 1.8);
+    assert.equal(STATION_HIT.wheel.pickY, 1.1);
+    assert.equal(STATION_HIT.wheel.floorR, 1.35);
+  });
+
   it('lets a ground hit in front of the anvil count as an anvil click', () => {
     const state = createState();
     const near = stationAtFloor(SHOP.anvil.x, SHOP.anvil.z + 0.7, state.furniture);

@@ -43,8 +43,17 @@ function hasMesh(root) {
   return found;
 }
 
+function sanitizeObjText(objText) {
+  // Blender OBJ dumps often include `l` edges plus `f` faces. Three's OBJLoader
+  // then treats the whole object as LineSegments and drops the mesh.
+  if (/^f /m.test(objText) && /^l /m.test(objText)) {
+    return objText.replace(/^l\s+.*$/gm, '');
+  }
+  return objText;
+}
+
 function parseObjBuffer(buffer, sidecars = {}) {
-  const objText = decodeText(buffer);
+  const objText = sanitizeObjText(decodeText(buffer));
   if (!objText.trim()) throw new Error('That .obj file is empty.');
   const { urls, revoke } = sidecarMap(sidecars);
   const manager = new THREE.LoadingManager();
@@ -53,7 +62,8 @@ function parseObjBuffer(buffer, sidecars = {}) {
     for (const url of revoke) URL.revokeObjectURL(url);
   };
   manager.onLoad = finish;
-  setTimeout(finish, 60000);
+  const revokeTimer = setTimeout(finish, 60000);
+  revokeTimer.unref?.();
 
   const objLoader = new OBJLoader(manager);
   const mtlEntry = Object.entries(sidecars).find(([name]) => name.toLowerCase().endsWith('.mtl'));
@@ -130,6 +140,8 @@ export function parseModelBuffer(buffer, name, sidecars = {}) {
   });
 }
 
+export const FOUNTAIN_DUMP_REV = 'blender-4e9b2aee';
+
 export const BUNDLED_PLAYER_DIR = 'models/player';
 
 export const BUNDLED_PROP_FOLDERS = [
@@ -150,7 +162,7 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'tree', folder: 'tree' },
   { id: 'flowers', folder: 'flowers' },
   { id: 'rock', folder: 'rock' },
-  { id: 'fountain', folder: 'fountain' },
+  { id: 'fountain', folder: 'fountain', rev: FOUNTAIN_DUMP_REV },
   { id: 'skeleton', folder: 'skeleton' },
   { id: 'rune-air', folder: 'runes/air' },
   { id: 'rune-water', folder: 'runes/water' },
@@ -249,13 +261,18 @@ function missingModel(label) {
   return err;
 }
 
-async function fetchObjMtl(folder, objFile, mtlFile) {
+function assetQuery(rev) {
+  return rev ? `?v=${encodeURIComponent(rev)}` : '';
+}
+
+async function fetchObjMtl(folder, objFile, mtlFile, rev) {
   const roots = cachedModelsRoot ? [cachedModelsRoot] : bundledModelRoots();
   let lastMissing = missingModel(`models/${folder}/${objFile}`);
+  const q = assetQuery(rev);
   for (const root of roots) {
     const base = `${root}${folder}/`;
     try {
-      const objRes = await fetch(`${base}${objFile}`);
+      const objRes = await fetch(`${base}${objFile}${q}`);
       if (!objRes.ok) {
         lastMissing = missingModel(`models/${folder}/${objFile}`);
         continue;
@@ -264,7 +281,7 @@ async function fetchObjMtl(folder, objFile, mtlFile) {
       cachedModelsRoot = root;
       const sidecars = {};
       if (mtlFile) {
-        const mtlRes = await fetch(`${base}${mtlFile}`);
+        const mtlRes = await fetch(`${base}${mtlFile}${q}`);
         if (mtlRes.ok) {
           const mtlBuffer = await mtlRes.arrayBuffer();
           try {
@@ -293,14 +310,14 @@ export async function loadBundledPlayerScene() {
   return fetchObjMtl('player', 'player.obj', 'player.mtl');
 }
 
-export async function loadBundledPropScene(folder) {
+export async function loadBundledPropScene(folder, rev) {
   const baseName = String(folder).split('/').pop();
   const names = [`${baseName}.obj`, `${folder}.obj`, 'model.obj', 'player.obj'];
   let lastErr = null;
   for (const objFile of names) {
     const mtlFile = objFile.replace(/\.obj$/i, '.mtl');
     try {
-      return await fetchObjMtl(folder, objFile, mtlFile);
+      return await fetchObjMtl(folder, objFile, mtlFile, rev);
     } catch (err) {
       lastErr = err;
       if (err?.code === 'MISSING_MODEL') break;
@@ -313,9 +330,9 @@ export async function loadBundledLooks(onProgress) {
   await resolveBundledModelRoot();
   const total = BUNDLED_PROP_FOLDERS.length;
   let done = 0;
-  const entries = await Promise.all(BUNDLED_PROP_FOLDERS.map(async ({ id, folder }) => {
+  const entries = await Promise.all(BUNDLED_PROP_FOLDERS.map(async ({ id, folder, rev }) => {
     try {
-      const scene = await loadBundledPropScene(folder);
+      const scene = await loadBundledPropScene(folder, rev);
       done += 1;
       onProgress?.(done, total, id);
       return [id, scene];

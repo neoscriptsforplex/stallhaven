@@ -443,6 +443,34 @@ describe('customer trade', () => {
     assert.equal(RECIPES[mage.recipeId].combatClass, 'magic');
   });
 
+  it('never cross-asks outside each buyer class', () => {
+    const samples = [
+      ['mercenary', 'melee'],
+      ['ranger', 'range'],
+      ['hedgemage', 'magic'],
+      ['pilgrim', null],
+    ];
+    for (const [id, combatClass] of samples) {
+      for (let i = 0; i < 24; i += 1) {
+        const req = decideRequest(id, () => i / 24);
+        assert.ok(req, `${id} should still request something`);
+        const recipe = RECIPES[req.recipeId];
+        assert.ok(recipe.buyers.includes(id), `${id} asked ${recipe.id} without being a listed buyer`);
+        if (combatClass) {
+          assert.ok(
+            recipe.combatClass === combatClass || recipe.category === 'potion',
+            `${id} asked ${recipe.id} (${recipe.combatClass})`,
+          );
+        } else {
+          assert.ok(
+            recipe.category === 'food' || recipe.category === 'potion',
+            `${id} asked ${recipe.id} (${recipe.category})`,
+          );
+        }
+      }
+    }
+  });
+
   it('usually asks for an unlocked recipe the player can already craft', () => {
     const state = createState();
     const rng = sequentialRng(0.9, 0);
@@ -764,7 +792,7 @@ describe('material regen', () => {
     tickMaterials(state, 8);
     assert.equal(state.materials.flour, 1);
     tickMaterials(state, 8);
-    assert.ok(state.materials.logs >= 1);
+    assert.equal(state.materials.logs, 0);
     state.materials.flour = 249;
     state.materialAcc.flour = 0;
     tickMaterials(state, 16);
@@ -785,6 +813,7 @@ describe('material regen', () => {
     state.gold = 1000;
     assert.equal(canRestock(state, 'bronze'), false);
     assert.equal(canRestock(state, 'essence'), false);
+    assert.equal(canRestock(state, 'logs'), false);
     assert.equal(restock(state, 'bronze'), false);
     assert.equal(restock(state, 'essence'), false);
   });
@@ -1496,8 +1525,10 @@ describe('anvil tools', () => {
     for (let i = 0; i < 20; i += 1) finishCraft(state, 'bronze_hatchet', i);
     assert.equal(isUnlocked(state, 'iron_hatchet'), true);
     assert.equal(state.chest.bronze_hatchet, 20);
-    assert.ok(CUSTOMERS.mercenary.prefers.includes('bronze_pickaxe'));
-    assert.ok(CUSTOMERS.ranger.prefers.includes('bronze_hatchet'));
+    assert.ok(CUSTOMERS.mercenary.prefers.includes('bronze_scimitar'));
+    assert.ok(CUSTOMERS.ranger.prefers.includes('bronze_shortbow'));
+    assert.equal(CUSTOMERS.mercenary.prefers.includes('bronze_pickaxe'), false);
+    assert.equal(CUSTOMERS.ranger.prefers.includes('bronze_hatchet'), false);
     assert.equal(canDisplayOn('table', RECIPES.bronze_hatchet), true);
     assert.equal(canDisplayOn('stand', RECIPES.bronze_pickaxe), false);
     const prices = METALS.map((metal) => RECIPES[`${metal.id}_hatchet`].price);
@@ -1567,7 +1598,8 @@ describe('magic runes', () => {
     state.craftCounts.water_rune = 40;
     assert.equal(isUnlocked(state, 'fire_rune'), true);
     assert.ok(CUSTOMERS.hedgemage.prefers.includes('air_rune'));
-    assert.ok(CUSTOMERS.pilgrim.prefers.includes('fire_rune'));
+    assert.equal(CUSTOMERS.pilgrim.prefers.includes('fire_rune'), false);
+    assert.equal(CUSTOMERS.mercenary.prefers.includes('air_rune'), false);
     const saved = serializeState(state);
     const next = createState();
     assert.equal(applyState(next, saved), true);

@@ -129,6 +129,12 @@ describe('player look UI', () => {
     assert.match(world, /rotateFurniturePose\(moveTarget, dir\)/);
   });
 
+  it('resets anvil tabs with craftUiForStation so furnace smelt state cannot leak', () => {
+    assert.match(hud, /craftUiForStation\(craftStation/);
+    const catalog = readFileSync(join(root, 'catalog.js'), 'utf8');
+    assert.match(catalog, /ANVIL_TAB_IDS\.has\(prev\.tab\) \? prev\.tab : 'melee'/);
+  });
+
   it('opens a dedicated customize dock with every look slot and a back path', () => {
     const look = slice(html, 'id="look-dock"', 'id="music-dock"');
     assert.match(look, /id="look-dock"/);

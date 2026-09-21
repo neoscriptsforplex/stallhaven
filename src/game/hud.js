@@ -7,8 +7,6 @@ import {
   PLAYER_COLORS,
   RECIPES,
   SKYBOXES,
-  anvilSubtabForRecipe,
-  anvilTabForRecipe,
   classLabel,
   costLabel,
   customerName,
@@ -26,6 +24,7 @@ import {
   recipesForTab,
   SHELF_SLOT_LABELS,
   stationForRecipe,
+  craftUiForStation,
 } from './catalog.js';
 import {
   addMusicFiles,
@@ -575,20 +574,9 @@ export function bindHud(root, state, world) {
     const recipe = options.focusId ? RECIPES[options.focusId] : null;
     craftStation = recipe ? stationForRecipe(recipe) : station;
     craftFocusId = options.focusId ?? null;
-    if (craftStation === 'range') craftTab = 'food';
-    else if (craftStation === 'cauldron') craftTab = 'potion';
-    else if (craftStation === 'furnace') craftTab = 'smelt';
-    else if (craftStation === 'wheel') craftTab = 'spin';
-    else {
-      craftTab = recipe ? anvilTabForRecipe(recipe) : (craftTab === 'food' || craftTab === 'potion' ? 'melee' : craftTab);
-      craftSubtab = recipe
-        ? anvilSubtabForRecipe(recipe)
-        : (craftSubtab === 'armour' || craftSubtab === 'ammo' || craftSubtab === 'rune' || craftSubtab === 'hatchet' || craftSubtab === 'pickaxe' ? craftSubtab : 'weapon');
-      if (craftTab !== 'ranged' && craftSubtab === 'ammo') craftSubtab = 'weapon';
-      if (craftTab !== 'magic' && craftSubtab === 'rune') craftSubtab = 'weapon';
-      if (craftTab !== 'tools' && (craftSubtab === 'hatchet' || craftSubtab === 'pickaxe')) craftSubtab = 'weapon';
-      if (craftTab === 'tools' && craftSubtab !== 'hatchet' && craftSubtab !== 'pickaxe') craftSubtab = 'hatchet';
-    }
+    const ui = craftUiForStation(craftStation, { tab: craftTab, subtab: craftSubtab }, recipe);
+    craftTab = ui.tab;
+    craftSubtab = ui.subtab;
     potionModal.hidden = true;
     craftModal.hidden = false;
     const reason = craftFocusId ? craftBlockReason(state, craftFocusId) : '';

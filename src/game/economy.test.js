@@ -39,6 +39,8 @@ import {
   offerClassOf,
   customerName,
   defaultAppearance,
+  TIER_SELL,
+  craftUiForStation,
 } from './catalog.js';
 import {
   applyState,
@@ -587,7 +589,6 @@ describe('catalog', () => {
     assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
     assert.equal(recipes.filter((r) => r.category === 'food').length, 13);
     assert.equal(recipes.filter((r) => r.category === 'potion').length, 8);
-    assert.equal(RECIPES.salmon.price, 16);
     assert.ok(RECIPES.salmon.price < RECIPES.cake.price);
     assert.ok(RECIPES.cake.price < RECIPES.lobster.price);
     assert.ok(RECIPES.lobster.price < RECIPES.chocolate_cake.price);
@@ -1538,7 +1539,7 @@ describe('ranged ammo', () => {
     state.craftCounts.bronze_arrows = 20;
     assert.equal(isUnlocked(state, 'iron_arrows'), true);
     assert.match(costLabel(RECIPES.bronze_arrows), /×20/);
-    assert.match(costLabel(RECIPES.bronze_arrows), /sells 2g/);
+    assert.match(costLabel(RECIPES.bronze_arrows), /sells 900g/);
   });
 });
 
@@ -1574,12 +1575,13 @@ describe('magic runes', () => {
     assert.equal(isUnlocked(next, 'earth_rune'), true);
   });
 
-  it('sells Air at 20g and climbs Earth, Water, then Fire', () => {
-    assert.equal(RECIPES.air_rune.price, 20);
-    assert.equal(RECIPES.earth_rune.price, 28);
-    assert.equal(RECIPES.water_rune.price, 36);
-    assert.equal(RECIPES.fire_rune.price, 48);
-    assert.match(costLabel(RECIPES.air_rune), /sells 20g/);
+  it('sells Air on the bronze-end of the 5k–60k curve and climbs Earth, Water, then Fire', () => {
+    assert.equal(RECIPES.air_rune.price, 3500);
+    assert.ok(RECIPES.air_rune.price < RECIPES.earth_rune.price);
+    assert.ok(RECIPES.earth_rune.price < RECIPES.water_rune.price);
+    assert.ok(RECIPES.water_rune.price < RECIPES.fire_rune.price);
+    assert.equal(RECIPES.fire_rune.price, 42000);
+    assert.match(costLabel(RECIPES.air_rune), /sells 3,500g/);
   });
 });
 
@@ -1618,7 +1620,7 @@ describe('display runes and ammo', () => {
 });
 
 describe('potion sell prices', () => {
-  it('starts at 1,000g and climbs by rarity, with comma labels and offer markdown', () => {
+  it('starts at 5,000g and climbs by rarity, with comma labels and offer markdown', () => {
     const prices = [
       RECIPES.strength_potion.price,
       RECIPES.prayer_potion.price,
@@ -1629,25 +1631,26 @@ describe('potion sell prices', () => {
       RECIPES.energy_potion.price,
       RECIPES.magic_potion.price,
     ];
-    assert.equal(prices[0], 1000);
+    assert.equal(prices[0], 5000);
     for (let i = 1; i < prices.length; i += 1) {
       assert.ok(prices[i] > prices[i - 1], `${i} should sell for more`);
     }
-    assert.match(costLabel(RECIPES.strength_potion), /sells 1,000g/);
-    assert.match(costLabel(RECIPES.magic_potion), /sells 16,000g/);
+    assert.equal(prices[prices.length - 1], 60000);
+    assert.match(costLabel(RECIPES.strength_potion), /sells 5,000g/);
+    assert.match(costLabel(RECIPES.magic_potion), /sells 60,000g/);
     const ask = decideRequest('hedgemage', () => 0.9, createState());
     if (ask.recipeId === 'magic_potion' || RECIPES[ask.recipeId]?.category === 'potion') {
       assert.equal(ask.gold, RECIPES[ask.recipeId].price);
     }
-    assert.equal(reducedSalePrice(RECIPES.strength_potion.price), 650);
+    assert.equal(reducedSalePrice(RECIPES.strength_potion.price), 3250);
     const state = createState();
     state.gold = 20000;
     state.furniture.cauldron = { x: 0, z: 0, rot: 0 };
     finishCraft(state, 'strength_potion');
     const offer = offerChoices(state, 'prayer_potion')[0];
     assert.equal(offer.recipeId, 'strength_potion');
-    assert.equal(offer.listPrice, 1000);
-    assert.equal(offer.gold, 650);
+    assert.equal(offer.listPrice, 5000);
+    assert.equal(offer.gold, 3250);
   });
 });
 
@@ -1784,6 +1787,41 @@ describe('customer look packs', () => {
     assert.equal(customerName('pilgrim', { plural: true }), 'Adventurers');
     assert.equal(customerName('mercenary', { plural: true }), 'Guards');
     assert.equal(customerName('hedgemage', { plural: true }), 'Wizards');
+  });
+});
+
+describe('sell price rebalance', () => {
+  it('anchors metal gear on the 5k–60k bronze→dragon ladder', () => {
+    assert.deepEqual(TIER_SELL, [5000, 10000, 20000, 30000, 40000, 50000, 60000]);
+    METALS.forEach((metal, index) => {
+      assert.equal(RECIPES[`${metal.id}_scimitar`].price, TIER_SELL[index], metal.id);
+    });
+    assert.ok(RECIPES.bronze_gloves.price < RECIPES.bronze_scimitar.price);
+    assert.ok(RECIPES.bronze_platebody.price > RECIPES.bronze_scimitar.price);
+    assert.ok(RECIPES.dragon_platebody.price > RECIPES.dragon_scimitar.price);
+    assert.equal(RECIPES.bronze_scimitar.price, 5000);
+    assert.equal(RECIPES.dragon_scimitar.price, 60000);
+    assert.equal(RECIPES.smelt_bronze.price, 0);
+    assert.equal(RECIPES.spin_bow_string.price, 0);
+    assert.ok(RECIPES.bread.price >= 5000);
+    assert.ok(RECIPES.anglerfish.price <= 60000);
+    assert.ok(RECIPES.green_dhide_body.price < RECIPES.black_dhide_body.price);
+  });
+});
+
+describe('craft station UI', () => {
+  it('opens the anvil on melee weapons after a furnace visit, not leftover smelt recipes', () => {
+    const afterFurnace = craftUiForStation('anvil', { tab: 'smelt', subtab: 'weapon' });
+    assert.equal(afterFurnace.tab, 'melee');
+    assert.equal(afterFurnace.subtab, 'weapon');
+    const cold = craftUiForStation('anvil');
+    assert.equal(cold.tab, 'melee');
+    assert.equal(recipesForTab(cold.tab, cold.subtab)[0].category, 'weapon');
+    assert.equal(recipesForTab(cold.tab, cold.subtab).some((r) => r.category === 'smelt'), false);
+    const furnace = craftUiForStation('furnace', { tab: 'melee', subtab: 'armour' });
+    assert.equal(furnace.tab, 'smelt');
+    const range = craftUiForStation('range');
+    assert.equal(range.tab, 'food');
   });
 });
 

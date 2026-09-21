@@ -85,6 +85,21 @@ describe('station walk-then-open', () => {
     assert.ok(end.x > 5);
   });
 
+  it('walks to the cook-face of the range, not behind it', () => {
+    const state = createState();
+    state.furniture.range = { x: SHOP.range.x, z: SHOP.range.z, rot: 0 };
+    const plan = resolveStationUse(
+      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+      state.furniture.range,
+      state,
+      undefined,
+      'range',
+    );
+    assert.equal(plan.action, 'walk');
+    assert.ok(plan.dest.x < state.furniture.range.x - 0.4, 'stand on the cook-face (−X after start yaw)');
+    assert.ok(Math.abs(plan.dest.z - state.furniture.range.z) < 0.35);
+  });
+
   it('treats dungeon boulders as walk-then-use rocks', () => {
     assert.equal(USE_KINDS.has('boulder'), true);
     assert.ok(STATION_HIT.boulder.w >= 1.2);

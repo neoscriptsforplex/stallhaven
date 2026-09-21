@@ -915,8 +915,8 @@ export function createWorld(canvas, state, opts = {}) {
     const plan = sceneMode === 'dungeon' || type === 'trapdoor' || type === 'ladder'
       ? resolveStationUse(from, pose, state, (start, dest) => (
         planWalk(start, dest, [], PLAYER_RADIUS, sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors)
-      ))
-      : resolveStationUse(from, pose, state);
+      ), type)
+      : resolveStationUse(from, pose, state, planPlayerWalk, type);
     if (plan.action === 'open' || isNearPose(pose, arrive)) {
       pendingUse = null;
       playerPath.length = 0;

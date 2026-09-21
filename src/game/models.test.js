@@ -742,7 +742,8 @@ describe('bundled prop swaps', () => {
         child.getMatrixAt(i, dummy);
         pos.setFromMatrixPosition(dummy);
         blades += 1;
-        if (Math.hypot(pos.x - TRAPDOOR.x, pos.z - TRAPDOOR.z) < TRAPDOOR_HOLE_CLEAR) inHole += 1;
+        const dist = Math.hypot(pos.x - TRAPDOOR.x, pos.z - TRAPDOOR.z);
+        if (dist < TRAPDOOR_HOLE_CLEAR || dist < 0.55) inHole += 1;
       }
     });
     assert.ok(blades > 100, `lawn should still have blades, got ${blades}`);

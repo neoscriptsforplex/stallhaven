@@ -262,10 +262,15 @@ describe('layout numbers', () => {
 
   it('treats the dungeon hatch opening as a grass-free hole', () => {
     assert.ok(TRAPDOOR.x > PATH_HALF_W, 'hatch sits on the right of the cobble path');
+    assert.ok(TRAPDOOR_HOLE_CLEAR >= 0.9, 'hole clear must cover leaning lawn blades');
     assert.equal(pointHitsTrapdoor(TRAPDOOR.x, TRAPDOOR.z), true);
     assert.equal(pointHitsTrapdoor(TRAPDOOR.x + TRAPDOOR_HOLE_CLEAR + 0.02, TRAPDOOR.z), false);
     assert.ok(gardenTrapdoorSpot([]));
     assert.equal(gardenTrapdoorSpot([]).x, TRAPDOOR.x);
+    const nearHatch = gardenGrassClusters([]).filter((c) => (
+      Math.hypot(c.x - TRAPDOOR.x, c.z - TRAPDOOR.z) < 1.22
+    ));
+    assert.equal(nearHatch.length, 0, 'lawn clusters should stay off the hatch');
   });
 
   it('snaps furniture on both floor axes, not only sideways', () => {

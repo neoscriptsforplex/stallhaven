@@ -105,8 +105,10 @@ export const FOUNTAIN = { x: 0, z: 8.85, radius: 0.7, apron: 1.42 };
 export const PATH_HALF_W = 0.72;
 export const PATH_START_Z = 4.22;
 export const TRAPDOOR = { x: 3.35, z: 9.55 };
-/** Keep lawn blades off the dark hatch opening; rim grass on the rock can stay. */
-export const TRAPDOOR_HOLE_CLEAR = 0.38;
+/** Keep lawn blades (including lean) off the dark hatch opening; rim grass on the rock can stay. */
+export const TRAPDOOR_HOLE_CLEAR = 0.96;
+/** Drop whole lawn clusters whose scatter would still reach the hole. */
+export const TRAPDOOR_CLUSTER_CLEAR = 1.22;
 /** Shop plank / station floor plane. Bundled chests sit on this, not at y=0. */
 export const SHOP_FURNITURE_FLOOR_Y = 0.09;
 
@@ -605,6 +607,7 @@ export function gardenGrassClusters(expansionIds = []) {
       const x = grass.minX + (c + 0.18 + rand() * 0.64) * dx;
       const z = grass.minZ + (r + 0.18 + rand() * 0.64) * dz;
       if (!keepGardenSpot({ x, z, side: 'edge' }, expansionIds)) continue;
+      if (pointHitsTrapdoor(x, z, TRAPDOOR_CLUSTER_CLEAR)) continue;
       clusters.push({
         x,
         z,
@@ -621,6 +624,7 @@ export function gardenGrassClusters(expansionIds = []) {
       const x = (side < 0 ? path.minX : path.maxX) + side * (0.58 + rand() * 0.62);
       const zz = z + (rand() - 0.5) * 0.32;
       if (!keepGardenSpot({ x, z: zz, side: 'path' }, expansionIds)) continue;
+      if (pointHitsTrapdoor(x, zz, TRAPDOOR_CLUSTER_CLEAR)) continue;
       clusters.push({
         x,
         z: zz,

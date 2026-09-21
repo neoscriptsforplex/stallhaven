@@ -128,6 +128,77 @@ export const TOOL_SUBTABS = [
 /** One anvil ammo recipe action puts this many units in the chest. */
 export const AMMO_BATCH = 20;
 
+/** Player-facing sell anchors: Bronze → Iron → Steel → Mithril → Adamant → Rune → Dragon. */
+export const TIER_SELL = [5000, 10000, 20000, 30000, 40000, 50000, 60000];
+
+/** Small pieces sit under the tier anchor; plate / 2H sit over. */
+const METAL_PIECE_WEIGHT = {
+  scimitar: 1,
+  dagger: 0.72,
+  sword: 1,
+  mace: 0.92,
+  spear: 1.05,
+  '2h_sword': 1.28,
+  defender: 0.82,
+  full_helm: 0.88,
+  med_helm: 0.74,
+  platebody: 1.32,
+  platelegs: 1.12,
+  boots: 0.62,
+  gloves: 0.58,
+  chainbody: 1.08,
+  plateskirt: 1.02,
+  shortbow: 1,
+  longbow: 1.08,
+  crossbow: 1.04,
+  knives: 0.7,
+  thrownaxe: 0.74,
+  arrows: 0.18,
+  hatchet: 0.86,
+  pickaxe: 0.9,
+};
+
+const DHIDE_PIECE_WEIGHT = {
+  coif: 0.9,
+  body: 1.15,
+  chaps: 1.05,
+  vambraces: 0.75,
+  boots: 0.72,
+};
+
+const MAGIC_ARMOUR_WEIGHT = {
+  hat: 0.88,
+  robe_top: 1.18,
+  robe_bottom: 1.08,
+  boots: 0.64,
+  gloves: 0.6,
+};
+
+/** Map 0..1 along the bronze→dragon sell curve. */
+export function tierSellFromT(t, weight = 1) {
+  const clamped = Math.max(0, Math.min(1, Number(t) || 0));
+  const pos = clamped * (TIER_SELL.length - 1);
+  const lo = Math.floor(pos);
+  const hi = Math.min(TIER_SELL.length - 1, lo + 1);
+  const frac = pos - lo;
+  const base = TIER_SELL[lo] + (TIER_SELL[hi] - TIER_SELL[lo]) * frac;
+  return Math.max(1, Math.round(base * weight));
+}
+
+/** Sell price for ladder index `index` of a `count`-long line. */
+export function tierSellPrice(index, { count = TIER_SELL.length, weight = 1 } = {}) {
+  const n = Math.max(1, count);
+  const t = n <= 1 ? 0 : Math.max(0, index) / (n - 1);
+  return tierSellFromT(t, weight);
+}
+
+/** Remap a legacy gold amount onto the 5k–60k curve, keeping relative order. */
+export function scaleSell(oldPrice, oldMin, oldMax, weight = 1) {
+  const span = oldMax - oldMin;
+  const t = span <= 0 ? 0 : ((Number(oldPrice) || 0) - oldMin) / span;
+  return tierSellFromT(t, weight);
+}
+
 /** @deprecated Food moved to the cooking range; anvil uses ANVIL_TABS. */
 export const CRAFT_TABS = ANVIL_TABS;
 
@@ -255,8 +326,7 @@ function metalLine({
   extraMats = {},
   gold0 = 0,
   time0 = 3,
-  price0 = 10,
-  priceStep = 8,
+  weight = 1,
   outputCount = 1,
 }) {
   METALS.forEach((metal, index) => {
@@ -281,7 +351,7 @@ function metalLine({
         gold: gold0 + index * 2,
       },
       time: time0 + index,
-      price: price0 + index * priceStep,
+      price: tierSellPrice(index, { weight: weight * (METAL_PIECE_WEIGHT[piece.id] ?? 1) }),
       buyers,
       tint: metal.tint,
       outputCount,
@@ -314,7 +384,7 @@ for (const piece of MELEE_WEAPONS) {
   metalLine({ piece, category: 'weapon', combatClass: 'melee', buyers: ['mercenary'] });
 }
 for (const piece of MELEE_ARMOUR) {
-  metalLine({ piece, category: 'armour', combatClass: 'melee', buyers: ['mercenary'], time0: 4, price0: 12 });
+  metalLine({ piece, category: 'armour', combatClass: 'melee', buyers: ['mercenary'], time0: 4 });
 }
 
 const RANGE_WEAPONS = [
@@ -343,8 +413,6 @@ metalLine({
   buyers: ['ranger'],
   extraMats: { logs: 1 },
   time0: 3,
-  price0: 2,
-  priceStep: 1,
   outputCount: AMMO_BATCH,
 });
 
@@ -365,7 +433,7 @@ addRecipe({
   tier: 3,
   cost: { materials: { steel_bar: 1 }, gold: 0 },
   time: 5,
-  price: 3,
+  price: tierSellPrice(2, { weight: METAL_PIECE_WEIGHT.arrows }),
   buyers: ['ranger', 'mercenary'],
   tint: 0xc5ccd4,
   outputCount: AMMO_BATCH,
@@ -399,7 +467,7 @@ DHIDE.forEach((color, index) => {
       tier: index + 1,
       cost: { materials: { hide: 1 }, gold: index * 2 },
       time: 4 + index,
-      price: 14 + index * 8,
+      price: tierSellPrice(index, { count: DHIDE.length, weight: DHIDE_PIECE_WEIGHT[piece.id] ?? 1 }),
       buyers: ['ranger'],
       tint: color.tint,
     });
@@ -427,7 +495,7 @@ MAGIC_STAVES.forEach((staff, index) => {
       gold: index * 3,
     },
     time: 4 + index * 2,
-    price: 16 + index * 10,
+    price: tierSellPrice(index, { count: MAGIC_STAVES.length }),
     buyers: ['hedgemage'],
     tint: MAGIC_SETS[index].tint,
   });
@@ -461,7 +529,7 @@ MAGIC_SETS.forEach((set, index) => {
       tier: index + 1,
       cost: { materials: { cloth: piece.id === 'robe_top' ? 2 : 1 }, gold: index * 2 },
       time: 4 + index,
-      price: 14 + index * 9,
+      price: tierSellPrice(index, { count: MAGIC_SETS.length, weight: MAGIC_ARMOUR_WEIGHT[piece.id] ?? 1 }),
       buyers: ['hedgemage'],
       tint: set.tint,
       accent: set.accent,
@@ -489,7 +557,6 @@ for (const piece of TOOL_PIECES) {
     combatClass: 'tools',
     buyers: ['mercenary', 'ranger'],
     time0: 3,
-    price0: 10,
   });
 }
 
@@ -512,7 +579,7 @@ RUNE_LINE.forEach((rune, index) => {
     tier: index + 1,
     cost: { materials: { essence: 1 }, gold: 0 },
     time: 3 + index,
-    price: [20, 28, 36, 48][index],
+    price: tierSellPrice(index, { count: RUNE_LINE.length, weight: 0.7 }),
     buyers: ['hedgemage', 'pilgrim', 'mercenary', 'ranger'],
     tint: rune.tint,
     shelfItem: true,
@@ -559,7 +626,7 @@ function addFoodLine(list, lineId, lineName, setKey, firstPreviousId = null) {
       tier: index + 1,
       cost: { materials: { ...food.mats }, gold: 0 },
       time: food.time,
-      price: food.price,
+      price: scaleSell(food.price, 8, 120),
       buyers: ['pilgrim'],
       tint: food.tint,
       shelfItem: true,
@@ -603,7 +670,7 @@ POTION_LINE.forEach((potion, index) => {
       gold: 0,
     },
     time: 4 + index,
-    price: potion.price,
+    price: scaleSell(potion.price, 1000, 16000),
     buyers: potion.buyers,
     tint: potion.tint,
     shelfItem: true,
@@ -1031,6 +1098,28 @@ export function anvilSubtabsForTab(tabId) {
     if (tab.id === 'rune') return tabId === 'magic';
     return tab.id === 'weapon' || tab.id === 'armour';
   });
+}
+
+const ANVIL_TAB_IDS = new Set(ANVIL_TABS.map((tab) => tab.id));
+const ANVIL_SUBTAB_IDS = new Set(['armour', 'ammo', 'rune', 'hatchet', 'pickaxe']);
+
+/** Reset shared craft-panel tab state so furnace/range/anvil never leak into each other. */
+export function craftUiForStation(station, prev = {}, recipe = null) {
+  if (station === 'range') return { tab: 'food', subtab: prev.subtab ?? 'weapon' };
+  if (station === 'cauldron') return { tab: 'potion', subtab: prev.subtab ?? 'weapon' };
+  if (station === 'furnace') return { tab: 'smelt', subtab: prev.subtab ?? 'weapon' };
+  if (station === 'wheel') return { tab: 'spin', subtab: prev.subtab ?? 'weapon' };
+  let tab = recipe
+    ? anvilTabForRecipe(recipe)
+    : (ANVIL_TAB_IDS.has(prev.tab) ? prev.tab : 'melee');
+  let subtab = recipe
+    ? anvilSubtabForRecipe(recipe)
+    : (ANVIL_SUBTAB_IDS.has(prev.subtab) ? prev.subtab : 'weapon');
+  if (tab !== 'ranged' && subtab === 'ammo') subtab = 'weapon';
+  if (tab !== 'magic' && subtab === 'rune') subtab = 'weapon';
+  if (tab !== 'tools' && (subtab === 'hatchet' || subtab === 'pickaxe')) subtab = 'weapon';
+  if (tab === 'tools' && subtab !== 'hatchet' && subtab !== 'pickaxe') subtab = 'hatchet';
+  return { tab, subtab };
 }
 
 export function recipeList() {

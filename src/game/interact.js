@@ -1,4 +1,5 @@
 import { PLAYER_RADIUS, planPlayerWalk } from './nav.js';
+import { furnitureVisualYaw } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel'];
 export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder']);
@@ -29,6 +30,28 @@ const APPROACH_OFFSETS = [
   [0, 1.15],
   [0, 0],
 ];
+
+const APPROACH_DIST = 0.85;
+
+/** Local +Z is the cook-face / door on the range dump. Prefer that side first. */
+function facingApproachOffsets(kind, pose) {
+  const yaw = furnitureVisualYaw(kind, pose?.rot ?? 0);
+  const fx = Math.sin(yaw);
+  const fz = Math.cos(yaw);
+  const rx = Math.cos(yaw);
+  const rz = -Math.sin(yaw);
+  return [
+    [fx * APPROACH_DIST, fz * APPROACH_DIST],
+    [fx * 0.7, fz * 0.7],
+    [fx * 1.15, fz * 1.15],
+    [rx * APPROACH_DIST, rz * APPROACH_DIST],
+    [-rx * APPROACH_DIST, -rz * APPROACH_DIST],
+    [-fx * APPROACH_DIST, -fz * APPROACH_DIST],
+    [fx * 0.65 + rx * 0.65, fz * 0.65 + rz * 0.65],
+    [fx * 0.65 - rx * 0.65, fz * 0.65 - rz * 0.65],
+    [0, 0],
+  ];
+}
 
 export function isNearPoint(from, to, dist) {
   return Math.hypot((from?.x ?? 0) - (to?.x ?? 0), (from?.z ?? 0) - (to?.z ?? 0)) <= dist;
@@ -61,10 +84,11 @@ export function stationAtFloor(x, z, furniture = {}) {
   return best;
 }
 
-export function resolveStationUse(from, pose, state, planFn = planPlayerWalk) {
+export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, kind = null) {
   if (!pose) return { action: 'none' };
   if (isNearPoint(from, pose, STATION_ARRIVE)) return { action: 'open' };
-  for (const [dx, dz] of APPROACH_OFFSETS) {
+  const offsets = kind === 'range' ? facingApproachOffsets(kind, pose) : APPROACH_OFFSETS;
+  for (const [dx, dz] of offsets) {
     const dest = { x: pose.x + dx, z: pose.z + dz };
     const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
     if (path.length) return { action: 'walk', path, dest };

@@ -86,6 +86,17 @@ export function stationAtFloor(x, z, furniture = {}) {
 
 export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, kind = null) {
   if (!pose) return { action: 'none' };
+  if (kind === 'counter') {
+    const offsets = facingApproachOffsets('counter', pose);
+    const stand = { x: pose.x + offsets[0][0], z: pose.z + offsets[0][1] };
+    if (isNearPoint(from, stand, 0.5)) return { action: 'open', dest: stand };
+    for (const [dx, dz] of offsets) {
+      const dest = { x: pose.x + dx, z: pose.z + dz };
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      if (path.length) return { action: 'walk', path, dest };
+    }
+    return { action: 'blocked' };
+  }
   if (isNearPoint(from, pose, STATION_ARRIVE)) return { action: 'open' };
   const offsets = kind === 'range' ? facingApproachOffsets(kind, pose) : APPROACH_OFFSETS;
   for (const [dx, dz] of offsets) {

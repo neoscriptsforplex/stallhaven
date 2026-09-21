@@ -954,7 +954,7 @@ export const SHOP = {
   keeper: { x: -0.48, z: -2.52 },
   // Side walls keep the starter tables. Back wall: anvil left.
   // Chest sits flush on the right stone wall, latch into the room.
-  // Furnace and cooking range start unplaced; Upgrade previews them on open floor.
+  // Furnace and cooking range start unplaced; Build previews them on open floor.
   anvil: { x: -2.55, z: -2.22 },
   chest: { x: 3.72, z: -2.22 },
   furnace: { x: -1.65, z: -0.45 },

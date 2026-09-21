@@ -108,6 +108,28 @@ describe('station walk-then-open', () => {
     assert.ok(Math.abs(plan.dest.z - state.furniture.range.z) < 0.35);
   });
 
+  it('walks behind the counter to the shopkeeper side, not the buyer queue', () => {
+    const state = createState();
+    const plan = resolveStationUse(
+      { x: 0, z: 1.4 },
+      state.furniture.counter,
+      state,
+      undefined,
+      'counter',
+    );
+    assert.equal(plan.action, 'walk');
+    assert.ok(plan.dest.z < state.furniture.counter.z - 0.4, 'stand on the keeper side (−Z)');
+    assert.ok(Math.abs(plan.dest.x - state.furniture.counter.x) < 0.5);
+    const already = resolveStationUse(
+      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+      state.furniture.counter,
+      state,
+      undefined,
+      'counter',
+    );
+    assert.equal(already.action, 'open');
+  });
+
   it('treats dungeon boulders as walk-then-use rocks', () => {
     assert.equal(USE_KINDS.has('boulder'), true);
     assert.ok(STATION_HIT.boulder.w >= 1.2);

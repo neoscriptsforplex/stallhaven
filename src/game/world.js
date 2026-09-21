@@ -917,10 +917,17 @@ export function createWorld(canvas, state, opts = {}) {
         planWalk(start, dest, [], PLAYER_RADIUS, sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors)
       ), type)
       : resolveStationUse(from, pose, state, planPlayerWalk, type);
-    if (plan.action === 'open' || isNearPose(pose, arrive)) {
+    const atStation = type === 'counter'
+      ? plan.action === 'open'
+      : (plan.action === 'open' || isNearPose(pose, arrive));
+    if (atStation) {
       pendingUse = null;
       playerPath.length = 0;
       moveMarker.visible = false;
+      if (type === 'counter') {
+        playClick('ui');
+        return;
+      }
       if (type === 'boulder') {
         startMining(pose.materialId, pose);
         playClick('ui');
@@ -937,19 +944,42 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     if (plan.action === 'walk' && applyWalkPath(plan.path)) {
-      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true, materialId: pose.materialId };
+      const dest = type === 'counter' && plan.dest ? plan.dest : pose;
+      pendingUse = {
+        type,
+        x: dest.x,
+        z: dest.z,
+        arrive: type === 'counter' ? 0.55 : arrive,
+        openOnArrive: type !== 'counter',
+        materialId: pose.materialId,
+      };
       playClick('move');
       return;
     }
+    const fallbackDest = type === 'counter' && plan.dest ? plan.dest : { x: pose.x, z: pose.z };
     const fallback = sceneMode === 'dungeon'
-      ? planWalk(from, { x: pose.x, z: pose.z }, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
-      : planPlayerWalk(from, { x: pose.x, z: pose.z }, state, PLAYER_RADIUS);
+      ? planWalk(from, fallbackDest, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
+      : planPlayerWalk(from, fallbackDest, state, PLAYER_RADIUS);
     if (applyWalkPath(fallback)) {
-      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true, materialId: pose.materialId };
+      pendingUse = {
+        type,
+        x: fallbackDest.x,
+        z: fallbackDest.z,
+        arrive: type === 'counter' ? 0.55 : arrive,
+        openOnArrive: type !== 'counter',
+        materialId: pose.materialId,
+      };
       playClick('move');
       return;
     }
-    pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: false, materialId: pose.materialId };
+    pendingUse = {
+      type,
+      x: fallbackDest.x,
+      z: fallbackDest.z,
+      arrive: type === 'counter' ? 0.55 : arrive,
+      openOnArrive: false,
+      materialId: pose.materialId,
+    };
     playClick('ui');
   }
 
@@ -957,6 +987,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pendingUse) return;
     const { type, materialId, x, z } = pendingUse;
     pendingUse = null;
+    if (type === 'counter') return;
     if (type === 'boulder') startMining(materialId, { x, z, materialId });
     else if (type === 'tree') startChopping({ x, z, materialId: 'logs' });
     else pickHandler?.({ type });
@@ -1258,6 +1289,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (data.kind === 'counter') {
+        queueUse('counter', state.furniture.counter);
         return;
       }
       if (data.kind === 'display') {

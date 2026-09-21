@@ -40,10 +40,14 @@ describe('player look UI', () => {
 
   it('labels the shop placement panel Build, not Upgrade', () => {
     assert.match(html, /id="build-btn"[^>]*>Build</);
+    assert.match(html, /id="build-btn"[^>]*title="Build"/);
     assert.match(html, /id="build-btn"[^>]*aria-label="Build"/);
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
     assert.match(build, /<h2>Build<\/h2>/);
     assert.equal(build.includes('<h2>Upgrade</h2>'), false);
+    const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
+    assert.match(help, /from Build/);
+    assert.equal(help.includes('from Upgrade'), false);
     const chest = slice(html, 'id="chest-upgrade-modal"', 'id="expand-dock"');
     assert.match(chest, /<h2>Upgrade Chest<\/h2>/);
     assert.match(chest, /data-upgrade-buy>Upgrade</);

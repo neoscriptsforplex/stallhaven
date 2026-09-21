@@ -936,7 +936,7 @@ describe('furnace and spinning wheel', () => {
     }
   });
 
-  it('starts without a furnace and places a free one from Upgrade to smelt ore into a bar', () => {
+  it('starts without a furnace and places a free one from Build to smelt ore into a bar', () => {
     const state = createState();
     assert.equal(ownsFurnace(state), false);
     assert.equal(canBuyFurnace(state), true);

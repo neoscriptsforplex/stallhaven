@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
@@ -29,9 +29,15 @@ import {
   wrapBundledProp,
   wrapImportedCharacter,
   wrapShopPlayer,
+  wrapBuyerDump,
   sitVisibleOnY,
+  nextBuyerLookId,
+  resetBuyerCycle,
+  BUYER_DUMP_YAW,
+  BUYER_FIT_HEIGHT,
   ANVIL_WORLD_SCALE,
 } from './models.js';
+import { BUYER_PACKS, BUYER_PACK_FOLDERS } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
 import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
@@ -66,6 +72,26 @@ describe('customer class looks', () => {
     assert.deepEqual(Object.keys(CUSTOMER_LOOKS).sort(), [
       'king', 'mage', 'mercenary', 'pilgrim', 'ranger',
     ]);
+  });
+
+  it('cycles buyer dumps round-robin per traveler type', () => {
+    resetBuyerCycle();
+    assert.equal(BUYER_PACKS.hedgemage.length, 6);
+    assert.equal(BUYER_PACKS.pilgrim.length, 5);
+    assert.equal(BUYER_PACKS.ranger.length, 2);
+    assert.equal(BUYER_PACKS.mercenary.length, 2);
+    const first = nextBuyerLookId('hedgemage');
+    for (let i = 1; i < BUYER_PACKS.hedgemage.length; i += 1) nextBuyerLookId('hedgemage');
+    assert.equal(nextBuyerLookId('hedgemage'), first);
+    assert.equal(nextBuyerLookId('kingroald'), null);
+    const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    for (const item of BUYER_PACK_FOLDERS) {
+      assert.equal(byId[item.id], item.folder);
+      const slug = item.folder.split('/').pop();
+      const folderPath = join(dirname(fileURLToPath(import.meta.url)), '../../public/models', item.folder);
+      assert.equal(existsSync(join(folderPath, `${slug}.obj`)), true, `${item.folder}.obj`);
+      assert.equal(existsSync(join(folderPath, `${slug}.mtl`)), true, `${item.folder}.mtl`);
+    }
   });
 
   it('dresses hedge mages with robes, a staff orb, and hat or hood variants', () => {
@@ -404,6 +430,9 @@ describe('bundled prop swaps', () => {
     }
     for (const id of ['food-bread', 'food-pizza', 'food-cake', 'food-pie', 'food-fish-pie', 'food-salmon', 'food-lobster', 'food-chocolate-cake', 'food-monkfish', 'food-curry', 'food-shark', 'food-summer-pie', 'food-anglerfish']) {
       assert.ok(ids.includes(id), id);
+    }
+    for (const item of BUYER_PACK_FOLDERS) {
+      assert.ok(ids.includes(item.id), item.id);
     }
     assert.ok(ids.includes('goblin'));
   });
@@ -798,6 +827,25 @@ describe('bundled prop swaps', () => {
       });
     } finally {
       setBundledLook('chest', null);
+    }
+  });
+
+  it('fits buyer dumps to humanoid height and bakes walk yaw', async () => {
+    const samples = [
+      ['hedgemage', 'buyers/wizard/wizard-level-9'],
+      ['pilgrim', 'buyers/adventurer/bob'],
+      ['ranger', 'buyers/ranger/armour-salesman'],
+      ['mercenary', 'buyers/guard/guard-level-21'],
+    ];
+    for (const [typeId, folder] of samples) {
+      const bundled = await loadFolder(folder);
+      const wrapped = wrapBuyerDump(bundled, typeId, { lookId: `test-${typeId}` });
+      assert.equal(wrapped.userData.buyerLookId, `test-${typeId}`);
+      const box = measureVisibleBox(wrapped);
+      const height = box.max.y - Math.min(0, box.min.y);
+      assert.ok(Math.abs(height - BUYER_FIT_HEIGHT) < 0.12, `${typeId} height ${height}`);
+      assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `${typeId} feet minY=${box.min.y}`);
+      assert.ok(Math.abs(wrapped.children[0].rotation.y - BUYER_DUMP_YAW) < 1e-6, `${typeId} dump yaw`);
     }
   });
 

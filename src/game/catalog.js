@@ -861,15 +861,45 @@ export const CUSTOMERS = {
   },
 };
 
+/** Bundled buyer dumps, cycled round-robin per customer type. */
+export const BUYER_PACKS = {
+  hedgemage: [
+    { id: 'buyer-wizard-archmage-sedridor', folder: 'buyers/wizard/archmage-sedridor' },
+    { id: 'buyer-wizard-wizard-level-9', folder: 'buyers/wizard/wizard-level-9' },
+    { id: 'buyer-wizard-wizard-grayzag', folder: 'buyers/wizard/wizard-grayzag' },
+    { id: 'buyer-wizard-wizard-jalarast', folder: 'buyers/wizard/wizard-jalarast' },
+    { id: 'buyer-wizard-wizard-mizgog', folder: 'buyers/wizard/wizard-mizgog' },
+    { id: 'buyer-wizard-wizard-traiborn', folder: 'buyers/wizard/wizard-traiborn' },
+  ],
+  pilgrim: [
+    { id: 'buyer-adventurer-bob', folder: 'buyers/adventurer/bob' },
+    { id: 'buyer-adventurer-cooking-tutor', folder: 'buyers/adventurer/cooking-tutor' },
+    { id: 'buyer-adventurer-donie', folder: 'buyers/adventurer/donie' },
+    { id: 'buyer-adventurer-man-level-2', folder: 'buyers/adventurer/man-level-2' },
+    { id: 'buyer-adventurer-woman-level-2', folder: 'buyers/adventurer/woman-level-2' },
+  ],
+  ranger: [
+    { id: 'buyer-ranger-armour-salesman', folder: 'buyers/ranger/armour-salesman' },
+    { id: 'buyer-ranger-ranging-guild-doorman', folder: 'buyers/ranger/ranging-guild-doorman' },
+  ],
+  mercenary: [
+    { id: 'buyer-guard-barbarian-level-17', folder: 'buyers/guard/barbarian-level-17' },
+    { id: 'buyer-guard-guard-level-21', folder: 'buyers/guard/guard-level-21' },
+  ],
+};
+
+export const BUYER_PACK_FOLDERS = Object.values(BUYER_PACKS).flat();
+
 export const SHOP = {
   door: { x: 0, z: 3.58 },
   outside: { x: 0, z: 5.55 },
   counter: { x: 0, z: -1.72 },
   keeper: { x: -0.48, z: -2.52 },
-  // Side walls keep the starter tables. Back wall: anvil left, chest right.
+  // Side walls keep the starter tables. Back wall: anvil left.
+  // Chest sits flush on the right stone wall, latch into the room.
   // Furnace and cooking range start unplaced; Upgrade previews them on open floor.
   anvil: { x: -2.55, z: -2.22 },
-  chest: { x: 2.55, z: -2.22 },
+  chest: { x: 3.72, z: -2.22 },
   furnace: { x: -1.65, z: -0.45 },
   range: { x: 1.65, z: -0.45 },
   cauldron: { x: 0, z: 0.8 },

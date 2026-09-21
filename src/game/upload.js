@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import { recipeList } from './catalog.js';
+import { BUYER_PACK_FOLDERS, recipeList } from './catalog.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
 import { UPLOADS_CLEARED, clearModels, saveModel } from './storage.js';
 import { normalizeImported } from './models.js';
@@ -170,6 +170,7 @@ export const BUNDLED_PROP_FOLDERS = [
       const slug = String(recipe.id).replaceAll('_', '-');
       return { id: `food-${slug}`, folder: `food/${slug}` };
     }),
+  ...BUYER_PACK_FOLDERS,
 ];
 
 export async function parseBundledPlayerBuffers(objBuffer, mtlBuffer) {

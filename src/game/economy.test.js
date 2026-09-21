@@ -98,7 +98,7 @@ import {
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
-import { furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
+import { defaultFurniture, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS } from './shopbuild.js';
 
@@ -387,6 +387,21 @@ describe('save and load', () => {
     const interior = roomInteriorFloor(0, 0);
     assert.ok(Math.abs(state.furniture.displays[center].z - (interior.minZ + SHELF_FROM_WALL)) < 1e-6);
     assert.ok(Math.abs(state.furniture.displays[center].rot) < 1e-6);
+  });
+
+  it('moves the old mid-floor starter chest flush onto the right stone wall', () => {
+    const state = createState();
+    const defaults = defaultFurniture();
+    assert.equal(applyState(state, {
+      gold: 0,
+      furniture: {
+        ...defaults,
+        chest: { x: 2.55, z: -2.22, rot: 0 },
+      },
+    }), true);
+    assert.ok(Math.abs(state.furniture.chest.x - SHOP.chest.x) < 1e-6);
+    assert.ok(Math.abs(state.furniture.chest.z - SHOP.chest.z) < 1e-6);
+    assert.ok(state.furniture.chest.x > 3.4);
   });
 });
 

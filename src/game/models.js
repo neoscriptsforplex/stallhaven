@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {
+  BUYER_PACKS,
   CUSTOMERS,
   customerName,
   pickMageRobes,
@@ -2708,7 +2709,49 @@ export const CUSTOMER_LOOKS = {
   mage: dressMage,
 };
 
+/** Dump snouts face +X; bake so +Z matches customer walk heading. */
+export const BUYER_DUMP_YAW = -Math.PI / 2;
+export const BUYER_FIT_HEIGHT = 1.65;
+
+const buyerCycle = Object.create(null);
+
+export function resetBuyerCycle() {
+  for (const key of Object.keys(buyerCycle)) delete buyerCycle[key];
+}
+
+export function nextBuyerLookId(typeId) {
+  const pack = BUYER_PACKS[typeId];
+  if (!pack?.length) return null;
+  const i = buyerCycle[typeId] ?? 0;
+  buyerCycle[typeId] = i + 1;
+  return pack[i % pack.length].id;
+}
+
+export function wrapBuyerDump(source, typeId, opts = {}) {
+  const wrapped = wrapImportedCharacter(source, {
+    name: typeId,
+    label: customerName(typeId),
+    height: BUYER_FIT_HEIGHT,
+    speech: true,
+    pickKind: 'customer',
+    ring: true,
+    rotateY: BUYER_DUMP_YAW,
+    ...opts,
+  });
+  wrapped.userData.buyerLookId = opts.lookId ?? null;
+  return wrapped;
+}
+
 export function buildAdventurer(typeId, opts = {}) {
+  const buyerLookId = opts.lookId ?? nextBuyerLookId(typeId);
+  const bundled = buyerLookId ? getBundledLook(buyerLookId) : null;
+  if (bundled) {
+    try {
+      return wrapBuyerDump(bundled, typeId, { lookId: buyerLookId });
+    } catch {
+      // Missing or broken dump — keep the procedural traveler.
+    }
+  }
   const type = CUSTOMERS[typeId] ?? CUSTOMERS.pilgrim;
   const group = new THREE.Group();
   group.name = typeId;
@@ -3470,6 +3513,7 @@ export function wrapImportedCharacter(source, opts = {}) {
   const group = new THREE.Group();
   group.name = opts.name ?? 'character';
   const mesh = source.clone(true);
+  if (opts.rotateY) mesh.rotation.y += opts.rotateY;
   normalizeImported(mesh, opts.height ?? 1.7, true, { fit: 'height' });
   tintImportedMesh(mesh, opts.tint);
   group.add(mesh);

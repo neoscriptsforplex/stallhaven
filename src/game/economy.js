@@ -1206,7 +1206,19 @@ export function applyState(state, data) {
     next.furniture = {
       counter: readPose(data.furniture.counter, defaults.counter),
       anvil: readPose(data.furniture.anvil, defaults.anvil),
-      chest: readPose(data.furniture.chest, defaults.chest),
+      chest: (() => {
+        const pose = readPose(data.furniture.chest, defaults.chest);
+        const oldStarterPads = [
+          { x: 2.55, z: -2.22 },
+          { x: 2.55, z: 3.05 },
+        ];
+        if (oldStarterPads.some((pad) => (
+          Math.abs(pose.x - pad.x) < 1e-6 && Math.abs(pose.z - pad.z) < 1e-6
+        ))) {
+          return { ...pose, x: defaults.chest.x, z: defaults.chest.z };
+        }
+        return pose;
+      })(),
       range: data.furniture.range
         ? readPose(data.furniture.range, { ...SHOP.range, rot: FURNITURE_FORWARD })
         : null,

@@ -64,6 +64,7 @@ import {
 } from './interact.js';
 import {
   buildAdventurer,
+  nextBuyerLookId,
   buildAnvil,
   buildChest,
   buildCounter,
@@ -1711,7 +1712,7 @@ export function createWorld(canvas, state, opts = {}) {
     spawnActor(typeId, now, request);
   }
 
-  function makeCustomerMesh(typeId, seed) {
+  function makeCustomerMesh(typeId, seed, lookId) {
     if (customCustomerSource) {
       const type = CUSTOMERS[typeId] ?? CUSTOMERS.pilgrim;
       const wrapped = wrapImportedCharacter(customCustomerSource, {
@@ -1725,11 +1726,12 @@ export function createWorld(canvas, state, opts = {}) {
       });
       return wrapped;
     }
-    return buildAdventurer(typeId, { seed });
+    return buildAdventurer(typeId, { seed, lookId });
   }
 
   function spawnActor(typeId, now, request) {
-    const mesh = makeCustomerMesh(typeId, customerSerial + Math.random());
+    const lookId = nextBuyerLookId(typeId);
+    const mesh = makeCustomerMesh(typeId, customerSerial + Math.random(), lookId);
     mesh.userData.pick.userData.customerId = customerSerial;
     mesh.position.set(SHOP.outside.x, 0, SHOP.outside.z + 0.15);
     setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
@@ -1737,6 +1739,7 @@ export function createWorld(canvas, state, opts = {}) {
     const actor = {
       id: customerSerial,
       typeId,
+      lookId,
       mesh,
       state: 'enter',
       path: [
@@ -1942,7 +1945,7 @@ export function createWorld(canvas, state, opts = {}) {
       const carried = actor.carried;
       if (carried && actor.mesh.userData.hand) actor.mesh.userData.hand.remove(carried);
       scene.remove(actor.mesh);
-      actor.mesh = makeCustomerMesh(actor.typeId, actor.id);
+      actor.mesh = makeCustomerMesh(actor.typeId, actor.id, actor.lookId);
       actor.mesh.position.copy(pos);
       actor.mesh.rotation.y = rotY;
       if (actor.mesh.userData.pick) actor.mesh.userData.pick.userData.customerId = actor.id;

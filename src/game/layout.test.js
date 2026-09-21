@@ -153,11 +153,16 @@ describe('layout numbers', () => {
     assert.equal(beside.z, SHOP.furnace.z);
   });
 
-  it('puts the chest on the old range pad, facing the front-door wall', () => {
-    assert.ok(SHOP.chest.x > 0, 'chest should sit on the right half of the back wall');
-    assert.ok(SHOP.chest.z < SHOP.counter.z - 0.2, 'chest should sit behind the counter');
-    assert.ok(Math.abs(SHOP.chest.x - 2.55) < 1e-9);
-    assert.ok(Math.abs(SHOP.chest.z - 2.22) < 1e-9 || Math.abs(SHOP.chest.z + 2.22) < 1e-9);
+  it('puts the chest flush on the right stone wall with the latch into the room', () => {
+    const wrapTau = (yaw) => ((yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const interior = roomInteriorFloor();
+    const { hw } = furnitureHalfSize('chest');
+    const box = poseRect('chest', { ...SHOP.chest, rot: FURNITURE_FORWARD });
+    assert.ok(SHOP.chest.x > 3.4, 'chest should sit on the right wall, not mid-floor');
+    assert.ok(SHOP.chest.z < SHOP.counter.z - 0.2, 'chest stays at the back-right depth');
+    assert.ok(Math.abs(SHOP.chest.x - (interior.maxX - hw)) < 1e-6, 'back of chest flush on interior face');
+    assert.ok(Math.abs(box.maxX - interior.maxX) < 0.04, `chest back should meet the wall, maxX=${box.maxX}`);
+    assert.ok(Math.abs(wrapTau(furnitureVisualYaw('chest', 0)) - 0) < 1e-9, 'latch faces −X into the room');
     assert.ok(SHOP.anvil.x < -1.8, 'anvil should sit on the left half of the back wall');
   });
 

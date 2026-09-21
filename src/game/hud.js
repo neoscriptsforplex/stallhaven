@@ -1399,17 +1399,18 @@ export function bindHud(root, state, world) {
       const itemBuy = buildModal.querySelector(`[data-${station.id}-buy]`);
       if (!itemStatus || !itemBuy) continue;
       if (ownsStation(state, station.id)) {
+        itemStatus.hidden = false;
         itemStatus.textContent = `Placed in the shop. Click it to use, or right-click to move.`;
         itemStatus.classList.remove('craft-note');
         itemBuy.disabled = true;
         itemBuy.textContent = 'Owned';
       } else {
-        itemStatus.textContent = station.cost > 0
-          ? `Costs ${formatGold(station.cost)} gp.`
-          : 'Free.';
+        const paid = station.cost > 0;
+        itemStatus.hidden = !paid;
+        itemStatus.textContent = paid ? `Costs ${formatGold(station.cost)} gp.` : '';
         itemStatus.classList.remove('craft-note');
         itemBuy.disabled = !canBuyStation(state, station.id);
-        itemBuy.textContent = station.cost > 0
+        itemBuy.textContent = paid
           ? `Buy · ${formatGold(station.cost)} gp`
           : 'Place · Free';
       }
@@ -1557,6 +1558,7 @@ export function bindHud(root, state, world) {
         ? `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(state.gold)}g.`
         : `A ${label} is already placed.`;
       if (status) {
+        status.hidden = false;
         status.textContent = msg;
         status.classList.add('craft-note');
       }

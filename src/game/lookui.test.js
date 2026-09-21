@@ -67,11 +67,21 @@ describe('player look UI', () => {
     const range = build.slice(build.indexOf('Cooking Range'), build.indexOf('Spinning Wheel'));
     assert.equal((furnace.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.equal((range.match(/Place it on the floor snap grid/g) ?? []).length, 1);
-    assert.match(furnace, /data-furnace-status class="meta">Free\.</);
-    assert.match(range, /data-range-status class="meta">Free\.</);
+    assert.match(furnace, /data-furnace-status class="meta" hidden><\/p>/);
+    assert.match(range, /data-range-status class="meta" hidden><\/p>/);
+    assert.match(furnace, /data-furnace-buy>Place · Free</);
+    assert.match(range, /data-range-buy>Place · Free</);
     assert.equal(furnace.includes('Free. Place it on the floor snap grid, then confirm.'), false);
     assert.equal(range.includes('Free. Place it on the floor snap grid, then confirm.'), false);
     assert.equal(hud.includes('Free. Place it on the floor snap grid, then confirm.'), false);
+    assert.equal(hud.includes(": 'Free.'"), false);
+    assert.match(hud, /itemStatus\.hidden = !paid/);
+    const wheel = build.slice(build.indexOf('Spinning Wheel'), build.indexOf('Cauldron'));
+    const cauldron = build.slice(build.indexOf('Cauldron'), build.indexOf('Table'));
+    assert.equal((wheel.match(/Place it on the floor snap grid/g) ?? []).length, 1);
+    assert.equal((cauldron.match(/Place it on the floor snap grid/g) ?? []).length, 1);
+    assert.match(wheel, /data-wheel-status class="meta">Costs 500 gp\.</);
+    assert.match(cauldron, /data-cauldron-status class="meta">Costs 10,000 gp\.</);
   });
 
   it('does not show old buyer class names in Help', () => {

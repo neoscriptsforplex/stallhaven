@@ -1027,6 +1027,11 @@ body.modal-open #view {
   border-top: 1px solid var(--line);
 }
 
+.build-item .meta:empty {
+  display: none;
+  margin: 0;
+}
+
 .build-item h3 {
   margin: 0 0 6px;
   font-size: 1rem;

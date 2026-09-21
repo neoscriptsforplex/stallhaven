@@ -58,7 +58,7 @@ export function worldToMap(x, z, bounds, size, yaw = 0, zoom = 1, focus = null) 
   const span = spanOf(bounds);
   const zed = clampMapZoom(zoom);
   return {
-    x: (0.5 + (spun.x / span) * zed) * size,
+    x: (0.5 - (spun.x / span) * zed) * size,
     y: (0.5 - (spun.z / span) * zed) * size,
   };
 }
@@ -67,7 +67,7 @@ export function worldToMap(x, z, bounds, size, yaw = 0, zoom = 1, focus = null) 
 export function mapToWorld(px, py, bounds, size, yaw = 0, zoom = 1, focus = null) {
   const span = spanOf(bounds);
   const zed = clampMapZoom(zoom);
-  const rx = ((px / size) - 0.5) * span / zed;
+  const rx = (0.5 - (px / size)) * span / zed;
   const rz = (0.5 - (py / size)) * span / zed;
   const world = rotate(rx, rz, mapYaw(yaw));
   const origin = focusOf(bounds, focus);

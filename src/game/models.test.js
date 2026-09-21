@@ -185,15 +185,15 @@ describe('outdoor and dungeon extras', () => {
     assert.equal(namedSkeleton, 0);
   });
 
-  it('paints outdoor grass as mottled greens with dry tan patches', () => {
+  it('paints outdoor grass as the flat pre-mottle green', () => {
     const shop = buildShop([]).root;
     let ground = null;
     shop.traverse((child) => {
       if (child.name === 'grass-ground') ground = child;
     });
     assert.ok(ground, 'garden should have a grass ground plane');
-    assert.ok(ground.material?.map, 'grass ground should use a mottled texture, not a flat color');
-    assert.ok((ground.material.map.repeat?.x ?? 0) > 1);
+    assert.equal(Boolean(ground.material?.map), false);
+    assert.equal(ground.material?.color?.getHex?.(), 0x4f7a3a);
   });
 
   it('tiles the cobble path about 3× finer than the wall stone scale', () => {
@@ -1286,15 +1286,15 @@ describe('shop props', () => {
     assert.ok(box.max.y > 1.8, `range should be 2× tall, maxY=${box.max.y}`);
   });
 
-  it('doubles the spinning wheel uniformly and keeps it on the floor', () => {
-    assert.equal(WHEEL_WORLD_SCALE, 2);
+  it('scales the spinning wheel 2× the previous live size and keeps it on the floor', () => {
+    assert.equal(WHEEL_WORLD_SCALE, 4);
     const wheel = buildSpinningWheel();
     assert.ok(Math.abs(wheel.scale.x - wheel.scale.y) < 1e-6);
     assert.ok(Math.abs(wheel.scale.y - wheel.scale.z) < 1e-6);
     assert.ok(Math.abs(wheel.scale.x - WHEEL_WORLD_SCALE) < 1e-6);
     const box = measureVisibleBox(wheel);
     assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `wheel should sit on the floor, minY=${box.min.y}`);
-    assert.ok(box.max.y > 1.2, `wheel should be 2× tall, maxY=${box.max.y}`);
+    assert.ok(box.max.y > 2.4, `wheel should be 2× the prior live height, maxY=${box.max.y}`);
   });
 
   it('keeps shop tables at the previous size on the floor', () => {

@@ -114,62 +114,8 @@ const COBBLE_V = 2.6 / 2.7;
 export const PATH_COBBLE_SCALE = 3;
 const PATH_COBBLE_U = COBBLE_U * PATH_COBBLE_SCALE;
 
-let cachedGrass = null;
-
-function grassGroundMap() {
-  if (cachedGrass) return cachedGrass.clone();
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#4a6e32';
-  ctx.fillRect(0, 0, 256, 256);
-  let seed = 11027;
-  const rand = () => {
-    seed = (seed * 16807) % 2147483647;
-    return (seed - 1) / 2147483646;
-  };
-  const blobs = [
-    ['#6a9a3a', 70],
-    ['#3d6a2c', 55],
-    ['#5c8234', 50],
-    ['#8a7a3a', 28],
-    ['#6b5428', 18],
-    ['#c4a06a', 12],
-  ];
-  for (const [color, count] of blobs) {
-    ctx.fillStyle = color;
-    for (let i = 0; i < count; i += 1) {
-      const x = rand() * 256;
-      const y = rand() * 256;
-      const r = 8 + rand() * 28;
-      ctx.globalAlpha = 0.22 + rand() * 0.38;
-      ctx.beginPath();
-      ctx.ellipse(x, y, r, r * (0.55 + rand() * 0.7), rand() * Math.PI, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  ctx.globalAlpha = 1;
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  tex.needsUpdate = true;
-  cachedGrass = tex;
-  return tex.clone();
-}
-
-function grassGroundMat(width, depth) {
-  const map = grassGroundMap();
-  const span = Math.max(width, depth, 1);
-  map.repeat.set(span * 0.22, span * 0.22);
-  return new THREE.MeshStandardMaterial({
-    map,
-    color: 0xffffff,
-    roughness: 1,
-    metalness: 0,
-  });
+function grassGroundMat() {
+  return new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 });
 }
 
 function cobbleMat(repeatX, repeatY, offsetX = 0, offsetY = 0) {
@@ -1076,8 +1022,10 @@ function buildProceduralFurnace() {
   return group;
 }
 
-/** Uniform world scale vs the baked spinning wheel after size-match. */
-export const WHEEL_WORLD_SCALE = 2;
+/** Uniform world scale vs the baked spinning wheel after size-match.
+ * Live size was already 2× the dump; queued correction is another 2× of that
+ * (supersedes a 1.5× request), so 4× the original baked fit. */
+export const WHEEL_WORLD_SCALE = 4;
 
 function applyWheelWorldScale(mesh) {
   mesh.scale.multiplyScalar(WHEEL_WORLD_SCALE);
@@ -1098,6 +1046,7 @@ export function buildSpinningWheel() {
       label: 'Spinning Wheel',
       wareY: 'top',
     });
+    sitVisibleOnY(fitted, 0);
     const spinner = new THREE.Group();
     spinner.name = 'spin-wheel';
     fitted.add(spinner);
@@ -1446,7 +1395,7 @@ function addGarden(root, cells, expansionIds = []) {
   const grassD = grass.maxZ - grass.minZ;
   const grassMesh = addShadow(new THREE.Mesh(
     new THREE.PlaneGeometry(grassW, grassD),
-    grassGroundMat(grassW, grassD),
+    grassGroundMat(),
   ));
   grassMesh.name = 'grass-ground';
   grassMesh.rotation.x = -Math.PI / 2;

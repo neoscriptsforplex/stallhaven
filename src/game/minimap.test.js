@@ -47,6 +47,19 @@ describe('minimap', () => {
     assert.ok(north.y > south.y, 'after 180 flip, +Z should be lower on the canvas');
   });
 
+  it('mirrors left/right so a left-side click walks toward world −X', () => {
+    const bounds = shopMapBounds([]);
+    const size = 196;
+    const cx = (bounds.minX + bounds.maxX) / 2;
+    const cz = (bounds.minZ + bounds.maxZ) / 2;
+    const left = worldToMap(cx - 2, cz, bounds, size, 0);
+    const right = worldToMap(cx + 2, cz, bounds, size, 0);
+    assert.ok(left.x < right.x, 'world −X should sit on the left of the map');
+    const clickLeft = mapToWorld(size * 0.25, size * 0.5, bounds, size, 0);
+    const clickRight = mapToWorld(size * 0.75, size * 0.5, bounds, size, 0);
+    assert.ok(clickLeft.x < clickRight.x, 'clicking left should walk toward world −X');
+  });
+
   it('clamps zoom to a usable range', () => {
     assert.equal(clampMapZoom(0), MAP_ZOOM_MIN);
     assert.equal(clampMapZoom(99), MAP_ZOOM_MAX);

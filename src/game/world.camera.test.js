@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   TOUCH_HOLD_MOVE_PX,
   TOUCH_LONG_PRESS_MS,
+  applyCanvasOrbitDelta,
   canvasPointerMovedPastHold,
   canvasPointerStartsCamOrbit,
 } from './world.js';
@@ -23,6 +24,18 @@ describe('canvas camera orbit pointers', () => {
     assert.equal(canvasPointerStartsCamOrbit({ button: 0, pointerType: 'touch' }, { moved: true, moveTarget: true }), false);
     assert.equal(canvasPointerStartsCamOrbit({ button: 0, pointerType: 'touch' }, { moved: true, expandMode: true }), false);
     assert.equal(canvasPointerStartsCamOrbit({ button: 0, pointerType: 'touch' }, { moved: true, modalOpen: true }), false);
+  });
+});
+
+describe('canvas orbit yaw', () => {
+  it('swaps left/right drag yaw and leaves pitch sign alone', () => {
+    const cam = { yaw: 0, pitch: 0.62 };
+    applyCanvasOrbitDelta(cam, 10, 0);
+    assert.ok(cam.yaw > 0, 'drag right increases yaw');
+    assert.equal(cam.pitch, 0.62);
+    applyCanvasOrbitDelta(cam, -10, 8);
+    assert.ok(Math.abs(cam.yaw) < 1e-9, 'drag left undoes the same yaw');
+    assert.ok(cam.pitch < 0.62, 'downward drag still pitches down');
   });
 });
 

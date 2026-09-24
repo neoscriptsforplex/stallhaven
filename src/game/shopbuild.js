@@ -1747,7 +1747,7 @@ const ORE_VEIN_COLOR = {
   bronze: 0xb56a28,
   iron: 0x8d939a,
   steel: 0xd4dbe2,
-  mithril: 0x2f6ad4,
+  mithril: 0x2458a6,
   adamant: METALS.find((metal) => metal.id === 'adamant')?.tint ?? 0x3a8a45,
   runite: 0x8fd4f5,
   dragon: 0xd41e1e,
@@ -1843,6 +1843,25 @@ function oreFitTarget(spot) {
   return target;
 }
 
+/** Slightly darker than the dump, still blue. Other ore tiers are untouched. */
+const MITHRIL_ROCK_DARKEN = 0.82;
+
+function darkenMithrilRock(root) {
+  root?.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    const next = mats.map((mat) => {
+      if (!mat?.color) return mat;
+      const copy = mat.clone();
+      copy.color.multiplyScalar(MITHRIL_ROCK_DARKEN);
+      if (copy.emissive) copy.emissive.multiplyScalar(MITHRIL_ROCK_DARKEN);
+      copy.userData = { ...(mat.userData ?? {}), mithrilRockDark: true };
+      return copy;
+    });
+    child.material = Array.isArray(child.material) ? next : next[0];
+  });
+}
+
 function buildMineBoulder(spot) {
   const group = new THREE.Group();
   group.name = `boulder-${spot.id}`;
@@ -1854,6 +1873,7 @@ function buildMineBoulder(spot) {
     ? wrapBundledProp(bundled, target, { name: `ore-${spot.id}`, fit: 'max' })
     : target;
   if (bundled) prepareDungeonRockMaterials(visual);
+  if (bundled && spot.materialId === 'mithril') darkenMithrilRock(visual);
   group.add(visual);
   sitVisibleOnY(visual, DUNGEON_FLOOR_Y);
   attachBoulderPick(group, spot);

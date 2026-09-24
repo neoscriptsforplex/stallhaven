@@ -1784,7 +1784,7 @@ describe('dungeon sky and remains', () => {
     assert.equal(byId.bronze.vein, 0xb56a28);
     assert.equal(byId.iron.vein, 0x8d939a);
     assert.equal(byId.steel.vein, 0xd4dbe2);
-    assert.equal(byId.mithril.vein, 0x2f6ad4);
+    assert.equal(byId.mithril.vein, 0x2458a6);
     assert.equal(byId.adamant.vein, 0x3a8a45);
     assert.equal(byId.runite.vein, 0x8fd4f5);
     assert.equal(byId.dragon.vein, 0xd41e1e);

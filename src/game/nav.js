@@ -81,6 +81,11 @@ export function shopObstacles(shop = SHOP, furniture = null) {
       furnitureHalfSize('wheel').hd,
     ));
   }
+  for (const id of ['loom', 'fletch', 'potter']) {
+    if (!poses[id]) continue;
+    const { hw, hd } = furnitureHalfSize(id);
+    blocks.push(blockFromPose(yaw(id, poses[id]), hw, hd));
+  }
   const displayPoses = poses.displays ?? [];
   const kinds = furniture?.displayKinds;
   const removed = furniture?.displayRemoved;
@@ -115,6 +120,9 @@ export function liveObstacles(state, shop = SHOP, skip = null) {
   if (skip?.id === 'furnace') furniture.furnace = null;
   if (skip?.id === 'range') furniture.range = null;
   if (skip?.id === 'wheel') furniture.wheel = null;
+  if (skip?.id === 'loom') furniture.loom = null;
+  if (skip?.id === 'fletch') furniture.fletch = null;
+  if (skip?.id === 'potter') furniture.potter = null;
   if (skip?.id === 'anvil') furniture.anvil = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'chest') furniture.chest = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'counter') furniture.counter = { x: 999, z: 999, rot: 0 };

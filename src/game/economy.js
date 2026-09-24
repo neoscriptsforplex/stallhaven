@@ -30,6 +30,7 @@ import {
   offerClassOf,
   recipeCost,
   recipeList,
+  stationForRecipe,
   scheduleKingRoald,
 } from './catalog.js';
 import {
@@ -319,6 +320,9 @@ export function isUnlocked(state, recipeId) {
   if (recipe.category === 'food' && !ownsRange(state)) return false;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return false;
   if (recipe.category === 'spin' && !ownsWheel(state)) return false;
+  if (stationForRecipe(recipe) === 'loom' && !ownsStation(state, 'loom')) return false;
+  if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) return false;
+  if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) return false;
   if (recipe.unlockAnyOf?.length) {
     const need = recipe.unlockNeed ?? 0;
     return recipe.unlockAnyOf.some((id) => craftCount(state, id) >= need);
@@ -341,6 +345,15 @@ export function craftBlockReason(state, recipeId) {
   }
   if (recipe.category === 'spin' && !ownsWheel(state)) {
     return 'Place a spinning wheel from Build to spin flax into bow string.';
+  }
+  if (stationForRecipe(recipe) === 'loom' && !ownsStation(state, 'loom')) {
+    return 'Place a loom from Build to weave cloth and armour.';
+  }
+  if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) {
+    return 'Place a fletching bench from Build to make ranged weapons and ammo.';
+  }
+  if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) {
+    return 'Place a Potter Wheel from Build to turn soft clay into hard clay.';
   }
   if (!isUnlocked(state, recipeId)) {
     const remain = unlockRemaining(state, recipeId);
@@ -399,6 +412,9 @@ export function maxCraftActions(state, recipeId) {
   if (recipe.category === 'food' && !ownsRange(state)) return 0;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return 0;
   if (recipe.category === 'spin' && !ownsWheel(state)) return 0;
+  if (stationForRecipe(recipe) === 'loom' && !ownsStation(state, 'loom')) return 0;
+  if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) return 0;
+  if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) return 0;
   if (!isUnlocked(state, recipeId)) return 0;
   const cost = recipeCost(recipe);
   let max = Infinity;
@@ -1303,6 +1319,15 @@ export function applyState(state, data) {
         : null,
       wheel: data.furniture.wheel
         ? readPose(data.furniture.wheel, { ...SHOP.wheel, rot: FURNITURE_FORWARD })
+        : null,
+      loom: data.furniture.loom
+        ? readPose(data.furniture.loom, { ...SHOP.loom, rot: FURNITURE_FORWARD })
+        : null,
+      fletch: data.furniture.fletch
+        ? readPose(data.furniture.fletch, { ...SHOP.fletch, rot: FURNITURE_FORWARD })
+        : null,
+      potter: data.furniture.potter
+        ? readPose(data.furniture.potter, { ...SHOP.potter, rot: FURNITURE_FORWARD })
         : null,
       rug: readPose(data.furniture.rug, defaults.rug),
       displays: next.displays.map((display, index) => {

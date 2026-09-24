@@ -75,6 +75,9 @@ export const RANGE_COST = 0;
 export const STATION_UNLOCKS = [
   { id: 'furnace', label: 'Furnace', cost: FURNACE_COST },
   { id: 'range', label: 'Cooking Range', cost: RANGE_COST },
+  { id: 'loom', label: 'Loom', cost: LOOM_COST },
+  { id: 'fletch', label: 'Fletching Bench', cost: FLETCH_COST },
+  { id: 'potter', label: 'Potter Wheel', cost: POTTER_COST },
   { id: 'wheel', label: 'Spinning Wheel', cost: WHEEL_COST },
   { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
 ];
@@ -345,6 +348,9 @@ export function furnitureHalfSize(kind) {
   if (kind === 'anvil') return { hw: 0.22, hd: 0.175 };
   if (kind === 'chest') return { hw: 0.3, hd: 0.22 };
   if (kind === 'range') return { hw: 0.68, hd: 0.56 };
+  if (kind === 'loom') return { hw: 0.48, hd: 0.36 };
+  if (kind === 'fletch') return { hw: 0.55, hd: 0.4 };
+  if (kind === 'potter') return { hw: 0.4, hd: 0.4 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
   if (kind === 'stand') return { hw: 0.36, hd: 0.36 };
@@ -404,6 +410,9 @@ export function defaultFurniture() {
     cauldron: null,
     furnace: null,
     wheel: null,
+    loom: null,
+    fletch: null,
+    potter: null,
     rug: { x: shopRugPose().x, z: shopRugPose().z, rot: FURNITURE_FORWARD },
     displays: SHOP.displays.map((spot) => (
       (spot.kind ?? 'table') === 'shelf'
@@ -427,6 +436,9 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     cauldron: clonePose(furniture.cauldron),
     furnace: clonePose(furniture.furnace),
     wheel: clonePose(furniture.wheel),
+    loom: clonePose(furniture.loom),
+    fletch: clonePose(furniture.fletch),
+    potter: clonePose(furniture.potter),
     rug: { ...(furniture.rug ?? defaults.rug) },
     displays: (furniture.displays ?? defaults.displays).map((pose) => ({ ...pose })),
   };

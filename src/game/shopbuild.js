@@ -1045,6 +1045,70 @@ function applyWheelWorldScale(mesh) {
   return mesh;
 }
 
+function buildWorkBench(name, topHex, accentHex) {
+  const group = new THREE.Group();
+  group.name = name;
+  const top = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.92, 0.08, 0.56),
+    wood(topHex, 0.84),
+  ));
+  top.position.y = 0.74;
+  group.add(top);
+  for (const [x, z] of [[-0.36, -0.2], [0.36, -0.2], [-0.36, 0.2], [0.36, 0.2]]) {
+    const leg = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.74, 0.07), wood(0x3e2616, 0.9)));
+    leg.position.set(x, 0.37, z);
+    group.add(leg);
+  }
+  const accent = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 0.04, 0.08),
+    wood(accentHex, 0.7),
+  ));
+  accent.position.set(0, 0.82, 0);
+  group.add(accent);
+  return group;
+}
+
+export function buildLoom() {
+  const group = buildWorkBench('loom', 0x6b4423, 0xc4a05a);
+  const frame = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.55, 0.08), wood(0x4a301c, 0.88)));
+  frame.position.set(-0.28, 1.05, 0);
+  group.add(frame);
+  const frame2 = frame.clone();
+  frame2.position.x = 0.28;
+  group.add(frame2);
+  const beam = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.06, 0.06), wood(0x8a6238, 0.8)));
+  beam.position.set(0, 1.3, 0);
+  group.add(beam);
+  return group;
+}
+
+export function buildFletchingBench() {
+  const group = buildWorkBench('fletch', 0x5a3a22, 0xd7c09a);
+  const stave = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.035, 0.035), wood(0xc4a05a, 0.7)));
+  stave.position.set(0.05, 0.84, 0.08);
+  stave.rotation.y = 0.4;
+  group.add(stave);
+  return group;
+}
+
+export function buildPotterWheel() {
+  const group = new THREE.Group();
+  group.name = 'potter';
+  const stand = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.62, 10), wood(0x4a301c, 0.88)));
+  stand.position.y = 0.31;
+  group.add(stand);
+  const disc = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.06, 16), wood(0x6b4423, 0.8)));
+  disc.position.y = 0.64;
+  group.add(disc);
+  const clay = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.14, 0.12, 10),
+    new THREE.MeshStandardMaterial({ color: 0xb56a3a, roughness: 0.9 }),
+  ));
+  clay.position.y = 0.73;
+  group.add(clay);
+  return group;
+}
+
 export function buildSpinningWheel() {
   const bundled = getBundledLook('wheel');
   if (bundled) {

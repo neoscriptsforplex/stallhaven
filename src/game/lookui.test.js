@@ -55,7 +55,7 @@ describe('player look UI', () => {
 
   it('lists Build cards furnace-first and names the extra room Shop Expansion', () => {
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
-    const order = ['Furnace', 'Cooking Range', 'Spinning Wheel', 'Cauldron', 'Table', 'Shelf', 'Mannequin', 'Shop Expansion'];
+    const order = ['Furnace', 'Cooking Range', 'Loom', 'Fletching Bench', 'Potter Wheel', 'Spinning Wheel', 'Cauldron', 'Table', 'Shelf', 'Mannequin', 'Shop Expansion'];
     let last = -1;
     for (const label of order) {
       const at = build.indexOf(`<h3>${label}</h3>`);
@@ -68,7 +68,7 @@ describe('player look UI', () => {
   it('states furnace and range place/cost once on Build cards', () => {
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
     const furnace = build.slice(build.indexOf('Furnace'), build.indexOf('Cooking Range'));
-    const range = build.slice(build.indexOf('Cooking Range'), build.indexOf('Spinning Wheel'));
+    const range = build.slice(build.indexOf('Cooking Range'), build.indexOf('Loom'));
     assert.equal((furnace.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.equal((range.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.match(furnace, /data-furnace-status class="meta" hidden><\/p>/);

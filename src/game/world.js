@@ -94,7 +94,7 @@ import {
   PLAYER_WORLD_SCALE,
   UPLOADED_PLAYER_HEIGHT,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildRug, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFletchingBench, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRug, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 
@@ -412,7 +412,19 @@ export function createWorld(canvas, state, opts = {}) {
   scene.add(rugMesh);
   const rugPick = makePick(SHOP_RUG.w, 0.28, SHOP_RUG.d, 'rug');
 
-  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel'];
+  const loomMesh = buildLoom();
+  scene.add(loomMesh);
+  const loomPick = makePick(STATION_HIT.loom.w, STATION_HIT.loom.h, STATION_HIT.loom.d, 'loom');
+
+  const fletchMesh = buildFletchingBench();
+  scene.add(fletchMesh);
+  const fletchPick = makePick(STATION_HIT.fletch.w, STATION_HIT.fletch.h, STATION_HIT.fletch.d, 'fletch');
+
+  const potterMesh = buildPotterWheel();
+  scene.add(potterMesh);
+  const potterPick = makePick(STATION_HIT.potter.w, STATION_HIT.potter.h, STATION_HIT.potter.d, 'potter');
+
+  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel', 'loom', 'fletch', 'potter'];
 
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
@@ -422,6 +434,9 @@ export function createWorld(canvas, state, opts = {}) {
     cauldron: { mesh: cauldronMesh, pick: cauldronPick, glow: null, pickY: STATION_HIT.cauldron.pickY },
     furnace: { mesh: furnaceMesh, pick: furnacePick, glow: null, pickY: STATION_HIT.furnace.pickY },
     wheel: { mesh: wheelMesh, pick: wheelPick, glow: null, pickY: STATION_HIT.wheel.pickY },
+    loom: { mesh: loomMesh, pick: loomPick, glow: null, pickY: STATION_HIT.loom.pickY },
+    fletch: { mesh: fletchMesh, pick: fletchPick, glow: null, pickY: STATION_HIT.fletch.pickY },
+    potter: { mesh: potterMesh, pick: potterPick, glow: null, pickY: STATION_HIT.potter.pickY },
     rug: { mesh: rugMesh, pick: rugPick, glow: null, pickY: 0.18 },
   };
 
@@ -2607,6 +2622,9 @@ export function createWorld(canvas, state, opts = {}) {
       replaceFixture('anvil', buildAnvil);
       replaceFixture('cauldron', buildCauldron);
       replaceFixture('wheel', buildSpinningWheel);
+      replaceFixture('loom', buildLoom);
+      replaceFixture('fletch', buildFletchingBench);
+      replaceFixture('potter', buildPotterWheel);
       replaceFixture('rug', buildRug);
       try {
         const nextDoor = buildShopDoor();

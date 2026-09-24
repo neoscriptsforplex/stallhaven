@@ -1,7 +1,7 @@
 import { PLAYER_RADIUS, planPlayerWalk } from './nav.js';
 import { furnitureVisualYaw } from './layout.js';
 
-export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel'];
+export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter'];
 export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder']);
 
 /** Invisible click boxes and floor-steal radii for walk-then-open stations. */
@@ -12,6 +12,9 @@ export const STATION_HIT = {
   furnace: { w: 1.28, h: 1.7, d: 1.2, pickY: 0.8, floorR: 1.05 },
   cauldron: { w: 1.15, h: 1.55, d: 1.15, pickY: 0.74, floorR: 1.0 },
   wheel: { w: 1.85, h: 2.4, d: 1.8, pickY: 1.1, floorR: 1.35 },
+  loom: { w: 1.25, h: 1.45, d: 0.95, pickY: 0.72, floorR: 0.95 },
+  fletch: { w: 1.4, h: 1.25, d: 1.05, pickY: 0.64, floorR: 1.0 },
+  potter: { w: 1.15, h: 1.3, d: 1.15, pickY: 0.64, floorR: 0.9 },
   boulder: { w: 1.4, h: 1.2, d: 1.4, pickY: 0.52, floorR: 1.15 },
 };
 

@@ -107,7 +107,6 @@ export const MASTERY_SPEED = 0.5;
 export const ANVIL_TABS = [
   { id: 'melee', label: 'Melee' },
   { id: 'magic', label: 'Magic' },
-  { id: 'ranged', label: 'Ranged' },
   { id: 'tools', label: 'Tools' },
 ];
 
@@ -1049,6 +1048,52 @@ addRecipe({
   outputCount: 1,
 });
 
+addRecipe({
+  id: 'weave_cloth',
+  name: 'Cloth',
+  category: 'weave',
+  combatClass: null,
+  slot: 'fibre',
+  shape: 'cloth',
+  setKey: 'weave',
+  lineId: 'weave-cloth',
+  lineName: 'Cloth',
+  lineIndex: 0,
+  previousId: null,
+  unlockNeed: 0,
+  tier: 1,
+  cost: { materials: { flax: 1 }, gold: 0 },
+  time: 4,
+  price: 0,
+  buyers: [],
+  tint: 0xe7d7c4,
+  outputMaterial: 'cloth',
+  outputCount: 1,
+});
+
+addRecipe({
+  id: 'fire_clay',
+  name: 'Hard Clay',
+  category: 'potter',
+  combatClass: null,
+  slot: 'clay',
+  shape: 'hard_clay',
+  setKey: 'potter',
+  lineId: 'potter-clay',
+  lineName: 'Clay',
+  lineIndex: 0,
+  previousId: null,
+  unlockNeed: 0,
+  tier: 1,
+  cost: { materials: { soft_clay: 1 }, gold: 0 },
+  time: 4,
+  price: 0,
+  buyers: [],
+  tint: 0xb56a3a,
+  outputMaterial: 'hard_clay',
+  outputCount: 1,
+});
+
 /** Low-poly robe sets for magic-class buyers. Original names — colour variants, not product lines. */
 export const MAGE_ROBE_SETS = [
   { id: 'azure', robe: 0x6a8fd4, trim: 0xf4f4f0, hat: 0x5a7ec8, orb: 0x9ad4ff, style: 'hat' },
@@ -1284,6 +1329,9 @@ export const SHOP = {
   range: { x: 1.65, z: -0.45 },
   cauldron: { x: 0, z: 0.8 },
   wheel: { x: 1.2, z: 0.8 },
+  loom: { x: -1.7, z: 1.15 },
+  fletch: { x: 1.9, z: 1.15 },
+  potter: { x: -1.7, z: 0.2 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [
     { id: 'left-front', name: 'Left Front Table', x: -2.95, z: 2.08, kind: 'table' },
@@ -1399,6 +1447,12 @@ export function stationForRecipe(recipe) {
   if (recipe.category === 'potion') return 'cauldron';
   if (recipe.category === 'smelt') return 'furnace';
   if (recipe.category === 'spin') return 'wheel';
+  if (recipe.category === 'weave') return 'loom';
+  if (recipe.category === 'potter') return 'potter';
+  if (recipe.category === 'ammo') return 'fletch';
+  if (recipe.combatClass === 'range' && recipe.category === 'weapon') return 'fletch';
+  if (recipe.combatClass === 'range' && recipe.category === 'armour') return 'loom';
+  if (recipe.combatClass === 'magic' && recipe.category === 'armour') return 'loom';
   return 'anvil';
 }
 
@@ -1425,10 +1479,10 @@ export function anvilSubtabForRecipe(recipe) {
 export function anvilSubtabsForTab(tabId) {
   if (tabId === 'tools') return TOOL_SUBTABS;
   return ANVIL_SUBTABS.filter((tab) => {
-    if (tab.id === 'hatchet' || tab.id === 'pickaxe') return false;
-    if (tab.id === 'ammo') return tabId === 'ranged';
+    if (tab.id === 'hatchet' || tab.id === 'pickaxe' || tab.id === 'ammo') return false;
     if (tab.id === 'rune') return tabId === 'magic';
-    return tab.id === 'weapon' || tab.id === 'armour';
+    if (tab.id === 'armour') return tabId === 'melee';
+    return tab.id === 'weapon';
   });
 }
 
@@ -1441,6 +1495,18 @@ export function craftUiForStation(station, prev = {}, recipe = null) {
   if (station === 'cauldron') return { tab: 'potion', subtab: prev.subtab ?? 'weapon' };
   if (station === 'furnace') return { tab: 'smelt', subtab: prev.subtab ?? 'weapon' };
   if (station === 'wheel') return { tab: 'spin', subtab: prev.subtab ?? 'weapon' };
+  if (station === 'potter') return { tab: 'potter', subtab: prev.subtab ?? 'weapon' };
+  if (station === 'loom') {
+    const tab = recipe?.category === 'armour'
+      ? (recipe.combatClass === 'range' ? 'ranged' : 'magic')
+      : 'cloth';
+    const keep = prev.tab === 'cloth' || prev.tab === 'ranged' || prev.tab === 'magic';
+    return { tab: recipe ? tab : (keep ? prev.tab : 'cloth'), subtab: 'weapon' };
+  }
+  if (station === 'fletch') {
+    const tab = recipe?.category === 'ammo' ? 'ammo' : 'weapon';
+    return { tab: recipe ? tab : (prev.tab === 'ammo' ? 'ammo' : 'weapon'), subtab: 'weapon' };
+  }
   let tab = recipe
     ? anvilTabForRecipe(recipe)
     : (ANVIL_TAB_IDS.has(prev.tab) ? prev.tab : 'melee');
@@ -1482,6 +1548,8 @@ export function recipesForTab(tabId, subtabId = null) {
   if (tabId === 'food') return recipeList().filter((recipe) => recipe.category === 'food');
   if (tabId === 'smelt') return recipeList().filter((recipe) => recipe.category === 'smelt');
   if (tabId === 'spin') return recipeList().filter((recipe) => recipe.category === 'spin');
+  if (tabId === 'weave' || tabId === 'cloth') return recipeList().filter((recipe) => recipe.category === 'weave');
+  if (tabId === 'potter') return recipeList().filter((recipe) => recipe.category === 'potter');
   const combatClass = tabId === 'ranged' ? 'range' : tabId;
   const list = recipeList().filter((recipe) => recipe.combatClass === combatClass);
   if (subtabId === 'weapon' || subtabId === 'armour' || subtabId === 'ammo' || subtabId === 'rune' || subtabId === 'hatchet' || subtabId === 'pickaxe') {

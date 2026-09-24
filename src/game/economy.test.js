@@ -16,6 +16,7 @@ import {
   recipeCost,
   recipeList,
   recipesForTab,
+  stationForRecipe,
   unlockNeed,
   CRAFT_TABS,
   ANVIL_SUBTABS,
@@ -115,11 +116,14 @@ function placeStation(state, id) {
 
 function finishCraft(state, recipeId, at = 0) {
   const recipe = RECIPES[recipeId];
-  if (recipe.category === 'food' && !state.furniture.range) placeStation(state, 'range');
-  if (recipe.category === 'smelt' && !state.furniture.furnace) placeStation(state, 'furnace');
+  const station = stationForRecipe(recipe);
+  if (station !== 'anvil' && !state.furniture[station] && SHOP[station]) placeStation(state, station);
   const cost = recipeCost(recipe);
   for (const [id, n] of Object.entries(cost.materials)) {
     state.materials[id] = Math.max(state.materials[id] ?? 0, n);
+  }
+  for (const [id, n] of Object.entries(cost.items ?? {})) {
+    state.chest[id] = Math.max(state.chest[id] ?? 0, n);
   }
   assert.equal(startCraft(state, recipeId, at), true, `could not start ${recipeId}`);
   const done = completeCrafts(state, at + RECIPES[recipeId].time);
@@ -263,6 +267,8 @@ describe('unlock lines', () => {
     const state = createState();
     assert.equal(isUnlocked(state, 'bronze_sword'), true);
     assert.equal(isUnlocked(state, 'staff'), true);
+    assert.equal(isUnlocked(state, 'blue_dhide_body'), false);
+    placeStation(state, 'loom');
     assert.equal(isUnlocked(state, 'blue_dhide_body'), true);
     assert.equal(isUnlocked(state, 'bread'), false);
     placeStation(state, 'range');
@@ -613,8 +619,11 @@ describe('catalog', () => {
       assert.ok((blue.cost?.gold ?? 0) < (green.cost?.gold ?? 0), `${piece} blue gold cost`);
       assert.equal(blue.unlockNeed, 0);
       assert.equal(green.unlockNeed, 20);
-      assert.equal(isUnlocked(createState(), blue.id), true);
-      assert.equal(isUnlocked(createState(), green.id), false);
+      const withLoom = createState();
+      placeStation(withLoom, 'loom');
+      assert.equal(isUnlocked(withLoom, blue.id), true);
+      assert.equal(isUnlocked(createState(), blue.id), false);
+      assert.equal(isUnlocked(withLoom, green.id), false);
     }
     assert.equal(RECIPES.black_dragon_mask.slot, 'helm');
     assert.equal(RECIPES.wizard_gloves, undefined);
@@ -713,7 +722,18 @@ describe('catalog', () => {
   });
 
   it('groups anvil recipes by melee, magic, ranged, and tools with weapons and armour subtabs', () => {
-    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged', 'Tools']);
+    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Tools']);
+    assert.equal(stationForRecipe(RECIPES.shortbow), 'fletch');
+    assert.equal(stationForRecipe(RECIPES.bronze_arrows), 'fletch');
+    assert.equal(stationForRecipe(RECIPES.green_dragon_mask), 'loom');
+    assert.equal(stationForRecipe(RECIPES.wizard_robe), 'loom');
+    assert.equal(stationForRecipe(RECIPES.staff), 'anvil');
+    assert.equal(stationForRecipe(RECIPES.weave_cloth), 'loom');
+    assert.equal(stationForRecipe(RECIPES.fire_clay), 'potter');
+    assert.equal(recipeCost(RECIPES.weave_cloth).materials.flax, 1);
+    assert.equal(RECIPES.weave_cloth.outputMaterial, 'cloth');
+    assert.equal(recipeCost(RECIPES.fire_clay).materials.soft_clay, 1);
+    assert.equal(RECIPES.fire_clay.outputMaterial, 'hard_clay');
     assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Runes', 'Hatchet', 'Pickaxe']);
     const melee = recipesForTab('melee');
     const meleeWeapons = recipesForTab('melee', 'weapon');
@@ -1737,6 +1757,7 @@ describe('craft batches', () => {
     const state = createState();
     state.materials.bronze_bar = 2;
     state.materials.logs = 40;
+    placeStation(state, 'fletch');
     assert.equal(maxCraftActions(state, 'bronze_arrows'), 2);
     assert.equal(startCraftBatch(state, 'bronze_arrows', 'max', 0), 2);
     assert.equal(completeCrafts(state, 100).length, 2);

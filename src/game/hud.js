@@ -1,5 +1,7 @@
 import {
   ANVIL_TABS,
+  FLETCH_TABS,
+  LOOM_TABS,
   anvilSubtabsForTab,
   FACE_HAIR,
   HAIR_STYLES,
@@ -215,7 +217,18 @@ export function bindHud(root, state, world) {
     if (craftStation === 'cauldron') return recipesForTab('potion');
     if (craftStation === 'furnace') return recipesForTab('smelt');
     if (craftStation === 'wheel') return recipesForTab('spin');
-    return recipesForTab(craftTab, craftSubtab);
+    if (craftStation === 'potter') return recipesForTab('potter');
+    if (craftStation === 'loom') {
+      if (craftTab === 'ranged') {
+        return recipesForTab('ranged', 'armour');
+      }
+      if (craftTab === 'magic') return recipesForTab('magic', 'armour');
+      return recipesForTab('cloth');
+    }
+    if (craftStation === 'fletch') {
+      return recipesForTab('ranged', craftTab === 'ammo' ? 'ammo' : 'weapon');
+    }
+    return recipesForTab(craftTab, craftSubtab).filter((recipe) => stationForRecipe(recipe) === 'anvil');
   }
 
   function setCraftNote(text) {
@@ -269,14 +282,34 @@ export function bindHud(root, state, world) {
     }).join('');
   }
 
+  let paintedTabStation = '';
+
+  function ensureCraftTabs() {
+    if (paintedTabStation === craftStation) return;
+    paintedTabStation = craftStation;
+    const tabs = craftStation === 'loom'
+      ? LOOM_TABS
+      : craftStation === 'fletch'
+        ? FLETCH_TABS
+        : ANVIL_TABS;
+    tabsEl.innerHTML = tabs.map((tab) => (
+      `<button type="button" class="tab" data-tab="${tab.id}">${tab.label}</button>`
+    )).join('');
+    tabsEl.classList.toggle('has-tools', craftStation !== 'loom' && craftStation !== 'fletch');
+  }
+
   function paintCrafts() {
     const rangeMode = craftStation === 'range';
     const cauldronMode = craftStation === 'cauldron';
     const furnaceMode = craftStation === 'furnace';
     const wheelMode = craftStation === 'wheel';
-    const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode;
+    const loomMode = craftStation === 'loom';
+    const fletchMode = craftStation === 'fletch';
+    const potterMode = craftStation === 'potter';
+    const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode || potterMode;
+    ensureCraftTabs();
     tabsEl.hidden = simpleStation;
-    subtabsEl.hidden = simpleStation;
+    subtabsEl.hidden = simpleStation || loomMode || fletchMode;
     const title = craftModal.querySelector('[data-craft-title]');
     const blurb = craftModal.querySelector('[data-craft-blurb]');
     if (title) {
@@ -288,7 +321,13 @@ export function bindHud(root, state, world) {
             ? 'Furnace'
             : wheelMode
               ? 'Spinning Wheel'
-              : 'Anvil';
+              : loomMode
+                ? 'Loom'
+                : fletchMode
+                  ? 'Fletching Bench'
+                  : potterMode
+                    ? 'Potter Wheel'
+                    : 'Anvil';
     }
     if (blurb) {
       blurb.textContent = rangeMode
@@ -299,7 +338,13 @@ export function bindHud(root, state, world) {
             ? 'Smelt ores into metal bars. Bronze starts unlocked; higher bars need enough smelts of the previous tier. Bars are used at the anvil — they are not restocked for free.'
             : wheelMode
               ? 'Spin flax into bow string. Bows and crossbows need bow string; it is not restocked for free.'
-              : 'Work a ware here. 1× / 5× / Max are craft actions (ammo makes 20 per action). Finished pieces land in the chest. Weapons, armour, ammo, and tools use metal bars. Bows and crossbows also need bow string. Magic Runes use Essence.';
+              : loomMode
+                ? 'Weave flax into cloth, then ranged and magic armour. Cloth is not restocked for free.'
+                : fletchMode
+                  ? 'Fletch ranged weapons and ammo. Arrows still make 20 per craft action.'
+                  : potterMode
+                    ? 'Turn soft clay into hard clay. This wheel does not make ranged gear.'
+                    : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons and runes stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
     }
     if (!simpleStation) paintSubtabs();
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
@@ -1209,6 +1254,9 @@ export function bindHud(root, state, world) {
             : target.id === 'cauldron' ? 'Cauldron'
               : target.id === 'furnace' ? 'Furnace'
                 : target.id === 'wheel' ? 'Spinning Wheel'
+                  : target.id === 'loom' ? 'Loom'
+                  : target.id === 'fletch' ? 'Fletching Bench'
+                  : target.id === 'potter' ? 'Potter Wheel'
                   : target.id === 'rug' ? 'Rug'
                   : target.id === 'counter' ? 'Counter'
                     : target.id === 'display' && displayKind(target.index, state) === 'stand' ? 'Mannequin'
@@ -1218,14 +1266,17 @@ export function bindHud(root, state, world) {
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
     const upgradeBtn = furnMenu.querySelector('[data-furn-upgrade]');
-    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel') {
+    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel' || target.id === 'loom' || target.id === 'fletch' || target.id === 'potter') {
       useBtn.hidden = false;
       useBtn.textContent = target.id === 'chest' ? 'Open Chest'
         : target.id === 'range' ? 'Cook'
           : target.id === 'cauldron' ? 'Potions'
             : target.id === 'furnace' ? 'Smelt'
               : target.id === 'wheel' ? 'Spin'
-                : 'Craft';
+                : target.id === 'loom' ? 'Weave'
+                  : target.id === 'fletch' ? 'Fletch'
+                    : target.id === 'potter' ? 'Shape'
+                      : 'Craft';
     } else {
       useBtn.hidden = true;
     }
@@ -1696,6 +1747,9 @@ export function bindHud(root, state, world) {
     if (target?.id === 'cauldron') openCraft('cauldron');
     if (target?.id === 'furnace') openCraft('furnace');
     if (target?.id === 'wheel') openCraft('wheel');
+    if (target?.id === 'loom') openCraft('loom');
+    if (target?.id === 'fletch') openCraft('fletch');
+    if (target?.id === 'potter') openCraft('potter');
   });
 
   function closeFillPicker() {
@@ -2184,6 +2238,9 @@ export function bindHud(root, state, world) {
     if (event.type === 'cauldron') openCraft('cauldron');
     if (event.type === 'furnace') openCraft('furnace');
     if (event.type === 'wheel') openCraft('wheel');
+    if (event.type === 'loom') openCraft('loom');
+    if (event.type === 'fletch') openCraft('fletch');
+    if (event.type === 'potter') openCraft('potter');
     if (event.type === 'display-select') render(performance.now() / 1000);
     if (event.type === 'chest-upgrade') openUpgrade();
     if (event.type === 'furn-menu') showFurnMenu(event.furniture, event.clientX, event.clientY);

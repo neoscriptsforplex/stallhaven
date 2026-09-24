@@ -157,6 +157,9 @@ describe('layout numbers', () => {
     assert.equal(furniture.cauldron, null);
     assert.equal(furniture.furnace, null);
     assert.equal(furniture.wheel, null);
+    assert.equal(furniture.loom, null);
+    assert.equal(furniture.fletch, null);
+    assert.equal(furniture.potter, null);
     assert.equal(furniture.rug.rot, FURNITURE_FORWARD);
     assert.equal(furniture.rug.x, shopRugPose().x);
     assert.equal(furniture.rug.z, shopRugPose().z);

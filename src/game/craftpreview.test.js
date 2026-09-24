@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import './canvas-mock.js';
 import * as THREE from 'three';
-import { frameCraftPreview, isRunePreview, poseRuneForFrontView } from './craftpreview.js';
+import { craftPreviewEuler, frameCraftPreview, isRunePreview, poseRuneForFrontView } from './craftpreview.js';
 import { buildWare } from './models.js';
 
 describe('craft preview framing', () => {
@@ -58,5 +58,27 @@ describe('craft preview framing', () => {
     assert.equal(framed.view, 'default');
     assert.ok(camera.position.x > camera.position.y * 0.5, 'ore preview keeps the three-quarter camera');
     assert.equal(isRunePreview('bronze'), false);
+  });
+
+  it('applies a preview-only flip by armour family and leaves the ware mesh alone', () => {
+    assert.equal(craftPreviewEuler('mystic_robe_bottom').z, -Math.PI / 4);
+    assert.equal(craftPreviewEuler('splitbark_robe_bottom').z, -Math.PI / 4);
+    assert.equal(craftPreviewEuler('bronze_platelegs').x, Math.PI);
+    assert.equal(craftPreviewEuler('dragon_platelegs').x, Math.PI);
+    assert.equal(craftPreviewEuler('blue_dhide_chaps').x, Math.PI);
+    assert.equal(craftPreviewEuler('black_dhide_chaps').x, Math.PI);
+    assert.equal(craftPreviewEuler('bronze_platebody').x, Math.PI);
+    assert.equal(craftPreviewEuler('runite_platebody').x, Math.PI);
+    assert.equal(craftPreviewEuler('wizard_robe').x, Math.PI);
+    assert.equal(craftPreviewEuler('mystic_robe_top').x, Math.PI);
+    assert.equal(craftPreviewEuler('bronze_plateskirt').x, Math.PI / 2);
+    assert.equal(craftPreviewEuler('dragon_plateskirt').x, Math.PI / 2);
+    assert.equal(craftPreviewEuler('green_dragon_mask').y, Math.PI);
+    assert.equal(craftPreviewEuler('black_dragon_mask').y, Math.PI);
+    assert.equal(craftPreviewEuler('bronze_sword'), null);
+    const ware = buildWare('bronze_platelegs');
+    assert.equal(ware.rotation.x, 0);
+    assert.equal(ware.rotation.y, 0);
+    assert.equal(ware.rotation.z, 0);
   });
 });

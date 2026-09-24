@@ -88,6 +88,7 @@ import {
   ownsStation,
   placeFromChest,
   pushLog,
+  clearDisplay,
   removePlacedFurniture,
   restock,
   offerChoices,
@@ -1288,6 +1289,13 @@ export function bindHud(root, state, world) {
     if (displayBtn) displayBtn.hidden = !canDisplay;
     if (fillBtn) fillBtn.hidden = !canFill;
     if (upgradeBtn) upgradeBtn.hidden = target.id !== 'chest';
+    const clearBtn = furnMenu.querySelector('[data-furn-clear]');
+    const canClear = target.id === 'display'
+      && (displayKind(target.index, state) === 'stand'
+        || displayKind(target.index, state) === 'shelf'
+        || displayKind(target.index, state) === 'table')
+      && !state.displays[target.index]?.removed;
+    if (clearBtn) clearBtn.hidden = !canClear;
     const deleteBtn = furnMenu.querySelector('[data-furn-delete]');
     const deleteKind = target.id === 'display' ? displayKind(target.index, state) : null;
     const canDelete = target.id === 'display'
@@ -1722,6 +1730,19 @@ export function bindHud(root, state, world) {
     const target = furnTarget;
     hideFurnMenu();
     if (target?.id === 'display') openFillPicker(target);
+  });
+  furnMenu.querySelector('[data-furn-clear]')?.addEventListener('click', () => {
+    const target = furnTarget;
+    hideFurnMenu();
+    if (target?.id !== 'display') return;
+    if (!clearDisplay(state, target.index)) return;
+    playClick('ui');
+    const kind = displayKind(target.index, state);
+    pushLog(state, kind === 'stand'
+      ? 'Cleared the mannequin.'
+      : 'Cleared the display. Wares went back to the chest.');
+    world.syncDisplays();
+    render(performance.now() / 1000);
   });
   furnMenu.querySelector('[data-furn-delete]')?.addEventListener('click', () => {
     const target = furnTarget;

@@ -87,6 +87,7 @@ import {
   ownsRange,
   ownsWheel,
   placeFromChest,
+  clearDisplay,
   placeOnDisplay,
   nextFurnitureCost,
   removePlacedFurniture,
@@ -212,6 +213,23 @@ describe('stall economy', () => {
     assert.equal(state.displays[standIndex].slots.helm, 'bronze_full_helm');
     assert.equal(state.displays[standIndex].slots.body, 'bronze_platebody');
     assert.equal(state.displays[standIndex].slots.legs, 'bronze_platelegs');
+    assert.equal(clearDisplay(state, standIndex), true);
+    assert.equal(state.displays[standIndex].slots.helm, null);
+    assert.equal(state.displays[standIndex].ware, null);
+    assert.equal(state.displays[standIndex].removed, false);
+    assert.equal(state.chest.bronze_full_helm, 1);
+  });
+
+  it('clears a table display back into the chest', () => {
+    const state = createState();
+    finishCraft(state, 'bronze_sword');
+    const tableIndex = SHOP.displays.findIndex((d) => d.kind === 'table');
+    assert.equal(placeOnDisplay(state, 'bronze_sword', tableIndex), true);
+    assert.equal(state.chest.bronze_sword, undefined);
+    assert.equal(clearDisplay(state, tableIndex), true);
+    assert.equal(state.displays[tableIndex].ware, null);
+    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.displays[tableIndex].removed, false);
   });
 
   it('places food onto a chosen shelf slot and swaps the previous ware back to the chest', () => {

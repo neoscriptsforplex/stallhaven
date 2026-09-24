@@ -787,6 +787,21 @@ function returnDisplayWares(state, display) {
   display.shelfSlots = display.kind === 'shelf' ? emptyShelfSlots() : null;
 }
 
+/** Clear a mannequin, table, or shelf. Table and shelf wares go back to the chest. */
+export function clearDisplay(state, index) {
+  const display = state.displays[index];
+  if (!display || display.removed) return false;
+  const kind = displayKind(index, state);
+  if (kind !== 'shelf' && kind !== 'table' && kind !== 'stand') return false;
+  if (kind === 'stand') {
+    display.ware = null;
+    display.slots = emptySlots();
+    return true;
+  }
+  returnDisplayWares(state, display);
+  return true;
+}
+
 export function removePlacedFurniture(state, index) {
   const display = state.displays[index];
   if (!display || display.removed) return false;

@@ -621,7 +621,7 @@ export function bindUploadUI({ button, modal, state, world, onChange }) {
     close();
   }
 
-  button.addEventListener('click', openModal);
+  button?.addEventListener('click', openModal);
   pickBtn.addEventListener('click', () => fileInput.click());
 
   const dropTarget = dropHint ?? modal;

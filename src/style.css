@@ -102,13 +102,6 @@ body {
   justify-content: space-between;
 }
 
-#upload-btn {
-  min-width: auto;
-  padding: 3px 8px;
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
 .gold {
   margin: 0;
   display: inline-block;

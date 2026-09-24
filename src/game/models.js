@@ -3058,11 +3058,14 @@ function speechTexture(text, bubble = false) {
   canvas.height = canvasH;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvasW, canvasH);
-  ctx.fillStyle = bubble ? 'rgba(248, 232, 196, 0.96)' : 'rgba(28, 18, 10, 0.78)';
+  ctx.fillStyle = bubble ? 'rgba(36, 22, 12, 0.94)' : 'rgba(28, 18, 10, 0.78)';
   const boxH = canvasH - tail;
   roundRect(ctx, 8, 6, canvasW - 16, boxH - 10, 14);
   ctx.fill();
   if (bubble) {
+    ctx.strokeStyle = '#e3b34a';
+    ctx.lineWidth = 3;
+    ctx.stroke();
     const mid = canvasW / 2;
     ctx.beginPath();
     ctx.moveTo(mid - 10, boxH - 8);
@@ -3070,8 +3073,9 @@ function speechTexture(text, bubble = false) {
     ctx.lineTo(mid, canvasH - 4);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
   }
-  ctx.fillStyle = bubble ? '#3a240e' : '#f6e4c4';
+  ctx.fillStyle = bubble ? '#ead8b8' : '#f6e4c4';
   ctx.font = font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

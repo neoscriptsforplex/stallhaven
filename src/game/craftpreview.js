@@ -20,13 +20,22 @@ const PREVIEW_EULER = {
   robe_bottom: { x: 0, y: 0, z: -Math.PI / 4 },
   platelegs: { x: Math.PI, y: 0, z: 0 },
   dhide_chaps: { x: Math.PI, y: 0, z: 0 },
-  platebody: { x: Math.PI, y: 0, z: 0 },
+  // Chest faces the camera; shoulders run left-right.
+  platebody: { x: 0, y: Math.PI / 2, z: 0 },
   robe_top: { x: Math.PI, y: 0, z: 0 },
   plateskirt: { x: Math.PI / 2, y: 0, z: 0 },
 };
 
+/** Dumps that do not share their shape's facing. */
+const PREVIEW_EULER_BY_ID = {
+  wizard_robe: { x: 0, y: -Math.PI / 2, z: 0 },
+  mystic_robe_top: { x: 0, y: Math.PI / 2, z: 0 },
+};
+
 export function craftPreviewEuler(id) {
-  if (String(id).endsWith('_dragon_mask')) return { x: 0, y: Math.PI, z: 0 };
+  // Side profile: spikes up, snout to the right.
+  if (String(id).endsWith('_dragon_mask')) return { x: 0, y: 0, z: Math.PI / 2 };
+  if (PREVIEW_EULER_BY_ID[id]) return PREVIEW_EULER_BY_ID[id];
   const shape = RECIPES[id]?.shape;
   return shape ? (PREVIEW_EULER[shape] ?? null) : null;
 }

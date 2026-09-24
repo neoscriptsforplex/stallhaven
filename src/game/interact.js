@@ -62,16 +62,20 @@ export function isNearPoint(from, to, dist) {
   return Math.hypot((from?.x ?? 0) - (to?.x ?? 0), (from?.z ?? 0) - (to?.z ?? 0)) <= dist;
 }
 
+function isWalkFloorKind(kind) {
+  return kind === 'ground' || kind === 'rug';
+}
+
 export function pickUseHit(hits) {
   if (!hits?.length) return null;
   const useHit = hits.find((hit) => USE_KINDS.has(hit.object?.userData?.kind));
   const closestKind = hits[0].object?.userData?.kind;
-  if (useHit && (!closestKind || closestKind === 'ground' || closestKind === 'expand-pad' || USE_KINDS.has(closestKind))) {
+  if (useHit && (!closestKind || isWalkFloorKind(closestKind) || closestKind === 'expand-pad' || USE_KINDS.has(closestKind))) {
     return useHit;
   }
   return hits.find((hit) => {
     const kind = hit.object?.userData?.kind;
-    return kind && kind !== 'ground' && kind !== 'customer' && kind !== 'expand-pad';
+    return kind && !isWalkFloorKind(kind) && kind !== 'customer' && kind !== 'expand-pad';
   }) ?? null;
 }
 

@@ -104,14 +104,23 @@ const CAM_PITCH_SPEED = 1.425;
 const CAM_ORBIT_YAW = 0.0055;
 const CAM_ORBIT_PITCH = 0.0036;
 
-/** Middle-mouse on desktop; one-finger canvas swipe on touch. UI stays ignored. */
+/** Still-finger hold on the canvas that opens the desktop right-click menu. */
+export const TOUCH_LONG_PRESS_MS = 2000;
+/** Movement past this cancels the hold and starts camera orbit. */
+export const TOUCH_HOLD_MOVE_PX = 8;
+
+/** Middle-mouse on desktop; one-finger canvas swipe on touch after a small move. */
 export function canvasPointerStartsCamOrbit(event, flags = {}) {
   if (event?.button === 1) return true;
   if (event?.pointerType !== 'touch') return false;
   if (flags.moveTarget || flags.expandMode || flags.modalOpen) return false;
   if ((flags.touchCount ?? 1) > 1) return false;
   if (event.isPrimary === false) return false;
-  return true;
+  return flags.moved === true;
+}
+
+export function canvasPointerMovedPastHold(from, to, threshold = TOUCH_HOLD_MOVE_PX) {
+  return Math.hypot((to?.x ?? to?.clientX ?? 0) - (from?.x ?? from?.clientX ?? 0), (to?.y ?? to?.clientY ?? 0) - (from?.y ?? from?.clientY ?? 0)) > threshold;
 }
 const CAM_ZOOM_STEP = 0.38;
 const CAM_MIN_DISTANCE = 2.05;
@@ -189,6 +198,7 @@ export function createWorld(canvas, state, opts = {}) {
   let camDrag = null;
   const canvasTouches = new Set();
   let multiTouch = false;
+  let touchHold = null;
   camera.position.set(SHOP.cameraStart.x, SHOP.cameraStart.y, SHOP.cameraStart.z);
   camera.lookAt(camLook);
 
@@ -788,7 +798,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (sceneMode === 'dungeon') return dungeon?.grounds?.children ?? [];
     const list = [];
     const add = (obj) => {
-      if (obj?.isMesh && obj.userData?.kind === 'ground') list.push(obj);
+      if (obj?.isMesh && (obj.userData?.kind === 'ground' || obj.userData?.kind === 'rug')) list.push(obj);
     };
     groundGroup?.children.forEach(add);
     architecture?.traverse((child) => add(child));
@@ -1089,12 +1099,37 @@ export function createWorld(canvas, state, opts = {}) {
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
+  function clearTouchHold() {
+    if (touchHold?.timer != null) clearTimeout(touchHold.timer);
+    touchHold = null;
+  }
+
+  function armTouchHold(event) {
+    clearTouchHold();
+    const hold = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      fired: false,
+      timer: null,
+    };
+    hold.timer = setTimeout(() => {
+      if (touchHold !== hold || hold.fired || multiTouch) return;
+      hold.fired = true;
+      camDrag = null;
+      openCanvasContextAt({ clientX: hold.x, clientY: hold.y });
+      ignorePicksUntil = performance.now() + 400;
+    }, TOUCH_LONG_PRESS_MS);
+    touchHold = hold;
+  }
+
   renderer.domElement.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'touch') {
       canvasTouches.add(event.pointerId);
       if (canvasTouches.size > 1) {
         camDrag = null;
         multiTouch = true;
+        clearTouchHold();
       }
     }
     if (canvasPointerStartsCamOrbit(event, {
@@ -1106,12 +1141,16 @@ export function createWorld(canvas, state, opts = {}) {
       event.preventDefault();
       camDrag = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
       renderer.domElement.setPointerCapture?.(event.pointerId);
-      if (event.pointerType === 'touch') {
-        pointerDown.x = event.clientX;
-        pointerDown.y = event.clientY;
-        pointerDown.t = performance.now();
-      }
-      if (event.button === 1 || event.pointerType === 'touch') return;
+      if (event.button === 1) return;
+    }
+    if (event.pointerType === 'touch' && event.isPrimary !== false && canvasTouches.size === 1) {
+      event.preventDefault();
+      pointerDown.x = event.clientX;
+      pointerDown.y = event.clientY;
+      pointerDown.t = performance.now();
+      renderer.domElement.setPointerCapture?.(event.pointerId);
+      armTouchHold(event);
+      return;
     }
     if (event.button !== 0) return;
     pointerDown.x = event.clientX;
@@ -1227,10 +1266,14 @@ export function createWorld(canvas, state, opts = {}) {
     if (event?.pointerType === 'touch') canvasTouches.delete(event.pointerId);
     if (canvasTouches.size === 0) multiTouch = false;
     if (event?.button === 1 || camDrag?.pointerId === event?.pointerId) camDrag = null;
+    if (touchHold && (event?.pointerId == null || touchHold.pointerId === event.pointerId)) {
+      clearTouchHold();
+    }
   }
 
   renderer.domElement.addEventListener('pointerup', (event) => {
     try {
+    if (touchHold?.fired) return;
     if (event.button !== 0) return;
     if (performance.now() < ignorePicksUntil) return;
     if (multiTouch) return;
@@ -1338,7 +1381,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
     }
-    const groundHit = hits.find((h) => h.object.userData.kind === 'ground');
+    const groundHit = hits.find((h) => h.object.userData.kind === 'ground' || h.object.userData.kind === 'rug');
     if (groundHit) {
       const point = groundHit.point;
       const station = stationAtFloor(point.x, point.z, state.furniture);
@@ -1383,6 +1426,21 @@ export function createWorld(canvas, state, opts = {}) {
   });
 
   renderer.domElement.addEventListener('pointermove', (event) => {
+    if (touchHold && touchHold.pointerId === event.pointerId && !touchHold.fired) {
+      if (canvasPointerMovedPastHold(touchHold, event)) {
+        clearTimeout(touchHold.timer);
+        touchHold = null;
+        if (canvasPointerStartsCamOrbit(event, {
+          moveTarget: Boolean(moveTarget),
+          expandMode,
+          modalOpen: modalBlocksWorld(),
+          touchCount: event.pointerType === 'touch' ? canvasTouches.size : 1,
+          moved: true,
+        })) {
+          camDrag = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+        }
+      }
+    }
     if (camDrag && (camDrag.pointerId == null || camDrag.pointerId === event.pointerId)) {
       const dx = event.clientX - camDrag.x;
       const dy = event.clientY - camDrag.y;
@@ -1407,8 +1465,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (event.button === 1) event.preventDefault();
   });
 
-  renderer.domElement.addEventListener('contextmenu', (event) => {
-    event.preventDefault();
+  function openCanvasContextAt(event) {
     if (modalBlocksWorld() && !moveTarget) return;
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
@@ -1465,6 +1522,11 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     pickHandler?.({ type: 'furn-menu', furniture: furn, clientX: event.clientX, clientY: event.clientY });
+  }
+
+  renderer.domElement.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    openCanvasContextAt(event);
   });
 
   renderer.domElement.addEventListener('wheel', (event) => {

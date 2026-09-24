@@ -39,6 +39,19 @@ describe('station walk-then-open', () => {
     assert.equal(far, null);
   });
 
+  it('treats a rug hit like walkable floor, not furniture', () => {
+    const picked = pickUseHit([
+      hit('rug', 3.2, 0, 0.25),
+      hit('ground', 3.4, 0, 0.25),
+    ]);
+    assert.equal(picked, null);
+    const anvilThroughRug = pickUseHit([
+      hit('rug', 4.0, 0, 0.25),
+      hit('anvil', 4.4, SHOP.anvil.x, SHOP.anvil.z),
+    ]);
+    assert.equal(anvilThroughRug.object.userData.kind, 'anvil');
+  });
+
   it('does not let a closer floor ray steal an anvil pick', () => {
     const picked = pickUseHit([
       hit('ground', 4.1, SHOP.anvil.x, SHOP.anvil.z + 0.2),

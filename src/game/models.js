@@ -1159,6 +1159,21 @@ export function slotPose(slot) {
   return { x: 0, y: 0.62, z: 0 };
 }
 
+/**
+ * Extra yaw after the dump is stood up. Mannequins face +Z.
+ * Platebodies already read correctly and are left alone.
+ * Wizard and mystic robe tops stand edge-on to that front; a quarter turn
+ * puts the chest toward +Z. Splitbark tops and dragon masks already face
+ * along Z, but the outer surface points -Z (away from the customer).
+ */
+export function wareDisplayYaw(id) {
+  if (id === 'wizard_robe') return -Math.PI / 2;
+  if (id === 'mystic_robe_top') return Math.PI / 2;
+  if (id === 'splitbark_robe_top') return Math.PI;
+  if (String(id).endsWith('_dragon_mask')) return Math.PI;
+  return 0;
+}
+
 /** Stand a flat dump upright when the procedural mesh is taller than it is wide. */
 export function dumpStandEuler(source, targetBox) {
   const none = { rotateX: 0, rotateY: 0, rotateZ: 0 };
@@ -1251,7 +1266,7 @@ export function buildWare(recipeId) {
   }
   if (recipe?.category !== 'food') {
     const bundled = recipe ? getBundledLook(recipe.id) : null;
-    attachBundledWare(group, host, bundled);
+    attachBundledWare(group, host, bundled, recipe?.id);
   }
   if (isShelfItem(recipe)) group.scale.setScalar(0.55);
   group.userData.recipeId = recipeId;
@@ -1267,18 +1282,21 @@ function addMaterialToken(host, tint) {
   host.add(lump);
 }
 
-function attachBundledWare(group, host, bundled) {
+function attachBundledWare(group, host, bundled, recipeId) {
   if (!bundled) {
     group.add(host);
     return;
   }
   const targetBox = new THREE.Box3().setFromObject(host);
-  group.add(wrapBundledProp(bundled, host, {
+  const mesh = wrapBundledProp(bundled, host, {
     name: 'dump',
     fit: 'max',
     targetBox,
     ...dumpStandEuler(bundled, targetBox),
-  }));
+  });
+  const yaw = wareDisplayYaw(recipeId);
+  if (yaw) bakeImportedEuler(mesh, 0, yaw, 0);
+  group.add(mesh);
 }
 
 function metal(color) {

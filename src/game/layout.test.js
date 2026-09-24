@@ -80,10 +80,10 @@ describe('layout numbers', () => {
     assert.ok(EXPANSION_PADS.some((p) => p.id === 'right' && p.gx === 1 && p.gz === 0));
   });
 
-  it('prices expansions 10000 then ×3, and chest 500 then ×3', () => {
-    assert.equal(expansionCost(0), 10000);
-    assert.equal(expansionCost(1), 30000);
-    assert.equal(expansionCost(2), 90000);
+  it('prices expansions 500000 then ×3, and chest 500 then ×3', () => {
+    assert.equal(expansionCost(0), 500000);
+    assert.equal(expansionCost(1), 1500000);
+    assert.equal(expansionCost(2), 4500000);
     assert.equal(chestUpgradeCost(1), 500);
     assert.equal(chestUpgradeCost(2), 1500);
     assert.equal(furnitureBuyCost(0), 500);
@@ -229,8 +229,8 @@ describe('layout numbers', () => {
     const right = gardenTreeSpots(['right']);
     assert.equal(right.some((spot) => spot.side === 'right' || spot.side === 'front-right'), false);
     assert.ok(right.some((spot) => spot.side === 'left'));
-    assert.equal(WHEEL_COST, 500);
-    assert.equal(CAULDRON_COST, 10000);
+    assert.equal(WHEEL_COST, 100000);
+    assert.equal(CAULDRON_COST, 1000000);
   });
 
   it('keeps the cobble path on the grass tile and puts the fountain mid-path', () => {

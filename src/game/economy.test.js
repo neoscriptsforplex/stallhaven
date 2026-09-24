@@ -863,13 +863,13 @@ describe('material regen', () => {
 });
 
 describe('shop expansions', () => {
-  it('sells the first extra room for 10000g and the next for three times that', () => {
+  it('sells the first extra room for 500000g and the next for three times that', () => {
     const state = createState();
-    state.gold = 10000;
+    state.gold = 500000;
     assert.equal(buyExpansion(state, 'left'), true);
     assert.deepEqual(state.expansions, ['left']);
     assert.equal(state.gold, 0);
-    state.gold = 30000;
+    state.gold = 1500000;
     assert.equal(buyExpansion(state, 'back-left'), true);
     assert.equal(state.gold, 0);
     assert.ok(state.expansions.includes('back-left'));
@@ -885,7 +885,7 @@ describe('shop expansions', () => {
 });
 
 describe('cauldron unlock', () => {
-  it('sells one cauldron for 10000 gp and keeps the pose in a save', () => {
+  it('sells one cauldron for 1000000 gp and keeps the pose in a save', () => {
     const state = createState();
     assert.equal(ownsCauldron(state), false);
     assert.equal(canBuyCauldron(state), false);
@@ -1021,7 +1021,7 @@ describe('furnace and spinning wheel', () => {
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
   });
 
-  it('sells a spinning wheel for 500 gp and spins flax into bow string', () => {
+  it('sells a spinning wheel for 100000 gp and spins flax into bow string', () => {
     const state = createState();
     assert.equal(ownsWheel(state), false);
     assert.match(craftBlockReason(state, 'spin_bow_string'), /spinning wheel/i);

@@ -84,8 +84,8 @@ describe('player look UI', () => {
     const cauldron = build.slice(build.indexOf('Cauldron'), build.indexOf('Table'));
     assert.equal((wheel.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.equal((cauldron.match(/Place it on the floor snap grid/g) ?? []).length, 1);
-    assert.match(wheel, /data-wheel-status class="meta">Costs 500 gp\.</);
-    assert.match(cauldron, /data-cauldron-status class="meta">Costs 10,000 gp\.</);
+    assert.match(wheel, /data-wheel-status class="meta">Costs 100,000 gp\.</);
+    assert.match(cauldron, /data-cauldron-status class="meta">Costs 1,000,000 gp\.</);
   });
 
   it('does not show old buyer class names in Help', () => {

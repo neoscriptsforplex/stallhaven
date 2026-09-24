@@ -13,7 +13,7 @@ export const EXPANSION_PADS = [
   { id: 'right', gx: 1, gz: 0, label: 'Right' },
 ];
 
-export const FIRST_EXPANSION_COST = 10000;
+export const FIRST_EXPANSION_COST = 500000;
 export const EXPANSION_COST_MULT = 3;
 export const MAX_EXPANSIONS = 5;
 
@@ -65,8 +65,11 @@ export function furnitureVisualYaw(id, poseRot = FURNITURE_FORWARD) {
   return (poseRot ?? FURNITURE_FORWARD) + furnitureStartYaw(id);
 }
 export const SWAP_PRICE_RATIO = 0.65;
-export const CAULDRON_COST = 10000;
-export const WHEEL_COST = 500;
+export const CAULDRON_COST = 1000000;
+export const WHEEL_COST = 100000;
+export const LOOM_COST = 50000;
+export const FLETCH_COST = 50000;
+export const POTTER_COST = 50000;
 export const FURNACE_COST = 0;
 export const RANGE_COST = 0;
 export const STATION_UNLOCKS = [

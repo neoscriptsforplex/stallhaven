@@ -3546,6 +3546,24 @@ export function bindImportedWalkRig(group, mesh, height = 1.7) {
   return 'proxy';
 }
 
+/** Hide debug skeleton / edge sticks so walk pose never shows bone lines. */
+export function hideWalkDebug(root) {
+  if (!root?.traverse) return root;
+  root.traverse((child) => {
+    if (child.isSkeletonHelper || child.type === 'SkeletonHelper') {
+      child.visible = false;
+      return;
+    }
+    if (child.isLine || child.isLineSegments || child.isLineLoop) {
+      child.visible = false;
+      return;
+    }
+    const mats = Array.isArray(child.material) ? child.material : child.material ? [child.material] : [];
+    if (mats.some((mat) => mat?.wireframe)) child.visible = false;
+  });
+  return root;
+}
+
 /** Wrap a glTF scene as a player or customer stand-in. Throws if the file has no mesh. */
 export function wrapImportedCharacter(source, opts = {}) {
   if (!source) throw new Error('No model to use.');
@@ -3553,9 +3571,7 @@ export function wrapImportedCharacter(source, opts = {}) {
   group.name = opts.name ?? 'character';
   const mesh = source.clone(true);
   if (opts.rotateY) mesh.rotation.y += opts.rotateY;
-  mesh.traverse((child) => {
-    if (child.isSkeletonHelper || child.type === 'SkeletonHelper') child.visible = false;
-  });
+  hideWalkDebug(mesh);
   normalizeImported(mesh, opts.height ?? 1.7, true, { fit: 'height' });
   tintImportedMesh(mesh, opts.tint);
   group.add(mesh);
@@ -3622,6 +3638,7 @@ export function wrapImportedCharacter(source, opts = {}) {
     scaleY: mesh.scale.y,
   };
   attachImportedGrip(group, mesh, height);
+  hideWalkDebug(group);
   return group;
 }
 

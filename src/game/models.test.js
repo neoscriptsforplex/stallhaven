@@ -298,6 +298,12 @@ describe('uploaded player walk', () => {
     );
     mesh.position.y = 0.8;
     source.add(mesh);
+    const bones = new THREE.LineSegments(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: 0xffff00 }),
+    );
+    bones.name = 'SkeletonHelper';
+    source.add(bones);
     const wrapped = wrapImportedCharacter(source, { name: 'hero', label: 'You' });
     assert.ok(wrapped.userData.rig?.legL);
     assert.ok(wrapped.userData.rig?.legR);
@@ -307,18 +313,23 @@ describe('uploaded player walk', () => {
     updateWalkPose(wrapped, true, 0.2, 1);
     assert.notEqual(wrapped.userData.rig.legL.rotation.x, rest);
     assert.ok(wrapped.userData.walkPhase > 0);
-    let visibleSticks = 0;
-    wrapped.traverse((child) => {
-      if (!child.isMesh) return;
-      if (child.isLine || child.isLineSegments || child.isSkinnedMesh?.skeleton && child.material?.wireframe) {
-        visibleSticks += 1;
-      }
-      if (String(child.name || '').startsWith('proxy') && child.visible !== false) visibleSticks += 1;
-      if (child.geometry?.type === 'CylinderGeometry' && child.material?.opacity < 1 && child.visible !== false) {
-        visibleSticks += 1;
-      }
-    });
-    assert.equal(visibleSticks, 0, 'imported walk must not draw skeleton/proxy wireframe');
+    const countSticks = (root) => {
+      let n = 0;
+      root.traverse((child) => {
+        if ((child.isLine || child.isLineSegments || child.isSkeletonHelper) && child.visible !== false) n += 1;
+        if (child.material?.wireframe && child.visible !== false) n += 1;
+        if (child.isMesh && String(child.name || '').startsWith('proxy') && child.visible !== false) n += 1;
+        if (child.isMesh && child.geometry?.type === 'CylinderGeometry' && child.material?.opacity < 1 && child.visible !== false) {
+          n += 1;
+        }
+      });
+      return n;
+    };
+    assert.equal(countSticks(wrapped), 0, 'imported walk must not draw skeleton/proxy wireframe');
+    const buyer = wrapImportedCharacter(source, { name: 'ranger', label: 'Ranger', speech: true, pickKind: 'customer' });
+    const goblin = wrapImportedCharacter(source, { name: 'goblin', label: false, pickKind: 'goblin' });
+    assert.equal(countSticks(buyer), 0, 'buyers must hide walk bone lines');
+    assert.equal(countSticks(goblin), 0, 'goblins must hide walk bone lines');
   });
 
   it('parents a pickaxe to the walk arm and swings it while mining', () => {

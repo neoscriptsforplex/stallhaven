@@ -14,17 +14,25 @@ import {
   gardenTreeSpots,
   keepFountain,
   keepGardenSpot,
+  pointHitsTrapdoor,
+  segmentHitsTrapdoor,
   neighborsOf,
   occupiedCells,
   padConnects,
   roomCenter,
+  SHOP_RUG,
+  shopRugPose,
   doorwayFloor,
   wallVineMounts,
 } from './layout.js';
 import { METALS } from './catalog.js';
-import { initRatWander } from './rats.js';
+import { DUNGEON_LIGHT_BOOST } from './lighting.js';
+import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
 import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp } from './models.js';
+import { prepareDungeonRockMaterials } from './upload.js';
+
+export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
 
 function wood(color, roughness = 0.86) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.04 });
@@ -108,6 +116,13 @@ function cobbleMap() {
 
 const COBBLE_U = 4.2 / ROOM_W;
 const COBBLE_V = 2.6 / 2.7;
+/** Path-only UV scale: cobbles read about 3× smaller than the wall stone. */
+export const PATH_COBBLE_SCALE = 3;
+const PATH_COBBLE_U = COBBLE_U * PATH_COBBLE_SCALE;
+
+function grassGroundMat() {
+  return new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 });
+}
 
 function cobbleMat(repeatX, repeatY, offsetX = 0, offsetY = 0) {
   const map = cobbleMap();
@@ -260,28 +275,61 @@ function flameMat() {
 export function buildTorch() {
   const bundled = getBundledLook('torch');
   if (bundled) {
-    const fitted = wrapBundledProp(bundled, buildProceduralTorch(), { name: 'torch', fit: 'max' });
+    const fitted = wrapBundledProp(bundled, buildProceduralTorchBody(), {
+      name: 'torch',
+      fit: 'max',
+      rotateZ: Math.PI / 2,
+    });
     fitted.name = 'torch';
     attachTorchFx(fitted);
     return fitted;
   }
-  return buildProceduralTorch();
+  const group = buildProceduralTorchBody();
+  attachTorchFx(group);
+  return group;
 }
 
+function localPointAtWorld(mesh, worldPoint) {
+  mesh.updateMatrixWorld(true);
+  return mesh.worldToLocal(worldPoint.clone());
+}
+
+/**
+ * PointLight + ember sit in an inverse-scaled holder at the visible tip so a
+ * tiny dumped torch scale cannot pull the bloom down the shaft.
+ */
 function attachTorchFx(mesh) {
+  mesh.updateMatrixWorld(true);
   const box = measureVisibleBox(mesh);
-  const tipY = Number.isFinite(box.max.y) ? box.max.y : 0.42;
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 7), flameMat());
-  flame.name = 'torch-flame';
-  flame.position.y = tipY + 0.04;
-  mesh.add(flame);
-  const glow = new THREE.PointLight(0xff9a3a, 1.15, 4.5, 2);
+  const tipWorld = new THREE.Vector3(
+    (box.min.x + box.max.x) / 2,
+    Number.isFinite(box.max.y) ? box.max.y : 0.42,
+    (box.min.z + box.max.z) / 2,
+  );
+  const holder = new THREE.Group();
+  holder.name = 'torch-fx';
+  holder.position.copy(localPointAtWorld(mesh, tipWorld));
+  const worldScale = new THREE.Vector3();
+  mesh.getWorldScale(worldScale);
+  const s = Math.max(Math.abs(worldScale.x), 1e-8);
+  holder.scale.setScalar(1 / s);
+  mesh.add(holder);
+
+  if (!mesh.getObjectByName('torch-flame')) {
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 7), flameMat());
+    flame.name = 'torch-flame';
+    flame.position.y = 0.04;
+    holder.add(flame);
+  }
+
+  const glow = new THREE.PointLight(0xff9a3a, 1.55, 1.9, 2);
   glow.name = 'torch-glow';
-  glow.position.y = tipY + 0.02;
-  mesh.add(glow);
+  // Slightly above the tip and toward local −Z (wall-facing on typical mounts).
+  glow.position.set(0, 0.05, -0.03);
+  holder.add(glow);
 }
 
-function buildProceduralTorch() {
+function buildProceduralTorchBody() {
   const group = new THREE.Group();
   group.name = 'torch';
   const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, 0.42, 6), wood(0x5a3a22)));
@@ -291,20 +339,29 @@ function buildProceduralTorch() {
   wrap.position.y = 0.3;
   group.add(wrap);
   const flame = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 7), flameMat()));
+  flame.name = 'torch-flame';
   flame.position.y = 0.42;
   group.add(flame);
-  const glow = new THREE.PointLight(0xff9a3a, 1.15, 4.5, 2);
-  glow.position.y = 0.46;
-  group.add(glow);
   return group;
 }
 
-function addWallTorch(root, x, y, z, rotY = 0) {
+function buildProceduralTorch() {
+  const group = buildProceduralTorchBody();
+  attachTorchFx(group);
+  return group;
+}
+
+function addWallTorch(root, x, y, z, rotY = 0, glowMul = 1) {
   const torch = buildTorch();
   torch.position.set(x, y, z);
   torch.rotation.y = rotY;
   // Procedural sconces lean off the wall. The dumped torch stays upright.
   if (!getBundledLook('torch')) torch.rotation.z = 0.55;
+  torch.traverse((child) => {
+    if (!child.isLight) return;
+    if (glowMul !== 1) child.intensity *= glowMul;
+    child.userData.baseIntensity = child.intensity;
+  });
   root.add(torch);
   return torch;
 }
@@ -578,7 +635,8 @@ function addRoomTorches(root, center, neigh) {
 
 function addOriginDecor(root, center) {
   const rug = buildRug();
-  rug.position.set(center.x, 0.11, center.z + 0.15);
+  const pose = shopRugPose();
+  rug.position.set(center.x, pose.y, pose.z);
   root.add(rug);
 
   addWallVines(root, center);
@@ -679,6 +737,9 @@ function randAt(seed) {
 export function buildRug() {
   const group = new THREE.Group();
   group.name = 'rug';
+  group.userData.kind = 'ground';
+  group.userData.rug = true;
+  group.userData.walkable = true;
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 160;
@@ -695,10 +756,12 @@ export function buildRug() {
   ctx.fillRect(48, 40, 160, 80);
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
-  const rug = new THREE.Mesh(
-    new THREE.BoxGeometry(2.35, 0.025, 1.55),
+  const rug = markGround(new THREE.Mesh(
+    new THREE.BoxGeometry(SHOP_RUG.w, 0.025, SHOP_RUG.d),
     new THREE.MeshStandardMaterial({ map, roughness: 0.95 }),
-  );
+  ));
+  rug.userData.rug = true;
+  rug.userData.walkable = true;
   rug.receiveShadow = true;
   group.add(rug);
   return group;
@@ -788,6 +851,8 @@ function addWallVines(root, center) {
 
 /** Uniform world scale vs the baked range (dump or procedural) after size-match. */
 export const RANGE_WORLD_SCALE = 2;
+/** Dump wooden plate is Y 0–16 of the 224-tall Cooking range mesh. */
+export const RANGE_PLATE_FRAC = 16 / 224;
 
 function applyRangeWorldScale(mesh) {
   mesh.scale.multiplyScalar(RANGE_WORLD_SCALE);
@@ -798,11 +863,27 @@ function applyRangeWorldScale(mesh) {
   return mesh;
 }
 
+/** Drop the dump so the brown base plate sits under the floorboards. */
+function sinkRangePlate(mesh) {
+  mesh.updateMatrixWorld(true);
+  const box = measureVisibleBox(mesh);
+  const height = box.max.y - box.min.y;
+  if (!Number.isFinite(height) || height <= 0) return mesh;
+  mesh.position.y -= height * RANGE_PLATE_FRAC;
+  mesh.userData.floorY = mesh.position.y;
+  return mesh;
+}
+
 export function buildRange() {
   const bundled = getBundledLook('range');
   const target = applyRangeWorldScale(buildProceduralRange());
   if (bundled) {
-    return wrapBundledProp(bundled, target, { name: 'range', fit: 'height', label: 'Range', wareY: 'top' });
+    return sinkRangePlate(wrapBundledProp(bundled, target, {
+      name: 'range',
+      fit: 'height',
+      label: 'Range',
+      wareY: 'top',
+    }));
   }
   return target;
 }
@@ -953,23 +1034,38 @@ function buildProceduralFurnace() {
   return group;
 }
 
+/** Uniform world scale vs the baked spinning wheel after size-match.
+ * Live size was 4× the dump (2× of the prior 2× live size). Halve that
+ * in-game size back to 2× the original baked fit. */
+export const WHEEL_WORLD_SCALE = 2;
+
+function applyWheelWorldScale(mesh) {
+  mesh.scale.multiplyScalar(WHEEL_WORLD_SCALE);
+  mesh.updateMatrixWorld(true);
+  const box = measureVisibleBox(mesh);
+  if (Number.isFinite(box.min.y)) mesh.position.y -= box.min.y;
+  if (mesh.userData.wareY != null) mesh.userData.wareY *= WHEEL_WORLD_SCALE;
+  return mesh;
+}
+
 export function buildSpinningWheel() {
   const bundled = getBundledLook('wheel');
   if (bundled) {
-    const target = buildProceduralSpinningWheel();
+    const target = applyWheelWorldScale(buildProceduralSpinningWheel());
     const fitted = wrapBundledProp(bundled, target, {
       name: 'wheel',
       fit: 'max',
       label: 'Spinning Wheel',
       wareY: 'top',
     });
+    sitVisibleOnY(fitted, 0);
     const spinner = new THREE.Group();
     spinner.name = 'spin-wheel';
     fitted.add(spinner);
     fitted.userData.spinWheel = spinner;
     return fitted;
   }
-  return buildProceduralSpinningWheel();
+  return applyWheelWorldScale(buildProceduralSpinningWheel());
 }
 
 function buildProceduralSpinningWheel() {
@@ -1181,6 +1277,7 @@ export function tickFountainWater(root, now) {
 export function buildFountain() {
   const group = new THREE.Group();
   group.name = 'fountain';
+  // Outdoor mesh is public/models/fountain/fountain.obj (Blender Object_Fountain_2026-09-12).
   const bundled = getBundledLook('fountain');
   if (bundled) {
     const target = buildProceduralFountain();
@@ -1307,10 +1404,13 @@ function addGarden(root, cells, expansionIds = []) {
     box.maxZ = Math.max(box.maxZ, c.z + ROOM_D / 2);
   }
   const grass = gardenBox(expansionIds);
+  const grassW = grass.maxX - grass.minX;
+  const grassD = grass.maxZ - grass.minZ;
   const grassMesh = addShadow(new THREE.Mesh(
-    new THREE.PlaneGeometry(grass.maxX - grass.minX, grass.maxZ - grass.minZ),
-    new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 }),
+    new THREE.PlaneGeometry(grassW, grassD),
+    grassGroundMat(),
   ));
+  grassMesh.name = 'grass-ground';
   grassMesh.rotation.x = -Math.PI / 2;
   grassMesh.position.set((grass.minX + grass.maxX) / 2, -0.02, (grass.minZ + grass.maxZ) / 2);
   grassMesh.userData.kind = 'ground';
@@ -1329,12 +1429,14 @@ function addGarden(root, cells, expansionIds = []) {
     tree.position.set(spot.x, 0, spot.z);
     tree.rotation.y = rand() * Math.PI * 2;
     tree.userData.gardenSide = spot.side;
+    attachTreePick(tree, spot);
     root.add(tree);
   }
   for (const spot of gardenRockSpots(expansionIds)) {
     const rock = buildBoulder(spot.scale ?? 1);
     rock.position.set(spot.x, 0, spot.z);
     rock.rotation.y = rand() * Math.PI * 2;
+    sitVisibleOnY(rock, 0);
     root.add(rock);
   }
   const hatch = gardenTrapdoorSpot(expansionIds);
@@ -1370,11 +1472,12 @@ function addPathRect(root, minX, maxX, minZ, maxZ) {
   if (w < 0.05 || d < 0.05) return;
   const mesh = addShadow(new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
-    cobbleMat(w * COBBLE_U, d * COBBLE_U),
+    cobbleMat(w * PATH_COBBLE_U, d * PATH_COBBLE_U),
   ));
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set((minX + maxX) / 2, -0.008, (minZ + maxZ) / 2);
   mesh.userData.kind = 'ground';
+  mesh.userData.pathCobble = true;
   root.add(mesh);
 }
 
@@ -1390,11 +1493,12 @@ function addCobblePath(root, expansionIds = []) {
     addPathRect(root, span.minX, span.maxX, FOUNTAIN.z + apron, span.maxZ);
     const ring = addShadow(new THREE.Mesh(
       new THREE.RingGeometry(FOUNTAIN.radius + 0.04, apron, 28),
-      cobbleMat(apron * 2 * COBBLE_U, apron * 2 * COBBLE_U),
+      cobbleMat(apron * 2 * PATH_COBBLE_U, apron * 2 * PATH_COBBLE_U),
     ));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(FOUNTAIN.x, -0.006, FOUNTAIN.z);
     ring.userData.kind = 'ground';
+    ring.userData.pathCobble = true;
     root.add(ring);
   } else {
     addPathRect(root, span.minX, span.maxX, span.minZ, span.maxZ);
@@ -1506,6 +1610,7 @@ function addLushGrass(root, grass, expansionIds, rand) {
     }),
   ];
   const dummy = new THREE.Object3D();
+  const tip = new THREE.Vector3();
   const buckets = greens.map(() => []);
   for (const cluster of clusters) {
     const n = cluster.blades;
@@ -1513,11 +1618,14 @@ function addLushGrass(root, grass, expansionIds, rand) {
       const x = cluster.x + (rand() - 0.5) * 0.4;
       const z = cluster.z + (rand() - 0.5) * 0.4;
       if (!keepGardenSpot({ x, z, side: 'edge' }, expansionIds)) continue;
+      if (pointHitsTrapdoor(x, z)) continue;
       const h = (0.14 + rand() * 0.46) * cluster.scale;
       dummy.position.set(x, 0, z);
       dummy.rotation.set((rand() - 0.5) * 0.38, rand() * Math.PI * 2, (rand() - 0.5) * 0.48);
       dummy.scale.set(0.65 + rand() * 0.55, h, 0.65 + rand() * 0.55);
       dummy.updateMatrix();
+      tip.set(0, 1, 0).applyMatrix4(dummy.matrix);
+      if (segmentHitsTrapdoor(x, z, tip.x, tip.z, 0.55)) continue;
       buckets[Math.floor(rand() * buckets.length)].push(dummy.matrix.clone());
     }
   }
@@ -1647,17 +1755,27 @@ const ORE_VEIN_COLOR = {
   dragon: 0xd41e1e,
 };
 
-/** Mineable rocks: olive-brown body; vein colour marks the tier. Essence glows separately. */
+/** Visible top of the dungeon cobble slab. Ore rocks sit on this plane. */
+export const DUNGEON_FLOOR_Y = 0.02;
+
+/** Previous essence xz — a second skeleton slump sits here after essence moved to the cave middle. */
+export const ESSENCE_OLD_XZ = { x: 0.2, z: 3.15 };
+
+/** Mineable rocks: olive-brown body; vein colour marks the tier. */
 export const DUNGEON_BOULDERS = [
-  { id: 'essence', materialId: 'essence', name: 'Essence', x: 0.2, z: 3.15, rot: 0.25, rock: 0xb8babf, vein: 0xe8d8ff, essence: true },
+  { id: 'essence', materialId: 'essence', name: 'Essence', x: 0, z: 0, rot: 0.25, scale: 2, rock: 0xb8babf, vein: 0xe8d8ff, essence: true },
   { id: 'bronze', materialId: 'bronze', name: 'Bronze Ore', x: -3.3, z: -3.15, rot: 0.5, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.bronze },
   { id: 'iron', materialId: 'iron', name: 'Iron Ore', x: 1.4, z: -3.15, rot: -0.3, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.iron },
   { id: 'steel', materialId: 'steel', name: 'Steel Ore', x: 4.05, z: -1.5, rot: 0.8, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.steel },
   { id: 'mithril', materialId: 'mithril', name: 'Mithril Ore', x: 4.05, z: 2.15, rot: -0.6, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.mithril },
-  { id: 'adamant', materialId: 'adamant', name: 'Adamant Ore', x: -1.5, z: 3.15, rot: 1.1, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.adamant },
-  { id: 'runite', materialId: 'runite', name: 'Runite Ore', x: -4.05, z: 1.7, rot: 0.2, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.runite },
+  { id: 'adamant', materialId: 'adamant', name: 'Adamantite', x: -1.5, z: 3.15, rot: 1.1, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.adamant },
+  { id: 'runite', materialId: 'runite', name: 'Runite', x: -4.05, z: 1.7, rot: 0.2, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.runite },
   { id: 'dragon', materialId: 'dragon', name: 'Dragon Ore', x: -4.05, z: -1.35, rot: -0.9, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.dragon },
 ];
+
+export function treeInspect() {
+  return { name: 'Tree', blurb: 'An outdoor pine. Chop it for Logs.' };
+}
 
 export function boulderInspect(materialId) {
   const spot = DUNGEON_BOULDERS.find((item) => item.materialId === materialId);
@@ -1665,7 +1783,8 @@ export function boulderInspect(materialId) {
   if (spot.essence) {
     return { name: 'Essence', blurb: 'A pale boulder. Mine it for Essence, used to craft runes.' };
   }
-  return { name: spot.name, blurb: `A ${spot.name.toLowerCase()} boulder. Left-click to walk over and mine.` };
+  const article = /^[aeiou]/i.test(spot.name) ? 'An' : 'A';
+  return { name: spot.name, blurb: `${article} ${spot.name.toLowerCase()} boulder. Left-click to walk over and mine.` };
 }
 
 function shadeHex(hex, factor) {
@@ -1674,18 +1793,84 @@ function shadeHex(hex, factor) {
   return color.getHex();
 }
 
+function attachTreePick(tree, spot) {
+  const pick = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.7, 0.85), pickMat());
+  pick.position.y = 0.85;
+  pick.userData.kind = 'tree';
+  pick.userData.materialId = 'logs';
+  pick.userData.name = 'Tree';
+  pick.userData.x = spot.x;
+  pick.userData.z = spot.z;
+  tree.add(pick);
+}
+
+function attachBoulderPick(group, spot) {
+  const s = spot.scale ?? 1;
+  const pick = new THREE.Mesh(new THREE.BoxGeometry(1.35 * s, 1.05 * s, 1.35 * s), pickMat());
+  pick.position.y = 0.48 * s;
+  pick.userData.kind = 'boulder';
+  pick.userData.materialId = spot.materialId;
+  pick.userData.name = spot.name;
+  pick.userData.x = spot.x;
+  pick.userData.z = spot.z;
+  group.add(pick);
+}
+
+function stripEmissive(root) {
+  const lights = [];
+  root?.traverse((child) => {
+    if (child.isLight) lights.push(child);
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    const next = mats.map((mat) => {
+      const copy = mat.clone();
+      if (copy.emissive) copy.emissive.setHex(0x000000);
+      if ('emissiveIntensity' in copy) copy.emissiveIntensity = 0;
+      copy.emissiveMap = null;
+      if ('envMapIntensity' in copy) copy.envMapIntensity = 0;
+      return copy;
+    });
+    child.material = Array.isArray(child.material) ? next : next[0];
+  });
+  for (const light of lights) light.parent?.remove(light);
+}
+
+function oreFitTarget(spot) {
+  const target = buildProceduralOreRock(spot);
+  const scale = spot.scale ?? 1;
+  if (scale !== 1) {
+    target.scale.setScalar(scale);
+    target.updateMatrixWorld(true);
+  }
+  return target;
+}
+
 function buildMineBoulder(spot) {
   const group = new THREE.Group();
   group.name = `boulder-${spot.id}`;
   group.position.set(spot.x, 0, spot.z);
   group.rotation.y = spot.rot ?? 0;
+  const target = oreFitTarget(spot);
+  const bundled = getBundledLook(`ore-${spot.id}`);
+  const visual = bundled
+    ? wrapBundledProp(bundled, target, { name: `ore-${spot.id}`, fit: 'max' })
+    : target;
+  if (bundled) prepareDungeonRockMaterials(visual);
+  group.add(visual);
+  sitVisibleOnY(visual, DUNGEON_FLOOR_Y);
+  attachBoulderPick(group, spot);
+  if (spot.essence) stripEmissive(group);
+  return group;
+}
+
+function buildProceduralOreRock(spot) {
+  const group = new THREE.Group();
+  group.name = `ore-${spot.id}`;
   const rockHex = spot.rock ?? 0xb8babf;
   const rock = new THREE.MeshStandardMaterial({
     color: rockHex,
     roughness: 0.94,
-    metalness: spot.essence ? 0.08 : 0.12,
-    emissive: spot.essence ? 0x6aa8d8 : 0x000000,
-    emissiveIntensity: spot.essence ? 0.12 : 0,
+    metalness: 0.12,
   });
   const mottled = new THREE.MeshStandardMaterial({
     color: shadeHex(rockHex, 0.72),
@@ -1694,10 +1879,10 @@ function buildMineBoulder(spot) {
   });
   const vein = new THREE.MeshStandardMaterial({
     color: spot.vein,
-    roughness: spot.essence ? 0.35 : 0.55,
-    metalness: spot.essence ? 0.32 : 0.16,
-    emissive: spot.vein,
-    emissiveIntensity: spot.essence ? 0.32 : 0.22,
+    roughness: 0.55,
+    metalness: 0.16,
+    emissive: spot.essence ? 0x000000 : spot.vein,
+    emissiveIntensity: spot.essence ? 0 : 0.22,
   });
   const body = addShadow(new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), rock));
   body.scale.set(1.35, 0.72, 1.15);
@@ -1730,32 +1915,6 @@ function buildMineBoulder(spot) {
     streak.rotation.set(rx, 0, rz);
     group.add(streak);
   }
-  if (spot.essence) {
-    const aura = new THREE.Mesh(
-      new THREE.SphereGeometry(0.68, 18, 14),
-      new THREE.MeshBasicMaterial({
-        color: 0x9ad4ff,
-        transparent: true,
-        opacity: 0.14,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    );
-    aura.position.y = 0.34;
-    aura.scale.set(1.05, 0.86, 1.02);
-    group.add(aura);
-    const glow = new THREE.PointLight(0x9ad4ff, 0.62, 3.4, 2);
-    glow.position.set(0, 0.42, 0);
-    group.add(glow);
-  }
-  const pick = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.05, 1.35), pickMat());
-  pick.position.y = 0.48;
-  pick.userData.kind = 'boulder';
-  pick.userData.materialId = spot.materialId;
-  pick.userData.name = spot.name;
-  pick.userData.x = spot.x;
-  pick.userData.z = spot.z;
-  group.add(pick);
   return group;
 }
 
@@ -1764,6 +1923,7 @@ export const DUNGEON_REMAINS = [
   { kind: 'slump', x: -1.1, z: -3.4, rot: 2.1 },
   { kind: 'slump', x: 4.6, z: -2.8, rot: -1.2 },
   { kind: 'slump', x: -4.5, z: 2.6, rot: 0.8 },
+  { kind: 'slump', x: ESSENCE_OLD_XZ.x, z: ESSENCE_OLD_XZ.z, rot: 1.35 },
 ];
 
 function slumpFitTarget() {
@@ -1789,6 +1949,24 @@ function addDungeonRemains(root) {
   }
 }
 
+function addDungeonWallTorches(root, W = 11, D = 9) {
+  const y = 1.7;
+  const inset = 0.18;
+  const mounts = [
+    { x: -W / 2 + inset, z: -2.2, rot: Math.PI / 2 },
+    { x: -W / 2 + inset, z: 2.2, rot: Math.PI / 2 },
+    { x: W / 2 - inset, z: -2.2, rot: -Math.PI / 2 },
+    { x: W / 2 - inset, z: 2.2, rot: -Math.PI / 2 },
+    { x: -3, z: -D / 2 + inset, rot: 0 },
+    { x: 3, z: -D / 2 + inset, rot: 0 },
+    { x: -3, z: D / 2 - inset, rot: Math.PI },
+    { x: 3, z: D / 2 - inset, rot: Math.PI },
+  ];
+  for (const mount of mounts) {
+    addWallTorch(root, mount.x, y, mount.z, mount.rot, DUNGEON_LIGHT_BOOST);
+  }
+}
+
 export function buildDungeon() {
   const root = new THREE.Group();
   root.name = 'dungeon';
@@ -1797,6 +1975,7 @@ export function buildDungeon() {
   const W = 11;
   const D = 9;
   const H = 3.4;
+  /** Top face of the cobble slab (0.12 thick, centered at y=-0.04). */
   const floor = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(W, 0.12, D),
     cobbleMat(6.5, 5.2),
@@ -1825,10 +2004,7 @@ export function buildDungeon() {
     root.add(mesh);
   }
 
-  addWallTorch(root, -W / 2 + 0.18, 1.7, -2.2, Math.PI / 2);
-  addWallTorch(root, -W / 2 + 0.18, 1.7, 2.2, Math.PI / 2);
-  addWallTorch(root, W / 2 - 0.18, 1.7, -2.2, -Math.PI / 2);
-  addWallTorch(root, W / 2 - 0.18, 1.7, 2.2, -Math.PI / 2);
+  addDungeonWallTorches(root);
 
   const cobweb = () => {
     const group = new THREE.Group();
@@ -1869,9 +2045,15 @@ export function buildDungeon() {
   });
 
   const rats = [];
-  for (let i = 0; i < 4; i += 1) {
+  const ratStarts = [
+    [-2.8, 1.8],
+    [-2.6, -1.9],
+    [2.7, 1.6],
+    [2.8, -1.8],
+  ];
+  for (let i = 0; i < ratStarts.length; i += 1) {
     const rat = buildRat();
-    rat.position.set(-2 + i * 1.1, 0.06, 1.2 - i * 0.6);
+    rat.position.set(ratStarts[i][0], 0.06, ratStarts[i][1]);
     initRatWander(rat, i);
     root.add(rat);
     rats.push(rat);
@@ -1892,11 +2074,14 @@ export function buildDungeon() {
 
 export function buildRat() {
   const bundled = getBundledLook('rat');
-  if (bundled) {
-    const target = buildProceduralRat();
-    return wrapBundledProp(bundled, target, { name: 'rat', fit: 'max' });
-  }
-  return buildProceduralRat();
+  const visual = bundled
+    ? wrapBundledProp(bundled, buildProceduralRat(), { name: 'rat-mesh', fit: 'max', rotateY: RAT_DUMP_YAW })
+    : buildProceduralRat();
+  // Wander yaw lives on the root so dump facing stays baked on the child.
+  const root = new THREE.Group();
+  root.name = 'rat';
+  root.add(visual);
+  return root;
 }
 
 function buildProceduralRat() {

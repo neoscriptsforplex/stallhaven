@@ -23,12 +23,33 @@ describe('station walk-then-open', () => {
     assert.ok(STATION_ARRIVE > 1.15);
   });
 
+  it('keeps the spinning wheel click box at half the prior 4× live size', () => {
+    assert.equal(STATION_HIT.wheel.w, 1.85);
+    assert.equal(STATION_HIT.wheel.h, 2.4);
+    assert.equal(STATION_HIT.wheel.d, 1.8);
+    assert.equal(STATION_HIT.wheel.pickY, 1.1);
+    assert.equal(STATION_HIT.wheel.floorR, 1.35);
+  });
+
   it('lets a ground hit in front of the anvil count as an anvil click', () => {
     const state = createState();
     const near = stationAtFloor(SHOP.anvil.x, SHOP.anvil.z + 0.7, state.furniture);
     assert.equal(near?.type, 'anvil');
     const far = stationAtFloor(0, 2.4, state.furniture);
     assert.equal(far, null);
+  });
+
+  it('treats a rug hit like walkable floor, not furniture', () => {
+    const picked = pickUseHit([
+      hit('rug', 3.2, 0, 0.25),
+      hit('ground', 3.4, 0, 0.25),
+    ]);
+    assert.equal(picked, null);
+    const anvilThroughRug = pickUseHit([
+      hit('rug', 4.0, 0, 0.25),
+      hit('anvil', 4.4, SHOP.anvil.x, SHOP.anvil.z),
+    ]);
+    assert.equal(anvilThroughRug.object.userData.kind, 'anvil');
   });
 
   it('does not let a closer floor ray steal an anvil pick', () => {
@@ -60,6 +81,10 @@ describe('station walk-then-open', () => {
   it('retargets a walk to the anvil, furnace, chest, and range from the keeper', () => {
     const state = createState();
     const from = { x: SHOP.keeper.x, z: SHOP.keeper.z };
+    assert.equal(resolveStationUse(from, state.furniture.furnace, state).action, 'none');
+    assert.equal(resolveStationUse(from, state.furniture.range, state).action, 'none');
+    state.furniture.furnace = { x: SHOP.furnace.x, z: SHOP.furnace.z, rot: 0 };
+    state.furniture.range = { x: SHOP.range.x, z: SHOP.range.z, rot: 0 };
     for (const id of ['anvil', 'furnace', 'chest', 'range']) {
       const plan = resolveStationUse(from, state.furniture[id], state);
       assert.equal(plan.action, 'walk', `${id} should path from the keeper`);
@@ -79,6 +104,58 @@ describe('station walk-then-open', () => {
     assert.equal(plan.action, 'walk');
     const end = plan.path[plan.path.length - 1];
     assert.ok(end.x > 5);
+  });
+
+  it('walks to the cook-face of the range, not behind it', () => {
+    const state = createState();
+    state.furniture.range = { x: SHOP.range.x, z: SHOP.range.z, rot: 0 };
+    const plan = resolveStationUse(
+      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+      state.furniture.range,
+      state,
+      undefined,
+      'range',
+    );
+    assert.equal(plan.action, 'walk');
+    assert.ok(plan.dest.x < state.furniture.range.x - 0.4, 'stand on the cook-face (−X after start yaw)');
+    assert.ok(Math.abs(plan.dest.z - state.furniture.range.z) < 0.35);
+  });
+
+  it('walks behind the counter to the shopkeeper side, not the buyer queue', () => {
+    const state = createState();
+    const plan = resolveStationUse(
+      { x: 0, z: 1.4 },
+      state.furniture.counter,
+      state,
+      undefined,
+      'counter',
+    );
+    assert.equal(plan.action, 'walk');
+    assert.ok(plan.dest.z < state.furniture.counter.z - 0.4, 'stand on the keeper side (−Z)');
+    assert.ok(Math.abs(plan.dest.x - state.furniture.counter.x) < 0.5);
+    const already = resolveStationUse(
+      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+      state.furniture.counter,
+      state,
+      undefined,
+      'counter',
+    );
+    assert.equal(already.action, 'open');
+  });
+
+  it('walks to the chest latch-front, not into the stone wall', () => {
+    const state = createState();
+    const chest = state.furniture.chest;
+    const plan = resolveStationUse(
+      { x: 0, z: 0 },
+      chest,
+      state,
+      undefined,
+      'chest',
+    );
+    assert.equal(plan.action, 'walk');
+    assert.ok(plan.dest.x < chest.x - 0.4, 'stand in front of the latch, into the room');
+    assert.ok(Math.abs(plan.dest.z - chest.z) < 0.35, 'not along the back wall');
   });
 
   it('treats dungeon boulders as walk-then-use rocks', () => {

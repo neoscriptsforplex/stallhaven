@@ -25,17 +25,33 @@ export const CHEST_UPGRADE_MULT = 3;
 
 export const MATERIAL_CAP = 250;
 export const FURNITURE_SNAP = 0.2;
+/** How far a floor snap/grid cell may sit inside the wall faces. */
+export const FLOOR_SNAP_MARGIN = 0;
+/** Stone wall thickness; interior faces sit half of this inside ROOM_W / ROOM_D. */
+export const WALL_THICK = 0.16;
 export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
+
+/** Yaw added by one furniture-menu Rotate click. Floor pieces 15°; shelves 90°. */
+export function furnitureRotateDelta(kind) {
+  return kind === 'shelf' ? Math.PI / 2 : FURNITURE_ROT_STEP;
+}
+
+/** Upright chest facing from before the bad X-axis tip. */
+export const CHEST_UPRIGHT_YAW = Math.PI;
+/** One 90° floor-furniture Rotate turn: six 15° clicks on world +Y. */
+export const CHEST_YAW_CLOCKWISE = furnitureRotateDelta('chest') * 6;
 /**
  * Start-only visual yaw around world +Y. Applied to the placed mesh and pick
  * (including async dump swaps), not stored in furniture.rot so queue / saves
  * stay on the gameplay facing.
- * Three.js Y-up: −π/2 is 90° counter-clockwise when viewed from above.
  */
 export const FURNITURE_START_YAW = {
-  chest: -Math.PI / 2,
+  // Flush on the right interior wall: two 90° +Y turns from the door-wall
+  // upright (visual yaw 0). Latch (dump local −X) faces into the room.
+  // A single 90° turn swaps hw/hd and pulls the box off the stone face.
+  chest: CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE * 2,
   range: -Math.PI / 2,
   furnace: -Math.PI / 2,
   counter: Math.PI,
@@ -51,7 +67,11 @@ export function furnitureVisualYaw(id, poseRot = FURNITURE_FORWARD) {
 export const SWAP_PRICE_RATIO = 0.65;
 export const CAULDRON_COST = 10000;
 export const WHEEL_COST = 500;
+export const FURNACE_COST = 0;
+export const RANGE_COST = 0;
 export const STATION_UNLOCKS = [
+  { id: 'furnace', label: 'Furnace', cost: FURNACE_COST },
+  { id: 'range', label: 'Cooking Range', cost: RANGE_COST },
   { id: 'wheel', label: 'Spinning Wheel', cost: WHEEL_COST },
   { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
 ];
@@ -69,13 +89,26 @@ export const FURNITURE_BUY_MULT = 3;
 export const FURNITURE_SHOP = [
   { type: 'table', kind: 'table', label: 'Table' },
   { type: 'mannequin', kind: 'stand', label: 'Mannequin' },
+  { type: 'shelf', kind: 'shelf', label: 'Shelf' },
 ];
+/** How far a wall shelf sits past the walk-floor edge, toward the wall. */
+export const SHELF_WALL_OUTSET = 0.04;
+/**
+ * Depth from an interior wall face to a flush wall-shelf origin.
+ * Matches the existing side-wall sit (walk-floor edge + SHELF_WALL_OUTSET).
+ */
+export const SHELF_FROM_WALL = 0.26;
+export const TREE_BED_CLEAR = 1.7;
 
 export const GRASS_PAD = 9;
 export const FOUNTAIN = { x: 0, z: 8.85, radius: 0.7, apron: 1.42 };
 export const PATH_HALF_W = 0.72;
 export const PATH_START_Z = 4.22;
 export const TRAPDOOR = { x: 3.35, z: 9.55 };
+/** Keep lawn blades (including lean) off the dark hatch opening; rim grass on the rock can stay. */
+export const TRAPDOOR_HOLE_CLEAR = 0.96;
+/** Drop whole lawn clusters whose scatter would still reach the hole. */
+export const TRAPDOOR_CLUSTER_CLEAR = 1.22;
 /** Shop plank / station floor plane. Bundled chests sit on this, not at y=0. */
 export const SHOP_FURNITURE_FLOOR_Y = 0.09;
 
@@ -131,6 +164,30 @@ export function roomCenter(gx, gz) {
   return { x: gx * ROOM_W, z: 0.1 + gz * ROOM_D };
 }
 
+/** Origin-room rug: visual only. Never a nav / placement block. */
+export const SHOP_RUG = { w: 2.35, d: 1.55, y: 0.11, zOffset: 0.15 };
+
+export function shopRugPose(gx = 0, gz = 0) {
+  const c = roomCenter(gx, gz);
+  return {
+    x: c.x,
+    z: c.z + SHOP_RUG.zOffset,
+    y: SHOP_RUG.y,
+    hw: SHOP_RUG.w / 2,
+    hd: SHOP_RUG.d / 2,
+  };
+}
+
+export function shopRugRect(gx = 0, gz = 0) {
+  const pose = shopRugPose(gx, gz);
+  return {
+    minX: pose.x - pose.hw,
+    maxX: pose.x + pose.hw,
+    minZ: pose.z - pose.hd,
+    maxZ: pose.z + pose.hd,
+  };
+}
+
 export function roomFloor(gx, gz) {
   return {
     minX: ORIGIN_FLOOR.minX + gx * ROOM_W,
@@ -140,13 +197,53 @@ export function roomFloor(gx, gz) {
   };
 }
 
+/** True interior wall faces of a room (stone inner plane, before snap expansion). */
+export function roomInteriorFloor(gx = 0, gz = 0) {
+  const c = roomCenter(gx, gz);
+  const inset = WALL_THICK / 2;
+  return {
+    minX: c.x - ROOM_W / 2 + inset,
+    maxX: c.x + ROOM_W / 2 - inset,
+    minZ: c.z - ROOM_D / 2 + inset,
+    maxZ: c.z + ROOM_D / 2 - inset,
+  };
+}
+
+/**
+ * If the inward 0.2 snap cell leaves a visible strip to the wall, include the
+ * next outward cell so the placement grid meets the wall the way the X sides do.
+ */
+function snapEdgeToWall(min, max, snap = FURNITURE_SNAP) {
+  const lo = Math.ceil(min / snap - 1e-9) * snap;
+  const hi = Math.floor(max / snap + 1e-9) * snap;
+  const gap = snap * 0.25;
+  return {
+    min: (lo - min > gap) ? lo - snap : min,
+    max: (max - hi > gap) ? hi + snap : max,
+  };
+}
+
+function expandRectToSnapWalls(rect, snap = FURNITURE_SNAP) {
+  const x = snapEdgeToWall(rect.minX, rect.maxX, snap);
+  const z = snapEdgeToWall(rect.minZ, rect.maxZ, snap);
+  return { minX: x.min, maxX: x.max, minZ: z.min, maxZ: z.max };
+}
+
+/** Placeable floor + snap grid, spanning to interior wall faces. */
+export function roomPlaceFloor(gx = 0, gz = 0) {
+  return expandRectToSnapWalls(roomInteriorFloor(gx, gz));
+}
+
+/** Interior wall-face rects (no snap expansion) — use these to draw the overlay. */
+export function interiorFloors(expansionIds = []) {
+  return floorsForCells(expansionIds, roomInteriorFloor);
+}
+
 /** How far a room-seam walk rect overlaps each room. Must exceed 2× player radius. */
 export const DOORWAY_WALK_OVERLAP = 0.75;
 const ROOM_SEAM_INSET = 0.18;
 
-export function doorwayFloor(a, b) {
-  const fa = roomFloor(a.gx, a.gz);
-  const fb = roomFloor(b.gx, b.gz);
+function doorwayBetween(fa, fb, a, b) {
   if (a.gx === b.gx && Math.abs(a.gz - b.gz) === 1) {
     const north = a.gz > b.gz ? fa : fb;
     const south = a.gz > b.gz ? fb : fa;
@@ -170,16 +267,34 @@ export function doorwayFloor(a, b) {
   return null;
 }
 
-export function walkFloors(expansionIds = []) {
+export function doorwayFloor(a, b) {
+  return doorwayBetween(roomFloor(a.gx, a.gz), roomFloor(b.gx, b.gz), a, b);
+}
+
+function floorsForCells(expansionIds, roomFn) {
   const cells = occupiedCells(expansionIds);
-  const floors = cells.map((cell) => roomFloor(cell.gx, cell.gz));
+  const floors = cells.map((cell) => roomFn(cell.gx, cell.gz));
   for (let i = 0; i < cells.length; i += 1) {
     for (let j = i + 1; j < cells.length; j += 1) {
-      const door = doorwayFloor(cells[i], cells[j]);
+      const door = doorwayBetween(
+        roomFn(cells[i].gx, cells[i].gz),
+        roomFn(cells[j].gx, cells[j].gz),
+        cells[i],
+        cells[j],
+      );
       if (door) floors.push(door);
     }
   }
   return floors;
+}
+
+export function walkFloors(expansionIds = []) {
+  return floorsForCells(expansionIds, roomFloor);
+}
+
+/** Placeable floor + snap grid, spanning to interior wall faces. */
+export function placeFloors(expansionIds = []) {
+  return floorsForCells(expansionIds, roomPlaceFloor);
 }
 
 const DOOR_HALF = 1.05;
@@ -213,14 +328,18 @@ export function stationUnlock(id) {
 
 export function stationLabel(id) {
   return stationUnlock(id)?.label
-    ?? (id === 'wheel' ? 'Spinning Wheel' : id === 'furnace' ? 'Furnace' : id === 'cauldron' ? 'Cauldron' : furnitureLabelForType(id));
+    ?? (id === 'wheel' ? 'Spinning Wheel'
+      : id === 'furnace' ? 'Furnace'
+        : id === 'range' ? 'Cooking Range'
+          : id === 'cauldron' ? 'Cauldron'
+            : furnitureLabelForType(id));
 }
 
 export function furnitureHalfSize(kind) {
   if (kind === 'cauldron') return { hw: 0.32, hd: 0.32 };
   if (kind === 'furnace') return { hw: 0.4, hd: 0.36 };
-  if (kind === 'wheel') return { hw: 0.36, hd: 0.32 };
-  if (kind === 'anvil') return { hw: 0.44, hd: 0.35 };
+  if (kind === 'wheel') return { hw: 0.72, hd: 0.64 };
+  if (kind === 'anvil') return { hw: 0.22, hd: 0.175 };
   if (kind === 'chest') return { hw: 0.3, hd: 0.22 };
   if (kind === 'range') return { hw: 0.68, hd: 0.56 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
@@ -277,15 +396,15 @@ export function defaultFurniture() {
     counter: { x: SHOP.counter.x, z: SHOP.counter.z, rot: FURNITURE_FORWARD },
     anvil: { x: SHOP.anvil.x, z: SHOP.anvil.z, rot: FURNITURE_FORWARD },
     chest: { x: SHOP.chest.x, z: SHOP.chest.z, rot: FURNITURE_FORWARD },
-    range: { x: SHOP.range.x, z: SHOP.range.z, rot: FURNITURE_FORWARD },
+    range: null,
     cauldron: null,
-    furnace: { x: SHOP.furnace.x, z: SHOP.furnace.z, rot: FURNITURE_FORWARD },
+    furnace: null,
     wheel: null,
-    displays: SHOP.displays.map((spot) => ({
-      x: spot.x,
-      z: spot.z,
-      rot: FURNITURE_FORWARD,
-    })),
+    displays: SHOP.displays.map((spot) => (
+      (spot.kind ?? 'table') === 'shelf'
+        ? snapToWallGrid(spot.x, spot.z, [])
+        : { x: spot.x, z: spot.z, rot: FURNITURE_FORWARD }
+    )),
   };
 }
 
@@ -299,7 +418,7 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     counter: { ...furniture.counter },
     anvil: { ...furniture.anvil },
     chest: { ...furniture.chest },
-    range: { ...furniture.range },
+    range: clonePose(furniture.range),
     cauldron: clonePose(furniture.cauldron),
     furnace: clonePose(furniture.furnace),
     wheel: clonePose(furniture.wheel),
@@ -391,6 +510,12 @@ export function keepGardenSpot(spot, expansionIds = []) {
   return true;
 }
 
+export function gardenSpotClearOfBeds(spot, expansionIds = [], minDist = TREE_BED_CLEAR) {
+  return gardenBedSpots(expansionIds).every((bed) => (
+    Math.hypot(spot.x - bed.x, spot.z - bed.z) >= minDist
+  ));
+}
+
 export function gardenTreeSpots(expansionIds = []) {
   const box = footprintBox(expansionIds);
   const grass = gardenBox(expansionIds);
@@ -408,12 +533,12 @@ export function gardenTreeSpots(expansionIds = []) {
     { x: cx, z: box.minZ - 2.8, side: 'rear' },
     { x: box.minX - 1.6, z: box.maxZ + 2.4, side: 'front-left' },
     { x: box.maxX + 1.6, z: box.maxZ + 2.4, side: 'front-right' },
-    { x: -2.55, z: 7.15, side: 'path' },
-    { x: 2.62, z: 7.35, side: 'path' },
-    { x: -2.85, z: 10.2, side: 'path' },
-    { x: 2.95, z: 10.45, side: 'path' },
-    { x: -2.15, z: 11.8, side: 'path' },
-    { x: 2.25, z: 11.55, side: 'path' },
+    { x: -4.45, z: 6.35, side: 'path' },
+    { x: 4.55, z: 6.55, side: 'path' },
+    { x: -4.65, z: 9.25, side: 'path' },
+    { x: 4.75, z: 9.45, side: 'path' },
+    { x: -4.15, z: 12.35, side: 'path' },
+    { x: 4.25, z: 12.15, side: 'path' },
     { x: grass.minX + 1.4, z: grass.minZ + 1.6, side: 'edge' },
     { x: grass.maxX - 1.4, z: grass.minZ + 1.8, side: 'edge' },
     { x: grass.minX + 1.6, z: grass.maxZ - 1.5, side: 'edge' },
@@ -423,7 +548,9 @@ export function gardenTreeSpots(expansionIds = []) {
     { x: cx - 5.4, z: grass.minZ + 1.3, side: 'edge' },
     { x: cx + 5.6, z: grass.minZ + 1.4, side: 'edge' },
   ];
-  return spots.filter((spot) => keepGardenSpot(spot, expansionIds));
+  return spots.filter((spot) => (
+    keepGardenSpot(spot, expansionIds) && gardenSpotClearOfBeds(spot, expansionIds)
+  ));
 }
 
 export function gardenRockSpots(expansionIds = []) {
@@ -436,13 +563,51 @@ export function gardenRockSpots(expansionIds = []) {
     { x: 6.4, z: -4.8, scale: 0.8, side: 'rear' },
     { x: -7.4, z: 2.2, scale: 0.95, side: 'left' },
     { x: 7.6, z: 1.6, scale: 1.1, side: 'right' },
+    { x: -8.35, z: 7.85, scale: 2.35, side: 'left' },
+    { x: 8.55, z: 8.35, scale: 2.8, side: 'right' },
+    { x: 0.2, z: -7.35, scale: 2.95, side: 'rear' },
   ];
-  return spots.filter((spot) => keepGardenSpot(spot, expansionIds));
+  return spots.filter((spot) => (
+    keepGardenSpot(spot, expansionIds)
+    && gardenSpotClearOfBeds(spot, expansionIds)
+    && gardenRockOnGrass(spot, expansionIds)
+  ));
+}
+
+/** Horizontal radius of the garden boulder mesh, plus a sit-on-lawn margin. */
+export function gardenRockRadius(scale = 1) {
+  return 0.32 * scale + 0.35;
+}
+
+function gardenRockOnGrass(spot, expansionIds = []) {
+  const grass = gardenBox(expansionIds);
+  const pad = gardenRockRadius(spot.scale ?? 1);
+  return spot.x >= grass.minX + pad
+    && spot.x <= grass.maxX - pad
+    && spot.z >= grass.minZ + pad
+    && spot.z <= grass.maxZ - pad;
 }
 
 export function gardenTrapdoorSpot(expansionIds = []) {
   const spot = { ...TRAPDOOR, side: 'path' };
   return keepGardenSpot(spot, expansionIds) ? spot : null;
+}
+
+export function pointHitsTrapdoor(x, z, pad = TRAPDOOR_HOLE_CLEAR) {
+  return Math.hypot(x - TRAPDOOR.x, z - TRAPDOOR.z) < pad;
+}
+
+/** True if the segment from (x0,z0) to (x1,z1) comes within `pad` of the hatch. */
+export function segmentHitsTrapdoor(x0, z0, x1, z1, pad = TRAPDOOR_HOLE_CLEAR) {
+  const dx = x1 - x0;
+  const dz = z1 - z0;
+  const len2 = dx * dx + dz * dz;
+  let t = 0;
+  if (len2 > 1e-8) {
+    t = ((TRAPDOOR.x - x0) * dx + (TRAPDOOR.z - z0) * dz) / len2;
+    t = Math.max(0, Math.min(1, t));
+  }
+  return pointHitsTrapdoor(x0 + dx * t, z0 + dz * t, pad);
 }
 
 export const GARDEN_BED_SPOTS = [
@@ -479,6 +644,7 @@ export function gardenGrassClusters(expansionIds = []) {
       const x = grass.minX + (c + 0.18 + rand() * 0.64) * dx;
       const z = grass.minZ + (r + 0.18 + rand() * 0.64) * dz;
       if (!keepGardenSpot({ x, z, side: 'edge' }, expansionIds)) continue;
+      if (pointHitsTrapdoor(x, z, TRAPDOOR_CLUSTER_CLEAR)) continue;
       clusters.push({
         x,
         z,
@@ -495,6 +661,7 @@ export function gardenGrassClusters(expansionIds = []) {
       const x = (side < 0 ? path.minX : path.maxX) + side * (0.58 + rand() * 0.62);
       const zz = z + (rand() - 0.5) * 0.32;
       if (!keepGardenSpot({ x, z: zz, side: 'path' }, expansionIds)) continue;
+      if (pointHitsTrapdoor(x, zz, TRAPDOOR_CLUSTER_CLEAR)) continue;
       clusters.push({
         x,
         z: zz,
@@ -534,6 +701,133 @@ export function rotatedFootprint(hw, hd, rot = 0) {
   };
 }
 
+const SHELF_WALL_END_PAD = 0.72;
+const SHELF_DOOR_HALF = 1.12;
+
+function pushWallMount(mounts, {
+  wall, axis, along0, minAlong, maxAlong, x, z, rot, doorAlong = null,
+}) {
+  const ranges = [];
+  if (doorAlong == null) {
+    ranges.push([minAlong, maxAlong]);
+  } else {
+    const leftMax = doorAlong - SHELF_DOOR_HALF;
+    const rightMin = doorAlong + SHELF_DOOR_HALF;
+    if (leftMax - minAlong > 0.9) ranges.push([minAlong, leftMax]);
+    if (maxAlong - rightMin > 0.9) ranges.push([rightMin, maxAlong]);
+  }
+  for (const [lo, hi] of ranges) {
+    mounts.push({
+      wall,
+      axis,
+      along0,
+      minAlong: lo,
+      maxAlong: hi,
+      x,
+      z,
+      rot,
+    });
+  }
+}
+
+/** Wall-grid mounts for shelves: exposed shop walls, skipping doorways. */
+export function wallShelfMounts(expansionIds = []) {
+  const mounts = [];
+  for (const cell of occupiedCells(expansionIds)) {
+    const interior = roomInteriorFloor(cell.gx, cell.gz);
+    const neigh = neighborsOf(cell.gx, cell.gz, expansionIds);
+    const midX = (interior.minX + interior.maxX) / 2;
+    const midZ = (interior.minZ + interior.maxZ) / 2;
+    const walls = [
+      {
+        wall: 'back',
+        axis: 'x',
+        along0: midX,
+        minAlong: interior.minX + SHELF_WALL_END_PAD,
+        maxAlong: interior.maxX - SHELF_WALL_END_PAD,
+        z: interior.minZ + SHELF_FROM_WALL,
+        rot: 0,
+        doorAlong: neigh.back ? midX : null,
+      },
+      {
+        wall: 'front',
+        axis: 'x',
+        along0: midX,
+        minAlong: interior.minX + SHELF_WALL_END_PAD,
+        maxAlong: interior.maxX - SHELF_WALL_END_PAD,
+        z: interior.maxZ - SHELF_FROM_WALL,
+        rot: Math.PI,
+        doorAlong: neigh.front ? midX : null,
+      },
+      {
+        wall: 'left',
+        axis: 'z',
+        along0: midZ,
+        minAlong: interior.minZ + SHELF_WALL_END_PAD,
+        maxAlong: interior.maxZ - SHELF_WALL_END_PAD,
+        x: interior.minX + SHELF_FROM_WALL,
+        rot: Math.PI / 2,
+        doorAlong: neigh.left ? midZ : null,
+      },
+      {
+        wall: 'right',
+        axis: 'z',
+        along0: midZ,
+        minAlong: interior.minZ + SHELF_WALL_END_PAD,
+        maxAlong: interior.maxZ - SHELF_WALL_END_PAD,
+        x: interior.maxX - SHELF_FROM_WALL,
+        rot: -Math.PI / 2,
+        doorAlong: neigh.right ? midZ : null,
+      },
+    ];
+    for (const spec of walls) pushWallMount(mounts, spec);
+  }
+  return mounts;
+}
+
+function wrapAngle(rad) {
+  const tau = Math.PI * 2;
+  let wrapped = rad % tau;
+  if (wrapped > Math.PI) wrapped -= tau;
+  if (wrapped < -Math.PI) wrapped += tau;
+  return wrapped;
+}
+
+function angleDiff(a, b) {
+  return Math.abs(wrapAngle((a ?? 0) - (b ?? 0)));
+}
+
+export function snapToWallGrid(x, z, expansionIds = [], preferRot = null) {
+  const mounts = wallShelfMounts(expansionIds);
+  let best = null;
+  let bestScore = Infinity;
+  for (const mount of mounts) {
+    let nx;
+    let nz;
+    let perp;
+    if (mount.axis === 'x') {
+      nx = Math.round(x / FURNITURE_SNAP) * FURNITURE_SNAP;
+      nx = Math.min(mount.maxAlong, Math.max(mount.minAlong, nx));
+      nz = mount.z;
+      perp = Math.abs(z - mount.z);
+    } else {
+      nz = Math.round(z / FURNITURE_SNAP) * FURNITURE_SNAP;
+      nz = Math.min(mount.maxAlong, Math.max(mount.minAlong, nz));
+      nx = mount.x;
+      perp = Math.abs(x - mount.x);
+    }
+    const along = mount.axis === 'x' ? Math.abs(nx - x) : Math.abs(nz - z);
+    const facing = preferRot == null ? 0 : angleDiff(preferRot, mount.rot) * 0.25;
+    // Prefer the nearest wall plane so front/back don't inherit side yaw.
+    const score = perp * 3 + along * 0.2 + facing;
+    if (score < bestScore) {
+      bestScore = score;
+      best = { x: nx, z: nz, rot: mount.rot };
+    }
+  }
+  return best ?? { x, z, rot: preferRot ?? FURNITURE_FORWARD };
+}
+
 export function pointOnFloors(x, z, floors, pad = 0) {
   return floors.some((rect) => (
     x >= rect.minX + pad
@@ -543,21 +837,50 @@ export function pointOnFloors(x, z, floors, pad = 0) {
   ));
 }
 
-export function snapToFloor(x, z, floors, margin = 0.55) {
+/** Inclusive snap coordinates that reach the wall faces of a floor span. */
+export function snapGridSpan(min, max, snap = FURNITURE_SNAP) {
+  const start = Math.floor(min / snap) * snap;
+  const end = Math.ceil(max / snap) * snap;
+  return { start, end };
+}
+
+/**
+ * Overlay line positions for a floor rect. Extra snap cells past a wall are
+ * clamped onto the interior face so front/back lines sit on the stone the
+ * way the side-wall lines already do.
+ */
+export function snapGridLines(rect, snap = FURNITURE_SNAP) {
+  const { start: minX, end: maxX } = snapGridSpan(rect.minX, rect.maxX, snap);
+  const { start: minZ, end: maxZ } = snapGridSpan(rect.minZ, rect.maxZ, snap);
+  const xs = [];
+  const zs = [];
+  for (let x = minX; x <= maxX + 1e-6; x += snap) {
+    xs.push(Math.min(rect.maxX, Math.max(rect.minX, x)));
+  }
+  for (let z = minZ; z <= maxZ + 1e-6; z += snap) {
+    zs.push(Math.min(rect.maxZ, Math.max(rect.minZ, z)));
+  }
+  return { xs, zs };
+}
+
+export function snapToFloor(x, z, floors, margin = FLOOR_SNAP_MARGIN) {
   const sx = Math.round(x / FURNITURE_SNAP) * FURNITURE_SNAP;
   const sz = Math.round(z / FURNITURE_SNAP) * FURNITURE_SNAP;
   if (pointOnFloors(sx, sz, floors, margin)) return { x: sx, z: sz };
   let best = null;
   let bestDist = Infinity;
   for (const rect of floors) {
-    const nx = Math.min(rect.maxX - margin, Math.max(rect.minX + margin, sx));
-    const nz = Math.min(rect.maxZ - margin, Math.max(rect.minZ + margin, sz));
-    const dist = Math.hypot(nx - sx, nz - sz);
-    if (dist < bestDist && pointOnFloors(nx, nz, floors, margin * 0.5)) {
-      best = {
-        x: Math.round(nx / FURNITURE_SNAP) * FURNITURE_SNAP,
-        z: Math.round(nz / FURNITURE_SNAP) * FURNITURE_SNAP,
-      };
+    const loX = Math.ceil((rect.minX + margin) / FURNITURE_SNAP - 1e-9) * FURNITURE_SNAP;
+    const hiX = Math.floor((rect.maxX - margin) / FURNITURE_SNAP + 1e-9) * FURNITURE_SNAP;
+    const loZ = Math.ceil((rect.minZ + margin) / FURNITURE_SNAP - 1e-9) * FURNITURE_SNAP;
+    const hiZ = Math.floor((rect.maxZ - margin) / FURNITURE_SNAP + 1e-9) * FURNITURE_SNAP;
+    if (loX > hiX || loZ > hiZ) continue;
+    const qx = Math.min(hiX, Math.max(loX, sx));
+    const qz = Math.min(hiZ, Math.max(loZ, sz));
+    if (!pointOnFloors(qx, qz, floors, margin)) continue;
+    const dist = Math.hypot(qx - x, qz - z);
+    if (dist < bestDist) {
+      best = { x: qx, z: qz };
       bestDist = dist;
     }
   }

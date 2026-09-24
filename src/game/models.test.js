@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
@@ -12,6 +13,7 @@ import {
   buildAnvil,
   buildChest,
   buildCounter,
+  buildDefaultTable,
   buildShopDoor,
   setDoorOpen,
   buildGoblin,
@@ -24,13 +26,23 @@ import {
   updateMinePose,
   updateWalkPose,
   setBundledLook,
+  buildWare,
   wrapBundledProp,
   wrapImportedCharacter,
   wrapShopPlayer,
+  wrapBuyerDump,
+  sitVisibleOnY,
+  nextBuyerLookId,
+  resetBuyerCycle,
+  BUYER_DUMP_YAW,
+  BUYER_FIT_HEIGHT,
+  ANVIL_WORLD_SCALE,
 } from './models.js';
-import { BUNDLED_PROP_FOLDERS, parseBundledPlayerBuffers, parseModelBuffer } from './upload.js';
-import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y } from './layout.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_REMAINS, RANGE_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, craftOreFolder, craftOreLookId } from './catalog.js';
+import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
+import { cobblePathSpan, furnitureVisualYaw, pointHitsShop, ROOM_W, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
+import { RAT_DUMP_YAW } from './rats.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -61,6 +73,26 @@ describe('customer class looks', () => {
     assert.deepEqual(Object.keys(CUSTOMER_LOOKS).sort(), [
       'king', 'mage', 'mercenary', 'pilgrim', 'ranger',
     ]);
+  });
+
+  it('cycles buyer dumps round-robin per traveler type', () => {
+    resetBuyerCycle();
+    assert.equal(BUYER_PACKS.hedgemage.length, 6);
+    assert.equal(BUYER_PACKS.pilgrim.length, 5);
+    assert.equal(BUYER_PACKS.ranger.length, 2);
+    assert.equal(BUYER_PACKS.mercenary.length, 2);
+    const first = nextBuyerLookId('hedgemage');
+    for (let i = 1; i < BUYER_PACKS.hedgemage.length; i += 1) nextBuyerLookId('hedgemage');
+    assert.equal(nextBuyerLookId('hedgemage'), first);
+    assert.equal(nextBuyerLookId('kingroald'), null);
+    const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    for (const item of BUYER_PACK_FOLDERS) {
+      assert.equal(byId[item.id], item.folder);
+      const slug = item.folder.split('/').pop();
+      const folderPath = join(dirname(fileURLToPath(import.meta.url)), '../../public/models', item.folder);
+      assert.equal(existsSync(join(folderPath, `${slug}.obj`)), true, `${item.folder}.obj`);
+      assert.equal(existsSync(join(folderPath, `${slug}.mtl`)), true, `${item.folder}.mtl`);
+    }
   });
 
   it('dresses hedge mages with robes, a staff orb, and hat or hood variants', () => {
@@ -154,6 +186,55 @@ describe('outdoor and dungeon extras', () => {
     assert.equal(namedSkeleton, 0);
   });
 
+  it('paints outdoor grass as the flat pre-mottle green', () => {
+    const shop = buildShop([]).root;
+    let ground = null;
+    shop.traverse((child) => {
+      if (child.name === 'grass-ground') ground = child;
+    });
+    assert.ok(ground, 'garden should have a grass ground plane');
+    assert.equal(Boolean(ground.material?.map), false);
+    assert.equal(ground.material?.color?.getHex?.(), 0x4f7a3a);
+  });
+
+  it('tiles only the outdoor cobble path about 3× finer than shop wall stone', () => {
+    assert.equal(PATH_COBBLE_SCALE, 3);
+    const shop = buildShop([]).root;
+    const span = cobblePathSpan([]);
+    const pathW = span.maxX - span.minX;
+    const want = pathW * (4.2 / ROOM_W) * PATH_COBBLE_SCALE;
+    let pathPlanes = 0;
+    let pathRing = 0;
+    let wallSlabs = 0;
+    shop.traverse((child) => {
+      const map = child.material?.map;
+      if (!map?.repeat) return;
+      if (child.userData?.pathCobble && child.geometry?.type === 'PlaneGeometry') {
+        assert.ok(Math.abs(map.repeat.x - want) < 1e-6, `path repeat.x ${map.repeat.x} vs ${want}`);
+        pathPlanes += 1;
+      }
+      if (child.userData?.pathCobble && child.geometry?.type === 'RingGeometry') {
+        const ringWant = 1.42 * 2 * (4.2 / ROOM_W) * PATH_COBBLE_SCALE;
+        assert.ok(Math.abs(map.repeat.x - ringWant) < 1e-6, `ring repeat.x ${map.repeat.x} vs ${ringWant}`);
+        pathRing += 1;
+      }
+      if (!child.userData?.pathCobble && Math.abs(map.repeat.y - 2.6) < 1e-6) wallSlabs += 1;
+    });
+    assert.ok(pathPlanes >= 1, 'path should have cobble planes');
+    assert.ok(pathRing >= 1, 'fountain apron ring should use the same finer cobble');
+    assert.ok(wallSlabs >= 1, 'shop wall cobble V scale should stay 2.6');
+
+    const dungeon = buildDungeon().root;
+    let dungeonFloor = 0;
+    dungeon.traverse((child) => {
+      const map = child.material?.map;
+      if (!map?.repeat) return;
+      assert.equal(Boolean(child.userData?.pathCobble), false);
+      if (Math.abs(map.repeat.x - 6.5) < 1e-6 && Math.abs(map.repeat.y - 5.2) < 1e-6) dungeonFloor += 1;
+    });
+    assert.ok(dungeonFloor >= 1, 'dungeon floor cobble scale should stay unchanged');
+  });
+
   it('instances many grass blades and clears them inside a left expansion', () => {
     const origin = buildShop([]).root;
     const left = buildShop(['left']).root;
@@ -213,6 +294,23 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(expanded > origin);
   });
 
+  it('lights every dungeon wall with wall torches', () => {
+    const built = buildDungeon();
+    const walls = { west: 0, east: 0, north: 0, south: 0 };
+    built.root.traverse((child) => {
+      if (child.name !== 'torch') return;
+      const { x, z } = child.position;
+      if (x < -built.size.w / 2 + 0.5) walls.west += 1;
+      else if (x > built.size.w / 2 - 0.5) walls.east += 1;
+      else if (z < -built.size.d / 2 + 0.5) walls.north += 1;
+      else if (z > built.size.d / 2 - 0.5) walls.south += 1;
+    });
+    assert.ok(walls.west >= 2, `west ${walls.west}`);
+    assert.ok(walls.east >= 2, `east ${walls.east}`);
+    assert.ok(walls.north >= 2, `north ${walls.north}`);
+    assert.ok(walls.south >= 2, `south ${walls.south}`);
+  });
+
   it('pours water from the fountain spout', () => {
     const shop = buildShop([]).root;
     let fountain = null;
@@ -235,6 +333,12 @@ describe('uploaded player walk', () => {
     );
     mesh.position.y = 0.8;
     source.add(mesh);
+    const bones = new THREE.LineSegments(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: 0xffff00 }),
+    );
+    bones.name = 'SkeletonHelper';
+    source.add(bones);
     const wrapped = wrapImportedCharacter(source, { name: 'hero', label: 'You' });
     assert.ok(wrapped.userData.rig?.legL);
     assert.ok(wrapped.userData.rig?.legR);
@@ -244,6 +348,23 @@ describe('uploaded player walk', () => {
     updateWalkPose(wrapped, true, 0.2, 1);
     assert.notEqual(wrapped.userData.rig.legL.rotation.x, rest);
     assert.ok(wrapped.userData.walkPhase > 0);
+    const countSticks = (root) => {
+      let n = 0;
+      root.traverse((child) => {
+        if ((child.isLine || child.isLineSegments || child.isSkeletonHelper) && child.visible !== false) n += 1;
+        if (child.material?.wireframe && child.visible !== false) n += 1;
+        if (child.isMesh && String(child.name || '').startsWith('proxy') && child.visible !== false) n += 1;
+        if (child.isMesh && child.geometry?.type === 'CylinderGeometry' && child.material?.opacity < 1 && child.visible !== false) {
+          n += 1;
+        }
+      });
+      return n;
+    };
+    assert.equal(countSticks(wrapped), 0, 'imported walk must not draw skeleton/proxy wireframe');
+    const buyer = wrapImportedCharacter(source, { name: 'ranger', label: 'Ranger', speech: true, pickKind: 'customer' });
+    const goblin = wrapImportedCharacter(source, { name: 'goblin', label: false, pickKind: 'goblin' });
+    assert.equal(countSticks(buyer), 0, 'buyers must hide walk bone lines');
+    assert.equal(countSticks(goblin), 0, 'goblins must hide walk bone lines');
   });
 
   it('parents a pickaxe to the walk arm and swings it while mining', () => {
@@ -259,6 +380,13 @@ describe('uploaded player walk', () => {
     assert.ok(wrapped.userData.hand);
     assert.equal(wrapped.userData.pickaxe.parent, wrapped.userData.hand);
     setHeldTool(wrapped, 'pickaxe');
+    assert.equal(wrapped.userData.pickaxe.visible, true);
+    assert.ok(wrapped.userData.hatchet);
+    setHeldTool(wrapped, 'hatchet');
+    assert.equal(wrapped.userData.pickaxe.visible, false);
+    assert.equal(wrapped.userData.hatchet.visible, true);
+    setHeldTool(wrapped, 'pickaxe');
+    assert.equal(wrapped.userData.hatchet.visible, false);
     assert.equal(wrapped.userData.pickaxe.visible, true);
     const rest = wrapped.userData.rig.armR.rotation.x;
     updateMinePose(wrapped, 0.2, 0.4);
@@ -337,12 +465,13 @@ describe('bundled prop swaps', () => {
   const modelsRoot = join(dirname(fileURLToPath(import.meta.url)), '../../public/models');
 
   async function loadFolder(folder) {
-    const obj = readFileSync(join(modelsRoot, folder, `${folder}.obj`));
-    const mtl = readFileSync(join(modelsRoot, folder, `${folder}.mtl`));
+    const base = folder.split('/').pop();
+    const obj = readFileSync(join(modelsRoot, folder, `${base}.obj`));
+    const mtl = readFileSync(join(modelsRoot, folder, `${base}.mtl`));
     return parseModelBuffer(
       obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength),
-      `${folder}.obj`,
-      { [`${folder}.mtl`]: mtl.buffer.slice(mtl.byteOffset, mtl.byteOffset + mtl.byteLength) },
+      `${folder}/${base}.obj`,
+      { [`${base}.mtl`]: mtl.buffer.slice(mtl.byteOffset, mtl.byteOffset + mtl.byteLength) },
     );
   }
 
@@ -360,6 +489,18 @@ describe('bundled prop swaps', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
     for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
+    }
+    for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-runite', 'ore-dragon', 'ore-essence']) {
+      assert.ok(ids.includes(id), id);
+    }
+    for (const id of ['food-bread', 'food-pizza', 'food-cake', 'food-pie', 'food-fish-pie', 'food-salmon', 'food-lobster', 'food-chocolate-cake', 'food-monkfish', 'food-curry', 'food-shark', 'food-summer-pie', 'food-anglerfish']) {
+      assert.ok(ids.includes(id), id);
+    }
+    for (const id of ['craft-ore-bronze', 'craft-ore-iron', 'craft-ore-steel', 'craft-ore-mithril', 'craft-ore-adamant', 'craft-ore-runite', 'craft-ore-dragon']) {
+      assert.ok(ids.includes(id), id);
+    }
+    for (const item of BUYER_PACK_FOLDERS) {
+      assert.ok(ids.includes(item.id), item.id);
     }
     assert.ok(ids.includes('goblin'));
   });
@@ -440,6 +581,40 @@ describe('bundled prop swaps', () => {
     const fx = group.userData.fountainWater;
     assert.ok(Math.abs(fx.fallStart - stone.max.y) < 0.02, `stream should start at the spout, ${fx.fallStart} vs ${stone.max.y}`);
     assert.ok(fx.fallStart > fx.fallEnd);
+  });
+
+  it('force-replaces the outdoor fountain with the Blender dump and keeps its footprint', async () => {
+    const objPath = join(modelsRoot, 'fountain', 'fountain.obj');
+    const objText = readFileSync(objPath, 'utf8');
+    assert.match(objText, /Blender/);
+    assert.match(objText, /Object_Fountain_2026-09-12/);
+    const sha = createHash('sha256').update(readFileSync(objPath)).digest('hex');
+    assert.ok(sha.startsWith('4e9b2aee804dc814'), `fountain.obj sha ${sha.slice(0, 16)}`);
+    assert.match(FOUNTAIN_DUMP_REV, /4e9b2aee/);
+    const fountainEntry = BUNDLED_PROP_FOLDERS.find((item) => item.id === 'fountain');
+    assert.equal(fountainEntry?.folder, 'fountain');
+    assert.equal(fountainEntry?.rev, FOUNTAIN_DUMP_REV);
+    const bundled = await loadFolder('fountain');
+    setBundledLook('fountain', bundled);
+    try {
+      const live = buildFountain();
+      const body = live.getObjectByName('fountain-body');
+      assert.ok(body, 'live fountain should wrap the dumped body, not a procedural stand-in');
+      let dumpedMeshes = 0;
+      body.traverse((child) => {
+        if (child.isMesh && (child.geometry?.getAttribute?.('position')?.count ?? 0) > 80) dumpedMeshes += 1;
+      });
+      assert.ok(dumpedMeshes >= 1, `dumped fountain mesh missing, count=${dumpedMeshes}`);
+      const liveBox = measureVisibleBox(live);
+      const liveSize = liveBox.getSize(new THREE.Vector3());
+      setBundledLook('fountain', null);
+      const proc = buildFountain();
+      const procSize = measureVisibleBox(proc).getSize(new THREE.Vector3());
+      assert.ok(Math.abs(liveSize.y - procSize.y) < 0.2, `height should match current fountain, live=${liveSize.y} proc=${procSize.y}`);
+      assert.ok(liveBox.min.y > -0.08 && liveBox.min.y < 0.1, `fountain should sit on the ground, minY=${liveBox.min.y}`);
+    } finally {
+      setBundledLook('fountain', null);
+    }
   });
 
   it('fits a bundled anvil dump to the current anvil bbox without stretch', async () => {
@@ -601,6 +776,16 @@ describe('bundled prop swaps', () => {
       assert.ok(mounts.length >= 8);
       for (const mount of mounts) {
         assert.ok(Math.abs(mount.rotation.z) < 0.05, `torch should stay upright, z=${mount.rotation.z}`);
+        const glow = mount.getObjectByName('torch-glow');
+        assert.ok(glow, 'torch-glow');
+        mount.updateMatrixWorld(true);
+        const box = measureVisibleBox(mount);
+        const tip = glow.getWorldPosition(new THREE.Vector3());
+        const mid = (box.min.y + box.max.y) / 2;
+        const height = box.max.y - box.min.y;
+        assert.ok(tip.y > mid, `glow should sit at the flame tip, y=${tip.y} mid=${mid}`);
+        assert.ok(tip.y > box.min.y + height * 0.85, `glow should be in the top of the torch, y=${tip.y} box=${box.min.y}..${box.max.y}`);
+        assert.ok(Math.abs(tip.y - box.max.y) < 0.08, `glow should be at the top, y=${tip.y} max=${box.max.y}`);
       }
       const origin = [];
       shop.traverse((child) => {
@@ -647,6 +832,35 @@ describe('bundled prop swaps', () => {
     }
   });
 
+  it('keeps lawn blades out of the dungeon entrance hole', () => {
+    const shop = buildShop([]).root;
+    const dummy = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    let blades = 0;
+    let inHole = 0;
+    shop.traverse((child) => {
+      if (child.name !== 'grass' || !child.isInstancedMesh) return;
+      for (let i = 0; i < child.count; i += 1) {
+        child.getMatrixAt(i, dummy);
+        pos.setFromMatrixPosition(dummy);
+        blades += 1;
+        const dist = Math.hypot(pos.x - TRAPDOOR.x, pos.z - TRAPDOOR.z);
+        if (dist < TRAPDOOR_HOLE_CLEAR || dist < 0.55) inHole += 1;
+      }
+    });
+    assert.ok(blades > 100, `lawn should still have blades, got ${blades}`);
+    assert.equal(inHole, 0, `grass should not cover the hatch opening, inHole=${inHole}`);
+  });
+
+  it('gives outdoor trees a chop pick', () => {
+    const shop = buildShop([]).root;
+    let trees = 0;
+    shop.traverse((child) => {
+      if (child.userData?.kind === 'tree' && child.userData?.materialId === 'logs') trees += 1;
+    });
+    assert.ok(trees > 0, `garden trees should be choppable, trees=${trees}`);
+  });
+
   it('fits a bundled pottery-oven furnace dump on the shop floor', async () => {
     const bundled = await loadFolder('furnace');
     const target = buildFurnace();
@@ -669,23 +883,102 @@ describe('bundled prop swaps', () => {
     }
   });
 
+  it('hides the dumped cooking-range wooden plate under the floor', async () => {
+    const bundled = await loadFolder('range');
+    setBundledLook('range', bundled);
+    try {
+      const range = buildRange();
+      const box = measureVisibleBox(range);
+      const height = box.max.y - box.min.y;
+      const sink = height * RANGE_PLATE_FRAC;
+      assert.ok(sink > 0.08, `plate should be thick enough to hide, sink=${sink}`);
+      assert.ok(Math.abs(box.min.y + sink) < 0.04, `plate bottom should sit sink below floor, minY=${box.min.y}`);
+      assert.ok(box.min.y < -0.08, `brown plate should be under the boards, minY=${box.min.y}`);
+      assert.ok(box.max.y > 1.6, `stove body should stay above the floor, maxY=${box.max.y}`);
+      assert.ok(range.userData.floorY < -0.08, `pose y should keep the sink, floorY=${range.userData.floorY}`);
+    } finally {
+      setBundledLook('range', null);
+    }
+  });
+
   it('sits a bundled chest on the shop floor after the world y=0 pose', async () => {
     const bundled = await loadFolder('chest');
     const procedural = buildChest();
     const procH = measureVisibleBox(procedural).getSize(new THREE.Vector3()).y;
+    const uprightDump = wrapBundledProp(bundled, procedural, { name: 'chest', fit: 'height' });
+    const pitchedDump = wrapBundledProp(bundled, procedural, {
+      name: 'chest',
+      fit: 'height',
+      rotateX: -Math.PI / 2,
+    });
+    const uprightSize = measureVisibleBox(uprightDump).getSize(new THREE.Vector3());
+    const pitchedSize = measureVisibleBox(pitchedDump).getSize(new THREE.Vector3());
     setBundledLook('chest', bundled);
     try {
       const chest = buildChest();
       assert.equal(chest.name, 'chest');
       const sized = measureVisibleBox(chest);
-      assert.ok(Math.abs((sized.max.y - sized.min.y) - procH) < 0.08, `chest should keep 60% height, ${sized.max.y - sized.min.y} vs ${procH}`);
+      const got = sized.getSize(new THREE.Vector3());
+      assert.ok(Math.abs(got.y - procH) < 0.08, `chest should keep 60% height, ${got.y} vs ${procH}`);
+      assert.ok(Math.abs(got.x - uprightSize.x) < 0.03, `no X pitch: width ${got.x} vs upright ${uprightSize.x}`);
+      assert.ok(Math.abs(got.z - uprightSize.z) < 0.03, `no X pitch: depth ${got.z} vs upright ${uprightSize.z}`);
+      assert.ok(
+        Math.abs(uprightSize.x - pitchedSize.x) > 0.01 || Math.abs(uprightSize.z - pitchedSize.z) > 0.01,
+        'pitched dump footprint should differ from upright',
+      );
       chest.position.set(2.1, 0, -1.4);
-      chest.rotation.y = furnitureVisualYaw('chest', 0);
+      chest.rotation.set(0, furnitureVisualYaw('chest', 0), 0);
       chest.updateMatrixWorld(true);
       const box = measureVisibleBox(chest);
       assert.ok(Math.abs(box.min.y - SHOP_FURNITURE_FLOOR_Y) < 0.03, `chest should sit on the floor, minY=${box.min.y}`);
+      assert.ok(Math.abs(chest.rotation.x) < 1e-8, 'chest stays unpitched');
+      assert.ok(Math.abs(chest.rotation.z) < 1e-8, 'chest stays unrolled');
+      chest.traverse((child) => {
+        if (child.isSprite) return;
+        assert.ok(Math.abs(child.rotation.x) < 1e-8, `${child.name || child.type} stays unpitched`);
+        assert.ok(Math.abs(child.rotation.z) < 1e-8, `${child.name || child.type} stays unrolled`);
+      });
     } finally {
       setBundledLook('chest', null);
+    }
+  });
+
+  it('fits buyer dumps to humanoid height without a sideways dump yaw', async () => {
+    const samples = [
+      ['hedgemage', 'buyers/wizard/wizard-level-9'],
+      ['pilgrim', 'buyers/adventurer/bob'],
+      ['ranger', 'buyers/ranger/armour-salesman'],
+      ['mercenary', 'buyers/guard/guard-level-21'],
+    ];
+    for (const [typeId, folder] of samples) {
+      const bundled = await loadFolder(folder);
+      const wrapped = wrapBuyerDump(bundled, typeId, { lookId: `test-${typeId}` });
+      assert.equal(wrapped.userData.buyerLookId, `test-${typeId}`);
+      const box = measureVisibleBox(wrapped);
+      const height = box.max.y - Math.min(0, box.min.y);
+      assert.ok(Math.abs(height - BUYER_FIT_HEIGHT) < 0.12, `${typeId} height ${height}`);
+      assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `${typeId} feet minY=${box.min.y}`);
+      assert.ok(Math.abs(BUYER_DUMP_YAW) < 1e-6, 'buyer dumps already face +Z');
+      assert.ok(Math.abs(wrapped.children[0].rotation.y - BUYER_DUMP_YAW) < 1e-6, `${typeId} dump yaw`);
+    }
+  });
+
+  it('bakes the bundled rat dump so the snout faces +Z with wander heading', async () => {
+    const bundled = await loadFolder('rat');
+    const target = buildRat();
+    const raw = wrapBundledProp(bundled, target, { name: 'rat', fit: 'max' });
+    const faced = wrapBundledProp(bundled, target, { name: 'rat', fit: 'max', rotateY: RAT_DUMP_YAW });
+    const rawSize = measureVisibleBox(raw).getSize(new THREE.Vector3());
+    const facedSize = measureVisibleBox(faced).getSize(new THREE.Vector3());
+    assert.ok(rawSize.x > rawSize.z, `dump length should start on X, got ${rawSize.x} x ${rawSize.z}`);
+    assert.ok(facedSize.z > facedSize.x, `baked dump should run along Z, got ${facedSize.x} x ${facedSize.z}`);
+    setBundledLook('rat', bundled);
+    try {
+      const live = buildRat();
+      const liveSize = measureVisibleBox(live).getSize(new THREE.Vector3());
+      assert.ok(liveSize.z > liveSize.x, `live rat should face +Z, got ${liveSize.x} x ${liveSize.z}`);
+    } finally {
+      setBundledLook('rat', null);
     }
   });
 
@@ -707,6 +1000,424 @@ describe('bundled prop swaps', () => {
     } finally {
       setBundledLook('wheel', null);
     }
+  });
+
+  it('maps nested rune and dungeon-rock folders by directory name, not dump labels', () => {
+    const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    assert.equal(byId['rune-air'], 'runes/air');
+    assert.equal(byId['rune-water'], 'runes/water');
+    assert.equal(byId['rune-earth'], 'runes/earth');
+    assert.equal(byId['rune-fire'], 'runes/fire');
+    assert.equal(byId['ore-bronze'], 'dungeon-rocks/bronze-rocks');
+    assert.equal(byId['ore-iron'], 'dungeon-rocks/iron-rocks');
+    assert.equal(byId['ore-steel'], 'dungeon-rocks/steel-rocks');
+    assert.equal(byId['ore-mithril'], 'dungeon-rocks/mithril-rocks');
+    assert.equal(byId['ore-adamant'], 'dungeon-rocks/adamant-rocks');
+    assert.equal(byId['ore-runite'], 'dungeon-rocks/rune-rocks');
+    assert.equal(byId['ore-dragon'], 'dungeon-rocks/dragon-rocks');
+    assert.equal(byId['ore-essence'], 'dungeon-rocks/essence');
+    assert.equal(byId['craft-ore-bronze'], 'ores/bronze-ore');
+    assert.equal(byId['craft-ore-iron'], 'ores/iron-ore');
+    assert.equal(byId['craft-ore-steel'], 'ores/steel-ore');
+    assert.equal(byId['craft-ore-mithril'], 'ores/mithril-ore');
+    assert.equal(byId['craft-ore-adamant'], 'ores/adamantite-ore');
+    assert.equal(byId['craft-ore-runite'], 'ores/runite-ore');
+    assert.equal(byId['craft-ore-dragon'], 'ores/dragon-ore');
+    assert.equal(byId['food-bread'], 'food/bread');
+    assert.equal(byId['food-salmon'], 'food/salmon');
+    assert.equal(byId['food-chocolate-cake'], 'food/chocolate-cake');
+    assert.equal(byId['food-fish-pie'], 'food/fish-pie');
+    assert.equal(byId['food-summer-pie'], 'food/summer-pie');
+  });
+
+  it('fits bundled food dumps to the current plate size by filename slug', async () => {
+    const samples = [
+      ['bread', 'food/bread'],
+      ['chocolate_cake', 'food/chocolate-cake'],
+      ['fish_pie', 'food/fish-pie'],
+      ['pizza', 'food/pizza'],
+      ['salmon', 'food/salmon'],
+    ];
+    for (const [recipeId, folder] of samples) {
+      const bundled = await loadFolder(folder);
+      const lookId = `food-${recipeId.replaceAll('_', '-')}`;
+      const want = measureVisibleBox(buildWare(recipeId)).getSize(new THREE.Vector3());
+      setBundledLook(lookId, bundled);
+      try {
+        const ware = buildWare(recipeId);
+        assert.ok(ware.getObjectByName(lookId), recipeId);
+        assertUniform(ware.getObjectByName(lookId));
+        const got = measureVisibleBox(ware).getSize(new THREE.Vector3());
+        assert.ok(
+          Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.08,
+          `${recipeId} size ${Math.max(got.x, got.y, got.z)} vs ${Math.max(want.x, want.y, want.z)}`,
+        );
+      } finally {
+        setBundledLook(lookId, null);
+      }
+    }
+    const salmonObj = readFileSync(join(modelsRoot, 'food/salmon/salmon.obj'), 'utf8');
+    assert.match(salmonObj, /Raw salmon/i);
+  });
+
+  it('fits craft-screen ore dumps to the current lump without touching dungeon rocks', async () => {
+    assert.equal(craftOreFolder('adamant'), 'ores/adamantite-ore');
+    assert.equal(CRAFT_ORE_FOLDERS.length, 7);
+    const dungeonById = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    assert.equal(dungeonById['ore-bronze'], 'dungeon-rocks/bronze-rocks');
+    const samples = [
+      ['bronze', 'ores/bronze-ore'],
+      ['iron', 'ores/iron-ore'],
+      ['steel', 'ores/steel-ore'],
+      ['mithril', 'ores/mithril-ore'],
+      ['adamant', 'ores/adamantite-ore'],
+      ['runite', 'ores/runite-ore'],
+      ['dragon', 'ores/dragon-ore'],
+    ];
+    for (const [metalId, folder] of samples) {
+      const lookId = craftOreLookId(metalId);
+      assert.equal(dungeonById[lookId], folder);
+      const slug = folder.split('/').pop();
+      assert.equal(existsSync(join(modelsRoot, folder, `${slug}.obj`)), true, `${folder}.obj`);
+      assert.equal(existsSync(join(modelsRoot, folder, `${slug}.mtl`)), true, `${folder}.mtl`);
+      const bundled = await loadFolder(folder);
+      const want = measureVisibleBox(buildWare(metalId)).getSize(new THREE.Vector3());
+      setBundledLook(lookId, bundled);
+      try {
+        const ware = buildWare(metalId);
+        assert.ok(ware.getObjectByName(lookId), metalId);
+        assertUniform(ware.getObjectByName(lookId));
+        const got = measureVisibleBox(ware).getSize(new THREE.Vector3());
+        assert.ok(
+          Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.08,
+          `${metalId} size ${Math.max(got.x, got.y, got.z)} vs ${Math.max(want.x, want.y, want.z)}`,
+        );
+      } finally {
+        setBundledLook(lookId, null);
+      }
+    }
+    assert.equal(existsSync(join(modelsRoot, 'ores/adamant-ore/adamant-ore.obj')), true);
+  });
+
+  it('fits a Tin-labelled steel-rocks dump to the current steel boulder', async () => {
+    const objText = readFileSync(join(modelsRoot, 'dungeon-rocks/steel-rocks/steel-rocks.obj'), 'utf8');
+    assert.match(objText, /Tin rocks/i);
+    const steel = await loadFolder('dungeon-rocks/steel-rocks');
+    setBundledLook('ore-steel', steel);
+    try {
+      const built = buildDungeon();
+      const names = [];
+      let steelPick = 0;
+      built.root.traverse((child) => {
+        if (child.name) names.push(child.name);
+        if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'steel') steelPick += 1;
+      });
+      assert.ok(names.includes('ore-steel'));
+      assert.ok(steelPick >= 1);
+      const spot = DUNGEON_BOULDERS.find((item) => item.id === 'steel');
+      assert.equal(spot?.name, 'Steel Ore');
+      assert.equal(DUNGEON_BOULDERS.find((item) => item.id === 'runite')?.name, 'Runite');
+    } finally {
+      setBundledLook('ore-steel', null);
+    }
+  });
+
+  it('fits a Mithril-labelled rune-rocks dump as Runite and keeps that display name', async () => {
+    const objText = readFileSync(join(modelsRoot, 'dungeon-rocks/rune-rocks/rune-rocks.obj'), 'utf8');
+    assert.match(objText, /Mithril rocks/i);
+    const target = buildDungeon().boulders.find((item) => item.name === 'boulder-runite');
+    assert.ok(target);
+    const want = measureVisibleBox(target.children.find((child) => child.name === 'ore-runite')).getSize(new THREE.Vector3());
+    const runite = await loadFolder('dungeon-rocks/rune-rocks');
+    setBundledLook('ore-runite', runite);
+    try {
+      const built = buildDungeon();
+      const names = [];
+      let runitePick = 0;
+      built.root.traverse((child) => {
+        if (child.name) names.push(child.name);
+        if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'runite') runitePick += 1;
+      });
+      assert.ok(names.includes('ore-runite'));
+      assert.ok(runitePick >= 1);
+      const spot = DUNGEON_BOULDERS.find((item) => item.id === 'runite');
+      assert.equal(spot?.name, 'Runite');
+      assert.notEqual(spot?.name, 'Rune Ore');
+      const visual = built.boulders.find((item) => item.name === 'boulder-runite')?.children.find((child) => child.name === 'ore-runite');
+      assert.ok(visual);
+      assertUniform(visual);
+      const got = measureVisibleBox(visual).getSize(new THREE.Vector3());
+      assert.ok(
+        Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.12,
+        `runite size ${Math.max(got.x, got.y, got.z)} vs ${Math.max(want.x, want.y, want.z)}`,
+      );
+    } finally {
+      setBundledLook('ore-runite', null);
+    }
+  });
+
+  it('fits nested rune dumps to the current disc size without stretch', async () => {
+    const target = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.028, 20));
+    target.position.y = 0.05;
+    for (const mark of ['air', 'water', 'earth', 'fire']) {
+      const bundled = await loadFolder(`runes/${mark}`);
+      const fitted = wrapBundledProp(bundled, target, { name: `rune-${mark}`, fit: 'max' });
+      assert.equal(fitted.name, `rune-${mark}`);
+      assertUniform(fitted);
+      const got = measureVisibleBox(fitted).getSize(new THREE.Vector3());
+      const want = measureVisibleBox(target).getSize(new THREE.Vector3());
+      assert.ok(Math.abs(Math.max(got.x, got.y, got.z) - Math.max(want.x, want.y, want.z)) < 0.08, mark);
+    }
+  });
+
+  it('fits dungeon ore dumps by folder tier and keeps mine picks without essence glow', async () => {
+    const bronze = await loadFolder('dungeon-rocks/bronze-rocks');
+    const essence = await loadFolder('dungeon-rocks/essence');
+    setBundledLook('ore-bronze', bronze);
+    setBundledLook('ore-essence', essence);
+    try {
+      const built = buildDungeon();
+      const names = [];
+      let bronzePick = 0;
+      let essencePick = 0;
+      let essenceLight = 0;
+      let essenceEmissive = 0;
+      built.root.traverse((child) => {
+        if (child.name) names.push(child.name);
+        if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'bronze') bronzePick += 1;
+        if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'essence') essencePick += 1;
+        let essenceParent = child;
+        while (essenceParent && essenceParent.name !== 'boulder-essence') essenceParent = essenceParent.parent;
+        if (essenceParent) {
+          if (child.isLight) essenceLight += 1;
+          const mats = child.isMesh
+            ? (Array.isArray(child.material) ? child.material : [child.material])
+            : [];
+          if (mats.some((mat) => {
+            const intensity = mat?.emissiveIntensity ?? 0;
+            const glow = mat?.emissive && (mat.emissive.r + mat.emissive.g + mat.emissive.b) > 0.01;
+            return intensity > 0.01 || glow;
+          })) essenceEmissive += 1;
+        }
+      });
+      assert.ok(names.includes('ore-bronze'));
+      assert.ok(names.includes('ore-essence'));
+      assert.ok(bronzePick >= 1);
+      assert.ok(essencePick >= 1);
+      assert.equal(essenceLight, 0);
+      assert.equal(essenceEmissive, 0);
+      assert.equal(DUNGEON_BOULDERS.some((spot) => spot.id === 'steel'), true);
+      assert.equal(DUNGEON_BOULDERS.some((spot) => spot.id === 'runite'), true);
+    } finally {
+      setBundledLook('ore-bronze', null);
+      setBundledLook('ore-essence', null);
+    }
+  });
+
+  it('lifts every dungeon ore dump toward Blender Kd and drops missing maps', async () => {
+    assert.ok(DUNGEON_ROCK_ALBEDO_LIFT >= 1.7);
+    assert.ok(DUNGEON_ROCK_AMBIENT > 0);
+    assert.ok(DUNGEON_ROCK_EMIT > 0);
+    const folders = {
+      bronze: 'dungeon-rocks/bronze-rocks',
+      iron: 'dungeon-rocks/iron-rocks',
+      steel: 'dungeon-rocks/steel-rocks',
+      mithril: 'dungeon-rocks/mithril-rocks',
+      adamant: 'dungeon-rocks/adamant-rocks',
+      runite: 'dungeon-rocks/rune-rocks',
+      dragon: 'dungeon-rocks/dragon-rocks',
+      essence: 'dungeon-rocks/essence',
+    };
+    for (const folder of Object.values(folders)) {
+      assert.equal(isDungeonRockDump(folder), true);
+    }
+    assert.equal(isDungeonRockDump('rock'), false);
+    assert.equal(isDungeonRockDump('rock/rock.obj'), false);
+
+    const garden = await loadFolder('rock');
+    assert.equal(garden.userData?.dungeonRockLift, undefined);
+    garden.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of mats) {
+        assert.equal(mat?.userData?.dungeonRockLift, undefined);
+      }
+    });
+
+    const rawAlbedo = {};
+    for (const [id, folder] of Object.entries(folders)) {
+      const raw = await loadFolder(folder);
+      assert.equal(raw.userData?.dungeonRockLift, true, `${id} should lift at OBJ/MTL load`);
+      prepareDungeonRockMaterials(raw);
+      prepareDungeonRockMaterials(raw);
+      rawAlbedo[id] = { r: 0, g: 0, b: 0, max: 0 };
+      raw.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        assert.ok(mats.every((mat) => mat?.isMeshStandardMaterial && mat.metalness === 0 && mat.userData?.dungeonRockLift));
+        for (const mat of mats) {
+          const c = mat?.color;
+          if (!c) continue;
+          const srgb = c.clone();
+          if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
+          rawAlbedo[id].r = Math.max(rawAlbedo[id].r, srgb.r);
+          rawAlbedo[id].g = Math.max(rawAlbedo[id].g, srgb.g);
+          rawAlbedo[id].b = Math.max(rawAlbedo[id].b, srgb.b);
+          rawAlbedo[id].max = Math.max(rawAlbedo[id].max, srgb.r, srgb.g, srgb.b);
+        }
+      });
+      setBundledLook(`ore-${id}`, raw);
+    }
+    try {
+      for (const [id, sample] of Object.entries(rawAlbedo)) {
+        assert.ok(sample.max > 0.28, `${id} albedo should read nearer Blender, max=${sample.max}`);
+      }
+      assert.ok(rawAlbedo.bronze.r > rawAlbedo.bronze.b, 'bronze should stay warm');
+      assert.ok(rawAlbedo.adamant.g > rawAlbedo.adamant.r, 'adamantite should stay green');
+      assert.ok(rawAlbedo.mithril.b > rawAlbedo.mithril.r, 'mithril should stay blue');
+      assert.ok(rawAlbedo.runite.b > rawAlbedo.runite.r, 'runite should stay cyan/blue');
+      assert.ok(rawAlbedo.dragon.r > rawAlbedo.bronze.max, 'dragon should stay redder than bronze');
+
+      const built = buildDungeon();
+      const dragon = built.boulders.find((item) => item.name === 'boulder-dragon');
+      const bronze = built.boulders.find((item) => item.name === 'boulder-bronze');
+      assert.ok(dragon && bronze);
+      let dragonMaps = 0;
+      let dragonStd = 0;
+      let dragonMeshes = 0;
+      dragon.traverse((child) => {
+        if (!child.isMesh || child.userData?.kind === 'boulder') return;
+        dragonMeshes += 1;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        if (mats.some((mat) => mat?.map)) dragonMaps += 1;
+        if (mats.every((mat) => mat?.isMeshStandardMaterial)) dragonStd += 1;
+      });
+      assert.ok(dragonMeshes >= 1);
+      assert.equal(dragonMaps, 0, 'missing .psd maps should not darken dragon rocks');
+      assert.equal(dragonStd, dragonMeshes);
+      for (const boulder of built.boulders) {
+        let lifted = 0;
+        boulder.traverse((child) => {
+          if (!child.isMesh || child.userData?.kind === 'boulder') return;
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          if (mats.every((mat) => mat?.isMeshStandardMaterial && mat.metalness === 0 && mat.userData?.dungeonRockLift)) {
+            lifted += 1;
+          }
+        });
+        assert.ok(lifted >= 1, `${boulder.name} should use the shared dungeon-rock material lift`);
+      }
+    } finally {
+      for (const id of Object.keys(folders)) setBundledLook(`ore-${id}`, null);
+    }
+  });
+
+  it('sits every dungeon ore rock on the floor plane', async () => {
+    const folders = {
+      bronze: 'dungeon-rocks/bronze-rocks',
+      iron: 'dungeon-rocks/iron-rocks',
+      steel: 'dungeon-rocks/steel-rocks',
+      mithril: 'dungeon-rocks/mithril-rocks',
+      adamant: 'dungeon-rocks/adamant-rocks',
+      runite: 'dungeon-rocks/rune-rocks',
+      dragon: 'dungeon-rocks/dragon-rocks',
+      essence: 'dungeon-rocks/essence',
+    };
+    for (const [id, folder] of Object.entries(folders)) {
+      try {
+        setBundledLook(`ore-${id}`, await loadFolder(folder));
+      } catch {
+        // Missing dump stays procedural and still has to sit on the floor.
+      }
+    }
+    try {
+      const built = buildDungeon();
+      assert.equal(built.boulders.length, DUNGEON_BOULDERS.length);
+      for (const boulder of built.boulders) {
+        const visual = boulder.children.find((child) => child.name?.startsWith('ore-'));
+        assert.ok(visual, boulder.name);
+        visual.updateMatrixWorld(true);
+        const box = measureVisibleBox(visual);
+        assert.ok(
+          Math.abs(box.min.y - DUNGEON_FLOOR_Y) < 0.02,
+          `${boulder.name} should sit on the floor, minY=${box.min.y}`,
+        );
+      }
+    } finally {
+      for (const id of Object.keys(folders)) setBundledLook(`ore-${id}`, null);
+    }
+  });
+
+  it('doubles essence size in the dungeon middle and seats a skeleton at the old spot', async () => {
+    const essenceSpot = DUNGEON_BOULDERS.find((item) => item.id === 'essence');
+    const adamant = DUNGEON_BOULDERS.find((item) => item.id === 'adamant');
+    assert.equal(essenceSpot?.scale, 2);
+    assert.ok(Math.abs(essenceSpot.x) < 1e-6);
+    assert.ok(Math.abs(essenceSpot.z) < 1e-6);
+    assert.ok(DUNGEON_REMAINS.some((spot) => (
+      Math.abs(spot.x - ESSENCE_OLD_XZ.x) < 1e-6 && Math.abs(spot.z - ESSENCE_OLD_XZ.z) < 1e-6
+    )));
+    assert.ok(Math.hypot(essenceSpot.x - adamant.x, essenceSpot.z - adamant.z) > 2.4);
+    for (const other of DUNGEON_BOULDERS.filter((item) => item.id !== 'essence')) {
+      const dist = Math.hypot(essenceSpot.x - other.x, essenceSpot.z - other.z);
+      assert.ok(dist > 2.4, `${other.id} too close to essence (${dist})`);
+    }
+    try {
+      setBundledLook('ore-essence', await loadFolder('dungeon-rocks/essence'));
+      setBundledLook('ore-bronze', await loadFolder('dungeon-rocks/bronze-rocks'));
+      setBundledLook('skeleton', await loadFolder('skeleton'));
+    } catch {
+      // Procedural fallback still has to keep layout and 2× size.
+    }
+    try {
+      const built = buildDungeon();
+      const essence = built.boulders.find((item) => item.name === 'boulder-essence');
+      const bronze = built.boulders.find((item) => item.name === 'boulder-bronze');
+      assert.ok(essence && bronze);
+      assert.ok(Math.abs(essence.position.x) < 1e-6);
+      assert.ok(Math.abs(essence.position.z) < 1e-6);
+      const essenceBox = measureVisibleBox(essence.children.find((child) => child.name === 'ore-essence'));
+      const bronzeBox = measureVisibleBox(bronze.children.find((child) => child.name === 'ore-bronze'));
+      const essenceSize = essenceBox.getSize(new THREE.Vector3());
+      const bronzeSize = bronzeBox.getSize(new THREE.Vector3());
+      const essenceMax = Math.max(essenceSize.x, essenceSize.y, essenceSize.z);
+      const bronzeMax = Math.max(bronzeSize.x, bronzeSize.y, bronzeSize.z);
+      assert.ok(essenceMax > bronzeMax * 1.6, `essence ${essenceMax} should be ~2× bronze ${bronzeMax}`);
+      assert.ok(Math.abs(essenceBox.min.y - DUNGEON_FLOOR_Y) < 0.02, `essence minY=${essenceBox.min.y}`);
+      let slumps = 0;
+      let oldSpotSlump = 0;
+      built.root.traverse((child) => {
+        if (child.name !== 'skeleton') return;
+        slumps += 1;
+        if (Math.hypot(child.position.x - ESSENCE_OLD_XZ.x, child.position.z - ESSENCE_OLD_XZ.z) < 0.05) {
+          oldSpotSlump += 1;
+        }
+      });
+      if (slumps) {
+        assert.equal(slumps, DUNGEON_REMAINS.length);
+        assert.equal(oldSpotSlump, 1);
+      }
+      let essencePick = 0;
+      built.root.traverse((child) => {
+        if (child.userData?.kind === 'boulder' && child.userData?.materialId === 'essence') essencePick += 1;
+      });
+      assert.ok(essencePick >= 1);
+    } finally {
+      setBundledLook('ore-essence', null);
+      setBundledLook('ore-bronze', null);
+      setBundledLook('skeleton', null);
+    }
+  });
+
+  it('sits a uniformly scaled dump on a world floor plane', () => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2));
+    mesh.scale.setScalar(0.05);
+    mesh.position.set(0, 0.8, 0);
+    const root = new THREE.Group();
+    root.add(mesh);
+    sitVisibleOnY(mesh, DUNGEON_FLOOR_Y);
+    mesh.updateMatrixWorld(true);
+    const box = measureVisibleBox(mesh);
+    assert.ok(Math.abs(box.min.y - DUNGEON_FLOOR_Y) < 0.005, `minY=${box.min.y}`);
   });
 });
 
@@ -757,6 +1468,19 @@ describe('shop props', () => {
     assert.equal(highBoxes, 0);
   });
 
+  it('halves the anvil uniformly and keeps it on the floor', () => {
+    assert.equal(ANVIL_WORLD_SCALE, 0.5);
+    const anvil = buildAnvil();
+    assert.ok(Math.abs(anvil.scale.x - anvil.scale.y) < 1e-6);
+    assert.ok(Math.abs(anvil.scale.y - anvil.scale.z) < 1e-6);
+    anvil.updateMatrixWorld(true);
+    const box = measureVisibleBox(anvil);
+    const size = box.getSize(new THREE.Vector3());
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `anvil should sit on the floor, minY=${box.min.y}`);
+    assert.ok(size.y < 0.75, `anvil should be half height, y=${size.y}`);
+    assert.ok(size.x < 0.7, `anvil should be half width, x=${size.x}`);
+  });
+
   it('doubles the cooking range uniformly and keeps it on the floor', () => {
     assert.equal(RANGE_WORLD_SCALE, 2);
     const range = buildRange();
@@ -766,6 +1490,26 @@ describe('shop props', () => {
     const box = measureVisibleBox(range);
     assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `range should sit on the floor, minY=${box.min.y}`);
     assert.ok(box.max.y > 1.8, `range should be 2× tall, maxY=${box.max.y}`);
+  });
+
+  it('scales the spinning wheel to half the previous 4× live size and keeps it on the floor', () => {
+    assert.equal(WHEEL_WORLD_SCALE, 2);
+    const wheel = buildSpinningWheel();
+    assert.ok(Math.abs(wheel.scale.x - wheel.scale.y) < 1e-6);
+    assert.ok(Math.abs(wheel.scale.y - wheel.scale.z) < 1e-6);
+    assert.ok(Math.abs(wheel.scale.x - WHEEL_WORLD_SCALE) < 1e-6);
+    const box = measureVisibleBox(wheel);
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `wheel should sit on the floor, minY=${box.min.y}`);
+    assert.ok(box.max.y > 1.2 && box.max.y < 2.4, `wheel should be half the prior 4× height, maxY=${box.max.y}`);
+  });
+
+  it('keeps shop tables at the previous size on the floor', () => {
+    const table = buildDefaultTable();
+    const box = measureVisibleBox(table);
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `table should sit on the floor, minY=${box.min.y}`);
+    const size = box.getSize(new THREE.Vector3());
+    assert.ok(size.x > 1.2 && size.x < 1.6, `table should keep the pre-2× width, x=${size.x}`);
+    assert.ok(size.z > 0.7 && size.z < 1.1, `table should keep the pre-2× depth, z=${size.z}`);
   });
 
   it('scales the chest to 60% and keeps it on the floor', () => {

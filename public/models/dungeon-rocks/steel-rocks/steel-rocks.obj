@@ -1,0 +1,159 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib steel-rocks.mtl
+o Object Tin rocks 2026-09-12_20-58-42
+v 22 52 -6
+v 34 54 -18
+v 40 34 -48
+v -8 24 0
+v 34 52 0
+v 38 53 -6
+v 56 30 0
+v 63 7 5
+v 42 12 -58
+v -20 -2 5
+v 40 25 24
+v 42 1 36
+v -16 17 24
+v 24 20 40
+v 41 1 37
+v -16 -5 14
+v -48 7 40
+v -16 25 40
+v 32 20 56
+v 53 1 59
+v -40 3 56
+v -50 -24 59
+v -62 -19 37
+v -21 92 -33
+v -15 90 -27
+v 0 19 -32
+v -16 23 -48
+v -27 92 -33
+v -27 87 -15
+v -32 9 0
+v -36 -6 12
+v 12 9 -36
+v -12 14 -60
+v -32 24 -48
+v -33 88 -21
+v -48 13 -16
+v -60 -1 -12
+v -36 16 -60
+v -41 14 -45
+v 44 10 -45
+v 44 0 45
+v -41 -14 45
+usemtl c0
+f 1 2 3
+usemtl c1
+f 1 3 4
+usemtl c2
+f 1 4 5
+usemtl c3
+f 1 5 6
+usemtl c4
+f 1 6 2
+usemtl c5
+f 2 6 7
+usemtl c6
+f 2 7 3
+usemtl c7
+f 3 7 8
+usemtl c8
+f 3 8 9
+usemtl c9
+f 3 9 4
+usemtl c10
+f 4 9 10
+usemtl c11
+f 4 10 11
+usemtl c12
+f 4 11 5
+usemtl c13
+f 5 11 6
+usemtl c4
+f 6 11 7
+usemtl c14
+f 7 11 12
+usemtl c15
+f 7 12 8
+usemtl c16
+f 13 14 15
+usemtl c17
+f 13 15 16
+usemtl c18
+f 13 16 17
+usemtl c19
+f 13 17 18
+usemtl c20
+f 13 18 14
+usemtl c21
+f 14 18 19
+usemtl c22
+f 14 19 20
+usemtl c23
+f 14 20 15
+usemtl c24
+f 19 21 22
+usemtl c25
+f 19 22 20
+usemtl c26
+f 21 17 23
+usemtl c27
+f 21 23 22
+usemtl c28
+f 17 16 23
+usemtl c29
+f 18 21 19
+usemtl c25
+f 21 18 17
+usemtl c30
+f 11 10 12
+usemtl c6
+f 24 25 26
+usemtl c31
+f 24 26 27
+usemtl c32
+f 24 27 28
+usemtl c33
+f 24 28 25
+usemtl c34
+f 25 28 29
+usemtl c35
+f 25 29 30
+usemtl c36
+f 25 30 26
+usemtl c1
+f 26 30 31
+usemtl c37
+f 26 31 32
+usemtl c38
+f 26 32 27
+usemtl c39
+f 27 32 33
+usemtl c40
+f 27 33 34
+usemtl c41
+f 27 34 28
+usemtl c42
+f 28 34 35
+usemtl c35
+f 28 35 29
+usemtl c43
+f 29 35 36
+f 29 36 30
+usemtl c24
+f 30 36 37
+usemtl c44
+f 30 37 31
+usemtl c45
+f 35 34 36
+usemtl c46
+f 36 34 38
+usemtl c11
+f 36 38 37
+usemtl c37
+f 34 33 38
+usemtl c47
+f 39 40 41
+f 39 41 42

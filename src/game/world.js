@@ -15,29 +15,38 @@ import {
   decideRequest,
   displayKind,
   MATERIALS,
+  CHOP_DURATION,
+  CHOP_YIELD,
   MINE_DURATION,
   MINE_YIELD,
   emptySlots,
   emptyShelfSlots,
   mostExpensiveChestId,
   scheduleKingRoald,
+  customerName,
   shelfSlotPoses,
   SHELF_SLOT_COUNT,
 } from './catalog.js';
-import { grantMinedMaterial, hasStock, pushLog } from './economy.js';
+import { grantChoppedLogs, grantMinedMaterial, hasStock, pushLog } from './economy.js';
 import {
   FURNITURE_FORWARD,
-  FURNITURE_ROT_STEP,
   FURNITURE_SNAP,
+  MATERIAL_CAP,
+  furnitureRotateDelta,
+  snapGridLines,
   cloneFurniture,
   furnitureStartYaw,
   furnitureVisualYaw,
   gardenBox,
   gardenTrapdoorSpot,
+  gardenTreeSpots,
+  interiorFloors,
   playerWalkFloors,
   pointHitsShop,
   pointOnFloors,
   snapToFloor,
+  snapToWallGrid,
+  placeFloors,
   walkFloors,
 } from './layout.js';
 import {
@@ -59,6 +68,7 @@ import {
 } from './interact.js';
 import {
   buildAdventurer,
+  nextBuyerLookId,
   buildAnvil,
   buildChest,
   buildCounter,
@@ -85,12 +95,33 @@ import {
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
-import { applySceneLighting, clampBrightness } from './lighting.js';
+import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
 const CAM_YAW_SPEED = 2.175;
 const CAM_PITCH_SPEED = 1.425;
+const CAM_ORBIT_YAW = 0.0055;
+const CAM_ORBIT_PITCH = 0.0036;
+
+/** Still-finger hold on the canvas that opens the desktop right-click menu. */
+export const TOUCH_LONG_PRESS_MS = 2000;
+/** Movement past this cancels the hold and starts camera orbit. */
+export const TOUCH_HOLD_MOVE_PX = 8;
+
+/** Middle-mouse on desktop; one-finger canvas swipe on touch after a small move. */
+export function canvasPointerStartsCamOrbit(event, flags = {}) {
+  if (event?.button === 1) return true;
+  if (event?.pointerType !== 'touch') return false;
+  if (flags.moveTarget || flags.expandMode || flags.modalOpen) return false;
+  if ((flags.touchCount ?? 1) > 1) return false;
+  if (event.isPrimary === false) return false;
+  return flags.moved === true;
+}
+
+export function canvasPointerMovedPastHold(from, to, threshold = TOUCH_HOLD_MOVE_PX) {
+  return Math.hypot((to?.x ?? to?.clientX ?? 0) - (from?.x ?? from?.clientX ?? 0), (to?.y ?? to?.clientY ?? 0) - (from?.y ?? from?.clientY ?? 0)) > threshold;
+}
 const CAM_ZOOM_STEP = 0.38;
 const CAM_MIN_DISTANCE = 2.05;
 const CAM_MAX_DISTANCE = 25.8;
@@ -164,6 +195,10 @@ export function createWorld(canvas, state, opts = {}) {
   };
   const camLook = new THREE.Vector3(SHOP.keeper.x, 0.95, SHOP.keeper.z);
   const camHeld = { left: false, right: false, up: false, down: false };
+  let camDrag = null;
+  const canvasTouches = new Set();
+  let multiTouch = false;
+  let touchHold = null;
   camera.position.set(SHOP.cameraStart.x, SHOP.cameraStart.y, SHOP.cameraStart.z);
   camera.lookAt(camLook);
 
@@ -189,6 +224,7 @@ export function createWorld(canvas, state, opts = {}) {
   const shopFill = new THREE.PointLight(0xffe8c4, 0.48, 16, 2);
   shopFill.position.set(0, 2.55, -0.35);
   scene.add(shopFill);
+  let dungeon = null;
 
   function syncLighting(mode = sceneMode) {
     applySceneLighting({
@@ -198,7 +234,12 @@ export function createWorld(canvas, state, opts = {}) {
       door: doorLight,
       sun,
       renderer,
-    }, mode, state.brightness);
+    }, mode, state.brightness, state.dungeonBrightness);
+    const torchMul = clampDungeonBrightness(state.dungeonBrightness);
+    dungeon?.root?.traverse((child) => {
+      if (!child.isLight || child.userData.baseIntensity == null) return;
+      child.intensity = child.userData.baseIntensity * torchMul;
+    });
   }
   syncLighting('shop');
 
@@ -208,6 +249,7 @@ export function createWorld(canvas, state, opts = {}) {
   let groundGroup = null;
   let padGroup = null;
   let floors = walkFloors(state.expansions ?? []);
+  let placeRects = placeFloors(state.expansions ?? []);
   let playerFloors = playerWalkFloors(state.expansions ?? []);
   const obstacles = liveObstacles(state);
   let expandMode = false;
@@ -242,6 +284,7 @@ export function createWorld(canvas, state, opts = {}) {
     scene.add(groundGroup);
     scene.add(padGroup);
     floors = floorsForState(state);
+    placeRects = placeFloors(state.expansions ?? []);
     playerFloors = playerWalkFloors(state.expansions ?? []);
     rebuildNav();
     rebuildSnapGrid();
@@ -284,7 +327,6 @@ export function createWorld(canvas, state, opts = {}) {
   const clouds = buildClouds();
   scene.add(clouds);
   let sceneMode = 'shop';
-  let dungeon = null;
   let pendingUse = null;
   let mining = null;
   let lastPlaceClickAt = 0;
@@ -358,7 +400,7 @@ export function createWorld(canvas, state, opts = {}) {
   scene.add(wheelMesh);
   const wheelPick = makePick(STATION_HIT.wheel.w, STATION_HIT.wheel.h, STATION_HIT.wheel.d, 'wheel');
 
-  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'wheel'];
+  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel'];
 
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
@@ -380,11 +422,12 @@ export function createWorld(canvas, state, opts = {}) {
     slot.pick.visible = owned && !draft;
     if (slot.glow) slot.glow.visible = owned;
     if (!pose) return;
-    slot.mesh.position.set(pose.x, 0, pose.z);
+    slot.mesh.position.set(pose.x, slot.mesh.userData.floorY ?? 0, pose.z);
     const yaw = furnitureVisualYaw(id, pose.rot);
-    slot.mesh.rotation.y = yaw;
+    // Yaw only (same axis as furniture Rotate). Never pitch/roll stations onto a side.
+    slot.mesh.rotation.set(0, yaw, 0);
     slot.pick.position.set(pose.x, slot.pickY, pose.z);
-    slot.pick.rotation.y = yaw;
+    slot.pick.rotation.set(0, yaw, 0);
     if (slot.glow) slot.glow.position.set(pose.x, 0.08, pose.z);
   }
 
@@ -402,7 +445,7 @@ export function createWorld(canvas, state, opts = {}) {
       ? [1.15, 2.05, 1.05]
       : spot.kind === 'shelf'
         ? [1.42, 1.15, 0.46]
-        : [1.45, 1.15, 1.0];
+        : [2.9, 1.55, 1.9];
     const pick = new THREE.Mesh(
       new THREE.BoxGeometry(...pickSize),
       new THREE.MeshBasicMaterial({ visible: false }),
@@ -483,16 +526,13 @@ export function createWorld(canvas, state, opts = {}) {
     });
     const positions = [];
     const y = 0.108;
-    for (const rect of floors) {
-      const minX = Math.ceil((rect.minX + 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
-      const maxX = Math.floor((rect.maxX - 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
-      const minZ = Math.ceil((rect.minZ + 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
-      const maxZ = Math.floor((rect.maxZ - 0.02) / FURNITURE_SNAP) * FURNITURE_SNAP;
-      for (let x = minX; x <= maxX + 1e-6; x += FURNITURE_SNAP) {
-        positions.push(x, y, minZ, x, y, maxZ);
+    for (const rect of interiorFloors(state.expansions ?? [])) {
+      const { xs, zs } = snapGridLines(rect);
+      for (const gx of xs) {
+        positions.push(gx, y, rect.minZ, gx, y, rect.maxZ);
       }
-      for (let z = minZ; z <= maxZ + 1e-6; z += FURNITURE_SNAP) {
-        positions.push(minX, y, z, maxX, y, z);
+      for (const gz of zs) {
+        positions.push(rect.minX, y, gz, rect.maxX, y, gz);
       }
     }
     const geo = new THREE.BufferGeometry();
@@ -533,11 +573,15 @@ export function createWorld(canvas, state, opts = {}) {
 
   function previewFurnitureAt(x, z) {
     if (!moveTarget) return null;
-    const snapped = snapToFloor(x, z, floors);
+    const kind = placeKindOf(moveTarget);
+    const snapped = kind === 'shelf'
+      ? snapToWallGrid(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
+      : snapToFloor(x, z, placeRects);
     const pose = poseOf(moveTarget);
     if (!pose) return snapped;
     pose.x = snapped.x;
     pose.z = snapped.z;
+    if (kind === 'shelf' && snapped.rot != null) pose.rot = snapped.rot;
     applyMovePose(moveTarget);
     highlightSnapCell(snapped.x, snapped.z);
     return snapped;
@@ -716,7 +760,7 @@ export function createWorld(canvas, state, opts = {}) {
   function shopUsePicks() {
     const found = [];
     architecture?.traverse((child) => {
-      if (child.userData?.kind === 'trapdoor') found.push(child);
+      if (child.userData?.kind === 'trapdoor' || child.userData?.kind === 'tree') found.push(child);
     });
     return found;
   }
@@ -754,7 +798,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (sceneMode === 'dungeon') return dungeon?.grounds?.children ?? [];
     const list = [];
     const add = (obj) => {
-      if (obj?.isMesh && obj.userData?.kind === 'ground') list.push(obj);
+      if (obj?.isMesh && (obj.userData?.kind === 'ground' || obj.userData?.kind === 'rug')) list.push(obj);
     };
     groundGroup?.children.forEach(add);
     architecture?.traverse((child) => add(child));
@@ -782,8 +826,10 @@ export function createWorld(canvas, state, opts = {}) {
     mining = {
       materialId,
       name: mat.name,
+      mode: 'mine',
       startedAt: performance.now() / 1000,
       duration: MINE_DURATION,
+      yield: MINE_YIELD,
       x: pose?.x ?? shopkeeper.position.x,
       z: pose?.z ?? shopkeeper.position.z,
     };
@@ -793,13 +839,37 @@ export function createWorld(canvas, state, opts = {}) {
     }
   }
 
+  function startChopping(pose) {
+    mining = {
+      materialId: 'logs',
+      name: 'Tree',
+      mode: 'chop',
+      startedAt: performance.now() / 1000,
+      duration: CHOP_DURATION,
+      yield: CHOP_YIELD,
+      x: pose?.x ?? shopkeeper.position.x,
+      z: pose?.z ?? shopkeeper.position.z,
+    };
+    setHeldTool(shopkeeper, 'hatchet');
+    if (pose) {
+      shopkeeper.rotation.y = Math.atan2(pose.x - shopkeeper.position.x, pose.z - shopkeeper.position.z);
+    }
+  }
+
   function tickMining(now) {
     if (!mining) return;
     if (now - mining.startedAt < mining.duration) return;
-    const got = grantMinedMaterial(state, mining.materialId, MINE_YIELD);
+    const amount = mining.yield ?? MINE_YIELD;
+    const got = mining.mode === 'chop'
+      ? grantChoppedLogs(state, amount)
+      : grantMinedMaterial(state, mining.materialId, amount);
     if (got > 0) {
-      pushLog(state, `Mined ${got} ${mining.name}.`);
-      pickHandler?.({ type: 'mined', materialId: mining.materialId, amount: got });
+      pushLog(state, mining.mode === 'chop' ? `Chopped ${got} Logs.` : `Mined ${got} ${mining.name}.`);
+      pickHandler?.({
+        type: mining.mode === 'chop' ? 'chopped' : 'mined',
+        materialId: mining.materialId,
+        amount: got,
+      });
     }
     mining.startedAt = now;
   }
@@ -867,14 +937,27 @@ export function createWorld(canvas, state, opts = {}) {
     const plan = sceneMode === 'dungeon' || type === 'trapdoor' || type === 'ladder'
       ? resolveStationUse(from, pose, state, (start, dest) => (
         planWalk(start, dest, [], PLAYER_RADIUS, sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors)
-      ))
-      : resolveStationUse(from, pose, state);
-    if (plan.action === 'open' || isNearPose(pose, arrive)) {
+      ), type)
+      : resolveStationUse(from, pose, state, planPlayerWalk, type);
+    const standFront = type === 'counter' || type === 'chest';
+    const atStation = standFront
+      ? plan.action === 'open'
+      : (plan.action === 'open' || isNearPose(pose, arrive));
+    if (atStation) {
       pendingUse = null;
       playerPath.length = 0;
       moveMarker.visible = false;
+      if (type === 'counter') {
+        playClick('ui');
+        return;
+      }
       if (type === 'boulder') {
         startMining(pose.materialId, pose);
+        playClick('ui');
+        return;
+      }
+      if (type === 'tree') {
+        startChopping(pose);
         playClick('ui');
         return;
       }
@@ -884,19 +967,42 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     if (plan.action === 'walk' && applyWalkPath(plan.path)) {
-      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true, materialId: pose.materialId };
+      const dest = standFront && plan.dest ? plan.dest : pose;
+      pendingUse = {
+        type,
+        x: dest.x,
+        z: dest.z,
+        arrive: standFront ? 0.55 : arrive,
+        openOnArrive: type !== 'counter',
+        materialId: pose.materialId,
+      };
       playClick('move');
       return;
     }
+    const fallbackDest = standFront && plan.dest ? plan.dest : { x: pose.x, z: pose.z };
     const fallback = sceneMode === 'dungeon'
-      ? planWalk(from, { x: pose.x, z: pose.z }, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
-      : planPlayerWalk(from, { x: pose.x, z: pose.z }, state, PLAYER_RADIUS);
+      ? planWalk(from, fallbackDest, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
+      : planPlayerWalk(from, fallbackDest, state, PLAYER_RADIUS);
     if (applyWalkPath(fallback)) {
-      pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: true, materialId: pose.materialId };
+      pendingUse = {
+        type,
+        x: fallbackDest.x,
+        z: fallbackDest.z,
+        arrive: standFront ? 0.55 : arrive,
+        openOnArrive: type !== 'counter',
+        materialId: pose.materialId,
+      };
       playClick('move');
       return;
     }
-    pendingUse = { type, x: pose.x, z: pose.z, arrive, openOnArrive: false, materialId: pose.materialId };
+    pendingUse = {
+      type,
+      x: fallbackDest.x,
+      z: fallbackDest.z,
+      arrive: standFront ? 0.55 : arrive,
+      openOnArrive: false,
+      materialId: pose.materialId,
+    };
     playClick('ui');
   }
 
@@ -904,7 +1010,9 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pendingUse) return;
     const { type, materialId, x, z } = pendingUse;
     pendingUse = null;
+    if (type === 'counter') return;
     if (type === 'boulder') startMining(materialId, { x, z, materialId });
+    else if (type === 'tree') startChopping({ x, z, materialId: 'logs' });
     else pickHandler?.({ type });
   }
 
@@ -991,7 +1099,59 @@ export function createWorld(canvas, state, opts = {}) {
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
+  function clearTouchHold() {
+    if (touchHold?.timer != null) clearTimeout(touchHold.timer);
+    touchHold = null;
+  }
+
+  function armTouchHold(event) {
+    clearTouchHold();
+    const hold = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      fired: false,
+      timer: null,
+    };
+    hold.timer = setTimeout(() => {
+      if (touchHold !== hold || hold.fired || multiTouch) return;
+      hold.fired = true;
+      camDrag = null;
+      openCanvasContextAt({ clientX: hold.x, clientY: hold.y });
+      ignorePicksUntil = performance.now() + 400;
+    }, TOUCH_LONG_PRESS_MS);
+    touchHold = hold;
+  }
+
   renderer.domElement.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'touch') {
+      canvasTouches.add(event.pointerId);
+      if (canvasTouches.size > 1) {
+        camDrag = null;
+        multiTouch = true;
+        clearTouchHold();
+      }
+    }
+    if (canvasPointerStartsCamOrbit(event, {
+      moveTarget: Boolean(moveTarget),
+      expandMode,
+      modalOpen: modalBlocksWorld(),
+      touchCount: event.pointerType === 'touch' ? canvasTouches.size : 1,
+    })) {
+      event.preventDefault();
+      camDrag = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+      renderer.domElement.setPointerCapture?.(event.pointerId);
+      if (event.button === 1) return;
+    }
+    if (event.pointerType === 'touch' && event.isPrimary !== false && canvasTouches.size === 1) {
+      event.preventDefault();
+      pointerDown.x = event.clientX;
+      pointerDown.y = event.clientY;
+      pointerDown.t = performance.now();
+      renderer.domElement.setPointerCapture?.(event.pointerId);
+      armTouchHold(event);
+      return;
+    }
     if (event.button !== 0) return;
     pointerDown.x = event.clientX;
     pointerDown.y = event.clientY;
@@ -1023,7 +1183,7 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = placeKindOf(target);
     const skip = target.id === 'display' ? { id: 'display', index: target.index } : { id: target.id };
     const blocks = liveObstacles(state, SHOP, skip);
-    return placementBlocked(pose, kind, blocks, floors, { checkAisle: kind !== 'counter' });
+    return placementBlocked(pose, kind, blocks, placeRects, { checkAisle: kind !== 'counter' });
   }
 
   function visualPlacePose() {
@@ -1073,10 +1233,20 @@ export function createWorld(canvas, state, opts = {}) {
     return true;
   }
 
-  function rotateFurniturePose(target) {
+  function rotateFurniturePose(target, dir = 1) {
     const pose = poseOf(target);
     if (!pose) return false;
-    pose.rot = (pose.rot ?? FURNITURE_FORWARD) + FURNITURE_ROT_STEP;
+    const kind = placeKindOf(target);
+    const step = furnitureRotateDelta(kind) * (dir < 0 ? -1 : 1);
+    const nextRot = (pose.rot ?? FURNITURE_FORWARD) + step;
+    if (kind === 'shelf') {
+      const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot);
+      pose.x = snapped.x;
+      pose.z = snapped.z;
+      pose.rot = snapped.rot;
+    } else {
+      pose.rot = nextRot;
+    }
     if (target.id === 'display') applyDisplayPose(target.index);
     else applyFixturePose(target.id);
     rebuildNav();
@@ -1092,9 +1262,21 @@ export function createWorld(canvas, state, opts = {}) {
     return preferChest ? chestHit : closest;
   }
 
+  function releaseCanvasPointer(event) {
+    if (event?.pointerType === 'touch') canvasTouches.delete(event.pointerId);
+    if (canvasTouches.size === 0) multiTouch = false;
+    if (event?.button === 1 || camDrag?.pointerId === event?.pointerId) camDrag = null;
+    if (touchHold && (event?.pointerId == null || touchHold.pointerId === event.pointerId)) {
+      clearTouchHold();
+    }
+  }
+
   renderer.domElement.addEventListener('pointerup', (event) => {
+    try {
+    if (touchHold?.fired) return;
     if (event.button !== 0) return;
     if (performance.now() < ignorePicksUntil) return;
+    if (multiTouch) return;
     if (modalBlocksWorld() && !moveTarget && !expandMode) return;
     const held = performance.now() - pointerDown.t;
     const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
@@ -1162,6 +1344,10 @@ export function createWorld(canvas, state, opts = {}) {
         queueUse('boulder', { x: data.x, z: data.z, materialId: data.materialId });
         return;
       }
+      if (data.kind === 'tree') {
+        queueUse('tree', { x: data.x, z: data.z, materialId: 'logs' });
+        return;
+      }
       if (data.kind === 'chest' && held >= 500) {
         playClick('ui');
         pickHandler?.({ type: 'chest-upgrade' });
@@ -1184,6 +1370,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (data.kind === 'counter') {
+        queueUse('counter', state.furniture.counter);
         return;
       }
       if (data.kind === 'display') {
@@ -1194,7 +1381,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
     }
-    const groundHit = hits.find((h) => h.object.userData.kind === 'ground');
+    const groundHit = hits.find((h) => h.object.userData.kind === 'ground' || h.object.userData.kind === 'rug');
     if (groundHit) {
       const point = groundHit.point;
       const station = stationAtFloor(point.x, point.z, state.furniture);
@@ -1206,6 +1393,15 @@ export function createWorld(canvas, state, opts = {}) {
       if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 1.7) {
         queueUse('trapdoor', hatch);
         return;
+      }
+      if (sceneMode === 'shop') {
+        const tree = gardenTreeSpots(state.expansions ?? []).find((spot) => (
+          Math.hypot(point.x - spot.x, point.z - spot.z) <= 1.15
+        ));
+        if (tree) {
+          queueUse('tree', { x: tree.x, z: tree.z, materialId: 'logs' });
+          return;
+        }
       }
       if (sceneMode === 'dungeon') {
         const spot = DUNGEON_BOULDERS.find((item) => (
@@ -1224,16 +1420,52 @@ export function createWorld(canvas, state, opts = {}) {
         refreshSelection(true);
       }
     }
+    } finally {
+      releaseCanvasPointer(event);
+    }
   });
 
   renderer.domElement.addEventListener('pointermove', (event) => {
+    if (touchHold && touchHold.pointerId === event.pointerId && !touchHold.fired) {
+      if (canvasPointerMovedPastHold(touchHold, event)) {
+        clearTimeout(touchHold.timer);
+        touchHold = null;
+        if (canvasPointerStartsCamOrbit(event, {
+          moveTarget: Boolean(moveTarget),
+          expandMode,
+          modalOpen: modalBlocksWorld(),
+          touchCount: event.pointerType === 'touch' ? canvasTouches.size : 1,
+          moved: true,
+        })) {
+          camDrag = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+        }
+      }
+    }
+    if (camDrag && (camDrag.pointerId == null || camDrag.pointerId === event.pointerId)) {
+      const dx = event.clientX - camDrag.x;
+      const dy = event.clientY - camDrag.y;
+      camDrag = { x: event.clientX, y: event.clientY, pointerId: camDrag.pointerId };
+      cam.yaw -= dx * CAM_ORBIT_YAW;
+      cam.pitch -= dy * CAM_ORBIT_PITCH;
+      clampCam();
+      return;
+    }
     if (!moveTarget) return;
     const point = floorPointFromEvent(event);
     if (point) previewFurnitureAt(point.x, point.z);
   });
 
-  renderer.domElement.addEventListener('contextmenu', (event) => {
-    event.preventDefault();
+  renderer.domElement.addEventListener('pointercancel', (event) => {
+    releaseCanvasPointer(event);
+  });
+  renderer.domElement.addEventListener('auxclick', (event) => {
+    if (event.button === 1) event.preventDefault();
+  });
+  renderer.domElement.addEventListener('mousedown', (event) => {
+    if (event.button === 1) event.preventDefault();
+  });
+
+  function openCanvasContextAt(event) {
     if (modalBlocksWorld() && !moveTarget) return;
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
@@ -1252,6 +1484,21 @@ export function createWorld(canvas, state, opts = {}) {
         type: 'boulder-inspect',
         materialId: data.materialId,
         name: data.name,
+        x: data.x,
+        z: data.z,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      return;
+    }
+    if (data.kind === 'tree') {
+      playClick('ui');
+      pickHandler?.({
+        type: 'tree-inspect',
+        materialId: 'logs',
+        name: 'Tree',
+        x: data.x,
+        z: data.z,
         clientX: event.clientX,
         clientY: event.clientY,
       });
@@ -1275,10 +1522,21 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     pickHandler?.({ type: 'furn-menu', furniture: furn, clientX: event.clientX, clientY: event.clientY });
+  }
+
+  renderer.domElement.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    openCanvasContextAt(event);
   });
 
   renderer.domElement.addEventListener('wheel', (event) => {
     event.preventDefault();
+    if (moveTarget) {
+      const dir = Math.sign(event.deltaY) || 1;
+      rotateFurniturePose(moveTarget, dir);
+      pickHandler?.({ type: 'furniture-rotate', furniture: moveTarget, dir });
+      return;
+    }
     cam.distance += Math.sign(event.deltaY) * CAM_ZOOM_STEP;
     clampCam();
   }, { passive: false });
@@ -1655,7 +1913,7 @@ export function createWorld(canvas, state, opts = {}) {
     spawnActor(typeId, now, request);
   }
 
-  function makeCustomerMesh(typeId, seed) {
+  function makeCustomerMesh(typeId, seed, lookId) {
     if (customCustomerSource) {
       const type = CUSTOMERS[typeId] ?? CUSTOMERS.pilgrim;
       const wrapped = wrapImportedCharacter(customCustomerSource, {
@@ -1669,11 +1927,12 @@ export function createWorld(canvas, state, opts = {}) {
       });
       return wrapped;
     }
-    return buildAdventurer(typeId, { seed });
+    return buildAdventurer(typeId, { seed, lookId });
   }
 
   function spawnActor(typeId, now, request) {
-    const mesh = makeCustomerMesh(typeId, customerSerial + Math.random());
+    const lookId = nextBuyerLookId(typeId);
+    const mesh = makeCustomerMesh(typeId, customerSerial + Math.random(), lookId);
     mesh.userData.pick.userData.customerId = customerSerial;
     mesh.position.set(SHOP.outside.x, 0, SHOP.outside.z + 0.15);
     setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
@@ -1681,6 +1940,7 @@ export function createWorld(canvas, state, opts = {}) {
     const actor = {
       id: customerSerial,
       typeId,
+      lookId,
       mesh,
       state: 'enter',
       path: [
@@ -1703,7 +1963,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (typeId === 'kingroald') {
       pushLog(state, `King Roald arrives, seeking ${RECIPES[request.recipeId].name}.`);
     } else {
-      pushLog(state, `${CUSTOMERS[typeId].name} looks around for ${RECIPES[request.recipeId].name}.`);
+      pushLog(state, `${customerName(typeId)} looks around for ${RECIPES[request.recipeId].name}.`);
     }
   }
 
@@ -1807,7 +2067,7 @@ export function createWorld(canvas, state, opts = {}) {
           actor.id === tradingId ? 0xf0d27a : have ? 0x8ecf4a : 0xe8b45a,
         );
         if (now >= actor.waitUntil) {
-          pushLog(state, `${CUSTOMERS[actor.typeId].name} grows tired and leaves.`);
+          pushLog(state, `${customerName(actor.typeId)} grows tired and leaves.`);
           dismissCustomer(actor, false);
         }
       } else if (actor.state === 'leave') {
@@ -1886,7 +2146,7 @@ export function createWorld(canvas, state, opts = {}) {
       const carried = actor.carried;
       if (carried && actor.mesh.userData.hand) actor.mesh.userData.hand.remove(carried);
       scene.remove(actor.mesh);
-      actor.mesh = makeCustomerMesh(actor.typeId, actor.id);
+      actor.mesh = makeCustomerMesh(actor.typeId, actor.id, actor.lookId);
       actor.mesh.position.copy(pos);
       actor.mesh.rotation.y = rotY;
       if (actor.mesh.userData.pick) actor.mesh.userData.pick.userData.customerId = actor.id;
@@ -2005,6 +2265,10 @@ export function createWorld(canvas, state, opts = {}) {
       applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
       syncLighting(sceneMode);
     },
+    refreshFurniture() {
+      applyAllPoses();
+      syncDisplays();
+    },
     setChestOpen(open) {
       chestOpen = Boolean(open);
     },
@@ -2016,6 +2280,15 @@ export function createWorld(canvas, state, opts = {}) {
     },
     onPick(handler) {
       pickHandler = handler;
+    },
+    useBoulder(pose) {
+      if (!pose) return;
+      if (pose.kind === 'tree') {
+        queueUse('tree', { x: pose.x, z: pose.z, materialId: 'logs' });
+        return;
+      }
+      if (!pose.materialId) return;
+      queueUse('boulder', { x: pose.x, z: pose.z, materialId: pose.materialId });
     },
     getCustomer(id) {
       return customers.find((c) => c.id === id) ?? null;
@@ -2062,7 +2335,7 @@ export function createWorld(canvas, state, opts = {}) {
     },
     beginPlaceUnlock(id) {
       const home = SHOP[id] ?? SHOP.cauldron;
-      const start = snapToFloor(home.x, home.z, floors);
+      const start = snapToFloor(home.x, home.z, placeRects);
       placeDraft = { id, x: start.x, z: start.z, rot: FURNITURE_FORWARD };
       moveTarget = { id };
       placeNeedsConfirm = true;
@@ -2075,17 +2348,25 @@ export function createWorld(canvas, state, opts = {}) {
       pickHandler?.({ type: 'furniture-place-start', furniture: { id } });
     },
     beginPlaceFurniture(kind) {
-      const start = snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, floors);
+      const start = kind === 'shelf'
+        ? snapToWallGrid(0, -3.11, state.expansions ?? [])
+        : snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, placeRects);
       const index = displays.length;
       const spot = {
         id: `new-${kind}-${index}`,
-        name: kind === 'stand' ? 'Mannequin' : 'Table',
+        name: kind === 'stand' ? 'Mannequin' : kind === 'shelf' ? 'Shelf' : 'Table',
         x: start.x,
         z: start.z,
         kind,
       };
       displays.push(makeDisplaySlot(spot, index, start));
-      placeDraft = { id: 'display', index, x: start.x, z: start.z, rot: FURNITURE_FORWARD };
+      placeDraft = {
+        id: 'display',
+        index,
+        x: start.x,
+        z: start.z,
+        rot: start.rot ?? FURNITURE_FORWARD,
+      };
       moveTarget = { id: 'display', index, kind };
       placeNeedsConfirm = true;
       expandMode = false;
@@ -2118,8 +2399,8 @@ export function createWorld(canvas, state, opts = {}) {
     isPlacingUnlock() {
       return Boolean(placeNeedsConfirm);
     },
-    rotateFurniture(target) {
-      return rotateFurniturePose(target);
+    rotateFurniture(target, dir = 1) {
+      return rotateFurniturePose(target, dir);
     },
     isMovingFurniture() {
       return Boolean(moveTarget);
@@ -2157,6 +2438,11 @@ export function createWorld(canvas, state, opts = {}) {
       state.brightness = clampBrightness(value);
       syncLighting(sceneMode);
       return state.brightness;
+    },
+    setDungeonBrightness(value) {
+      state.dungeonBrightness = clampDungeonBrightness(value);
+      syncLighting(sceneMode);
+      return state.dungeonBrightness;
     },
     setChefHat(on) {
       state.chefHat = Boolean(on);
@@ -2231,11 +2517,16 @@ export function createWorld(canvas, state, opts = {}) {
     getMining(now = performance.now() / 1000) {
       if (!mining) return null;
       const t = Math.min(1, Math.max(0, (now - mining.startedAt) / mining.duration));
+      const want = mining.yield ?? MINE_YIELD;
+      const have = state.materials[mining.materialId] ?? 0;
+      const grant = Math.min(want, Math.max(0, MATERIAL_CAP - have));
       return {
         materialId: mining.materialId,
         name: mining.name,
+        mode: mining.mode ?? 'mine',
+        verb: mining.mode === 'chop' ? 'Chopping' : 'Mining',
         t,
-        yield: MINE_YIELD,
+        yield: grant,
       };
     },
     getMinimapSnapshot() {

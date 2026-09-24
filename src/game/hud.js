@@ -1,22 +1,21 @@
 import {
   ANVIL_TABS,
   anvilSubtabsForTab,
-  CUSTOMERS,
   FACE_HAIR,
   HAIR_STYLES,
   MATERIALS,
   PLAYER_COLORS,
   RECIPES,
   SKYBOXES,
-  anvilSubtabForRecipe,
-  anvilTabForRecipe,
   classLabel,
   costLabel,
+  customerName,
   defaultAppearance,
   displayKind,
   formatGold,
   isAmmoRecipe,
   isCraftedMaterial,
+  isCraftOreId,
   isMinedMaterial,
   materialList,
   normalizeAppearance,
@@ -26,12 +25,14 @@ import {
   recipesForTab,
   SHELF_SLOT_LABELS,
   stationForRecipe,
+  craftUiForStation,
 } from './catalog.js';
 import {
   addMusicFiles,
   getMusicTrackName,
   getMusicVolume,
   getPlaylist,
+  isLooping,
   isMusicPlaying,
   isShuffle,
   movePlaylistTrack,
@@ -41,8 +42,11 @@ import {
   playTrackAt,
   removePlaylistTrack,
   setMusicVolume,
+  setLoop,
   skipTrack,
+  startMusicOnLoad,
   stopMusic,
+  toggleLoop,
   toggleShuffle,
 } from './audio.js';
 import {
@@ -75,11 +79,14 @@ import {
   hasStock,
   isMastered,
   isUnlocked,
+  liveFurnitureCount,
+  includedFurnitureCount,
   nextFurnitureCost,
   ownsCauldron,
   ownsStation,
   placeFromChest,
   pushLog,
+  removePlacedFurniture,
   restock,
   offerChoices,
   placeOnDisplay,
@@ -106,13 +113,17 @@ import {
   STATION_UNLOCKS,
 } from './layout.js';
 import { clampMapZoom, drawMinimap, mapToWorld, shopMapBounds } from './minimap.js';
-import { boulderInspect } from './shopbuild.js';
+import { boulderInspect, treeInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
 import {
   brightnessPercent,
   clampBrightness,
+  clampDungeonBrightness,
+  dungeonBrightnessPercent,
   writeStoredBrightness,
+  writeStoredDungeonBrightness,
+  DEFAULT_DUNGEON_BRIGHTNESS,
 } from './lighting.js';
 
 export function bindHud(root, state, world) {
@@ -142,9 +153,11 @@ export function bindHud(root, state, world) {
   const potionModal = document.querySelector('#potion-modal');
   const musicDock = document.querySelector('#music-dock');
   const settingsDock = document.querySelector('#settings-dock');
+  const lookDock = document.querySelector('#look-dock');
   const settingsBtn = document.querySelector('#settings-btn');
   const furnMenu = document.querySelector('#furn-menu');
   const inspectPop = document.querySelector('#inspect-pop');
+  let inspectTarget = null;
   const minimap = document.querySelector('#minimap');
   const minimapWrap = document.querySelector('.minimap-wrap');
   const mapZoomIn = document.querySelector('[data-map-zoom="in"]');
@@ -154,6 +167,7 @@ export function bindHud(root, state, world) {
   const shopFade = document.querySelector('#shop-fade');
   const activeCraft = root.querySelector('#active-craft');
   const activeCraftName = activeCraft?.querySelector('[data-active-craft-name]');
+  const activeCraftYield = activeCraft?.querySelector('[data-active-craft-yield]');
   const chestCapEl = document.querySelector('#chest-cap');
   const expandBtn = document.querySelector('#expand-btn');
   const musicBtn = document.querySelector('#music-btn');
@@ -321,8 +335,14 @@ export function bindHud(root, state, world) {
     container.dataset.ready = '1';
     container.addEventListener('click', (event) => {
       const btn = event.target.closest('[data-restock]');
-      if (!btn) return;
-      if (restock(state, btn.dataset.restock)) render(performance.now() / 1000);
+      if (btn) {
+        if (restock(state, btn.dataset.restock)) render(performance.now() / 1000);
+        return;
+      }
+      const matEl = event.target.closest('[data-mat]');
+      if (matEl && isCraftOreId(matEl.dataset.mat) && !craftModal.hidden) {
+        showPreview(matEl.dataset.mat);
+      }
     });
   }
   fillMats(matsEl);
@@ -370,7 +390,7 @@ export function bindHud(root, state, world) {
   function showPreview(recipeId) {
     const recipe = RECIPES[recipeId];
     if (craftPreview) craftPreview.show(recipeId);
-    const label = recipe?.name ?? 'Select or hover a recipe.';
+    const label = recipe?.name ?? MATERIALS[recipeId]?.name ?? 'Select or hover a recipe.';
     const craftName = craftModal.querySelector('[data-craft-preview-name]');
     if (craftName) craftName.textContent = label;
     syncQtyHint(recipeId);
@@ -503,6 +523,7 @@ export function bindHud(root, state, world) {
 
   function hideInspect() {
     if (inspectPop) inspectPop.hidden = true;
+    inspectTarget = null;
   }
 
   function hideFurnMenu() {
@@ -511,18 +532,24 @@ export function bindHud(root, state, world) {
     hideInspect();
   }
 
-  function showInspect(materialId, clientX, clientY) {
+  function showInspect(materialId, clientX, clientY, pose) {
     if (!inspectPop) return;
     furnMenu.hidden = true;
     furnTarget = null;
-    const info = boulderInspect(materialId);
+    const kind = pose?.kind === 'tree' ? 'tree' : 'boulder';
+    inspectTarget = materialId
+      ? { materialId, x: pose?.x, z: pose?.z, kind }
+      : null;
+    const info = kind === 'tree' ? treeInspect() : boulderInspect(materialId);
     const nameEl = inspectPop.querySelector('[data-inspect-name]');
     const blurbEl = inspectPop.querySelector('[data-inspect-blurb]');
+    const mineBtn = inspectPop.querySelector('[data-inspect-mine]');
     if (nameEl) nameEl.textContent = info.name;
     if (blurbEl) blurbEl.textContent = info.blurb;
+    if (mineBtn) mineBtn.textContent = kind === 'tree' ? 'Chop' : 'Mine';
     inspectPop.hidden = false;
     const x = Math.min(window.innerWidth - 250, Math.max(8, clientX ?? 24));
-    const y = Math.min(window.innerHeight - 140, Math.max(8, clientY ?? 80));
+    const y = Math.min(window.innerHeight - 180, Math.max(8, clientY ?? 80));
     inspectPop.style.left = `${x}px`;
     inspectPop.style.top = `${y}px`;
   }
@@ -531,7 +558,12 @@ export function bindHud(root, state, world) {
     if (musicDock) musicDock.hidden = true;
   }
 
+  function closeLookDock() {
+    if (lookDock) lookDock.hidden = true;
+  }
+
   function closeSettingsDock() {
+    closeLookDock();
     if (settingsDock) settingsDock.hidden = true;
   }
 
@@ -549,20 +581,9 @@ export function bindHud(root, state, world) {
     const recipe = options.focusId ? RECIPES[options.focusId] : null;
     craftStation = recipe ? stationForRecipe(recipe) : station;
     craftFocusId = options.focusId ?? null;
-    if (craftStation === 'range') craftTab = 'food';
-    else if (craftStation === 'cauldron') craftTab = 'potion';
-    else if (craftStation === 'furnace') craftTab = 'smelt';
-    else if (craftStation === 'wheel') craftTab = 'spin';
-    else {
-      craftTab = recipe ? anvilTabForRecipe(recipe) : (craftTab === 'food' || craftTab === 'potion' ? 'melee' : craftTab);
-      craftSubtab = recipe
-        ? anvilSubtabForRecipe(recipe)
-        : (craftSubtab === 'armour' || craftSubtab === 'ammo' || craftSubtab === 'rune' || craftSubtab === 'hatchet' || craftSubtab === 'pickaxe' ? craftSubtab : 'weapon');
-      if (craftTab !== 'ranged' && craftSubtab === 'ammo') craftSubtab = 'weapon';
-      if (craftTab !== 'magic' && craftSubtab === 'rune') craftSubtab = 'weapon';
-      if (craftTab !== 'tools' && (craftSubtab === 'hatchet' || craftSubtab === 'pickaxe')) craftSubtab = 'weapon';
-      if (craftTab === 'tools' && craftSubtab !== 'hatchet' && craftSubtab !== 'pickaxe') craftSubtab = 'hatchet';
-    }
+    const ui = craftUiForStation(craftStation, { tab: craftTab, subtab: craftSubtab }, recipe);
+    craftTab = ui.tab;
+    craftSubtab = ui.subtab;
     potionModal.hidden = true;
     craftModal.hidden = false;
     const reason = craftFocusId ? craftBlockReason(state, craftFocusId) : '';
@@ -861,7 +882,7 @@ export function bindHud(root, state, world) {
     const have = hasStock(state, actor.requestRecipeId);
     const offer = actor.offer;
     const offerMat = offer ? MATERIALS[offer.materialId] : null;
-    tradeModal.querySelector('[data-trade-title]').textContent = CUSTOMERS[actor.typeId].name;
+    tradeModal.querySelector('[data-trade-title]').textContent = customerName(actor.typeId);
     tradeModal.querySelector('[data-trade-want]').textContent = `Wants ${recipe.name}.`;
     tradeModal.querySelector('[data-trade-offer]').textContent = `Offers ${formatGold(actor.offerGold)}g.`;
     const haveEl = tradeModal.querySelector('[data-trade-have]');
@@ -987,7 +1008,7 @@ export function bindHud(root, state, world) {
       return;
     }
     playClick('trade');
-    pushLog(state, `Sold ${RECIPES[recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${formatGold(paid)}g.`);
+    pushLog(state, `Sold ${RECIPES[recipeId].name} to ${customerName(actor.typeId)} for ${formatGold(paid)}g.`);
     world.sellToActor(actor);
     world.syncDisplays();
     closeTrade();
@@ -997,7 +1018,7 @@ export function bindHud(root, state, world) {
   tradeModal.querySelector('[data-trade-refuse]').addEventListener('click', () => {
     const actor = tradeActor && world.getCustomer(tradeActor.id);
     if (actor) {
-      pushLog(state, `You refuse ${CUSTOMERS[actor.typeId].name}.`);
+      pushLog(state, `You refuse ${customerName(actor.typeId)}.`);
       world.refuseActor(actor);
     }
     closeTrade();
@@ -1010,7 +1031,7 @@ export function bindHud(root, state, world) {
     if (buyFromCustomer(state, actor.offer.materialId, actor.offer.price)) {
       playClick('trade');
       const mat = MATERIALS[actor.offer.materialId];
-      pushLog(state, `Bought ${mat.name} from ${CUSTOMERS[actor.typeId].name} for ${formatGold(actor.offer.price)}g.`);
+      pushLog(state, `Bought ${mat.name} from ${customerName(actor.typeId)} for ${formatGold(actor.offer.price)}g.`);
       world.buyFromActor(actor);
       closeTrade();
       render(performance.now() / 1000);
@@ -1026,7 +1047,7 @@ export function bindHud(root, state, world) {
     const recipe = RECIPES[actor.requestRecipeId];
     const craftNote = tradeModal.querySelector('[data-trade-craft-note]');
     if (recipe?.category === 'potion' && !ownsCauldron(state)) {
-      const msg = 'Place a cauldron from Upgrade to brew potions.';
+      const msg = 'Place a cauldron from Build to brew potions.';
       if (craftNote) {
         craftNote.hidden = false;
         craftNote.textContent = msg;
@@ -1110,7 +1131,7 @@ export function bindHud(root, state, world) {
       return;
     }
     playClick('trade');
-    pushLog(state, `Offered ${RECIPES[choice.recipeId].name} to ${CUSTOMERS[actor.typeId].name} for ${formatGold(paid)}g (reduced from ${formatGold(choice.listPrice)}g).`);
+    pushLog(state, `Offered ${RECIPES[choice.recipeId].name} to ${customerName(actor.typeId)} for ${formatGold(paid)}g (reduced from ${formatGold(choice.listPrice)}g).`);
     actor.requestRecipeId = choice.recipeId;
     world.sellToActor(actor);
     world.syncDisplays();
@@ -1214,6 +1235,12 @@ export function bindHud(root, state, world) {
     if (displayBtn) displayBtn.hidden = !canDisplay;
     if (fillBtn) fillBtn.hidden = !canFill;
     if (upgradeBtn) upgradeBtn.hidden = target.id !== 'chest';
+    const deleteBtn = furnMenu.querySelector('[data-furn-delete]');
+    const deleteKind = target.id === 'display' ? displayKind(target.index, state) : null;
+    const canDelete = target.id === 'display'
+      && (deleteKind === 'shelf' || deleteKind === 'table' || deleteKind === 'stand')
+      && !state.displays[target.index]?.removed;
+    if (deleteBtn) deleteBtn.hidden = !canDelete;
     furnMenu.hidden = false;
     const x = Math.min(window.innerWidth - 230, Math.max(8, clientX ?? 24));
     const y = Math.min(window.innerHeight - 220, Math.max(8, clientY ?? 80));
@@ -1372,15 +1399,20 @@ export function bindHud(root, state, world) {
       const itemBuy = buildModal.querySelector(`[data-${station.id}-buy]`);
       if (!itemStatus || !itemBuy) continue;
       if (ownsStation(state, station.id)) {
+        itemStatus.hidden = false;
         itemStatus.textContent = `Placed in the shop. Click it to use, or right-click to move.`;
         itemStatus.classList.remove('craft-note');
         itemBuy.disabled = true;
         itemBuy.textContent = 'Owned';
       } else {
-        itemStatus.textContent = `Costs ${formatGold(station.cost)} gp.`;
+        const paid = station.cost > 0;
+        itemStatus.hidden = !paid;
+        itemStatus.textContent = paid ? `Costs ${formatGold(station.cost)} gp.` : '';
         itemStatus.classList.remove('craft-note');
         itemBuy.disabled = !canBuyStation(state, station.id);
-        itemBuy.textContent = `Buy · ${formatGold(station.cost)} gp`;
+        itemBuy.textContent = paid
+          ? `Buy · ${formatGold(station.cost)} gp`
+          : 'Place · Free';
       }
     }
     const expandStatus = buildModal.querySelector('[data-expand-status]');
@@ -1398,20 +1430,39 @@ export function bindHud(root, state, world) {
         expandBuy.textContent = `Place Room · ${formatGold(cost)}g`;
       }
     }
-    for (const type of ['table', 'mannequin']) {
+    for (const type of ['table', 'mannequin', 'shelf']) {
       const itemStatus = buildModal.querySelector(`[data-${type}-status]`);
       const itemBuy = buildModal.querySelector(`[data-${type}-buy]`);
       if (!itemStatus || !itemBuy) continue;
       const cost = nextFurnitureCost(state, type);
       const label = furnitureLabelForType(type);
       const bought = state.boughtFurniture?.[type] ?? 0;
-      const extra = bought === 0
-        ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
-        : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
+      const extra = type === 'shelf'
+        ? (() => {
+          const live = liveFurnitureCount(state, 'shelf');
+          const included = includedFurnitureCount('shelf');
+          if (live < included) {
+            return `${live} of ${included} included shelves are placed. Replacement is free.`;
+          }
+          return bought === 0
+            ? `First ${included} shelves are included. The next costs ${formatGold(cost)}g.`
+            : `Next shelf costs ${formatGold(cost)}g (${bought} bought).`;
+        })()
+        : (() => {
+          const free = state.freeFurnitureReplace?.[type] ?? 0;
+          if (free > 0 || cost === 0) {
+            return free > 0
+              ? `${free} free replacement${free === 1 ? '' : 's'} left after deleting.`
+              : `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`;
+          }
+          return bought === 0
+            ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
+            : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
+        })();
       itemStatus.textContent = extra;
       itemStatus.classList.remove('craft-note');
       itemBuy.disabled = false;
-      itemBuy.textContent = `Buy · ${formatGold(cost)} gp`;
+      itemBuy.textContent = cost === 0 ? 'Place · Free' : `Buy · ${formatGold(cost)} gp`;
     }
   }
 
@@ -1426,7 +1477,9 @@ export function bindHud(root, state, world) {
     if (blurb) {
       blurb.textContent = STATION_UNLOCKS.some((item) => item.id === pendingPlace.type)
         ? 'Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Double-click a highlighted cell to confirm.'
-        : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
+        : pendingPlace.type === 'shelf'
+          ? 'Move the shelf on the wall grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.'
+          : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
     }
     if (costEl) costEl.textContent = `Cost: ${formatGold(pendingPlace.cost)} gp.`;
     if (note) {
@@ -1501,8 +1554,11 @@ export function bindHud(root, state, world) {
     const label = stationLabel(id).toLowerCase();
     const status = buildModal.querySelector(`[data-${id}-status]`);
     if (!canBuyStation(state, id)) {
-      const msg = `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(state.gold)}g.`;
+      const msg = cost > 0
+        ? `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(state.gold)}g.`
+        : `A ${label} is already placed.`;
       if (status) {
+        status.hidden = false;
         status.textContent = msg;
         status.classList.add('craft-note');
       }
@@ -1524,6 +1580,7 @@ export function bindHud(root, state, world) {
   }
   buildModal.querySelector('[data-table-buy]')?.addEventListener('click', () => startFurniturePlace('table'));
   buildModal.querySelector('[data-mannequin-buy]')?.addEventListener('click', () => startFurniturePlace('mannequin'));
+  buildModal.querySelector('[data-shelf-buy]')?.addEventListener('click', () => startFurniturePlace('shelf'));
   function confirmPendingPlace() {
     if (!pendingPlace) return;
     const check = world.tryConfirmPlace?.() ?? { ok: Boolean(world.getPlacePose()), pose: world.getPlacePose() };
@@ -1551,7 +1608,9 @@ export function bindHud(root, state, world) {
       }
       world.confirmPlaceUnlock();
       closePlace();
-      pushLog(state, `Placed a ${stationLabel(pending.type).toLowerCase()} for ${formatGold(cost)} gp.`);
+      pushLog(state, cost > 0
+        ? `Placed a ${stationLabel(pending.type).toLowerCase()} for ${formatGold(cost)} gp.`
+        : `Placed a ${stationLabel(pending.type).toLowerCase()}.`);
       render(performance.now() / 1000);
       return;
     }
@@ -1586,6 +1645,11 @@ export function bindHud(root, state, world) {
   });
 
   inspectPop?.querySelector('[data-inspect-close]')?.addEventListener('click', hideInspect);
+  inspectPop?.querySelector('[data-inspect-mine]')?.addEventListener('click', () => {
+    const target = inspectTarget;
+    hideInspect();
+    if (target?.materialId) world.useBoulder?.(target);
+  });
   inspectPop?.addEventListener('click', (event) => {
     if (event.target === inspectPop) hideInspect();
   });
@@ -1605,6 +1669,22 @@ export function bindHud(root, state, world) {
     const target = furnTarget;
     hideFurnMenu();
     if (target?.id === 'display') openFillPicker(target);
+  });
+  furnMenu.querySelector('[data-furn-delete]')?.addEventListener('click', () => {
+    const target = furnTarget;
+    hideFurnMenu();
+    if (target?.id !== 'display') return;
+    if (!removePlacedFurniture(state, target.index)) return;
+    playClick('ui');
+    const removedKind = displayKind(target.index, state);
+    const removedLabel = removedKind === 'shelf' ? 'wall shelf'
+      : removedKind === 'stand' ? 'mannequin'
+        : 'table';
+    pushLog(state, `Removed the ${removedLabel}.`);
+    world.refreshFurniture?.();
+    world.refreshSelection?.(true);
+    paintBuild();
+    render(performance.now() / 1000);
   });
   furnMenu.querySelector('[data-furn-use]').addEventListener('click', () => {
     const target = furnTarget;
@@ -1731,12 +1811,18 @@ export function bindHud(root, state, world) {
     const tracks = getPlaylist();
     const track = getMusicTrackName();
     const shuffleBtn = musicDock.querySelector('[data-music-shuffle]');
+    const loopBtn = musicDock.querySelector('[data-music-loop]');
     if (nameEl) {
       nameEl.textContent = track
         ? `${isMusicPlaying() ? 'Playing' : 'Paused'}: ${track}`
         : 'No track loaded. Upload MP3, WAV, or OGG files.';
     }
     if (shuffleBtn) shuffleBtn.classList.toggle('is-on', isShuffle());
+    if (loopBtn) {
+      const on = isLooping();
+      loopBtn.classList.toggle('is-on', on);
+      loopBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
     if (vol) vol.value = String(Math.round((state.music?.volume ?? getMusicVolume()) * 100));
     if (list) {
       if (!tracks.length) {
@@ -1784,6 +1870,13 @@ export function bindHud(root, state, world) {
     if (musicDock) musicDock.hidden = false;
   }
 
+  function persistMusic() {
+    if (!state.music) state.music = { volume: DEFAULT_MUSIC_VOLUME, loop: false, track: '' };
+    state.music.volume = getMusicVolume();
+    state.music.loop = isLooping();
+    state.music.track = getMusicTrackName() || state.music.track || '';
+  }
+
   musicBtn?.addEventListener('click', () => {
     if (musicDock?.hidden === false) closeMusicDock();
     else openMusic();
@@ -1827,29 +1920,39 @@ export function bindHud(root, state, world) {
       return;
     }
     await playMusic();
+    persistMusic();
     paintMusic();
   });
   musicDock?.querySelector('[data-music-pause]')?.addEventListener('click', () => {
     pauseMusic();
+    persistMusic();
     paintMusic();
   });
   musicDock?.querySelector('[data-music-shuffle]')?.addEventListener('click', () => {
     toggleShuffle();
     paintMusic();
   });
+  musicDock?.querySelector('[data-music-loop]')?.addEventListener('click', () => {
+    toggleLoop();
+    persistMusic();
+    paintMusic();
+  });
   musicDock?.querySelector('[data-music-stop]')?.addEventListener('click', () => {
     stopMusic();
+    persistMusic();
     paintMusic();
   });
   musicDock?.querySelector('[data-music-skip]')?.addEventListener('click', async () => {
     await skipTrack();
+    persistMusic();
     paintMusic();
   });
   musicDock?.querySelector('[data-music-volume]')?.addEventListener('input', (event) => {
     const volume = Number(event.target.value) / 100;
     setMusicVolume(volume);
-    if (!state.music) state.music = { volume: DEFAULT_MUSIC_VOLUME };
+    if (!state.music) state.music = { volume: DEFAULT_MUSIC_VOLUME, loop: false, track: '' };
     state.music.volume = volume;
+    persistMusic();
   });
   musicDock?.querySelector('[data-playlist]')?.addEventListener('click', async (event) => {
     const playBtn = event.target.closest('[data-play-track]');
@@ -1860,9 +1963,11 @@ export function bindHud(root, state, world) {
     if (up) movePlaylistTrack(Number(up.dataset.moveUp), Number(up.dataset.moveUp) - 1);
     if (down) movePlaylistTrack(Number(down.dataset.moveDown), Number(down.dataset.moveDown) + 1);
     if (remove) removePlaylistTrack(Number(remove.dataset.removeTrack));
+    persistMusic();
     paintMusic();
   });
   setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
+  setLoop(Boolean(state.music?.loop));
 
   function lookOptions(slot) {
     if (slot === 'hair') return HAIR_STYLES;
@@ -1870,10 +1975,15 @@ export function bindHud(root, state, world) {
     return PLAYER_COLORS[slot] ?? [];
   }
 
+  function lookRoot() {
+    return lookDock;
+  }
+
   function fillLookGrids() {
-    if (!settingsDock) return;
+    const root = lookRoot();
+    if (!root) return;
     for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
-      const row = settingsDock.querySelector(`[data-look="${slot}"]`);
+      const row = root.querySelector(`[data-look="${slot}"]`);
       if (!row || row.dataset.ready) continue;
       row.innerHTML = lookOptions(slot).map((item) => (
         `<button type="button" data-look-id="${item.id}">${item.label}</button>`
@@ -1890,29 +2000,26 @@ export function bindHud(root, state, world) {
         if (applied === false) {
           state.appearance = next;
         }
+        paintLook();
         paintSettings();
         render(performance.now() / 1000);
       });
     }
   }
 
-  function paintSettings() {
-    if (!settingsDock) return;
+  function paintLook() {
+    const root = lookRoot();
+    if (!root) return;
     fillLookGrids();
-    const current = state.skybox ?? 'blue';
-    for (const btn of settingsDock.querySelectorAll('[data-skybox]')) {
-      btn.classList.toggle('is-on', btn.dataset.skybox === current);
-    }
-    paintBrightness();
     const look = normalizeAppearance(state.appearance);
     for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
-      const row = settingsDock.querySelector(`[data-look="${slot}"]`);
+      const row = root.querySelector(`[data-look="${slot}"]`);
       if (!row) continue;
       for (const btn of row.querySelectorAll('[data-look-id]')) {
         btn.classList.toggle('is-on', btn.dataset.lookId === look[slot]);
       }
     }
-    const note = settingsDock.querySelector('[data-look-note]');
+    const note = root.querySelector('[data-look-note]');
     if (note) {
       note.textContent = world.hasCustomPlayer?.()
         ? 'A custom player mesh is active. Walking still works; hair and colour customizer may not apply until you clear the upload.'
@@ -1922,20 +2029,50 @@ export function bindHud(root, state, world) {
     }
   }
 
+  function paintSettings() {
+    if (!settingsDock) return;
+    const current = state.skybox ?? 'blue';
+    for (const btn of settingsDock.querySelectorAll('[data-skybox]')) {
+      btn.classList.toggle('is-on', btn.dataset.skybox === current);
+    }
+    paintBrightness();
+  }
+
+  function openLookDock() {
+    closeBuild();
+    closeExpand();
+    closeMusicDock();
+    hideFurnMenu();
+    paintLook();
+    if (settingsDock) settingsDock.hidden = true;
+    if (lookDock) lookDock.hidden = false;
+  }
+
+  function backToSettings() {
+    closeLookDock();
+    paintSettings();
+    if (settingsDock) settingsDock.hidden = false;
+  }
+
   function openSettings() {
     closeBuild();
     closeExpand();
     closeMusicDock();
+    closeLookDock();
     hideFurnMenu();
     paintSettings();
     if (settingsDock) settingsDock.hidden = false;
   }
 
   settingsBtn?.addEventListener('click', () => {
-    if (settingsDock?.hidden === false) closeSettingsDock();
+    if (settingsDock?.hidden === false || lookDock?.hidden === false) closeSettingsDock();
     else openSettings();
   });
   settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
+  settingsDock?.querySelector('[data-look-open]')?.addEventListener('click', openLookDock);
+  lookDock?.querySelector('[data-look-back]')?.addEventListener('click', backToSettings);
+  lookDock?.querySelector('[data-look-close]')?.addEventListener('click', closeSettingsDock);
+  paintLook();
   settingsDock?.querySelector('[data-skybox-list]')?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-skybox]');
     if (!btn) return;
@@ -1953,6 +2090,14 @@ export function bindHud(root, state, world) {
       slider.setAttribute('aria-valuenow', String(pct));
     }
     if (label) label.textContent = `${pct}%`;
+    const dungeonSlider = settingsDock?.querySelector('[data-dungeon-brightness]');
+    const dungeonLabel = settingsDock?.querySelector('[data-dungeon-brightness-label]');
+    const dungeonPct = dungeonBrightnessPercent(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
+    if (dungeonSlider) {
+      dungeonSlider.value = String(dungeonPct);
+      dungeonSlider.setAttribute('aria-valuenow', String(dungeonPct));
+    }
+    if (dungeonLabel) dungeonLabel.textContent = `${dungeonPct}%`;
   }
 
   function applyBrightnessFromSlider(raw) {
@@ -1963,8 +2108,19 @@ export function bindHud(root, state, world) {
     paintBrightness();
   }
 
+  function applyDungeonBrightnessFromSlider(raw) {
+    const next = clampDungeonBrightness(Number(raw) / 100);
+    state.dungeonBrightness = next;
+    writeStoredDungeonBrightness(next);
+    world.setDungeonBrightness?.(next);
+    paintBrightness();
+  }
+
   settingsDock?.querySelector('[data-brightness]')?.addEventListener('input', (event) => {
     applyBrightnessFromSlider(event.target.value);
+  });
+  settingsDock?.querySelector('[data-dungeon-brightness]')?.addEventListener('input', (event) => {
+    applyDungeonBrightnessFromSlider(event.target.value);
   });
   settingsDock?.querySelector('[data-cheat-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -2010,7 +2166,16 @@ export function bindHud(root, state, world) {
   world.onPick((event) => {
     if (event.type !== 'furn-menu') hideFurnMenu();
     if (event.type === 'boulder-inspect') {
-      showInspect(event.materialId, event.clientX, event.clientY);
+      showInspect(event.materialId, event.clientX, event.clientY, event);
+    }
+    if (event.type === 'tree-inspect') {
+      showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'tree' });
+    }
+    if (event.type === 'mined' || event.type === 'chopped') {
+      if (activeCraftYield) {
+        activeCraftYield.classList.add('is-grant');
+        window.setTimeout(() => activeCraftYield.classList.remove('is-grant'), 280);
+      }
     }
     if (event.type === 'chest') openChest();
     if (event.type === 'anvil') openCraft('anvil');
@@ -2088,11 +2253,15 @@ export function bindHud(root, state, world) {
         world.syncDisplays();
         world.refreshSelection(true);
         setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
+        setLoop(Boolean(state.music?.loop));
         writeStoredBrightness(state.brightness ?? DEFAULT_BRIGHTNESS);
+        writeStoredDungeonBrightness(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
         world.setBrightness?.(state.brightness ?? DEFAULT_BRIGHTNESS);
+        world.setDungeonBrightness?.(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
         paintCrafts();
         paintMusic();
         paintSettings();
+        paintLook();
         pushLog(state, 'Shop loaded from a file.');
       }
     } catch {
@@ -2231,8 +2400,12 @@ export function bindHud(root, state, world) {
       const mining = world.getMining?.(now);
       if (mining) {
         activeCraft.hidden = false;
-        if (activeCraftName) activeCraftName.textContent = `Mining ${mining.name}`;
+        if (activeCraftName) activeCraftName.textContent = `${mining.verb ?? 'Mining'} ${mining.name}`;
         activeCraft.style.setProperty('--t', String(mining.t ?? 0));
+        if (activeCraftYield) {
+          activeCraftYield.hidden = false;
+          activeCraftYield.textContent = `+${mining.yield ?? 0}`;
+        }
       } else if (busyId) {
         const progress = craftProgress(state, busyId, now);
         activeCraft.hidden = false;
@@ -2241,9 +2414,11 @@ export function bindHud(root, state, world) {
           activeCraftName.textContent = `Crafting ${RECIPES[busyId].name}${batch}`;
         }
         activeCraft.style.setProperty('--t', String(progress?.t ?? 0));
+        if (activeCraftYield) activeCraftYield.hidden = true;
       } else {
         activeCraft.hidden = true;
         activeCraft.style.setProperty('--t', '0');
+        if (activeCraftYield) activeCraftYield.hidden = true;
       }
     }
     const chestKey = chestList(state).map((item) => `${item.recipeId}:${item.count}`).join('|');
@@ -2290,5 +2465,19 @@ export function bindHud(root, state, world) {
     }
   }
 
-  return { render, openChest, openTrade, openCraft, openOfferPicker, selectOfferItem };
+  async function tryStartMusic() {
+    const savedVolume = state.music?.volume ?? DEFAULT_MUSIC_VOLUME;
+    const savedTrack = state.music?.track ?? '';
+    const result = await startMusicOnLoad({
+      volume: savedVolume,
+      muted: savedVolume <= 0,
+      track: savedTrack,
+      loop: Boolean(state.music?.loop),
+    });
+    persistMusic();
+    paintMusic();
+    return result;
+  }
+
+  return { render, openChest, openTrade, openCraft, openOfferPicker, selectOfferItem, tryStartMusic };
 }

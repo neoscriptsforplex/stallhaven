@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import './canvas-mock.js';
 import * as THREE from 'three';
-import { frameCraftPreview } from './craftpreview.js';
+import { frameCraftPreview, isRunePreview, poseRuneForFrontView } from './craftpreview.js';
 import { buildWare } from './models.js';
 
 describe('craft preview framing', () => {
@@ -23,5 +23,40 @@ describe('craft preview framing', () => {
       const aim = camera.position.clone().addScaledVector(dir, framed.dist);
       assert.ok(Math.abs(aim.y - center.y) < framed.radius * 0.25, `${id} should aim at the item center`);
     }
+  });
+
+  it('frames runes from the front so the glyph face is visible', () => {
+    assert.equal(isRunePreview('air_rune'), true);
+    assert.equal(isRunePreview('bronze_sword'), false);
+    const camera = new THREE.PerspectiveCamera(38, 1.15, 0.05, 20);
+    const ware = buildWare('air_rune');
+    poseRuneForFrontView(ware);
+    const glyph = new THREE.Vector3(0, 1, 0).applyQuaternion(ware.quaternion);
+    assert.ok(glyph.z > 0.85, `glyph +Y should face the +Z camera, z=${glyph.z}`);
+    const framed = frameCraftPreview(ware, camera, 1.42, null, { view: 'front' });
+    assert.ok(framed);
+    assert.equal(framed.view, 'front');
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    assert.ok(dir.z < -0.9, 'rune camera should look along -Z at the glyph, not down');
+    assert.ok(Math.abs(dir.y) < 0.15, 'rune camera should not be elevated');
+    assert.ok(Math.abs(camera.position.y - framed.center.y) < framed.radius * 0.35);
+    poseRuneForFrontView(ware, 1.2);
+    const spun = new THREE.Vector3(0, 1, 0).applyQuaternion(ware.quaternion);
+    assert.ok(spun.z > 0.85, 'in-plane spin must keep the glyph facing the camera');
+    const sword = buildWare('bronze_sword');
+    const other = new THREE.PerspectiveCamera(38, 1.15, 0.05, 20);
+    frameCraftPreview(sword, other);
+    assert.ok(other.position.x > other.position.y * 0.5, 'non-rune preview keeps the three-quarter camera');
+  });
+
+  it('frames craft-screen ore dumps with the default three-quarter camera', () => {
+    const camera = new THREE.PerspectiveCamera(38, 1.15, 0.05, 20);
+    const ware = buildWare('bronze');
+    const framed = frameCraftPreview(ware, camera);
+    assert.ok(framed);
+    assert.equal(framed.view, 'default');
+    assert.ok(camera.position.x > camera.position.y * 0.5, 'ore preview keeps the three-quarter camera');
+    assert.equal(isRunePreview('bronze'), false);
   });
 });

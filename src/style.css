@@ -539,6 +539,16 @@ button:disabled {
   color: #f0d9a8;
 }
 
+.active-craft-yield {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  color: #c8e39a;
+}
+
+.active-craft-yield.is-grant {
+  color: #e8f4b8;
+}
+
 .chest-tally {
   margin: 0 0 8px;
   color: var(--gold);
@@ -617,6 +627,11 @@ button:disabled {
   background: rgba(16, 10, 6, 0.55);
   z-index: 20;
   pointer-events: auto;
+}
+
+#craft-modal,
+#potion-modal {
+  background: rgba(16, 10, 6, 0.18);
 }
 
 #offer-modal {
@@ -910,9 +925,25 @@ body.modal-open #view {
   color: var(--gold);
 }
 
-[data-music-shuffle].is-on {
+[data-music-shuffle].is-on,
+[data-music-loop].is-on,
+#music-dock [data-music-loop].is-on {
   border-color: var(--gold);
   background: linear-gradient(#8a5a30, #5a3518);
+}
+
+#music-dock {
+  width: min(340px, calc(100vw - 32px));
+}
+
+#music-dock .music-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+#music-dock .music-tabs .tab {
+  white-space: nowrap;
 }
 
 .playlist-name {
@@ -996,6 +1027,11 @@ body.modal-open #view {
   border-top: 1px solid var(--line);
 }
 
+.build-item .meta:empty {
+  display: none;
+  margin: 0;
+}
+
 .build-item h3 {
   margin: 0 0 6px;
   font-size: 1rem;
@@ -1030,6 +1066,67 @@ body.modal-open #view {
 
 .settings-bright input {
   width: 100%;
+}
+
+html.is-booting #view,
+html.is-booting #hud,
+html.is-booting #save-bar {
+  visibility: hidden;
+}
+
+#boot-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  background: #050403;
+  color: #e6d3b2;
+  font: 600 0.95rem Georgia, serif;
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
+
+#boot-cover.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#boot-cover[hidden] {
+  display: none;
+}
+
+.boot-track {
+  width: min(22rem, 72vw);
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid #8a6a3b;
+  background: #1a140e;
+}
+
+.boot-bar {
+  width: 18%;
+  height: 100%;
+  background: linear-gradient(#f0d27a, #c49a48);
+  transition: width 0.2s ease;
+  animation: boot-slide 1.2s ease-in-out infinite;
+}
+
+.boot-bar.is-progress {
+  animation: none;
+}
+
+@keyframes boot-slide {
+  0%,
+  100% { opacity: 0.72; }
+  50% { opacity: 1; }
+}
+
+[data-look-open] {
+  width: 100%;
+  margin: 6px 0 12px;
 }
 
 .cheat-form {

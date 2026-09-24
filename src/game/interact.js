@@ -1,4 +1,5 @@
 import { PLAYER_RADIUS, planPlayerWalk } from './nav.js';
+import { furnitureVisualYaw } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel'];
 export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder']);
@@ -10,7 +11,7 @@ export const STATION_HIT = {
   range: { w: 2.4, h: 3.3, d: 2.2, pickY: 1.6, floorR: 1.55 },
   furnace: { w: 1.28, h: 1.7, d: 1.2, pickY: 0.8, floorR: 1.05 },
   cauldron: { w: 1.15, h: 1.55, d: 1.15, pickY: 0.74, floorR: 1.0 },
-  wheel: { w: 1.2, h: 1.6, d: 1.15, pickY: 0.74, floorR: 1.0 },
+  wheel: { w: 1.85, h: 2.4, d: 1.8, pickY: 1.1, floorR: 1.35 },
   boulder: { w: 1.4, h: 1.2, d: 1.4, pickY: 0.52, floorR: 1.15 },
 };
 
@@ -30,20 +31,51 @@ const APPROACH_OFFSETS = [
   [0, 0],
 ];
 
+const APPROACH_DIST = 0.85;
+const STAND_FRONT = new Set(['counter', 'chest']);
+
+/**
+ * Local +Z is the cook-face on the range and the shopkeeper side of the
+ * counter. The chest latch is dump local −X (into the room at visual yaw 0).
+ */
+function facingApproachOffsets(kind, pose) {
+  const yaw = furnitureVisualYaw(kind, pose?.rot ?? 0);
+  const face = kind === 'chest' ? yaw - Math.PI / 2 : yaw;
+  const fx = Math.sin(face);
+  const fz = Math.cos(face);
+  const rx = Math.cos(face);
+  const rz = -Math.sin(face);
+  return [
+    [fx * APPROACH_DIST, fz * APPROACH_DIST],
+    [fx * 0.7, fz * 0.7],
+    [fx * 1.15, fz * 1.15],
+    [rx * APPROACH_DIST, rz * APPROACH_DIST],
+    [-rx * APPROACH_DIST, -rz * APPROACH_DIST],
+    [-fx * APPROACH_DIST, -fz * APPROACH_DIST],
+    [fx * 0.65 + rx * 0.65, fz * 0.65 + rz * 0.65],
+    [fx * 0.65 - rx * 0.65, fz * 0.65 - rz * 0.65],
+    [0, 0],
+  ];
+}
+
 export function isNearPoint(from, to, dist) {
   return Math.hypot((from?.x ?? 0) - (to?.x ?? 0), (from?.z ?? 0) - (to?.z ?? 0)) <= dist;
+}
+
+function isWalkFloorKind(kind) {
+  return kind === 'ground' || kind === 'rug';
 }
 
 export function pickUseHit(hits) {
   if (!hits?.length) return null;
   const useHit = hits.find((hit) => USE_KINDS.has(hit.object?.userData?.kind));
   const closestKind = hits[0].object?.userData?.kind;
-  if (useHit && (!closestKind || closestKind === 'ground' || closestKind === 'expand-pad' || USE_KINDS.has(closestKind))) {
+  if (useHit && (!closestKind || isWalkFloorKind(closestKind) || closestKind === 'expand-pad' || USE_KINDS.has(closestKind))) {
     return useHit;
   }
   return hits.find((hit) => {
     const kind = hit.object?.userData?.kind;
-    return kind && kind !== 'ground' && kind !== 'customer' && kind !== 'expand-pad';
+    return kind && !isWalkFloorKind(kind) && kind !== 'customer' && kind !== 'expand-pad';
   }) ?? null;
 }
 
@@ -61,10 +93,22 @@ export function stationAtFloor(x, z, furniture = {}) {
   return best;
 }
 
-export function resolveStationUse(from, pose, state, planFn = planPlayerWalk) {
+export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, kind = null) {
   if (!pose) return { action: 'none' };
+  if (STAND_FRONT.has(kind)) {
+    const offsets = facingApproachOffsets(kind, pose);
+    const stand = { x: pose.x + offsets[0][0], z: pose.z + offsets[0][1] };
+    if (isNearPoint(from, stand, 0.5)) return { action: 'open', dest: stand };
+    for (const [dx, dz] of offsets) {
+      const dest = { x: pose.x + dx, z: pose.z + dz };
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      if (path.length) return { action: 'walk', path, dest };
+    }
+    return { action: 'blocked' };
+  }
   if (isNearPoint(from, pose, STATION_ARRIVE)) return { action: 'open' };
-  for (const [dx, dz] of APPROACH_OFFSETS) {
+  const offsets = kind === 'range' ? facingApproachOffsets(kind, pose) : APPROACH_OFFSETS;
+  for (const [dx, dz] of offsets) {
     const dest = { x: pose.x + dx, z: pose.z + dz };
     const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
     if (path.length) return { action: 'walk', path, dest };

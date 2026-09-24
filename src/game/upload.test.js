@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
-import { bundledModelBases, bundledModelRoots, parseModelBuffer } from './upload.js';
+import { bundledModelBases, bundledModelRoots, isDungeonRockDump, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { UPLOADS_CLEARED } from './storage.js';
 
 function file(name) {
@@ -73,5 +73,80 @@ describe('bundled model paths', () => {
       if (child.isMesh) meshes += 1;
     });
     assert.ok(meshes > 0);
+  });
+
+  it('keeps Blender OBJ face meshes when the dump also has edge lines', async () => {
+    const objPath = join(dirname(fileURLToPath(import.meta.url)), '../../public/models/fountain/fountain.obj');
+    const obj = readFileSync(objPath, 'utf8');
+    assert.match(obj, /^l /m);
+    assert.match(obj, /^f /m);
+    const buf = readFileSync(objPath);
+    const scene = await parseModelBuffer(
+      buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
+      'fountain.obj',
+    );
+    let meshes = 0;
+    let verts = 0;
+    scene.traverse((child) => {
+      if (!child.isMesh) return;
+      meshes += 1;
+      verts += child.geometry?.getAttribute?.('position')?.count ?? 0;
+    });
+    assert.ok(meshes > 0, 'fountain dump must load as a mesh, not only LineSegments');
+    assert.ok(verts > 80, `fountain dump should keep face verts, got ${verts}`);
+  });
+
+  it('lifts dungeon-rocks OBJ/MTL dumps once and leaves outdoor rocks alone', async () => {
+    const modelsRoot = join(dirname(fileURLToPath(import.meta.url)), '../../public/models');
+    async function loadDump(folder) {
+      const base = folder.split('/').pop();
+      const obj = readFileSync(join(modelsRoot, folder, `${base}.obj`));
+      const mtl = readFileSync(join(modelsRoot, folder, `${base}.mtl`));
+      return parseModelBuffer(
+        obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength),
+        `${folder}/${base}.obj`,
+        { [`${base}.mtl`]: mtl.buffer.slice(mtl.byteOffset, mtl.byteOffset + mtl.byteLength) },
+      );
+    }
+    for (const folder of [
+      'dungeon-rocks/bronze-rocks',
+      'dungeon-rocks/iron-rocks',
+      'dungeon-rocks/steel-rocks',
+      'dungeon-rocks/mithril-rocks',
+      'dungeon-rocks/adamant-rocks',
+      'dungeon-rocks/rune-rocks',
+      'dungeon-rocks/dragon-rocks',
+      'dungeon-rocks/essence',
+    ]) {
+      assert.equal(isDungeonRockDump(folder), true);
+      const scene = await loadDump(folder);
+      assert.equal(scene.userData.dungeonRockLift, true);
+      let lifted = 0;
+      scene.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        if (mats.every((mat) => mat?.isMeshStandardMaterial && mat.userData?.dungeonRockLift && mat.metalness === 0)) {
+          lifted += 1;
+        }
+      });
+      assert.ok(lifted >= 1, `${folder} should lift at parse time`);
+      const colorBefore = [];
+      scene.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) colorBefore.push(mat.color.getHex());
+      });
+      prepareDungeonRockMaterials(scene);
+      const colorAfter = [];
+      scene.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) colorAfter.push(mat.color.getHex());
+      });
+      assert.deepEqual(colorAfter, colorBefore, `${folder} must not double-lift`);
+    }
+    assert.equal(isDungeonRockDump('rock'), false);
+    const outdoor = await loadDump('rock');
+    assert.notEqual(outdoor.userData?.dungeonRockLift, true);
   });
 });

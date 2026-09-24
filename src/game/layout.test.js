@@ -3,15 +3,22 @@ import assert from 'node:assert/strict';
 import {
   CAULDRON_COST,
   WHEEL_COST,
+  FURNACE_COST,
+  RANGE_COST,
+  FURNITURE_SHOP,
+  TREE_BED_CLEAR,
   furnaceBesideAnvil,
   poseRect,
   rectsOverlap,
   CHEST_MAX_LEVEL,
   EXPANSION_PADS,
+  CHEST_UPRIGHT_YAW,
+  CHEST_YAW_CLOCKWISE,
   FURNITURE_FORWARD,
   FURNITURE_ROT_STEP,
   FURNITURE_START_YAW,
   furnitureHalfSize,
+  furnitureRotateDelta,
   furnitureVisualYaw,
   rotatedFootprint,
   SWAP_PRICE_RATIO,
@@ -22,27 +29,44 @@ import {
   furnitureBuyCost,
   gardenTreeSpots,
   gardenRockSpots,
+  gardenRockRadius,
   gardenTrapdoorSpot,
   gardenBedSpots,
+  pointHitsTrapdoor,
+  segmentHitsTrapdoor,
+  TRAPDOOR,
+  TRAPDOOR_HOLE_CLEAR,
+  PATH_HALF_W,
   gardenGrassClusters,
   gardenBox,
   cobblePathSpan,
   keepFountain,
   keepGardenSpot,
   FOUNTAIN,
+  shopRugPose,
+  shopRugRect,
   occupiedCells,
   padConnects,
   pointHitsShop,
   padById,
   rotatePose,
   snapToFloor,
+  snapGridSpan,
+  snapGridLines,
+  snapToWallGrid,
   walkFloors,
+  placeFloors,
+  interiorFloors,
   wallVineMounts,
   outdoorWalkFloors,
   playerWalkFloors,
   doorwayFloor,
   roomCenter,
   roomFloor,
+  roomInteriorFloor,
+  roomPlaceFloor,
+  SHELF_FROM_WALL,
+  ORIGIN_FLOOR,
 } from './layout.js';
 import { FLOOR, isWalkable, shopObstacles } from './nav.js';
 import { SHOP } from './catalog.js';
@@ -88,13 +112,31 @@ describe('layout numbers', () => {
     assert.equal(occupiedCells(['left', 'back']).length, 3);
   });
 
-  it('yaws chest, range, and furnace −90° CCW from above and the counter 180° at start only', () => {
-    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (-Math.PI / 2)) < 1e-9);
+  it('keeps the origin rug on the shop floor and off furniture pads', () => {
+    const pose = shopRugPose();
+    const box = shopRugRect();
+    assert.ok(pose.x === 0);
+    assert.ok(pose.z > SHOP.counter.z);
+    assert.ok(box.maxX < 2);
+    assert.ok(box.minZ > SHOP.counter.z);
+  });
+
+  it('yaws the chest latch into the room toward the counter, and range/furnace −90° at start only', () => {
+    // Gameplay yaw still uses furniture.rot. Start yaw is around +Y only — never X pitch.
+    const wrapTau = (yaw) => ((yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    assert.equal(CHEST_UPRIGHT_YAW, Math.PI);
+    assert.equal(furnitureRotateDelta('chest'), FURNITURE_ROT_STEP);
+    assert.equal(furnitureRotateDelta('anvil'), FURNITURE_ROT_STEP);
+    assert.ok(Math.abs(furnitureRotateDelta('shelf') - Math.PI / 2) < 1e-9);
+    assert.ok(Math.abs(CHEST_YAW_CLOCKWISE - furnitureRotateDelta('chest') * 6) < 1e-9);
+    assert.ok(Math.abs(CHEST_YAW_CLOCKWISE - Math.PI / 2) < 1e-9);
+    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE * 2)) < 1e-9);
+    assert.ok(Math.abs(wrapTau(FURNITURE_START_YAW.chest) - wrapTau(0)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.range - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.furnace - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.counter - Math.PI) < 1e-9);
     assert.equal(FURNITURE_START_YAW.anvil, undefined);
-    assert.ok(Math.abs(furnitureVisualYaw('chest', 0) - (-Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(wrapTau(furnitureVisualYaw('chest', 0)) - wrapTau(0)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('range', FURNITURE_ROT_STEP) - (-Math.PI / 2 + FURNITURE_ROT_STEP)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('furnace', 0) - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('counter', 0) - Math.PI) < 1e-9);
@@ -106,42 +148,47 @@ describe('layout numbers', () => {
     assert.equal(furniture.counter.rot, FURNITURE_FORWARD);
     assert.equal(furniture.anvil.rot, FURNITURE_FORWARD);
     assert.equal(furniture.chest.rot, FURNITURE_FORWARD);
-    assert.equal(furniture.range.rot, FURNITURE_FORWARD);
+    assert.equal(furniture.range, null);
     for (const pose of furniture.displays) {
       assert.equal(pose.rot, FURNITURE_FORWARD);
     }
-    const turned = rotatePose(furniture.range, 1);
-    assert.ok(Math.abs(turned.rot - FURNITURE_ROT_STEP) < 1e-9);
     assert.equal(furniture.cauldron, null);
-    assert.ok(furniture.furnace);
-    assert.equal(furniture.furnace.x, SHOP.furnace.x);
-    assert.equal(furniture.furnace.z, SHOP.furnace.z);
-    assert.equal(furniture.furnace.rot, FURNITURE_FORWARD);
+    assert.equal(furniture.furnace, null);
     assert.equal(furniture.wheel, null);
   });
 
-  it('sits the starter furnace on the back wall, not overlapping the side-wall anvil', () => {
-    assert.ok(SHOP.furnace.z < SHOP.anvil.z - 1.4, 'furnace should sit on the back wall');
-    assert.ok(SHOP.furnace.x > SHOP.anvil.x);
+  it('keeps the spinning wheel footprint at half the prior 4× live size', () => {
+    assert.deepEqual(furnitureHalfSize('wheel'), { hw: 0.72, hd: 0.64 });
+  });
+
+  it('sits the starter anvil on the old furnace back-wall pad', () => {
+    assert.ok(SHOP.anvil.z < SHOP.counter.z - 0.2, 'anvil should sit on the back wall');
+    assert.ok(SHOP.anvil.x < 0);
     const beside = furnaceBesideAnvil({ x: -2.98, z: -2.42, rot: 0 });
     assert.equal(beside.x, SHOP.furnace.x);
     assert.equal(beside.z, SHOP.furnace.z);
   });
 
-  it('puts the cooking range on the back wall and the chest on the right wall', () => {
-    assert.ok(SHOP.range.x > 0, 'range should sit on the right half of the back wall');
-    assert.ok(SHOP.range.z < SHOP.counter.z - 0.2, 'range should sit behind the counter');
-    assert.ok(SHOP.chest.x > 2.6, 'chest should sit on the right wall');
-    assert.ok(SHOP.chest.z > SHOP.range.z + 1.4, 'chest should sit forward of the back-wall range');
-    assert.ok(SHOP.anvil.x < -2.6, 'anvil should sit on the left wall');
+  it('puts the chest flush on the right stone wall with the latch into the room', () => {
+    const wrapTau = (yaw) => ((yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const interior = roomInteriorFloor();
+    const { hw } = furnitureHalfSize('chest');
+    const box = poseRect('chest', { ...SHOP.chest, rot: FURNITURE_FORWARD });
+    assert.ok(SHOP.chest.x > 3.4, 'chest should sit on the right wall, not mid-floor');
+    assert.ok(SHOP.chest.z < SHOP.counter.z - 0.2, 'chest stays at the back-right depth');
+    assert.ok(Math.abs(SHOP.chest.x - (interior.maxX - hw)) < 1e-6, 'back of chest flush on interior face');
+    assert.ok(Math.abs(box.maxX - interior.maxX) < 0.04, `chest should sit flush on the right wall, maxX=${box.maxX}`);
+    assert.ok(
+      Math.abs(wrapTau(furnitureVisualYaw('chest', 0)) - wrapTau(0)) < 1e-9,
+      'two 90° Rotates from door-wall upright; latch into the shop',
+    );
+    assert.ok(SHOP.anvil.x < -1.8, 'anvil should sit on the left half of the back wall');
   });
 
   it('keeps starter stations from overlapping each other or remaining tables', () => {
     const stations = [
       ['anvil', SHOP.anvil],
       ['chest', SHOP.chest],
-      ['furnace', SHOP.furnace],
-      ['range', SHOP.range],
       ['counter', SHOP.counter],
     ];
     const rects = stations.map(([kind, pose]) => poseRect(kind, pose));
@@ -232,6 +279,21 @@ describe('layout numbers', () => {
     assert.equal(leftRocks.some((spot) => spot.side === 'left'), false);
   });
 
+  it('treats the dungeon hatch opening as a grass-free hole', () => {
+    assert.ok(TRAPDOOR.x > PATH_HALF_W, 'hatch sits on the right of the cobble path');
+    assert.ok(TRAPDOOR_HOLE_CLEAR >= 0.9, 'hole clear must cover leaning lawn blades');
+    assert.equal(pointHitsTrapdoor(TRAPDOOR.x, TRAPDOOR.z), true);
+    assert.equal(pointHitsTrapdoor(TRAPDOOR.x + TRAPDOOR_HOLE_CLEAR + 0.02, TRAPDOOR.z), false);
+    assert.equal(segmentHitsTrapdoor(TRAPDOOR.x + 0.8, TRAPDOOR.z, TRAPDOOR.x + 0.9, TRAPDOOR.z, 0.55), false);
+    assert.equal(segmentHitsTrapdoor(TRAPDOOR.x + 0.7, TRAPDOOR.z, TRAPDOOR.x, TRAPDOOR.z, 0.55), true);
+    assert.ok(gardenTrapdoorSpot([]));
+    assert.equal(gardenTrapdoorSpot([]).x, TRAPDOOR.x);
+    const nearHatch = gardenGrassClusters([]).filter((c) => (
+      Math.hypot(c.x - TRAPDOOR.x, c.z - TRAPDOOR.z) < 1.22
+    ));
+    assert.equal(nearHatch.length, 0, 'lawn clusters should stay off the hatch');
+  });
+
   it('snaps furniture on both floor axes, not only sideways', () => {
     const floors = walkFloors([]);
     const side = snapToFloor(1.37, 0.11, floors);
@@ -239,6 +301,39 @@ describe('layout numbers', () => {
     assert.ok(Math.abs(side.x - 1.4) < 1e-9);
     assert.ok(Math.abs(along.z - 1.4) < 1e-9);
     assert.notEqual(along.z, side.z);
+  });
+
+  it('snaps floor furniture onto cells that reach the interior walls', () => {
+    const floors = placeFloors([]);
+    const shop = roomPlaceFloor(0, 0);
+    assert.ok(shop.minX < ORIGIN_FLOOR.minX);
+    assert.ok(shop.maxX > ORIGIN_FLOOR.maxX);
+    assert.ok(shop.minZ < ORIGIN_FLOOR.minZ);
+    assert.ok(shop.maxZ > ORIGIN_FLOOR.maxZ);
+    const { start: minX, end: maxX } = snapGridSpan(shop.minX, shop.maxX);
+    const { start: minZ, end: maxZ } = snapGridSpan(shop.minZ, shop.maxZ);
+    assert.ok(minX <= shop.minX + 1e-9);
+    assert.ok(maxX >= shop.maxX - 1e-9);
+    assert.ok(minZ <= shop.minZ + 1e-9);
+    assert.ok(maxZ >= shop.maxZ - 1e-9);
+    const interior = roomInteriorFloor(0, 0);
+    const left = snapToFloor(shop.minX, 0, floors);
+    const back = snapToFloor(0, shop.minZ, floors);
+    const front = snapToFloor(0, shop.maxZ, floors);
+    assert.ok(Math.abs(left.x - shop.minX) <= 0.2 + 1e-6, `left snap ${left.x} vs wall ${shop.minX}`);
+    assert.ok(Math.abs(back.z - shop.minZ) <= 0.2 + 1e-6, `back snap ${back.z} vs wall ${shop.minZ}`);
+    assert.ok(Math.abs(back.z - interior.minZ) <= 0.05 + 1e-6, `back snap ${back.z} vs interior ${interior.minZ}`);
+    assert.ok(Math.abs(front.z - interior.maxZ) <= 0.05 + 1e-6, `front snap ${front.z} vs interior ${interior.maxZ}`);
+    assert.ok(left.x < ORIGIN_FLOOR.minX, 'edge cells must sit past the old inset floor');
+    assert.ok(back.z < ORIGIN_FLOOR.minZ, 'edge cells must sit past the old inset floor');
+    const { xs, zs } = snapGridLines(interior);
+    assert.ok(Math.abs(xs[0] - interior.minX) < 1e-9, `left grid line ${xs[0]} vs wall ${interior.minX}`);
+    assert.ok(Math.abs(xs.at(-1) - interior.maxX) < 1e-9, `right grid line ${xs.at(-1)} vs wall ${interior.maxX}`);
+    assert.ok(Math.abs(zs[0] - interior.minZ) < 1e-9, `back grid line ${zs[0]} vs wall ${interior.minZ}`);
+    assert.ok(Math.abs(zs.at(-1) - interior.maxZ) < 1e-9, `front grid line ${zs.at(-1)} vs wall ${interior.maxZ}`);
+    const overlay = interiorFloors([]);
+    assert.equal(overlay.length >= 1, true);
+    assert.ok(Math.abs(overlay[0].minZ - interior.minZ) < 1e-9);
   });
 
   it('keeps side and rear expansion floors walkable through doorways', () => {
@@ -271,5 +366,103 @@ describe('layout numbers', () => {
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, shopObstacles(SHOP), 0.28, player), true);
     assert.equal(isWalkable(0, SHOP.door.z, [], 0.28, player), true);
     assert.equal(isWalkable(0, 4.6, [], 0.28, player), true);
+  });
+
+  it('keeps garden trees and large rocks off flower beds', () => {
+    const beds = gardenBedSpots([]);
+    assert.ok(beds.length >= 3);
+    for (const tree of gardenTreeSpots([])) {
+      for (const bed of beds) {
+        const dist = Math.hypot(tree.x - bed.x, tree.z - bed.z);
+        assert.ok(dist >= TREE_BED_CLEAR, `tree at ${tree.x},${tree.z} overlaps bed at ${bed.x},${bed.z}`);
+      }
+    }
+    for (const rock of gardenRockSpots([])) {
+      for (const bed of beds) {
+        const dist = Math.hypot(rock.x - bed.x, rock.z - bed.z);
+        assert.ok(dist >= TREE_BED_CLEAR, `rock at ${rock.x},${rock.z} overlaps bed at ${bed.x},${bed.z}`);
+      }
+    }
+  });
+
+  it('places a few large outdoor rocks at 2–3× the usual garden scale', () => {
+    const rocks = gardenRockSpots([]);
+    const large = rocks.filter((spot) => spot.scale >= 2 && spot.scale <= 3);
+    assert.ok(large.length >= 3, `expected decorative boulders, got ${large.map((s) => s.scale)}`);
+    assert.ok(rocks.some((spot) => spot.scale < 1.2), 'small path rocks should remain');
+  });
+
+  it('keeps outdoor rocks on the grass, not the blue void', () => {
+    const grass = gardenBox([]);
+    const rocks = gardenRockSpots([]);
+    assert.ok(rocks.length >= 2);
+    for (const rock of rocks) {
+      const pad = gardenRockRadius(rock.scale ?? 1);
+      assert.ok(rock.x >= grass.minX + pad - 1e-9, `rock x=${rock.x} off grass`);
+      assert.ok(rock.x <= grass.maxX - pad + 1e-9, `rock x=${rock.x} off grass`);
+      assert.ok(rock.z >= grass.minZ + pad - 1e-9, `rock z=${rock.z} off grass`);
+      assert.ok(rock.z <= grass.maxZ - pad + 1e-9, `rock z=${rock.z} off grass`);
+    }
+    assert.equal(rocks.some((spot) => spot.z > 12.8), false);
+    const voidSide = [
+      { x: 6.15, z: 13.45 },
+      { x: -5.85, z: 13.15 },
+    ];
+    for (const miss of voidSide) {
+      assert.equal(
+        rocks.some((spot) => Math.hypot(spot.x - miss.x, spot.z - miss.z) < 0.5),
+        false,
+        `void rock at ${miss.x},${miss.z} should not spawn`,
+      );
+    }
+  });
+
+  it('snaps extra shelves to a wall grid instead of the floor', () => {
+    const interior = roomInteriorFloor(0, 0);
+    const back = snapToWallGrid(0.13, -2.9, []);
+    const front = snapToWallGrid(0.13, 3.0, []);
+    const side = snapToWallGrid(-3.5, 0.11, []);
+    assert.ok(Math.abs(back.z - (interior.minZ + SHELF_FROM_WALL)) < 1e-6);
+    assert.ok(Math.abs(back.rot) < 1e-6);
+    assert.ok(Math.abs(front.z - (interior.maxZ - SHELF_FROM_WALL)) < 1e-6);
+    assert.ok(Math.abs(Math.abs(front.rot) - Math.PI) < 1e-6);
+    assert.ok(Math.abs(side.x - (interior.minX + SHELF_FROM_WALL)) < 1e-6);
+    assert.ok(Math.abs(Math.abs(side.rot) - Math.PI / 2) < 1e-6);
+    for (const id of ['shelf-left', 'shelf-right', 'shelf-center']) {
+      const spot = SHOP.displays.find((d) => d.id === id);
+      assert.ok(spot, id);
+      const placed = snapToWallGrid(spot.x, spot.z, []);
+      assert.ok(Math.abs(placed.z - back.z) < 1e-9, `${id} should sit on the back-wall mount`);
+      assert.ok(Math.abs(placed.rot) < 1e-6, `${id} should face into the room like a back-wall mount`);
+    }
+    const furniture = defaultFurniture();
+    for (const id of ['shelf-left', 'shelf-right', 'shelf-center']) {
+      const index = SHOP.displays.findIndex((d) => d.id === id);
+      const pose = furniture.displays[index];
+      assert.ok(Math.abs(pose.z - back.z) < 1e-9, `starter ${id} z=${pose.z}`);
+      assert.ok(Math.abs(pose.rot) < 1e-6, `starter ${id} rot=${pose.rot}`);
+    }
+    const right = snapToWallGrid(3.5, 0.11, []);
+    assert.ok(Math.abs(right.x - (interior.maxX - SHELF_FROM_WALL)) < 1e-6);
+    assert.ok(Math.abs(right.rot + Math.PI / 2) < 1e-6);
+    assert.ok(Math.abs((back.z - interior.minZ) - (interior.maxX - right.x)) < 1e-6, 'back and side use the same wall depth');
+    assert.ok(Math.abs((interior.maxZ - front.z) - (interior.maxX - right.x)) < 1e-6, 'front and side use the same wall depth');
+    const frontCorner = snapToWallGrid(0.2, 3.4, []);
+    assert.ok(Math.abs(Math.abs(frontCorner.rot) - Math.PI) < 1e-6, `front snap rot=${frontCorner.rot}`);
+    assert.ok(Math.abs(frontCorner.z - front.z) < 1e-9);
+    const backCorner = snapToWallGrid(0.2, -3.2, []);
+    assert.ok(Math.abs(backCorner.rot) < 1e-6, `back snap rot=${backCorner.rot}`);
+    assert.ok(Math.abs(backCorner.z - back.z) < 1e-9);
+  });
+
+  it('lists furnace and range as free upgrade stations and shelves in the furniture shop', () => {
+    assert.equal(FURNACE_COST, 0);
+    assert.equal(RANGE_COST, 0);
+    assert.equal(furnitureBuyCost(0), 500);
+    assert.equal(furnitureBuyCost(1), 1500);
+    assert.ok(FURNITURE_SHOP.some((item) => item.type === 'shelf' && item.kind === 'shelf'));
+    const table = furnitureHalfSize('table');
+    assert.equal(table.hw, 0.76);
+    assert.equal(table.hd, 0.51);
   });
 });

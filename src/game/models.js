@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import {
+  BUYER_PACKS,
   CUSTOMERS,
+  customerName,
+  craftOreLookId,
+  isCraftOreId,
   pickMageRobes,
   pickMercenaryPlate,
   pickPilgrimCiv,
@@ -828,12 +832,20 @@ export function buildPickaxe() {
   return group;
 }
 
+export function buildHatchet(tint = 0x8a5a32) {
+  const group = new THREE.Group();
+  group.name = 'hatchet';
+  addHatchet(group, tint);
+  return group;
+}
+
 export function setHeldTool(mesh, tool) {
   const hammers = mesh?.userData?.hammers ?? [];
   for (const part of hammers) {
     if (part) part.visible = tool === 'hammer';
   }
   if (mesh?.userData?.pickaxe) mesh.userData.pickaxe.visible = tool === 'pickaxe';
+  if (mesh?.userData?.hatchet) mesh.userData.hatchet.visible = tool === 'hatchet';
 }
 
 export function updateMinePose(mesh, dt = 0.016, now = 0) {
@@ -939,12 +951,16 @@ export function buildShopkeeper(opts = {}) {
   hammerHead.position.set(0.12, 0.3, 0.04);
   const pickaxe = buildPickaxe();
   pickaxe.visible = false;
+  const hatchet = buildHatchet();
+  hatchet.visible = false;
   const hand = group.userData.hand;
   if (hand) {
     hand.add(hammerHaft);
     hand.add(hammerHead);
     hand.add(pickaxe);
+    hand.add(hatchet);
     poseHeldPickaxe(pickaxe);
+    poseHeldPickaxe(hatchet);
   } else {
     hammerHaft.position.set(pose.handR.x, pose.handR.y + 0.08, pose.handR.z + 0.04);
     group.add(hammerHaft);
@@ -956,11 +972,18 @@ export function buildShopkeeper(opts = {}) {
     pickaxe.position.x += pose.handR.x;
     pickaxe.position.y += pose.handR.y;
     pickaxe.position.z += pose.handR.z;
+    hatchet.position.set(pose.handR.x, pose.handR.y, pose.handR.z);
+    group.add(hatchet);
+    poseHeldPickaxe(hatchet);
+    hatchet.position.x += pose.handR.x;
+    hatchet.position.y += pose.handR.y;
+    hatchet.position.z += pose.handR.z;
   }
   hammerHaft.visible = false;
   hammerHead.visible = false;
   group.userData.hammers = [hammerHaft, hammerHead];
   group.userData.pickaxe = pickaxe;
+  group.userData.hatchet = hatchet;
 
   const chefHat = buildChefHat();
   chefHat.position.y = pose.headTop + 0.02;
@@ -997,13 +1020,25 @@ export function setChefHatVisible(keeper, on) {
   if (hat) hat.visible = Boolean(on);
 }
 
+export const ANVIL_WORLD_SCALE = 0.5;
+
+function applyAnvilWorldScale(mesh) {
+  mesh.scale.multiplyScalar(ANVIL_WORLD_SCALE);
+  mesh.updateMatrixWorld(true);
+  sitVisibleOnY(mesh, 0);
+  if (mesh.userData.wareY != null) mesh.userData.wareY *= ANVIL_WORLD_SCALE;
+  return mesh;
+}
+
 export function buildAnvil() {
   const bundled = getBundledLook('anvil');
+  const target = applyAnvilWorldScale(buildProceduralAnvil());
   if (bundled) {
-    const target = buildProceduralAnvil();
-    return wrapBundledProp(bundled, target, { name: 'anvil', fit: 'max', label: 'Anvil', wareY: 'top' });
+    const fitted = wrapBundledProp(bundled, target, { name: 'anvil', fit: 'max', label: 'Anvil', wareY: 'top' });
+    sitVisibleOnY(fitted, 0);
+    return fitted;
   }
-  return buildProceduralAnvil();
+  return target;
 }
 
 function buildProceduralAnvil() {
@@ -1127,6 +1162,11 @@ export function buildWare(recipeId) {
   const recipe = RECIPES[recipeId];
   const group = new THREE.Group();
   group.name = recipeId;
+  if (!recipe && isCraftOreId(recipeId)) {
+    addOreWare(group, recipeId);
+    group.userData.recipeId = recipeId;
+    return group;
+  }
   const shape = recipe?.shape;
   const tint = recipe?.tint ?? 0x888888;
   const builders = {
@@ -1170,24 +1210,12 @@ export function buildWare(recipeId) {
     dhide_chaps: () => addChaps(group, tint),
     dhide_vambraces: () => addVambraces(group, tint),
     dhide_boots: () => addBoots(group, tint, false),
-    bread: () => addBread(group, tint),
-    pizza: () => addPizza(group, tint),
-    cake: () => addCake(group, tint),
-    pie: () => addPie(group, tint, 0xb45a4a),
-    fish_pie: () => addPie(group, tint, 0x7a9aaa),
-    salmon: () => addFish(group, tint, 1),
-    lobster: () => addLobster(group, tint),
-    chocolate_cake: () => addCake(group, tint, 0x3a2218),
-    monkfish: () => addFish(group, tint, 1.12),
-    curry: () => addCurry(group, tint),
-    shark: () => addFish(group, tint, 1.35),
-    summer_pie: () => addPie(group, tint, 0xe8a04a),
-    anglerfish: () => addFish(group, tint, 1.22, true),
     potion: () => addPotion(group, tint),
     bar: () => addMetalBar(group, tint),
     bow_string: () => addBowStringCoil(group, tint),
   };
-  if (builders[shape]) builders[shape]();
+  if (recipe?.category === 'food') addFoodWare(group, recipe);
+  else if (builders[shape]) builders[shape]();
   else {
     const lump = addShadow(new THREE.Mesh(
       new THREE.BoxGeometry(0.28, 0.18, 0.22),
@@ -1670,7 +1698,96 @@ function addCannonballs(group, tint) {
   }
 }
 
+function foodLookId(recipeId) {
+  return `food-${String(recipeId ?? '').replaceAll('_', '-')}`;
+}
+
+function buildProceduralOreLump(tint = 0x888888) {
+  const group = new THREE.Group();
+  const lump = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.18, 0.22),
+    new THREE.MeshStandardMaterial({ color: tint, roughness: 0.6 }),
+  ));
+  lump.position.y = 0.1;
+  group.add(lump);
+  return group;
+}
+
+function addOreWare(group, metalId) {
+  const lookId = craftOreLookId(metalId);
+  const bundled = getBundledLook(lookId);
+  const tint = RECIPES[`smelt_${metalId}`]?.tint ?? 0x888888;
+  if (bundled) {
+    group.add(wrapBundledProp(bundled, buildProceduralOreLump(tint), { name: lookId, fit: 'max' }));
+    return;
+  }
+  group.add(buildProceduralOreLump(tint));
+}
+
+function addFoodWare(group, recipe) {
+  const lookId = foodLookId(recipe?.id);
+  const bundled = getBundledLook(lookId);
+  if (bundled) {
+    const target = buildProceduralFood(recipe);
+    group.add(wrapBundledProp(bundled, target, { name: lookId, fit: 'max' }));
+    return;
+  }
+  addProceduralFood(group, recipe);
+}
+
+function buildProceduralFood(recipe) {
+  const group = new THREE.Group();
+  addProceduralFood(group, recipe);
+  return group;
+}
+
+function addProceduralFood(group, recipe) {
+  const tint = recipe?.tint ?? 0x888888;
+  const shape = recipe?.shape ?? recipe?.id;
+  const builders = {
+    bread: () => addBread(group, tint),
+    pizza: () => addPizza(group, tint),
+    cake: () => addCake(group, tint),
+    pie: () => addPie(group, tint, 0xb45a4a),
+    fish_pie: () => addPie(group, tint, 0x7a9aaa),
+    salmon: () => addFish(group, tint, 1),
+    lobster: () => addLobster(group, tint),
+    chocolate_cake: () => addCake(group, tint, 0x3a2218),
+    monkfish: () => addFish(group, tint, 1.12),
+    curry: () => addCurry(group, tint),
+    shark: () => addFish(group, tint, 1.35),
+    summer_pie: () => addPie(group, tint, 0xe8a04a),
+    anglerfish: () => addFish(group, tint, 1.22, true),
+  };
+  if (builders[shape]) builders[shape]();
+  else {
+    const lump = addShadow(new THREE.Mesh(
+      new THREE.BoxGeometry(0.28, 0.18, 0.22),
+      new THREE.MeshStandardMaterial({ color: tint, roughness: 0.6 }),
+    ));
+    lump.position.y = 0.1;
+    group.add(lump);
+  }
+}
+
 function addRune(group, mark, tint) {
+  const bundled = getBundledLook(`rune-${mark}`);
+  if (bundled) {
+    const target = buildProceduralRuneMark(mark, tint);
+    const fitted = wrapBundledProp(bundled, target, { name: `rune-${mark}`, fit: 'max' });
+    group.add(fitted);
+    return;
+  }
+  addProceduralRune(group, mark, tint);
+}
+
+function buildProceduralRuneMark(mark, tint) {
+  const group = new THREE.Group();
+  addProceduralRune(group, mark, tint);
+  return group;
+}
+
+function addProceduralRune(group, mark, tint) {
   const stone = new THREE.MeshStandardMaterial({
     color: 0x8a8a90,
     roughness: 0.55,
@@ -2009,11 +2126,21 @@ export function buildChest() {
   const bundled = getBundledLook('chest');
   if (bundled) {
     const target = buildProceduralChest();
-    const fitted = wrapBundledProp(bundled, target, { name: 'chest', fit: 'height', label: 'Chest' });
+    const fitted = wrapBundledProp(bundled, target, {
+      name: 'chest',
+      fit: 'height',
+      label: 'Chest',
+      // Dump is already Y-up / sitting on y=0. Do not bake an X pitch.
+      rotateX: 0,
+      rotateY: 0,
+      rotateZ: 0,
+    });
+    fitted.rotation.set(0, 0, 0);
     fitted.userData.lid = fitted.userData.lid ?? null;
     sitVisibleOnY(fitted, SHOP_FURNITURE_FLOOR_Y);
     const root = new THREE.Group();
     root.name = 'chest';
+    root.rotation.set(0, 0, 0);
     root.add(fitted);
     root.userData.lid = fitted.userData.lid ?? null;
     return root;
@@ -2630,7 +2757,50 @@ export const CUSTOMER_LOOKS = {
   mage: dressMage,
 };
 
+/** Buyer dumps already face +Z (same as walkToward / idle π toward the counter).
+ * Rats need -π/2 because those snouts start on +X; do not reuse that offset here. */
+export const BUYER_DUMP_YAW = 0;
+export const BUYER_FIT_HEIGHT = 1.65;
+
+const buyerCycle = Object.create(null);
+
+export function resetBuyerCycle() {
+  for (const key of Object.keys(buyerCycle)) delete buyerCycle[key];
+}
+
+export function nextBuyerLookId(typeId) {
+  const pack = BUYER_PACKS[typeId];
+  if (!pack?.length) return null;
+  const i = buyerCycle[typeId] ?? 0;
+  buyerCycle[typeId] = i + 1;
+  return pack[i % pack.length].id;
+}
+
+export function wrapBuyerDump(source, typeId, opts = {}) {
+  const wrapped = wrapImportedCharacter(source, {
+    name: typeId,
+    label: customerName(typeId),
+    height: BUYER_FIT_HEIGHT,
+    speech: true,
+    pickKind: 'customer',
+    ring: true,
+    rotateY: BUYER_DUMP_YAW,
+    ...opts,
+  });
+  wrapped.userData.buyerLookId = opts.lookId ?? null;
+  return wrapped;
+}
+
 export function buildAdventurer(typeId, opts = {}) {
+  const buyerLookId = opts.lookId ?? nextBuyerLookId(typeId);
+  const bundled = buyerLookId ? getBundledLook(buyerLookId) : null;
+  if (bundled) {
+    try {
+      return wrapBuyerDump(bundled, typeId, { lookId: buyerLookId });
+    } catch {
+      // Missing or broken dump — keep the procedural traveler.
+    }
+  }
   const type = CUSTOMERS[typeId] ?? CUSTOMERS.pilgrim;
   const group = new THREE.Group();
   group.name = typeId;
@@ -2710,7 +2880,7 @@ export function buildAdventurer(typeId, opts = {}) {
   const dress = CUSTOMER_LOOKS[lookId] ?? dressPilgrim;
   const labelY = dress(group, { type, pose, rand, typeId, set: lookSet }) ?? pose.headTop + 0.24;
 
-  const label = makeNameSprite(type.name);
+  const label = makeNameSprite(customerName(typeId));
   label.position.y = labelY;
   group.add(label);
 
@@ -3003,7 +3173,7 @@ export function measureVisibleMeshHeight(root) {
     if (child.userData?.skipWalk) return;
     if (child.material && child.material.visible === false) return;
     const name = child.name || '';
-    if (/pickaxe|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
+    if (/pickaxe|hatchet|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
     box.expandByObject(child);
     any = true;
   });
@@ -3018,6 +3188,7 @@ export function proceduralPlayerFitHeight() {
   if (cachedProceduralHeight) return cachedProceduralHeight;
   const keeper = buildShopkeeper({ chefHat: false });
   if (keeper.userData.pickaxe) keeper.userData.pickaxe.visible = false;
+  if (keeper.userData.hatchet) keeper.userData.hatchet.visible = false;
   for (const hammer of keeper.userData.hammers ?? []) hammer.visible = false;
   if (keeper.userData.chefHat) keeper.userData.chefHat.visible = false;
   cachedProceduralHeight = Math.max(0.9, measureVisibleMeshHeight(keeper));
@@ -3065,7 +3236,7 @@ export function measureVisibleBox(root) {
     if (child.userData?.skipWalk) return;
     if (child.material && child.material.visible === false) return;
     const name = child.name || '';
-    if (/pickaxe|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
+    if (/pickaxe|hatchet|chef-hat|importedGrip|proxy(Leg|Arm)/i.test(name)) return;
     box.expandByObject(child);
     any = true;
   });
@@ -3077,6 +3248,7 @@ export function wrapBundledProp(source, target, opts = {}) {
   if (!source) return null;
   const mesh = source.clone(true);
   if (opts.mirrorX) mirrorImportedX(mesh);
+  bakeImportedEuler(mesh, opts.rotateX ?? 0, opts.rotateY ?? 0, opts.rotateZ ?? 0);
   const tbox = opts.targetBox ?? measureVisibleBox(target);
   const tsize = tbox.getSize(new THREE.Vector3());
   const targetSize = opts.fit === 'xz'
@@ -3100,6 +3272,33 @@ export function wrapBundledProp(source, target, opts = {}) {
     mesh.add(tag);
   }
   return mesh;
+}
+
+/** Bake an Euler rotation into dump geometry so wall mounts can stay identity. */
+function bakeImportedEuler(root, rx = 0, ry = 0, rz = 0) {
+  if (!root || (!rx && !ry && !rz)) return root;
+  root.rotation.set(
+    root.rotation.x + rx,
+    root.rotation.y + ry,
+    root.rotation.z + rz,
+  );
+  root.updateMatrixWorld(true);
+  const world = new THREE.Matrix4();
+  root.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    world.copy(child.matrixWorld);
+    child.geometry = child.geometry.clone();
+    child.geometry.applyMatrix4(world);
+    child.geometry.computeVertexNormals();
+  });
+  root.traverse((child) => {
+    child.position.set(0, 0, 0);
+    child.quaternion.identity();
+    child.scale.set(1, 1, 1);
+    child.updateMatrix();
+  });
+  root.updateMatrixWorld(true);
+  return root;
 }
 
 /** Horizontally mirror dump geometry (knob/latch side) without stretching. */
@@ -3151,7 +3350,13 @@ export function sitVisibleOnY(mesh, y = 0) {
   mesh.updateMatrixWorld(true);
   const box = measureVisibleBox(mesh);
   if (!Number.isFinite(box.min.y)) return mesh;
-  mesh.position.y += y - box.min.y;
+  const dy = y - box.min.y;
+  if (Math.abs(dy) < 1e-9) return mesh;
+  const world = new THREE.Vector3();
+  mesh.getWorldPosition(world);
+  world.y += dy;
+  if (mesh.parent) mesh.parent.worldToLocal(world);
+  mesh.position.copy(world);
   return mesh;
 }
 
@@ -3271,22 +3476,11 @@ function partitionLimbMeshes(root) {
   return { legsL, legsR, armsL, armsR, box };
 }
 
-function addProxyLimb(parent, x, y, length, name) {
+function addProxyLimb(parent, x, y, _length, name) {
   const pivot = new THREE.Group();
   pivot.name = name;
   pivot.position.set(x, y, 0);
-  const stick = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.018, 0.024, length, 6),
-    new THREE.MeshStandardMaterial({
-      color: 0x2a2218,
-      roughness: 0.9,
-      transparent: true,
-      opacity: 0.42,
-    }),
-  );
-  stick.position.y = -length * 0.45;
-  stick.userData.skipWalk = true;
-  pivot.add(stick);
+  // Invisible pivot only — visible cylinders read as a walk-skeleton wireframe.
   parent.add(pivot);
   return pivot;
 }
@@ -3352,12 +3546,32 @@ export function bindImportedWalkRig(group, mesh, height = 1.7) {
   return 'proxy';
 }
 
+/** Hide debug skeleton / edge sticks so walk pose never shows bone lines. */
+export function hideWalkDebug(root) {
+  if (!root?.traverse) return root;
+  root.traverse((child) => {
+    if (child.isSkeletonHelper || child.type === 'SkeletonHelper') {
+      child.visible = false;
+      return;
+    }
+    if (child.isLine || child.isLineSegments || child.isLineLoop) {
+      child.visible = false;
+      return;
+    }
+    const mats = Array.isArray(child.material) ? child.material : child.material ? [child.material] : [];
+    if (mats.some((mat) => mat?.wireframe)) child.visible = false;
+  });
+  return root;
+}
+
 /** Wrap a glTF scene as a player or customer stand-in. Throws if the file has no mesh. */
 export function wrapImportedCharacter(source, opts = {}) {
   if (!source) throw new Error('No model to use.');
   const group = new THREE.Group();
   group.name = opts.name ?? 'character';
   const mesh = source.clone(true);
+  if (opts.rotateY) mesh.rotation.y += opts.rotateY;
+  hideWalkDebug(mesh);
   normalizeImported(mesh, opts.height ?? 1.7, true, { fit: 'height' });
   tintImportedMesh(mesh, opts.tint);
   group.add(mesh);
@@ -3424,6 +3638,7 @@ export function wrapImportedCharacter(source, opts = {}) {
     scaleY: mesh.scale.y,
   };
   attachImportedGrip(group, mesh, height);
+  hideWalkDebug(group);
   return group;
 }
 
@@ -3437,6 +3652,10 @@ function attachImportedGrip(group, mesh, height) {
   pickaxe.visible = false;
   grip.add(pickaxe);
   poseHeldPickaxe(pickaxe);
+  const hatchet = buildHatchet();
+  hatchet.visible = false;
+  grip.add(hatchet);
+  poseHeldPickaxe(hatchet);
   if (handBone) {
     handBone.add(grip);
     grip.position.set(0.035, 0.0, 0.02);
@@ -3453,6 +3672,7 @@ function attachImportedGrip(group, mesh, height) {
   }
   group.userData.hand = grip;
   group.userData.pickaxe = pickaxe;
+  group.userData.hatchet = hatchet;
 }
 
 export function wareTopY(object) {

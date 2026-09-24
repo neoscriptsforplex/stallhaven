@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CUSTOMERS,
+  DHIDE,
   MATERIALS,
   METALS,
   RECIPES,
@@ -31,12 +32,16 @@ import {
   costLabel,
   isAmmoRecipe,
   isMinedMaterial,
+  CHOP_YIELD,
   MINE_YIELD,
   nearestShelfSlot,
   SHELF_SLOT_COUNT,
   SHELF_SLOT_LABELS,
   offerClassOf,
+  customerName,
   defaultAppearance,
+  TIER_SELL,
+  craftUiForStation,
 } from './catalog.js';
 import {
   applyState,
@@ -46,9 +51,11 @@ import {
   buyFromCustomer,
   buyFurniture,
   buyFurnace,
+  buyRange,
   buyWheel,
   canBuyCauldron,
   canBuyFurnace,
+  canBuyRange,
   canBuyWheel,
   canRestock,
   canBuyFurniture,
@@ -58,7 +65,9 @@ import {
   chestCapacity,
   chestCount,
   chestDisplayList,
+  grantChoppedLogs,
   grantMinedMaterial,
+  FREE_FURNITURE_REPLACE,
   chestTotal,
   completeCrafts,
   craftBlockReason,
@@ -73,9 +82,12 @@ import {
   OLD_DEFAULT_DISPLAYS,
   ownsCauldron,
   ownsFurnace,
+  ownsRange,
   ownsWheel,
   placeFromChest,
   placeOnDisplay,
+  nextFurnitureCost,
+  removePlacedFurniture,
   reducedSalePrice,
   restock,
   sellToCustomer,
@@ -92,12 +104,19 @@ import {
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
-import { furnaceBesideAnvil } from './layout.js';
+import { defaultFurniture, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS } from './shopbuild.js';
 
+function placeStation(state, id) {
+  const pose = SHOP[id];
+  state.furniture[id] = { x: pose.x, z: pose.z, rot: 0 };
+}
+
 function finishCraft(state, recipeId, at = 0) {
   const recipe = RECIPES[recipeId];
+  if (recipe.category === 'food' && !state.furniture.range) placeStation(state, 'range');
+  if (recipe.category === 'smelt' && !state.furniture.furnace) placeStation(state, 'furnace');
   const cost = recipeCost(recipe);
   for (const [id, n] of Object.entries(cost.materials)) {
     state.materials[id] = Math.max(state.materials[id] ?? 0, n);
@@ -121,7 +140,7 @@ describe('stall economy', () => {
     assert.equal(state.materials.bow_string, 0);
     assert.equal(state.materials.flax, 8);
     assert.equal(state.materials.flour, 10);
-    assert.equal(state.materials.logs, 8);
+    assert.equal(state.materials.logs, 0);
     assert.equal(state.materials.hide, 8);
     assert.equal(state.materials.herbs, 8);
     assert.equal(state.materials.water, 12);
@@ -132,6 +151,7 @@ describe('stall economy', () => {
 
   it('crafts from materials into the chest without auto-placing on stalls', () => {
     const state = createState();
+    placeStation(state, 'range');
     assert.equal(canCraft(state, 'bread'), true);
     assert.equal(startCraft(state, 'bread', 0), true);
     assert.equal(state.materials.flour, 9);
@@ -244,9 +264,13 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'bronze_sword'), true);
     assert.equal(isUnlocked(state, 'staff'), true);
     assert.equal(isUnlocked(state, 'blue_dhide_body'), true);
+    assert.equal(isUnlocked(state, 'bread'), false);
+    placeStation(state, 'range');
     assert.equal(isUnlocked(state, 'bread'), true);
     assert.equal(isUnlocked(state, 'air_rune'), true);
     assert.equal(isUnlocked(state, 'earth_rune'), false);
+    assert.equal(isUnlocked(state, 'smelt_bronze'), false);
+    placeStation(state, 'furnace');
     assert.equal(isUnlocked(state, 'smelt_bronze'), true);
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
@@ -293,6 +317,7 @@ describe('save and load', () => {
     state.materialAcc.bronze = 0.4;
     state.skybox = 'black';
     state.brightness = 1.25;
+    state.dungeonBrightness = 0.8;
     state.chefHat = true;
     const saved = serializeState(state);
     const other = createState();
@@ -306,8 +331,17 @@ describe('save and load', () => {
     assert.equal(other.materialAcc.bronze, 0.4);
     assert.equal(other.chest.bronze_scimitar, 1);
     assert.equal(other.music.volume, state.music.volume);
+    assert.equal(other.music.loop, false);
+    state.music.loop = true;
+    state.music.track = 'Newbie Melody';
+    const withLoop = serializeState(state);
+    const looped = createState();
+    assert.equal(applyState(looped, withLoop), true);
+    assert.equal(looped.music.loop, true);
+    assert.equal(looped.music.track, 'Newbie Melody');
     assert.equal(other.skybox, 'black');
     assert.equal(other.brightness, 1.25);
+    assert.equal(other.dungeonBrightness, 0.8);
     assert.equal(other.chefHat, true);
     assert.ok(other.shopXp > 0);
     assert.equal(other.shopLevel, shopProgress(other.shopXp).level);
@@ -328,18 +362,53 @@ describe('save and load', () => {
     assert.equal(state.materials.herbs, 8);
     assert.equal(state.materials.water, 12);
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
-    assert.equal(ownsFurnace(state), true);
+    assert.equal(ownsFurnace(state), false);
+    assert.equal(ownsRange(state), false);
     assert.equal(state.chest.bread, 2);
     assert.equal(state.fullscreen, false);
     assert.ok(state.music.volume > 0);
     assert.equal(state.skybox, 'blue');
-    assert.equal(state.brightness, 1);
+    assert.equal(state.brightness, 1.5);
+    assert.equal(state.dungeonBrightness, 1.5);
     assert.equal(state.chefHat, false);
     assert.equal(state.shopXp, 0);
     assert.equal(state.shopLevel, 1);
     const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
     assert.equal(state.displays[shelfIndex].shelfSlots.length, 4);
     assert.equal(state.displays[shelfIndex].shelfSlots.every((id) => id == null), true);
+  });
+
+  it('snaps saved wall shelves onto the current back-wall mount', () => {
+    const state = createState();
+    const center = SHOP.displays.findIndex((d) => d.id === 'shelf-center');
+    const defaults = state.furniture.displays;
+    assert.equal(applyState(state, {
+      gold: 0,
+      furniture: {
+        displays: defaults.map((pose, i) => (
+          i === center ? { x: 0, z: -3.22, rot: 0 } : pose
+        )),
+      },
+    }), true);
+    const interior = roomInteriorFloor(0, 0);
+    assert.ok(Math.abs(state.furniture.displays[center].z - (interior.minZ + SHELF_FROM_WALL)) < 1e-6);
+    assert.ok(Math.abs(state.furniture.displays[center].rot) < 1e-6);
+  });
+
+  it('moves the old mid-floor starter chest flush onto the right stone wall', () => {
+    const state = createState();
+    const defaults = defaultFurniture();
+    assert.equal(applyState(state, {
+      gold: 0,
+      furniture: {
+        ...defaults,
+        chest: { x: 2.55, z: -2.22, rot: Math.PI / 2 },
+      },
+    }), true);
+    assert.ok(Math.abs(state.furniture.chest.x - SHOP.chest.x) < 1e-6);
+    assert.ok(Math.abs(state.furniture.chest.z - SHOP.chest.z) < 1e-6);
+    assert.equal(state.furniture.chest.rot, 0);
+    assert.ok(state.furniture.chest.x > 3.4);
   });
 });
 
@@ -374,6 +443,34 @@ describe('customer trade', () => {
     assert.equal(RECIPES[range.recipeId].combatClass, 'range');
     const mage = decideRequest('hedgemage', () => 0);
     assert.equal(RECIPES[mage.recipeId].combatClass, 'magic');
+  });
+
+  it('never cross-asks outside each buyer class', () => {
+    const samples = [
+      ['mercenary', 'melee'],
+      ['ranger', 'range'],
+      ['hedgemage', 'magic'],
+      ['pilgrim', null],
+    ];
+    for (const [id, combatClass] of samples) {
+      for (let i = 0; i < 24; i += 1) {
+        const req = decideRequest(id, () => i / 24);
+        assert.ok(req, `${id} should still request something`);
+        const recipe = RECIPES[req.recipeId];
+        assert.ok(recipe.buyers.includes(id), `${id} asked ${recipe.id} without being a listed buyer`);
+        if (combatClass) {
+          assert.ok(
+            recipe.combatClass === combatClass || recipe.category === 'potion',
+            `${id} asked ${recipe.id} (${recipe.combatClass})`,
+          );
+        } else {
+          assert.ok(
+            recipe.category === 'food' || recipe.category === 'potion',
+            `${id} asked ${recipe.id} (${recipe.category})`,
+          );
+        }
+      }
+    }
   });
 
   it('usually asks for an unlocked recipe the player can already craft', () => {
@@ -493,13 +590,36 @@ describe('catalog', () => {
     assert.equal(recipes.filter((r) => r.category === 'rune').length, 4);
     assert.equal(recipes.filter((r) => r.combatClass === 'tools').length, 14);
     assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 20);
+    assert.deepEqual(DHIDE.map((color) => color.id), ['blue', 'green', 'red', 'black']);
     assert.equal(RECIPES.blue_dhide_coif.name, "Blue D'hide Coif");
+    assert.equal(RECIPES.blue_dhide_body.previousId, null);
+    assert.equal(RECIPES.green_dhide_body.previousId, 'blue_dhide_body');
+    assert.equal(RECIPES.blue_dhide_body.tier, 1);
+    assert.equal(RECIPES.green_dhide_body.tier, 2);
+    assert.equal(RECIPES.green_dhide_coif.name, "Green D'hide Coif");
+    for (const piece of ['coif', 'body', 'chaps', 'vambraces', 'boots']) {
+      const green = RECIPES[`green_dhide_${piece}`];
+      const blue = RECIPES[`blue_dhide_${piece}`];
+      const red = RECIPES[`red_dhide_${piece}`];
+      assert.ok(green && blue && red, piece);
+      assert.equal(blue.tier, 1, `${piece} blue tier`);
+      assert.equal(green.tier, 2, `${piece} green tier`);
+      assert.equal(blue.previousId, null);
+      assert.equal(green.previousId, `blue_dhide_${piece}`);
+      assert.equal(red.previousId, `green_dhide_${piece}`);
+      assert.ok(blue.price < green.price, `${piece} blue should sell below green`);
+      assert.ok(blue.time < green.time, `${piece} blue should craft faster than green`);
+      assert.ok((blue.cost?.gold ?? 0) < (green.cost?.gold ?? 0), `${piece} blue gold cost`);
+      assert.equal(blue.unlockNeed, 0);
+      assert.equal(green.unlockNeed, 20);
+      assert.equal(isUnlocked(createState(), blue.id), true);
+      assert.equal(isUnlocked(createState(), green.id), false);
+    }
     assert.equal(RECIPES.black_dhide_coif.slot, 'helm');
     assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
     assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
     assert.equal(recipes.filter((r) => r.category === 'food').length, 13);
     assert.equal(recipes.filter((r) => r.category === 'potion').length, 8);
-    assert.equal(RECIPES.salmon.price, 16);
     assert.ok(RECIPES.salmon.price < RECIPES.cake.price);
     assert.ok(RECIPES.cake.price < RECIPES.lobster.price);
     assert.ok(RECIPES.lobster.price < RECIPES.chocolate_cake.price);
@@ -549,8 +669,7 @@ describe('catalog', () => {
   it('keeps a clear queue aisle in front of the counter', () => {
     for (const spot of SHOP.displays) {
       if (spot.kind === 'shelf') continue;
-      const hw = spot.kind === 'stand' ? 0.36 : 0.76;
-      const hd = spot.kind === 'stand' ? 0.36 : 0.52;
+      const { hw, hd } = furnitureHalfSize(spot.kind);
       assert.equal(rectHitsAisle(spot.x, spot.z, hw, hd, QUEUE_AISLE), false, spot.name);
     }
     assert.equal(rectHitsAisle(SHOP.anvil.x, SHOP.anvil.z, 0.48, 0.4, QUEUE_AISLE), false);
@@ -676,7 +795,7 @@ describe('material regen', () => {
     tickMaterials(state, 8);
     assert.equal(state.materials.flour, 1);
     tickMaterials(state, 8);
-    assert.ok(state.materials.logs >= 1);
+    assert.equal(state.materials.logs, 0);
     state.materials.flour = 249;
     state.materialAcc.flour = 0;
     tickMaterials(state, 16);
@@ -697,6 +816,7 @@ describe('material regen', () => {
     state.gold = 1000;
     assert.equal(canRestock(state, 'bronze'), false);
     assert.equal(canRestock(state, 'essence'), false);
+    assert.equal(canRestock(state, 'logs'), false);
     assert.equal(restock(state, 'bronze'), false);
     assert.equal(restock(state, 'essence'), false);
   });
@@ -716,6 +836,14 @@ describe('material regen', () => {
     assert.equal(grantMinedMaterial(state, 'runite'), 2);
     assert.equal(state.materials.runite, 250);
     assert.equal(grantMinedMaterial(state, 'flour'), 0);
+    assert.equal(CHOP_YIELD, 5);
+    assert.equal(MATERIALS.logs.start, 0);
+    assert.equal(MATERIALS.logs.restock, 0);
+    assert.equal(MATERIALS.logs.regenEvery, 0);
+    const logsBefore = state.materials.logs;
+    assert.equal(logsBefore, 0);
+    assert.equal(grantChoppedLogs(state), 5);
+    assert.equal(state.materials.logs, 5);
   });
 
   it('does not regenerate or restock metal bars or bow string', () => {
@@ -785,7 +913,7 @@ describe('cauldron unlock', () => {
   it('brews potions only after a cauldron is placed, using herbs and water', () => {
     const state = createState();
     assert.match(craftBlockReason(state, 'strength_potion'), /cauldron/i);
-    assert.match(craftBlockReason(state, 'strength_potion'), /Upgrade/);
+    assert.match(craftBlockReason(state, 'strength_potion'), /Build/);
     assert.equal(canCraft(state, 'strength_potion'), false);
     assert.equal(isUnlocked(state, 'prayer_potion'), false);
     state.gold = CAULDRON_COST;
@@ -812,13 +940,14 @@ describe('furnace and spinning wheel', () => {
     }
   });
 
-  it('starts with a free furnace beside the anvil and smelts ore into a bar', () => {
+  it('starts without a furnace and places a free one from Build to smelt ore into a bar', () => {
     const state = createState();
-    assert.equal(ownsFurnace(state), true);
-    assert.equal(canBuyFurnace(state), false);
-    assert.equal(buyFurnace(state, { x: -1, z: 0.6, rot: 0 }), false);
-    assert.equal(state.furniture.furnace.x, SHOP.furnace.x);
-    assert.equal(state.furniture.furnace.z, SHOP.furnace.z);
+    assert.equal(ownsFurnace(state), false);
+    assert.equal(canBuyFurnace(state), true);
+    assert.equal(buyFurnace(state, { x: -1, z: 0.6, rot: 0 }), true);
+    assert.equal(state.gold, START_GOLD);
+    assert.equal(state.furniture.furnace.x, -1);
+    assert.equal(state.furniture.furnace.z, 0.6);
     const ore = state.materials.bronze;
     assert.equal(canCraft(state, 'smelt_bronze'), true);
     finishCraft(state, 'smelt_bronze');
@@ -829,11 +958,11 @@ describe('furnace and spinning wheel', () => {
     const next = createState();
     assert.equal(applyState(next, saved), true);
     assert.equal(ownsFurnace(next), true);
-    assert.equal(next.furniture.furnace.x, SHOP.furnace.x);
+    assert.equal(next.furniture.furnace.x, -1);
     assert.equal(next.materials.bronze_bar, 1);
   });
 
-  it('keeps a furnace the player already placed and auto-places one if a save never had one', () => {
+  it('keeps a furnace the player already placed and leaves a missing one unplaced', () => {
     const kept = createState();
     assert.equal(applyState(kept, {
       version: 8,
@@ -854,14 +983,28 @@ describe('furnace and spinning wheel', () => {
         anvil: { x: -2.98, z: -2.42, rot: 0 },
       },
     }), true);
+    assert.equal(missing.furniture.furnace, null);
+    assert.equal(ownsFurnace(missing), false);
     const expected = furnaceBesideAnvil({ x: -2.98, z: -2.42, rot: 0 });
-    assert.equal(missing.furniture.furnace.x, expected.x);
-    assert.equal(missing.furniture.furnace.z, expected.z);
-    assert.equal(ownsFurnace(missing), true);
+    assert.equal(expected.x, SHOP.furnace.x);
+    assert.equal(expected.z, SHOP.furnace.z);
+  });
+
+  it('places a free cooking range from Build before food unlocks', () => {
+    const state = createState();
+    assert.equal(ownsRange(state), false);
+    assert.equal(canBuyRange(state), true);
+    assert.match(craftBlockReason(state, 'bread'), /range/i);
+    assert.equal(buyRange(state, { x: 1.65, z: -0.45, rot: 0 }), true);
+    assert.equal(ownsRange(state), true);
+    assert.equal(canBuyRange(state), false);
+    assert.equal(isUnlocked(state, 'bread'), true);
+    assert.equal(canCraft(state, 'bread'), true);
   });
 
   it('unlocks feast foods after bread without changing the kitchen cake line', () => {
     const state = createState();
+    placeStation(state, 'range');
     assert.equal(isUnlocked(state, 'salmon'), false);
     assert.equal(isUnlocked(state, 'pizza'), false);
     state.craftCounts.bread = 20;
@@ -955,9 +1098,81 @@ describe('build furniture', () => {
     assert.equal(applyState(next, saved), true);
     assert.equal(next.boughtFurniture.table, 2);
     assert.equal(next.boughtFurniture.mannequin, 2);
+    assert.equal(next.boughtFurniture.shelf, 0);
     assert.equal(next.displays.length, SHOP.displays.length + 4);
     assert.equal(next.displays.at(-1).kind, 'stand');
     assert.equal(next.furniture.displays.at(-1).z, 1.4);
+  });
+
+  it('sells extra shelves on the same 500 then ×3 curve after the included three', () => {
+    const state = createState();
+    const starterShelves = SHOP.displays.filter((d) => d.kind === 'shelf').length;
+    assert.equal(starterShelves, 3);
+    assert.equal(state.boughtFurniture.shelf, 0);
+    assert.equal(canBuyFurniture(state, 'shelf'), false);
+    state.gold = 500;
+    assert.equal(canBuyFurniture(state, 'shelf'), true);
+    assert.equal(buyFurniture(state, 'shelf', { x: 0, z: -3.11, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.shelf, 1);
+    assert.equal(state.displays.at(-1).kind, 'shelf');
+    state.gold = 1500;
+    assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.11, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.shelf, 2);
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.boughtFurniture.shelf, 2);
+    assert.equal(next.displays.filter((d) => d.kind === 'shelf').length, starterShelves + 2);
+  });
+
+  it('deletes a shelf and lets the included first three be replaced for free', () => {
+    const state = createState();
+    const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
+    assert.ok(shelfIndex >= 0);
+    state.chest.bread = 1;
+    assert.equal(placeOnDisplay(state, 'bread', shelfIndex, 0), true);
+    assert.equal(removePlacedFurniture(state, shelfIndex), true);
+    assert.equal(state.displays[shelfIndex].removed, true);
+    assert.equal(state.chest.bread, 1);
+    assert.equal(nextFurnitureCost(state, 'shelf'), 0);
+    assert.equal(canBuyFurniture(state, 'shelf'), true);
+    assert.equal(buyFurniture(state, 'shelf', { x: 0, z: -3.11, rot: 0 }), true);
+    assert.equal(state.boughtFurniture.shelf, 0);
+    assert.equal(state.displays.at(-1).bought, false);
+    assert.equal(nextFurnitureCost(state, 'shelf'), 500);
+    state.gold = 500;
+    assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.11, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.boughtFurniture.shelf, 1);
+    const extraIndex = state.displays.length - 1;
+    assert.equal(removePlacedFurniture(state, extraIndex), true);
+    assert.equal(state.boughtFurniture.shelf, 0);
+    assert.equal(nextFurnitureCost(state, 'shelf'), 500);
+  });
+
+  it('deletes tables and mannequins and allows two free replacements each', () => {
+    const state = createState();
+    const tableIndex = SHOP.displays.findIndex((d) => d.kind === 'table');
+    const standIndex = SHOP.displays.findIndex((d) => d.kind === 'stand');
+    assert.ok(tableIndex >= 0 && standIndex >= 0);
+    assert.equal(FREE_FURNITURE_REPLACE, 2);
+    state.chest.bronze_sword = 1;
+    assert.equal(placeOnDisplay(state, 'bronze_sword', tableIndex), true);
+    assert.equal(removePlacedFurniture(state, tableIndex), true);
+    assert.equal(state.displays[tableIndex].removed, true);
+    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.freeFurnitureReplace.table, 1);
+    assert.equal(nextFurnitureCost(state, 'table'), 0);
+    assert.equal(buyFurniture(state, 'table', { x: 0.2, z: 0.2, rot: 0 }), true);
+    assert.equal(state.freeFurnitureReplace.table, 0);
+    assert.equal(state.displays.at(-1).bought, false);
+    assert.equal(nextFurnitureCost(state, 'table'), 500);
+    assert.equal(removePlacedFurniture(state, standIndex), true);
+    assert.equal(state.freeFurnitureReplace.mannequin, 1);
+    assert.equal(nextFurnitureCost(state, 'mannequin'), 0);
+    assert.equal(removePlacedFurniture(state, standIndex), false);
   });
 
   it('does not count starter tables or mannequins as paid extras in an old save', () => {
@@ -969,6 +1184,7 @@ describe('build furniture', () => {
     }), true);
     assert.equal(state.boughtFurniture.table, 0);
     assert.equal(state.boughtFurniture.mannequin, 0);
+    assert.equal(state.boughtFurniture.shelf, 0);
     assert.equal(state.displays.length, SHOP.displays.length);
     assert.equal(buyFurniture(state, 'table', { x: 0, z: 0.8, rot: 0 }), true);
     assert.equal(state.gold, 0);
@@ -1087,15 +1303,119 @@ describe('default display order', () => {
 describe('ores, appearance, king, and chest bin', () => {
   it('names metal materials as ore and matching bars', () => {
     assert.equal(MATERIALS.bronze.name, 'Bronze Ore');
+    assert.equal(MATERIALS.adamant.name, 'Adamantite');
     assert.equal(MATERIALS.runite.name, 'Runite Ore');
     assert.equal(MATERIALS.dragon.name, 'Dragon Ore');
     assert.equal(MATERIALS.bronze_bar.name, 'Bronze Bar');
-    assert.equal(MATERIALS.runite_bar.name, 'Runite Bar');
+    assert.equal(MATERIALS.adamant_bar.name, 'Adamant Bar');
+    assert.equal(MATERIALS.runite_bar.name, 'Rune Bar');
     assert.equal(MATERIALS.dragon_bar.name, 'Dragon Bar');
+    assert.equal(METALS.find((metal) => metal.id === 'adamant')?.name, 'Adamant');
+    assert.equal(RECIPES.adamant_dagger?.name, 'Adamant Dagger');
+    assert.equal(RECIPES.adamant_platebody?.name, 'Adamant Platebody');
+    assert.equal(RECIPES.adamant_hatchet?.name, 'Adamant Hatchet');
+    assert.equal(RECIPES.adamant_pickaxe?.name, 'Adamant Pickaxe');
+    assert.equal(RECIPES.adamant_arrows?.name, 'Adamant Arrows');
+    assert.equal(RECIPES.smelt_adamant?.name, 'Adamant Bar');
+    assert.match(costLabel(RECIPES.smelt_adamant), /Adamantite/);
+    assert.doesNotMatch(costLabel(RECIPES.smelt_adamant), /Adamant Ore/);
     assert.equal(MATERIALS.bow_string.name, 'Bow String');
     assert.equal(MATERIALS.flax.name, 'Flax');
     assert.equal(MATERIALS.chocolate.name, 'Chocolate');
     assert.equal(MATERIALS.string, undefined);
+  });
+
+  it('keeps Adamantite on rock and ore labels only', () => {
+    assert.equal(MATERIALS.adamant.name, 'Adamantite');
+    assert.equal(MATERIALS.adamant_bar.name, 'Adamant Bar');
+    assert.equal(METALS.find((metal) => metal.id === 'adamant')?.name, 'Adamant');
+    assert.equal(boulderInspect('adamant').name, 'Adamantite');
+    assert.notEqual(boulderInspect('adamant').name, 'Adamant Ore');
+
+    const adamantRecipes = recipeList().filter(
+      (recipe) => recipe.id === 'smelt_adamant' || recipe.id.startsWith('adamant_'),
+    );
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'weapon'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'armour'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'ammo'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'hatchet'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'pickaxe'));
+    assert.ok(adamantRecipes.some((recipe) => recipe.category === 'smelt'));
+    assert.ok(adamantRecipes.length > 8, 'expected a full Adamant gear ladder');
+    for (const recipe of adamantRecipes) {
+      assert.equal(recipe.name.startsWith('Adamant '), true, `${recipe.id} should stay Adamant …`);
+      assert.equal(recipe.name.includes('Adamantite'), false, recipe.id);
+    }
+    assert.equal(RECIPES.smelt_adamant.name, 'Adamant Bar');
+    assert.equal(RECIPES.adamant_hatchet.name, 'Adamant Hatchet');
+    assert.equal(RECIPES.adamant_pickaxe.name, 'Adamant Pickaxe');
+    assert.equal(RECIPES.adamant_arrows.name, 'Adamant Arrows');
+
+    for (const recipe of recipeList()) {
+      assert.equal(recipe.name.includes('Adamantite'), false, recipe.id);
+    }
+    for (const material of Object.values(MATERIALS)) {
+      if (material.id === 'adamant') {
+        assert.equal(material.name, 'Adamantite');
+        continue;
+      }
+      assert.equal(material.name.includes('Adamantite'), false, material.id);
+    }
+
+    assert.match(costLabel(RECIPES.smelt_adamant), /Adamantite/);
+    assert.doesNotMatch(costLabel(RECIPES.adamant_dagger), /Adamantite/);
+    assert.match(costLabel(RECIPES.adamant_dagger), /Adamant Bar/);
+    assert.doesNotMatch(costLabel(RECIPES.adamant_hatchet), /Adamantite/);
+    assert.doesNotMatch(costLabel(RECIPES.adamant_pickaxe), /Adamantite/);
+    assert.doesNotMatch(costLabel(RECIPES.adamant_arrows), /Adamantite/);
+  });
+
+  it('names runite gear Rune and keeps ore and rock Runite', () => {
+    assert.equal(MATERIALS.runite.name, 'Runite Ore');
+    assert.equal(MATERIALS.runite_bar.name, 'Rune Bar');
+    assert.equal(METALS.find((metal) => metal.id === 'runite')?.name, 'Rune');
+    assert.equal(boulderInspect('runite').name, 'Runite');
+    assert.notEqual(boulderInspect('runite').name, 'Rune Ore');
+
+    const runiteRecipes = recipeList().filter(
+      (recipe) => recipe.id === 'smelt_runite' || recipe.id.startsWith('runite_'),
+    );
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'weapon'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'armour'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'ammo'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'hatchet'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'pickaxe'));
+    assert.ok(runiteRecipes.some((recipe) => recipe.category === 'smelt'));
+    assert.ok(runiteRecipes.length > 8, 'expected a full Rune gear ladder');
+    for (const recipe of runiteRecipes) {
+      assert.equal(recipe.name.startsWith('Rune '), true, `${recipe.id} should display as Rune …`);
+      assert.equal(recipe.name.includes('Runite'), false, recipe.id);
+    }
+    assert.equal(RECIPES.smelt_runite.name, 'Rune Bar');
+    assert.equal(RECIPES.runite_scimitar.name, 'Rune Scimitar');
+    assert.equal(RECIPES.runite_platebody.name, 'Rune Platebody');
+    assert.equal(RECIPES.runite_hatchet.name, 'Rune Hatchet');
+    assert.equal(RECIPES.runite_pickaxe.name, 'Rune Pickaxe');
+    assert.equal(RECIPES.runite_arrows.name, 'Rune Arrows');
+
+    for (const recipe of recipeList()) {
+      assert.equal(recipe.name.includes('Runite'), false, recipe.id);
+    }
+    for (const material of Object.values(MATERIALS)) {
+      if (material.id === 'runite') {
+        assert.equal(material.name, 'Runite Ore');
+        continue;
+      }
+      assert.equal(material.name.includes('Runite'), false, material.id);
+    }
+
+    assert.match(costLabel(RECIPES.smelt_runite), /Runite Ore/);
+    assert.doesNotMatch(costLabel(RECIPES.smelt_runite), /Rune Ore/);
+    assert.doesNotMatch(costLabel(RECIPES.runite_dagger), /Runite/);
+    assert.match(costLabel(RECIPES.runite_dagger), /Rune Bar/);
+    assert.doesNotMatch(costLabel(RECIPES.runite_hatchet), /Runite/);
+    assert.doesNotMatch(costLabel(RECIPES.runite_pickaxe), /Runite/);
+    assert.doesNotMatch(costLabel(RECIPES.runite_arrows), /Runite/);
   });
 
   it('lists peach among skyboxes', () => {
@@ -1162,6 +1482,7 @@ describe('ores, appearance, king, and chest bin', () => {
 describe('furnace bar unlocks', () => {
   it('unlocks iron after 20 bronze smelts, then steel after 30 iron smelts', () => {
     const state = createState();
+    placeStation(state, 'furnace');
     assert.equal(isUnlocked(state, 'smelt_bronze'), true);
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(unlockRemaining(state, 'smelt_iron'), 20);
@@ -1192,7 +1513,7 @@ describe('anvil tools', () => {
     assert.deepEqual(hatchets.map((r) => r.id), METALS.map((metal) => `${metal.id}_hatchet`));
     assert.deepEqual(pickaxes.map((r) => r.id), METALS.map((metal) => `${metal.id}_pickaxe`));
     assert.equal(RECIPES.bronze_hatchet.name, 'Bronze Hatchet');
-    assert.equal(RECIPES.runite_pickaxe.name, 'Runite Pickaxe');
+    assert.equal(RECIPES.runite_pickaxe.name, 'Rune Pickaxe');
     assert.equal(RECIPES.dragon_hatchet.shape, 'hatchet');
     assert.equal(RECIPES.dragon_pickaxe.shape, 'pickaxe');
     assert.equal(anvilTabForRecipe(RECIPES.bronze_hatchet), 'tools');
@@ -1211,8 +1532,10 @@ describe('anvil tools', () => {
     for (let i = 0; i < 20; i += 1) finishCraft(state, 'bronze_hatchet', i);
     assert.equal(isUnlocked(state, 'iron_hatchet'), true);
     assert.equal(state.chest.bronze_hatchet, 20);
-    assert.ok(CUSTOMERS.mercenary.prefers.includes('bronze_pickaxe'));
-    assert.ok(CUSTOMERS.ranger.prefers.includes('bronze_hatchet'));
+    assert.ok(CUSTOMERS.mercenary.prefers.includes('bronze_scimitar'));
+    assert.ok(CUSTOMERS.ranger.prefers.includes('bronze_shortbow'));
+    assert.equal(CUSTOMERS.mercenary.prefers.includes('bronze_pickaxe'), false);
+    assert.equal(CUSTOMERS.ranger.prefers.includes('bronze_hatchet'), false);
     assert.equal(canDisplayOn('table', RECIPES.bronze_hatchet), true);
     assert.equal(canDisplayOn('stand', RECIPES.bronze_pickaxe), false);
     const prices = METALS.map((metal) => RECIPES[`${metal.id}_hatchet`].price);
@@ -1236,7 +1559,7 @@ describe('ranged ammo', () => {
     assert.ok(ammo.every((r) => r.category === 'ammo'));
     assert.ok(ammo.some((r) => r.id === 'bronze_arrows'));
     assert.ok(ammo.some((r) => r.id === 'runite_arrows'));
-    assert.equal(RECIPES.runite_arrows.name, 'Runite Arrows');
+    assert.equal(RECIPES.runite_arrows.name, 'Rune Arrows');
     assert.ok(ammo.some((r) => r.id === 'cannonballs'));
     assert.equal(RECIPES.bronze_arrows.outputCount, AMMO_BATCH);
     assert.equal(RECIPES.cannonballs.outputCount, AMMO_BATCH);
@@ -1254,7 +1577,7 @@ describe('ranged ammo', () => {
     state.craftCounts.bronze_arrows = 20;
     assert.equal(isUnlocked(state, 'iron_arrows'), true);
     assert.match(costLabel(RECIPES.bronze_arrows), /×20/);
-    assert.match(costLabel(RECIPES.bronze_arrows), /sells 2g/);
+    assert.match(costLabel(RECIPES.bronze_arrows), /sells 900g/);
   });
 });
 
@@ -1282,7 +1605,8 @@ describe('magic runes', () => {
     state.craftCounts.water_rune = 40;
     assert.equal(isUnlocked(state, 'fire_rune'), true);
     assert.ok(CUSTOMERS.hedgemage.prefers.includes('air_rune'));
-    assert.ok(CUSTOMERS.pilgrim.prefers.includes('fire_rune'));
+    assert.equal(CUSTOMERS.pilgrim.prefers.includes('fire_rune'), false);
+    assert.equal(CUSTOMERS.mercenary.prefers.includes('air_rune'), false);
     const saved = serializeState(state);
     const next = createState();
     assert.equal(applyState(next, saved), true);
@@ -1290,12 +1614,13 @@ describe('magic runes', () => {
     assert.equal(isUnlocked(next, 'earth_rune'), true);
   });
 
-  it('sells Air at 20g and climbs Earth, Water, then Fire', () => {
-    assert.equal(RECIPES.air_rune.price, 20);
-    assert.equal(RECIPES.earth_rune.price, 28);
-    assert.equal(RECIPES.water_rune.price, 36);
-    assert.equal(RECIPES.fire_rune.price, 48);
-    assert.match(costLabel(RECIPES.air_rune), /sells 20g/);
+  it('sells Air on the bronze-end of the 5k–60k curve and climbs Earth, Water, then Fire', () => {
+    assert.equal(RECIPES.air_rune.price, 3500);
+    assert.ok(RECIPES.air_rune.price < RECIPES.earth_rune.price);
+    assert.ok(RECIPES.earth_rune.price < RECIPES.water_rune.price);
+    assert.ok(RECIPES.water_rune.price < RECIPES.fire_rune.price);
+    assert.equal(RECIPES.fire_rune.price, 42000);
+    assert.match(costLabel(RECIPES.air_rune), /sells 3,500g/);
   });
 });
 
@@ -1334,7 +1659,7 @@ describe('display runes and ammo', () => {
 });
 
 describe('potion sell prices', () => {
-  it('starts at 1,000g and climbs by rarity, with comma labels and offer markdown', () => {
+  it('starts at 5,000g and climbs by rarity, with comma labels and offer markdown', () => {
     const prices = [
       RECIPES.strength_potion.price,
       RECIPES.prayer_potion.price,
@@ -1345,25 +1670,26 @@ describe('potion sell prices', () => {
       RECIPES.energy_potion.price,
       RECIPES.magic_potion.price,
     ];
-    assert.equal(prices[0], 1000);
+    assert.equal(prices[0], 5000);
     for (let i = 1; i < prices.length; i += 1) {
       assert.ok(prices[i] > prices[i - 1], `${i} should sell for more`);
     }
-    assert.match(costLabel(RECIPES.strength_potion), /sells 1,000g/);
-    assert.match(costLabel(RECIPES.magic_potion), /sells 16,000g/);
+    assert.equal(prices[prices.length - 1], 60000);
+    assert.match(costLabel(RECIPES.strength_potion), /sells 5,000g/);
+    assert.match(costLabel(RECIPES.magic_potion), /sells 60,000g/);
     const ask = decideRequest('hedgemage', () => 0.9, createState());
     if (ask.recipeId === 'magic_potion' || RECIPES[ask.recipeId]?.category === 'potion') {
       assert.equal(ask.gold, RECIPES[ask.recipeId].price);
     }
-    assert.equal(reducedSalePrice(RECIPES.strength_potion.price), 650);
+    assert.equal(reducedSalePrice(RECIPES.strength_potion.price), 3250);
     const state = createState();
     state.gold = 20000;
     state.furniture.cauldron = { x: 0, z: 0, rot: 0 };
     finishCraft(state, 'strength_potion');
     const offer = offerChoices(state, 'prayer_potion')[0];
     assert.equal(offer.recipeId, 'strength_potion');
-    assert.equal(offer.listPrice, 1000);
-    assert.equal(offer.gold, 650);
+    assert.equal(offer.listPrice, 5000);
+    assert.equal(offer.gold, 3250);
   });
 });
 
@@ -1448,8 +1774,11 @@ describe('dungeon sky and remains', () => {
     assert.equal(boulderInspect('essence').name, 'Essence');
     assert.equal(boulderInspect('bronze').name, 'Bronze Ore');
     assert.equal(boulderInspect('mithril').name, 'Mithril Ore');
+    assert.equal(boulderInspect('adamant').name, 'Adamantite');
+    assert.notEqual(boulderInspect('adamant').name, 'Adamant Ore');
+    assert.match(boulderInspect('adamant').blurb, /adamantite/i);
     assert.equal(boulderInspect('dragon').name, 'Dragon Ore');
-    assert.match(boulderInspect('runite').blurb, /runite ore/i);
+    assert.match(boulderInspect('runite').blurb, /runite/i);
   });
 });
 
@@ -1488,6 +1817,51 @@ describe('customer look packs', () => {
     assert.equal(CUSTOMERS.ranger.look, 'ranger');
     assert.equal(CUSTOMERS.mercenary.look, 'mercenary');
     assert.equal(CUSTOMERS.pilgrim.look, 'pilgrim');
+    assert.equal(CUSTOMERS.pilgrim.name, 'Adventurer');
+    assert.equal(CUSTOMERS.mercenary.name, 'Guard');
+    assert.equal(CUSTOMERS.hedgemage.name, 'Wizard');
+    assert.equal(customerName('pilgrim'), 'Adventurer');
+    assert.equal(customerName('mercenary'), 'Guard');
+    assert.equal(customerName('hedgemage'), 'Wizard');
+    assert.equal(customerName('pilgrim', { plural: true }), 'Adventurers');
+    assert.equal(customerName('mercenary', { plural: true }), 'Guards');
+    assert.equal(customerName('hedgemage', { plural: true }), 'Wizards');
+  });
+});
+
+describe('sell price rebalance', () => {
+  it('anchors metal gear on the 5k–60k bronze→dragon ladder', () => {
+    assert.deepEqual(TIER_SELL, [5000, 10000, 20000, 30000, 40000, 50000, 60000]);
+    METALS.forEach((metal, index) => {
+      assert.equal(RECIPES[`${metal.id}_scimitar`].price, TIER_SELL[index], metal.id);
+    });
+    assert.ok(RECIPES.bronze_gloves.price < RECIPES.bronze_scimitar.price);
+    assert.ok(RECIPES.bronze_platebody.price > RECIPES.bronze_scimitar.price);
+    assert.ok(RECIPES.dragon_platebody.price > RECIPES.dragon_scimitar.price);
+    assert.equal(RECIPES.bronze_scimitar.price, 5000);
+    assert.equal(RECIPES.dragon_scimitar.price, 60000);
+    assert.equal(RECIPES.smelt_bronze.price, 0);
+    assert.equal(RECIPES.spin_bow_string.price, 0);
+    assert.ok(RECIPES.bread.price >= 5000);
+    assert.ok(RECIPES.anglerfish.price <= 60000);
+    assert.ok(RECIPES.green_dhide_body.price < RECIPES.black_dhide_body.price);
+    assert.ok(RECIPES.blue_dhide_body.price < RECIPES.green_dhide_body.price);
+  });
+});
+
+describe('craft station UI', () => {
+  it('opens the anvil on melee weapons after a furnace visit, not leftover smelt recipes', () => {
+    const afterFurnace = craftUiForStation('anvil', { tab: 'smelt', subtab: 'weapon' });
+    assert.equal(afterFurnace.tab, 'melee');
+    assert.equal(afterFurnace.subtab, 'weapon');
+    const cold = craftUiForStation('anvil');
+    assert.equal(cold.tab, 'melee');
+    assert.equal(recipesForTab(cold.tab, cold.subtab)[0].category, 'weapon');
+    assert.equal(recipesForTab(cold.tab, cold.subtab).some((r) => r.category === 'smelt'), false);
+    const furnace = craftUiForStation('furnace', { tab: 'melee', subtab: 'armour' });
+    assert.equal(furnace.tab, 'smelt');
+    const range = craftUiForStation('range');
+    assert.equal(range.tab, 'food');
   });
 });
 

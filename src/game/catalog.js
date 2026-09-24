@@ -128,6 +128,77 @@ export const TOOL_SUBTABS = [
 /** One anvil ammo recipe action puts this many units in the chest. */
 export const AMMO_BATCH = 20;
 
+/** Player-facing sell anchors: Bronze → Iron → Steel → Mithril → Adamant → Rune → Dragon. */
+export const TIER_SELL = [5000, 10000, 20000, 30000, 40000, 50000, 60000];
+
+/** Small pieces sit under the tier anchor; plate / 2H sit over. */
+const METAL_PIECE_WEIGHT = {
+  scimitar: 1,
+  dagger: 0.72,
+  sword: 1,
+  mace: 0.92,
+  spear: 1.05,
+  '2h_sword': 1.28,
+  defender: 0.82,
+  full_helm: 0.88,
+  med_helm: 0.74,
+  platebody: 1.32,
+  platelegs: 1.12,
+  boots: 0.62,
+  gloves: 0.58,
+  chainbody: 1.08,
+  plateskirt: 1.02,
+  shortbow: 1,
+  longbow: 1.08,
+  crossbow: 1.04,
+  knives: 0.7,
+  thrownaxe: 0.74,
+  arrows: 0.18,
+  hatchet: 0.86,
+  pickaxe: 0.9,
+};
+
+const DHIDE_PIECE_WEIGHT = {
+  coif: 0.9,
+  body: 1.15,
+  chaps: 1.05,
+  vambraces: 0.75,
+  boots: 0.72,
+};
+
+const MAGIC_ARMOUR_WEIGHT = {
+  hat: 0.88,
+  robe_top: 1.18,
+  robe_bottom: 1.08,
+  boots: 0.64,
+  gloves: 0.6,
+};
+
+/** Map 0..1 along the bronze→dragon sell curve. */
+export function tierSellFromT(t, weight = 1) {
+  const clamped = Math.max(0, Math.min(1, Number(t) || 0));
+  const pos = clamped * (TIER_SELL.length - 1);
+  const lo = Math.floor(pos);
+  const hi = Math.min(TIER_SELL.length - 1, lo + 1);
+  const frac = pos - lo;
+  const base = TIER_SELL[lo] + (TIER_SELL[hi] - TIER_SELL[lo]) * frac;
+  return Math.max(1, Math.round(base * weight));
+}
+
+/** Sell price for ladder index `index` of a `count`-long line. */
+export function tierSellPrice(index, { count = TIER_SELL.length, weight = 1 } = {}) {
+  const n = Math.max(1, count);
+  const t = n <= 1 ? 0 : Math.max(0, index) / (n - 1);
+  return tierSellFromT(t, weight);
+}
+
+/** Remap a legacy gold amount onto the 5k–60k curve, keeping relative order. */
+export function scaleSell(oldPrice, oldMin, oldMax, weight = 1) {
+  const span = oldMax - oldMin;
+  const t = span <= 0 ? 0 : ((Number(oldPrice) || 0) - oldMin) / span;
+  return tierSellFromT(t, weight);
+}
+
 /** @deprecated Food moved to the cooking range; anvil uses ANVIL_TABS. */
 export const CRAFT_TABS = ANVIL_TABS;
 
@@ -141,7 +212,7 @@ export const METALS = [
   { id: 'steel', name: 'Steel', tint: 0xc5ccd4, restock: 7, start: 1 },
   { id: 'mithril', name: 'Mithril', tint: 0x3a6ec8, restock: 10, start: 1 },
   { id: 'adamant', name: 'Adamant', tint: 0x3a8a45, restock: 13, start: 0 },
-  { id: 'runite', name: 'Runite', tint: 0x3ec8c4, restock: 16, start: 0 },
+  { id: 'runite', name: 'Rune', tint: 0x3ec8c4, restock: 16, start: 0 },
   { id: 'dragon', name: 'Dragon', tint: 0xb42a22, restock: 22, start: 0 },
 ];
 
@@ -178,10 +249,10 @@ export const MATERIALS = {
   iron: { id: 'iron', name: 'Iron Ore', restock: 0, start: 2, tier: 2, regenEvery: 0 },
   steel: { id: 'steel', name: 'Steel Ore', restock: 0, start: 1, tier: 3, regenEvery: 0 },
   mithril: { id: 'mithril', name: 'Mithril Ore', restock: 0, start: 1, tier: 4, regenEvery: 0 },
-  adamant: { id: 'adamant', name: 'Adamant Ore', restock: 0, start: 0, tier: 5, regenEvery: 0 },
+  adamant: { id: 'adamant', name: 'Adamantite', restock: 0, start: 0, tier: 5, regenEvery: 0 },
   runite: { id: 'runite', name: 'Runite Ore', restock: 0, start: 0, tier: 6, regenEvery: 0 },
   dragon: { id: 'dragon', name: 'Dragon Ore', restock: 0, start: 0, tier: 7, regenEvery: 0 },
-  logs: { id: 'logs', name: 'Logs', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  logs: { id: 'logs', name: 'Logs', restock: 0, start: 0, tier: 1, regenEvery: 0 },
   flax: { id: 'flax', name: 'Flax', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
   bow_string: {
     id: 'bow_string',
@@ -255,8 +326,7 @@ function metalLine({
   extraMats = {},
   gold0 = 0,
   time0 = 3,
-  price0 = 10,
-  priceStep = 8,
+  weight = 1,
   outputCount = 1,
 }) {
   METALS.forEach((metal, index) => {
@@ -281,7 +351,7 @@ function metalLine({
         gold: gold0 + index * 2,
       },
       time: time0 + index,
-      price: price0 + index * priceStep,
+      price: tierSellPrice(index, { weight: weight * (METAL_PIECE_WEIGHT[piece.id] ?? 1) }),
       buyers,
       tint: metal.tint,
       outputCount,
@@ -314,7 +384,7 @@ for (const piece of MELEE_WEAPONS) {
   metalLine({ piece, category: 'weapon', combatClass: 'melee', buyers: ['mercenary'] });
 }
 for (const piece of MELEE_ARMOUR) {
-  metalLine({ piece, category: 'armour', combatClass: 'melee', buyers: ['mercenary'], time0: 4, price0: 12 });
+  metalLine({ piece, category: 'armour', combatClass: 'melee', buyers: ['mercenary'], time0: 4 });
 }
 
 const RANGE_WEAPONS = [
@@ -335,7 +405,7 @@ for (const piece of RANGE_WEAPONS) {
   });
 }
 
-// Ammo uses Runite naming to match Runite Bar / Runite gear. One craft is 20 units.
+// Ammo uses Rune naming to match Rune Bar / Rune gear. One craft is 20 units.
 metalLine({
   piece: { id: 'arrows', name: 'Arrows', slot: 'ammo', shape: 'arrows' },
   category: 'ammo',
@@ -343,8 +413,6 @@ metalLine({
   buyers: ['ranger'],
   extraMats: { logs: 1 },
   time0: 3,
-  price0: 2,
-  priceStep: 1,
   outputCount: AMMO_BATCH,
 });
 
@@ -365,7 +433,7 @@ addRecipe({
   tier: 3,
   cost: { materials: { steel_bar: 1 }, gold: 0 },
   time: 5,
-  price: 3,
+  price: tierSellPrice(2, { weight: METAL_PIECE_WEIGHT.arrows }),
   buyers: ['ranger', 'mercenary'],
   tint: 0xc5ccd4,
   outputCount: AMMO_BATCH,
@@ -399,7 +467,7 @@ DHIDE.forEach((color, index) => {
       tier: index + 1,
       cost: { materials: { hide: 1 }, gold: index * 2 },
       time: 4 + index,
-      price: 14 + index * 8,
+      price: tierSellPrice(index, { count: DHIDE.length, weight: DHIDE_PIECE_WEIGHT[piece.id] ?? 1 }),
       buyers: ['ranger'],
       tint: color.tint,
     });
@@ -427,7 +495,7 @@ MAGIC_STAVES.forEach((staff, index) => {
       gold: index * 3,
     },
     time: 4 + index * 2,
-    price: 16 + index * 10,
+    price: tierSellPrice(index, { count: MAGIC_STAVES.length }),
     buyers: ['hedgemage'],
     tint: MAGIC_SETS[index].tint,
   });
@@ -461,7 +529,7 @@ MAGIC_SETS.forEach((set, index) => {
       tier: index + 1,
       cost: { materials: { cloth: piece.id === 'robe_top' ? 2 : 1 }, gold: index * 2 },
       time: 4 + index,
-      price: 14 + index * 9,
+      price: tierSellPrice(index, { count: MAGIC_SETS.length, weight: MAGIC_ARMOUR_WEIGHT[piece.id] ?? 1 }),
       buyers: ['hedgemage'],
       tint: set.tint,
       accent: set.accent,
@@ -489,7 +557,6 @@ for (const piece of TOOL_PIECES) {
     combatClass: 'tools',
     buyers: ['mercenary', 'ranger'],
     time0: 3,
-    price0: 10,
   });
 }
 
@@ -512,8 +579,8 @@ RUNE_LINE.forEach((rune, index) => {
     tier: index + 1,
     cost: { materials: { essence: 1 }, gold: 0 },
     time: 3 + index,
-    price: [20, 28, 36, 48][index],
-    buyers: ['hedgemage', 'pilgrim', 'mercenary', 'ranger'],
+    price: tierSellPrice(index, { count: RUNE_LINE.length, weight: 0.7 }),
+    buyers: ['hedgemage'],
     tint: rune.tint,
     shelfItem: true,
   });
@@ -559,7 +626,7 @@ function addFoodLine(list, lineId, lineName, setKey, firstPreviousId = null) {
       tier: index + 1,
       cost: { materials: { ...food.mats }, gold: 0 },
       time: food.time,
-      price: food.price,
+      price: scaleSell(food.price, 8, 120),
       buyers: ['pilgrim'],
       tint: food.tint,
       shelfItem: true,
@@ -603,7 +670,7 @@ POTION_LINE.forEach((potion, index) => {
       gold: 0,
     },
     time: 4 + index,
-    price: potion.price,
+    price: scaleSell(potion.price, 1000, 16000),
     buyers: potion.buyers,
     tint: potion.tint,
     shelfItem: true,
@@ -771,18 +838,25 @@ export function pickPilgrimCiv(rand = Math.random) {
   return PILGRIM_CIVILIAN_SETS[Math.max(0, Math.min(PILGRIM_CIVILIAN_SETS.length - 1, i))];
 }
 
+/** Strict class shop list: combat line plus potions that already name this buyer. */
+function prefersFor(customerId, { combatClass = null, categories = [] } = {}) {
+  return Object.values(RECIPES)
+    .filter((recipe) => {
+      if (!recipe.buyers?.includes(customerId)) return false;
+      if (combatClass && recipe.combatClass === combatClass) return true;
+      if (categories.includes(recipe.category)) return true;
+      return false;
+    })
+    .map((recipe) => recipe.id);
+}
+
 export const CUSTOMERS = {
   pilgrim: {
     id: 'pilgrim',
-    name: 'Pilgrim',
+    name: 'Adventurer',
+    namePlural: 'Adventurers',
     combatClass: null,
-    prefers: [
-      ...FOOD_LINE.map((food) => food.id),
-      ...FEAST_LINE.map((food) => food.id),
-      'prayer_potion',
-      'energy_potion',
-      ...RUNE_LINE.map((rune) => rune.id),
-    ],
+    prefers: prefersFor('pilgrim', { categories: ['food', 'potion'] }),
     patient: true,
     leaveIfEmpty: false,
     robe: 0xc8b48a,
@@ -792,16 +866,10 @@ export const CUSTOMERS = {
   },
   mercenary: {
     id: 'mercenary',
-    name: 'Mercenary',
+    name: 'Guard',
+    namePlural: 'Guards',
     combatClass: 'melee',
-    prefers: Object.values(RECIPES)
-      .filter((recipe) => (
-        recipe.combatClass === 'melee'
-        || recipe.combatClass === 'tools'
-        || recipe.category === 'rune'
-        || ['strength_potion', 'attack_potion', 'anti_poison_potion', 'antifire_potion'].includes(recipe.id)
-      ))
-      .map((recipe) => recipe.id),
+    prefers: prefersFor('mercenary', { combatClass: 'melee', categories: ['potion'] }),
     patient: false,
     leaveIfEmpty: true,
     robe: 0x4a463f,
@@ -812,15 +880,9 @@ export const CUSTOMERS = {
   ranger: {
     id: 'ranger',
     name: 'Ranger',
+    namePlural: 'Rangers',
     combatClass: 'range',
-    prefers: Object.values(RECIPES)
-      .filter((recipe) => (
-        recipe.combatClass === 'range'
-        || recipe.combatClass === 'tools'
-        || recipe.category === 'rune'
-        || ['ranging_potion', 'antifire_potion', 'energy_potion', 'anti_poison_potion'].includes(recipe.id)
-      ))
-      .map((recipe) => recipe.id),
+    prefers: prefersFor('ranger', { combatClass: 'range', categories: ['potion'] }),
     patient: true,
     leaveIfEmpty: false,
     robe: 0x3f4a32,
@@ -830,11 +892,10 @@ export const CUSTOMERS = {
   },
   hedgemage: {
     id: 'hedgemage',
-    name: 'Hedge Mage',
+    name: 'Wizard',
+    namePlural: 'Wizards',
     combatClass: 'magic',
-    prefers: Object.values(RECIPES)
-      .filter((recipe) => recipe.combatClass === 'magic' || ['magic_potion', 'prayer_potion'].includes(recipe.id))
-      .map((recipe) => recipe.id),
+    prefers: prefersFor('hedgemage', { combatClass: 'magic', categories: ['potion'] }),
     patient: false,
     leaveIfEmpty: false,
     robe: 0x3d5a4c,
@@ -857,28 +918,58 @@ export const CUSTOMERS = {
   },
 };
 
+/** Bundled buyer dumps, cycled round-robin per customer type. */
+export const BUYER_PACKS = {
+  hedgemage: [
+    { id: 'buyer-wizard-archmage-sedridor', folder: 'buyers/wizard/archmage-sedridor' },
+    { id: 'buyer-wizard-wizard-level-9', folder: 'buyers/wizard/wizard-level-9' },
+    { id: 'buyer-wizard-wizard-grayzag', folder: 'buyers/wizard/wizard-grayzag' },
+    { id: 'buyer-wizard-wizard-jalarast', folder: 'buyers/wizard/wizard-jalarast' },
+    { id: 'buyer-wizard-wizard-mizgog', folder: 'buyers/wizard/wizard-mizgog' },
+    { id: 'buyer-wizard-wizard-traiborn', folder: 'buyers/wizard/wizard-traiborn' },
+  ],
+  pilgrim: [
+    { id: 'buyer-adventurer-bob', folder: 'buyers/adventurer/bob' },
+    { id: 'buyer-adventurer-cooking-tutor', folder: 'buyers/adventurer/cooking-tutor' },
+    { id: 'buyer-adventurer-donie', folder: 'buyers/adventurer/donie' },
+    { id: 'buyer-adventurer-man-level-2', folder: 'buyers/adventurer/man-level-2' },
+    { id: 'buyer-adventurer-woman-level-2', folder: 'buyers/adventurer/woman-level-2' },
+  ],
+  ranger: [
+    { id: 'buyer-ranger-armour-salesman', folder: 'buyers/ranger/armour-salesman' },
+    { id: 'buyer-ranger-ranging-guild-doorman', folder: 'buyers/ranger/ranging-guild-doorman' },
+  ],
+  mercenary: [
+    { id: 'buyer-guard-barbarian-level-17', folder: 'buyers/guard/barbarian-level-17' },
+    { id: 'buyer-guard-guard-level-21', folder: 'buyers/guard/guard-level-21' },
+  ],
+};
+
+export const BUYER_PACK_FOLDERS = Object.values(BUYER_PACKS).flat();
+
 export const SHOP = {
   door: { x: 0, z: 3.58 },
   outside: { x: 0, z: 5.55 },
   counter: { x: 0, z: -1.72 },
   keeper: { x: -0.48, z: -2.52 },
-  // Side walls: anvil left, chest right (forward of the side doorways).
-  // Back wall: furnace left and 2× range right, leaving walk-around beside the counter.
-  anvil: { x: -3.2, z: 0.95 },
-  chest: { x: 3.2, z: 0.95 },
-  furnace: { x: -2.55, z: -2.22 },
-  range: { x: 2.55, z: -2.22 },
+  // Side walls keep the starter tables. Back wall: anvil left.
+  // Chest sits flush on the right stone wall, latch into the room.
+  // Furnace and cooking range start unplaced; Build previews them on open floor.
+  anvil: { x: -2.55, z: -2.22 },
+  chest: { x: 3.72, z: -2.22 },
+  furnace: { x: -1.65, z: -0.45 },
+  range: { x: 1.65, z: -0.45 },
   cauldron: { x: 0, z: 0.8 },
   wheel: { x: 1.2, z: 0.8 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [
     { id: 'left-front', name: 'Left Front Table', x: -2.95, z: 2.08, kind: 'table' },
     { id: 'right-front', name: 'Right Front Table', x: 2.95, z: 2.08, kind: 'table' },
-    { id: 'shelf-left', name: 'Left Wall Shelf', x: -2.48, z: -3.22, kind: 'shelf' },
-    { id: 'shelf-right', name: 'Right Wall Shelf', x: 2.48, z: -3.22, kind: 'shelf' },
+    { id: 'shelf-left', name: 'Left Wall Shelf', x: -2.48, z: -3.11, kind: 'shelf' },
+    { id: 'shelf-right', name: 'Right Wall Shelf', x: 2.48, z: -3.11, kind: 'shelf' },
     { id: 'stand-left', name: 'Left Armour Stand', x: -1.58, z: 2.68, kind: 'stand' },
     { id: 'stand-right', name: 'Right Armour Stand', x: 1.58, z: 2.68, kind: 'stand' },
-    { id: 'shelf-center', name: 'Back Wall Shelf', x: 0, z: -3.22, kind: 'shelf' },
+    { id: 'shelf-center', name: 'Back Wall Shelf', x: 0, z: -3.11, kind: 'shelf' },
   ],
   cameraStart: { x: -0.15, y: 3.35, z: 2.85 },
   cameraTarget: { x: -0.85, y: 0.95, z: -1.35 },
@@ -921,10 +1012,31 @@ export function nearestShelfSlot(localX, localY, localZ = 0) {
 
 export const MINE_YIELD = 5;
 export const MINE_DURATION = 3.2;
+export const CHOP_YIELD = 5;
+export const CHOP_DURATION = 3.2;
 
 export function isMinedMaterial(materialId) {
   return materialId === 'essence' || METALS.some((metal) => metal.id === materialId);
 }
+
+/** Craft/inventory/smelt preview dumps for ore items — not dungeon rock props. */
+export function isCraftOreId(materialId) {
+  return METALS.some((metal) => metal.id === materialId);
+}
+
+export function craftOreLookId(metalId) {
+  return `craft-ore-${metalId}`;
+}
+
+export function craftOreFolder(metalId) {
+  if (metalId === 'adamant') return 'ores/adamantite-ore';
+  return `ores/${metalId}-ore`;
+}
+
+export const CRAFT_ORE_FOLDERS = METALS.map((metal) => ({
+  id: craftOreLookId(metal.id),
+  folder: craftOreFolder(metal.id),
+}));
 
 export function isAmmoRecipe(recipe) {
   return recipe?.category === 'ammo';
@@ -995,6 +1107,28 @@ export function anvilSubtabsForTab(tabId) {
     if (tab.id === 'rune') return tabId === 'magic';
     return tab.id === 'weapon' || tab.id === 'armour';
   });
+}
+
+const ANVIL_TAB_IDS = new Set(ANVIL_TABS.map((tab) => tab.id));
+const ANVIL_SUBTAB_IDS = new Set(['armour', 'ammo', 'rune', 'hatchet', 'pickaxe']);
+
+/** Reset shared craft-panel tab state so furnace/range/anvil never leak into each other. */
+export function craftUiForStation(station, prev = {}, recipe = null) {
+  if (station === 'range') return { tab: 'food', subtab: prev.subtab ?? 'weapon' };
+  if (station === 'cauldron') return { tab: 'potion', subtab: prev.subtab ?? 'weapon' };
+  if (station === 'furnace') return { tab: 'smelt', subtab: prev.subtab ?? 'weapon' };
+  if (station === 'wheel') return { tab: 'spin', subtab: prev.subtab ?? 'weapon' };
+  let tab = recipe
+    ? anvilTabForRecipe(recipe)
+    : (ANVIL_TAB_IDS.has(prev.tab) ? prev.tab : 'melee');
+  let subtab = recipe
+    ? anvilSubtabForRecipe(recipe)
+    : (ANVIL_SUBTAB_IDS.has(prev.subtab) ? prev.subtab : 'weapon');
+  if (tab !== 'ranged' && subtab === 'ammo') subtab = 'weapon';
+  if (tab !== 'magic' && subtab === 'rune') subtab = 'weapon';
+  if (tab !== 'tools' && (subtab === 'hatchet' || subtab === 'pickaxe')) subtab = 'weapon';
+  if (tab === 'tools' && subtab !== 'hatchet' && subtab !== 'pickaxe') subtab = 'hatchet';
+  return { tab, subtab };
 }
 
 export function recipeList() {
@@ -1085,6 +1219,14 @@ export function offerClassLabel(cls) {
   if (cls === 'food') return 'Food';
   if (cls === 'potion') return 'Potion';
   return 'matching';
+}
+
+/** Player-facing buyer label. Internal ids (pilgrim / mercenary / hedgemage) stay for saves. */
+export function customerName(id, { plural = false } = {}) {
+  const customer = CUSTOMERS[id];
+  if (!customer) return id;
+  if (plural) return customer.namePlural ?? `${customer.name}s`;
+  return customer.name;
 }
 
 export function classLabel(combatClass, category = null) {
@@ -1182,6 +1324,7 @@ export function decideRequest(customerId, rng = Math.random, state = null) {
   const preferred = customer.prefers
     .map((id) => RECIPES[id])
     .filter(Boolean)
+    .filter((recipe) => recipe.buyers?.includes(customerId))
     .filter((recipe) => recipe.category !== 'potion' || Boolean(state?.furniture?.cauldron));
   const unlocked = preferred.filter((recipe) => recipeUnlocked(state, recipe));
   const maxUnlockedPrice = unlocked.reduce((max, recipe) => Math.max(max, recipe.price ?? 0), 0);
@@ -1197,6 +1340,7 @@ export function decideRequest(customerId, rng = Math.random, state = null) {
   const aspire = rng() < ASPIRE_CHANCE && aspirePool.length;
   const pool = aspire ? aspirePool : (unlocked.length ? unlocked : preferred);
   const recipe = pickWeighted(pool, rng);
+  if (!recipe) return null;
   return {
     recipeId: recipe.id,
     gold: recipe.price,

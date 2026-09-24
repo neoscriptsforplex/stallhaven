@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import { recipeList } from './catalog.js';
+import { BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, recipeList } from './catalog.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
 import { UPLOADS_CLEARED, clearModels, saveModel } from './storage.js';
 import { normalizeImported } from './models.js';
@@ -43,8 +43,17 @@ function hasMesh(root) {
   return found;
 }
 
-function parseObjBuffer(buffer, sidecars = {}) {
-  const objText = decodeText(buffer);
+function sanitizeObjText(objText) {
+  // Blender OBJ dumps often include `l` edges plus `f` faces. Three's OBJLoader
+  // then treats the whole object as LineSegments and drops the mesh.
+  if (/^f /m.test(objText) && /^l /m.test(objText)) {
+    return objText.replace(/^l\s+.*$/gm, '');
+  }
+  return objText;
+}
+
+function parseObjBuffer(buffer, sidecars = {}, name = '') {
+  const objText = sanitizeObjText(decodeText(buffer));
   if (!objText.trim()) throw new Error('That .obj file is empty.');
   const { urls, revoke } = sidecarMap(sidecars);
   const manager = new THREE.LoadingManager();
@@ -53,10 +62,11 @@ function parseObjBuffer(buffer, sidecars = {}) {
     for (const url of revoke) URL.revokeObjectURL(url);
   };
   manager.onLoad = finish;
-  setTimeout(finish, 60000);
+  const revokeTimer = setTimeout(finish, 60000);
+  revokeTimer.unref?.();
 
   const objLoader = new OBJLoader(manager);
-  const mtlEntry = Object.entries(sidecars).find(([name]) => name.toLowerCase().endsWith('.mtl'));
+  const mtlEntry = Object.entries(sidecars).find(([fileName]) => fileName.toLowerCase().endsWith('.mtl'));
   if (mtlEntry) {
     try {
       const mtlLoader = new MTLLoader(manager);
@@ -69,7 +79,104 @@ function parseObjBuffer(buffer, sidecars = {}) {
   }
   const group = objLoader.parse(objText);
   if (!hasMesh(group)) throw new Error('That .obj has no mesh.');
+  dropUnusableMaps(group);
+  if (isDungeonRockDump(name) || isDungeonRockDump(mtlEntry?.[0])) {
+    prepareDungeonRockMaterials(group);
+  }
   return group;
+}
+
+/** MTL map_Kd to missing files (e.g. .psd) otherwise multiplies albedo toward black. */
+function dropUnusableMaps(root) {
+  const keys = ['map', 'emissiveMap', 'specularMap', 'normalMap', 'bumpMap', 'displacementMap', 'alphaMap'];
+  root?.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      for (const key of keys) {
+        const tex = mat[key];
+        if (!tex) continue;
+        const img = tex.image;
+        const ok = Boolean(img && ((img.width ?? 0) > 0 || img.data));
+        if (!ok) mat[key] = null;
+      }
+    }
+  });
+}
+
+/** sRGB albedo lift so dump Kd colors read under cave lights, nearer Blender. */
+export const DUNGEON_ROCK_ALBEDO_LIFT = 2;
+/** Extra sRGB floor — Blender's studio/world fill; keeps dark verts from sinking. */
+export const DUNGEON_ROCK_AMBIENT = 0.08;
+/** Fraction of lifted albedo copied to emissive so cave shadows still show Kd. */
+export const DUNGEON_ROCK_EMIT = 0.25;
+
+const DUNGEON_ROCK_FILE = /^(bronze|iron|steel|mithril|adamant|rune|dragon)-rocks$|^essence$/i;
+
+export function isDungeonRockFolder(folder = '') {
+  return String(folder).replace(/\\/g, '/').toLowerCase().includes('dungeon-rocks/');
+}
+
+export function isDungeonRockDump(nameOrFolder = '') {
+  const normalized = String(nameOrFolder).replace(/\\/g, '/').toLowerCase();
+  if (normalized.includes('dungeon-rocks/')) return true;
+  const base = basename(normalized).replace(/\.(obj|mtl)$/i, '');
+  return DUNGEON_ROCK_FILE.test(base);
+}
+
+function liftDungeonRockColor(color) {
+  const srgb = color.clone();
+  if (typeof srgb.convertLinearToSRGB === 'function') srgb.convertLinearToSRGB();
+  srgb.r = Math.min(1, srgb.r * DUNGEON_ROCK_ALBEDO_LIFT + DUNGEON_ROCK_AMBIENT);
+  srgb.g = Math.min(1, srgb.g * DUNGEON_ROCK_ALBEDO_LIFT + DUNGEON_ROCK_AMBIENT);
+  srgb.b = Math.min(1, srgb.b * DUNGEON_ROCK_ALBEDO_LIFT + DUNGEON_ROCK_AMBIENT);
+  if (typeof srgb.convertSRGBToLinear === 'function') srgb.convertSRGBToLinear();
+  return srgb;
+}
+
+function dumpAlbedo(mat) {
+  const color = mat?.color ? mat.color.clone() : new THREE.Color(0x888888);
+  const ka = mat?.emissive;
+  if (ka && (ka.r + ka.g + ka.b) > 0.02) color.add(ka);
+  return liftDungeonRockColor(color);
+}
+
+function mapLooksMissing(map) {
+  if (!map) return true;
+  const img = map.image;
+  return !(img && ((img.width ?? 0) > 0 || img.data));
+}
+
+/** Shared OBJ/MTL tweak for every dungeon-rocks/* dump. Idempotent. */
+export function prepareDungeonRockMaterials(root) {
+  if (!root || root.userData?.dungeonRockLift) return root;
+  root.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    const next = mats.map((mat) => {
+      if (mat?.userData?.dungeonRockLift) return mat;
+      const color = dumpAlbedo(mat);
+      const emit = color.clone().multiplyScalar(DUNGEON_ROCK_EMIT);
+      const std = new THREE.MeshStandardMaterial({
+        name: mat.name,
+        color,
+        emissive: emit,
+        emissiveIntensity: 1,
+        roughness: 0.68,
+        metalness: 0,
+        side: mat.side ?? THREE.FrontSide,
+        vertexColors: Boolean(mat.vertexColors),
+        flatShading: false,
+      });
+      if (mat.map && !mapLooksMissing(mat.map)) std.map = mat.map;
+      if ('envMapIntensity' in std) std.envMapIntensity = 0;
+      std.userData.dungeonRockLift = true;
+      return std;
+    });
+    child.material = Array.isArray(child.material) ? next : next[0];
+  });
+  root.userData.dungeonRockLift = true;
+  return root;
 }
 
 function friendlyParseError(err, kind) {
@@ -87,7 +194,7 @@ export function parseModelBuffer(buffer, name, sidecars = {}) {
     const ext = (name || '').toLowerCase();
     if (ext.endsWith('.obj')) {
       try {
-        resolve(parseObjBuffer(buffer, sidecars));
+        resolve(parseObjBuffer(buffer, sidecars, name));
       } catch (err) {
         reject(new Error(friendlyParseError(err, 'obj')));
       }
@@ -111,6 +218,8 @@ export function parseModelBuffer(buffer, name, sidecars = {}) {
   });
 }
 
+export const FOUNTAIN_DUMP_REV = 'blender-4e9b2aee-overwrite';
+
 export const BUNDLED_PLAYER_DIR = 'models/player';
 
 export const BUNDLED_PROP_FOLDERS = [
@@ -131,8 +240,28 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'tree', folder: 'tree' },
   { id: 'flowers', folder: 'flowers' },
   { id: 'rock', folder: 'rock' },
-  { id: 'fountain', folder: 'fountain' },
+  { id: 'fountain', folder: 'fountain', rev: FOUNTAIN_DUMP_REV },
   { id: 'skeleton', folder: 'skeleton' },
+  { id: 'rune-air', folder: 'runes/air' },
+  { id: 'rune-water', folder: 'runes/water' },
+  { id: 'rune-earth', folder: 'runes/earth' },
+  { id: 'rune-fire', folder: 'runes/fire' },
+  { id: 'ore-bronze', folder: 'dungeon-rocks/bronze-rocks' },
+  { id: 'ore-iron', folder: 'dungeon-rocks/iron-rocks' },
+  { id: 'ore-steel', folder: 'dungeon-rocks/steel-rocks' },
+  { id: 'ore-mithril', folder: 'dungeon-rocks/mithril-rocks' },
+  { id: 'ore-adamant', folder: 'dungeon-rocks/adamant-rocks' },
+  { id: 'ore-runite', folder: 'dungeon-rocks/rune-rocks' },
+  { id: 'ore-dragon', folder: 'dungeon-rocks/dragon-rocks' },
+  { id: 'ore-essence', folder: 'dungeon-rocks/essence' },
+  ...recipeList()
+    .filter((recipe) => recipe.category === 'food')
+    .map((recipe) => {
+      const slug = String(recipe.id).replaceAll('_', '-');
+      return { id: `food-${slug}`, folder: `food/${slug}` };
+    }),
+  ...CRAFT_ORE_FOLDERS,
+  ...BUYER_PACK_FOLDERS,
 ];
 
 export async function parseBundledPlayerBuffers(objBuffer, mtlBuffer) {
@@ -211,13 +340,18 @@ function missingModel(label) {
   return err;
 }
 
-async function fetchObjMtl(folder, objFile, mtlFile) {
+function assetQuery(rev) {
+  return rev ? `?v=${encodeURIComponent(rev)}` : '';
+}
+
+async function fetchObjMtl(folder, objFile, mtlFile, rev) {
   const roots = cachedModelsRoot ? [cachedModelsRoot] : bundledModelRoots();
   let lastMissing = missingModel(`models/${folder}/${objFile}`);
+  const q = assetQuery(rev);
   for (const root of roots) {
     const base = `${root}${folder}/`;
     try {
-      const objRes = await fetch(`${base}${objFile}`);
+      const objRes = await fetch(`${base}${objFile}${q}`);
       if (!objRes.ok) {
         lastMissing = missingModel(`models/${folder}/${objFile}`);
         continue;
@@ -226,7 +360,7 @@ async function fetchObjMtl(folder, objFile, mtlFile) {
       cachedModelsRoot = root;
       const sidecars = {};
       if (mtlFile) {
-        const mtlRes = await fetch(`${base}${mtlFile}`);
+        const mtlRes = await fetch(`${base}${mtlFile}${q}`);
         if (mtlRes.ok) {
           const mtlBuffer = await mtlRes.arrayBuffer();
           try {
@@ -237,7 +371,9 @@ async function fetchObjMtl(folder, objFile, mtlFile) {
           }
         }
       }
-      return parseModelBuffer(objBuffer, objFile, sidecars);
+      const scene = await parseModelBuffer(objBuffer, objFile, sidecars);
+      if (isDungeonRockFolder(folder)) prepareDungeonRockMaterials(scene);
+      return scene;
     } catch (err) {
       if (err?.code === 'MISSING_MODEL') {
         lastMissing = err;
@@ -255,13 +391,14 @@ export async function loadBundledPlayerScene() {
   return fetchObjMtl('player', 'player.obj', 'player.mtl');
 }
 
-export async function loadBundledPropScene(folder) {
-  const names = [`${folder}.obj`, 'model.obj', 'player.obj'];
+export async function loadBundledPropScene(folder, rev) {
+  const baseName = String(folder).split('/').pop();
+  const names = [`${baseName}.obj`, `${folder}.obj`, 'model.obj', 'player.obj'];
   let lastErr = null;
   for (const objFile of names) {
     const mtlFile = objFile.replace(/\.obj$/i, '.mtl');
     try {
-      return await fetchObjMtl(folder, objFile, mtlFile);
+      return await fetchObjMtl(folder, objFile, mtlFile, rev);
     } catch (err) {
       lastErr = err;
       if (err?.code === 'MISSING_MODEL') break;
@@ -270,12 +407,19 @@ export async function loadBundledPropScene(folder) {
   throw lastErr ?? new Error(`Missing bundled ${folder} model.`);
 }
 
-export async function loadBundledLooks() {
+export async function loadBundledLooks(onProgress) {
   await resolveBundledModelRoot();
-  const entries = await Promise.all(BUNDLED_PROP_FOLDERS.map(async ({ id, folder }) => {
+  const total = BUNDLED_PROP_FOLDERS.length;
+  let done = 0;
+  const entries = await Promise.all(BUNDLED_PROP_FOLDERS.map(async ({ id, folder, rev }) => {
     try {
-      return [id, await loadBundledPropScene(folder)];
+      const scene = await loadBundledPropScene(folder, rev);
+      done += 1;
+      onProgress?.(done, total, id);
+      return [id, scene];
     } catch (err) {
+      done += 1;
+      onProgress?.(done, total, id);
       if (err?.code !== 'MISSING_MODEL') {
         console.warn(`Bundled ${id} model skipped:`, err?.message || err);
       }

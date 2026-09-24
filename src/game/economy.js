@@ -10,6 +10,7 @@ import {
   isCraftedMaterial,
   isMinedMaterial,
   isMaterialCraft,
+  CHOP_YIELD,
   MINE_YIELD,
   SHOP,
   SHELF_SLOT_COUNT,
@@ -34,6 +35,8 @@ import {
 import {
   CAULDRON_COST,
   WHEEL_COST,
+  FURNACE_COST,
+  RANGE_COST,
   STATION_UNLOCKS,
   CHEST_MAX_LEVEL,
   FURNITURE_FORWARD,
@@ -49,21 +52,27 @@ import {
   furnitureBuyCost,
   furnitureKindForType,
   furnitureLabelForType,
-  furnaceBesideAnvil,
   padById,
   padConnects,
+  snapToWallGrid,
+  stationUnlock,
 } from './layout.js';
 import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_MIN,
   DEFAULT_BRIGHTNESS,
+  DEFAULT_DUNGEON_BRIGHTNESS,
   clampBrightness,
+  clampDungeonBrightness,
   readStoredBrightness,
+  readStoredDungeonBrightness,
 } from './lighting.js';
 
 export {
   CAULDRON_COST,
   WHEEL_COST,
+  FURNACE_COST,
+  RANGE_COST,
   STATION_UNLOCKS,
   furnitureBuyCost,
   masteryNeed,
@@ -77,11 +86,17 @@ export {
   DEFAULT_BRIGHTNESS,
 };
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
 function emptyBoughtFurniture() {
+  return { table: 0, mannequin: 0, shelf: 0 };
+}
+
+export const FREE_FURNITURE_REPLACE = 2;
+
+function emptyFreeFurnitureReplace() {
   return { table: 0, mannequin: 0 };
 }
 
@@ -258,12 +273,14 @@ export function createState() {
     selectedDisplay: 0,
     wareLooks: {},
     fullscreen: false,
-    music: { volume: DEFAULT_MUSIC_VOLUME },
+    music: { volume: DEFAULT_MUSIC_VOLUME, loop: false, track: '' },
     boughtFurniture: emptyBoughtFurniture(),
+    freeFurnitureReplace: emptyFreeFurnitureReplace(),
     shopXp: 0,
     shopLevel: 1,
     skybox: DEFAULT_SKYBOX,
     brightness: readStoredBrightness(),
+    dungeonBrightness: readStoredDungeonBrightness(),
     chefHat: false,
     appearance: defaultAppearance(),
     playTime: 0,
@@ -294,6 +311,7 @@ export function isUnlocked(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return false;
   if (recipe.category === 'potion' && !ownsCauldron(state)) return false;
+  if (recipe.category === 'food' && !ownsRange(state)) return false;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return false;
   if (recipe.category === 'spin' && !ownsWheel(state)) return false;
   if (!recipe.previousId) return true;
@@ -304,13 +322,16 @@ export function craftBlockReason(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 'Unknown recipe.';
   if (recipe.category === 'potion' && !ownsCauldron(state)) {
-    return 'Place a cauldron from Upgrade to brew potions.';
+    return 'Place a cauldron from Build to brew potions.';
+  }
+  if (recipe.category === 'food' && !ownsRange(state)) {
+    return 'Place a cooking range from Build to bake food.';
   }
   if (recipe.category === 'smelt' && !ownsFurnace(state)) {
-    return 'The furnace is missing.';
+    return 'Place a furnace from Build to smelt ores into bars.';
   }
   if (recipe.category === 'spin' && !ownsWheel(state)) {
-    return 'Place a spinning wheel from Upgrade to spin flax into bow string.';
+    return 'Place a spinning wheel from Build to spin flax into bow string.';
   }
   if (!isUnlocked(state, recipeId)) {
     const remain = unlockRemaining(state, recipeId);
@@ -359,6 +380,7 @@ export function maxCraftActions(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 0;
   if (recipe.category === 'potion' && !ownsCauldron(state)) return 0;
+  if (recipe.category === 'food' && !ownsRange(state)) return 0;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return 0;
   if (recipe.category === 'spin' && !ownsWheel(state)) return 0;
   if (!isUnlocked(state, recipeId)) return 0;
@@ -511,22 +533,7 @@ export function backWallShelfIndex() {
 export function clearBackWallShelf(state) {
   const index = backWallShelfIndex();
   if (index < 0) return false;
-  const display = state.displays[index];
-  if (!display || display.removed) return false;
-  const ids = [];
-  if (Array.isArray(display.shelfSlots)) {
-    for (const id of display.shelfSlots) {
-      if (id) ids.push(id);
-    }
-  } else if (display.ware?.recipeId) {
-    ids.push(display.ware.recipeId);
-  }
-  for (const id of ids) addToChest(state, id);
-  display.ware = null;
-  display.slots = emptySlots();
-  display.shelfSlots = emptyShelfSlots();
-  display.removed = true;
-  return true;
+  return removePlacedFurniture(state, index);
 }
 
 export function canUpgradeChest(state) {
@@ -571,13 +578,14 @@ export function ownsStation(state, id) {
 }
 
 export function canBuyStation(state, id) {
-  const cost = stationCost(id);
-  return cost > 0 && !ownsStation(state, id) && state.gold >= cost;
+  const unlock = stationUnlock(id);
+  if (!unlock) return false;
+  return !ownsStation(state, id) && state.gold >= unlock.cost;
 }
 
 export function buyStation(state, id, pose) {
   const cost = stationCost(id);
-  if (cost <= 0 || state.gold < cost || !pose || ownsStation(state, id)) return false;
+  if (!stationUnlock(id) || state.gold < cost || !pose || ownsStation(state, id)) return false;
   state.gold -= cost;
   state.furniture[id] = {
     x: pose.x,
@@ -603,12 +611,24 @@ export function ownsFurnace(state) {
   return ownsStation(state, 'furnace');
 }
 
+export function ownsRange(state) {
+  return ownsStation(state, 'range');
+}
+
 export function canBuyFurnace(state) {
   return canBuyStation(state, 'furnace');
 }
 
 export function buyFurnace(state, pose) {
   return buyStation(state, 'furnace', pose);
+}
+
+export function canBuyRange(state) {
+  return canBuyStation(state, 'range');
+}
+
+export function buyRange(state, pose) {
+  return buyStation(state, 'range', pose);
 }
 
 export function ownsWheel(state) {
@@ -627,12 +647,33 @@ export function boughtFurnitureCount(state, type) {
   return Math.max(0, state.boughtFurniture?.[type] ?? 0);
 }
 
+export function includedFurnitureCount(type) {
+  const kind = furnitureKindForType(type);
+  return SHOP.displays.filter((spot) => (spot.kind ?? 'table') === kind).length;
+}
+
+export function liveFurnitureCount(state, type) {
+  const kind = furnitureKindForType(type);
+  return (state.displays ?? []).filter((display, index) => (
+    !display?.removed && displayKind(index, state) === kind
+  )).length;
+}
+
 export function nextFurnitureCost(state, type) {
+  if (type === 'shelf') {
+    const live = liveFurnitureCount(state, 'shelf');
+    const included = includedFurnitureCount('shelf');
+    if (live < included) return 0;
+    return furnitureBuyCost(Math.max(0, live - included));
+  }
+  if ((type === 'table' || type === 'mannequin') && (state.freeFurnitureReplace?.[type] ?? 0) > 0) {
+    return 0;
+  }
   return furnitureBuyCost(boughtFurnitureCount(state, type));
 }
 
 export function canBuyFurniture(state, type) {
-  if (type !== 'table' && type !== 'mannequin') return false;
+  if (!['table', 'mannequin', 'shelf'].includes(type)) return false;
   return state.gold >= nextFurnitureCost(state, type);
 }
 
@@ -650,13 +691,20 @@ export function buyFurniture(state, type, pose) {
   const cost = nextFurnitureCost(state, type);
   state.gold -= cost;
   if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
-  state.boughtFurniture[type] = boughtFurnitureCount(state, type) + 1;
-  const n = state.boughtFurniture[type];
+  if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
+  if (cost === 0 && (type === 'table' || type === 'mannequin') && state.freeFurnitureReplace[type] > 0) {
+    state.freeFurnitureReplace[type] -= 1;
+  }
+  const paidExtra = cost > 0;
+  if (paidExtra) {
+    state.boughtFurniture[type] = boughtFurnitureCount(state, type) + 1;
+  }
+  const n = liveFurnitureCount(state, type) + 1;
   const label = furnitureLabelForType(type);
   state.displays.push(emptyDisplay({
     kind,
-    name: `${label} ${n}`,
-    bought: true,
+    name: paidExtra ? `${label} ${n}` : label,
+    bought: paidExtra,
   }));
   if (!state.furniture.displays) state.furniture.displays = defaultFurniture().displays;
   state.furniture.displays.push({
@@ -665,6 +713,50 @@ export function buyFurniture(state, type, pose) {
     rot: pose.rot ?? FURNITURE_FORWARD,
   });
   state.selectedDisplay = state.displays.length - 1;
+  return true;
+}
+
+function returnDisplayWares(state, display) {
+  const ids = [];
+  if (Array.isArray(display.shelfSlots)) {
+    for (const id of display.shelfSlots) {
+      if (id) ids.push(id);
+    }
+  } else {
+    for (const id of Object.values(display.slots ?? {})) {
+      if (id) ids.push(id);
+    }
+    if (display.ware?.recipeId) ids.push(display.ware.recipeId);
+  }
+  for (const id of ids) addToChest(state, id);
+  display.ware = null;
+  display.slots = emptySlots();
+  display.shelfSlots = display.kind === 'shelf' ? emptyShelfSlots() : null;
+}
+
+export function removePlacedFurniture(state, index) {
+  const display = state.displays[index];
+  if (!display || display.removed) return false;
+  const kind = displayKind(index, state);
+  if (kind !== 'shelf' && kind !== 'table' && kind !== 'stand') return false;
+  returnDisplayWares(state, display);
+  display.removed = true;
+  const type = kind === 'stand' ? 'mannequin' : kind === 'shelf' ? 'shelf' : 'table';
+  if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
+  if (display.bought) {
+    state.boughtFurniture[type] = Math.max(0, boughtFurnitureCount(state, type) - 1);
+  }
+  if (type === 'table' || type === 'mannequin') {
+    if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
+    state.freeFurnitureReplace[type] = Math.min(
+      FREE_FURNITURE_REPLACE,
+      (state.freeFurnitureReplace[type] ?? 0) + 1,
+    );
+  }
+  if (state.selectedDisplay === index) {
+    const next = state.displays.findIndex((item) => !item.removed);
+    state.selectedDisplay = next >= 0 ? next : 0;
+  }
   return true;
 }
 
@@ -919,13 +1011,21 @@ export function chestDisplayList(state, kind) {
   return chestList(state).filter((item) => canDisplayOn(kind, item.recipe));
 }
 
-export function grantMinedMaterial(state, materialId, amount = MINE_YIELD) {
-  if (!isMinedMaterial(materialId)) return 0;
+function grantMaterial(state, materialId, amount) {
   const cur = state.materials[materialId] ?? 0;
   const add = Math.min(MATERIAL_CAP - cur, Math.max(0, Math.round(Number(amount) || 0)));
   if (add <= 0) return 0;
   state.materials[materialId] = cur + add;
   return add;
+}
+
+export function grantMinedMaterial(state, materialId, amount = MINE_YIELD) {
+  if (!isMinedMaterial(materialId)) return 0;
+  return grantMaterial(state, materialId, amount);
+}
+
+export function grantChoppedLogs(state, amount = CHOP_YIELD) {
+  return grantMaterial(state, 'logs', amount);
 }
 
 export function placeOnDisplay(state, recipeId, displayIndex = state.selectedDisplay, slotIndex = 0) {
@@ -968,11 +1068,16 @@ export function serializeState(state) {
     expansions: [...(state.expansions ?? [])],
     furniture,
     fullscreen: Boolean(state.fullscreen),
-    music: { volume: Number.isFinite(state.music?.volume) ? state.music.volume : DEFAULT_MUSIC_VOLUME },
+    music: {
+      volume: Number.isFinite(state.music?.volume) ? state.music.volume : DEFAULT_MUSIC_VOLUME,
+      loop: Boolean(state.music?.loop),
+      track: typeof state.music?.track === 'string' ? state.music.track : '',
+    },
     shopXp: Math.max(0, Math.round(state.shopXp ?? 0)),
     shopLevel: shopProgress(state.shopXp ?? 0).level,
     skybox: skyboxId(state.skybox),
     brightness: clampBrightness(state.brightness),
+    dungeonBrightness: clampDungeonBrightness(state.dungeonBrightness),
     chefHat: Boolean(state.chefHat),
     appearance: normalizeAppearance(state.appearance),
     playTime: Math.max(0, Number(state.playTime) || 0),
@@ -992,6 +1097,11 @@ export function serializeState(state) {
     boughtFurniture: {
       table: boughtFurnitureCount(state, 'table'),
       mannequin: boughtFurnitureCount(state, 'mannequin'),
+      shelf: boughtFurnitureCount(state, 'shelf'),
+    },
+    freeFurnitureReplace: {
+      table: Math.max(0, state.freeFurnitureReplace?.table ?? 0),
+      mannequin: Math.max(0, state.freeFurnitureReplace?.mannequin ?? 0),
     },
   };
 }
@@ -1036,7 +1146,7 @@ export function applyState(state, data) {
     if (savedFurnitureDisplays) {
       savedFurnitureDisplays = [
         ...savedFurnitureDisplays.slice(0, OLD_DEFAULT_DISPLAYS),
-        { x: 0, z: -3.22, rot: 0 },
+        { x: 0, z: -3.11, rot: 0 },
         ...savedFurnitureDisplays.slice(OLD_DEFAULT_DISPLAYS),
       ];
     }
@@ -1057,8 +1167,17 @@ export function applyState(state, data) {
     }
   }
   next.boughtFurniture = emptyBoughtFurniture();
-  if (data.boughtFurniture && typeof data.boughtFurniture === 'object') {
+  next.freeFurnitureReplace = emptyFreeFurnitureReplace();
+  if (data.freeFurnitureReplace && typeof data.freeFurnitureReplace === 'object') {
     for (const type of ['table', 'mannequin']) {
+      const value = data.freeFurnitureReplace[type];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        next.freeFurnitureReplace[type] = Math.max(0, Math.min(FREE_FURNITURE_REPLACE, Math.round(value)));
+      }
+    }
+  }
+  if (data.boughtFurniture && typeof data.boughtFurniture === 'object') {
+    for (const type of ['table', 'mannequin', 'shelf']) {
       const value = data.boughtFurniture[type];
       if (typeof value === 'number' && Number.isFinite(value)) {
         next.boughtFurniture[type] = Math.max(0, Math.round(value));
@@ -1066,7 +1185,8 @@ export function applyState(state, data) {
     }
   } else {
     for (let index = SHOP.displays.length; index < next.displays.length; index += 1) {
-      const type = next.displays[index].kind === 'stand' ? 'mannequin' : 'table';
+      const kind = next.displays[index].kind;
+      const type = kind === 'stand' ? 'mannequin' : kind === 'shelf' ? 'shelf' : 'table';
       next.boughtFurniture[type] += 1;
     }
   }
@@ -1095,6 +1215,8 @@ export function applyState(state, data) {
     if (typeof volume === 'number' && Number.isFinite(volume)) {
       next.music.volume = Math.min(1, Math.max(0, volume));
     }
+    if (typeof data.music.loop === 'boolean') next.music.loop = data.music.loop;
+    if (typeof data.music.track === 'string') next.music.track = data.music.track;
   }
   if (typeof data.shopXp === 'number' && Number.isFinite(data.shopXp)) {
     next.shopXp = Math.max(0, Math.round(data.shopXp));
@@ -1104,6 +1226,9 @@ export function applyState(state, data) {
   next.brightness = data.brightness != null
     ? clampBrightness(data.brightness)
     : DEFAULT_BRIGHTNESS;
+  next.dungeonBrightness = data.dungeonBrightness != null
+    ? clampDungeonBrightness(data.dungeonBrightness)
+    : DEFAULT_DUNGEON_BRIGHTNESS;
   if (typeof data.chefHat === 'boolean') next.chefHat = data.chefHat;
   next.appearance = normalizeAppearance(data.appearance);
   if (typeof data.playTime === 'number' && Number.isFinite(data.playTime)) {
@@ -1126,16 +1251,30 @@ export function applyState(state, data) {
     next.furniture = {
       counter: readPose(data.furniture.counter, defaults.counter),
       anvil: readPose(data.furniture.anvil, defaults.anvil),
-      chest: readPose(data.furniture.chest, defaults.chest),
-      range: readPose(data.furniture.range, defaults.range),
+      chest: (() => {
+        const pose = readPose(data.furniture.chest, defaults.chest);
+        const oldStarterPads = [
+          { x: 2.55, z: -2.22 },
+          { x: 2.55, z: 3.05 },
+        ];
+        if (oldStarterPads.some((pad) => (
+          Math.abs(pose.x - pad.x) < 1e-6 && Math.abs(pose.z - pad.z) < 1e-6
+        ))) {
+          return { x: defaults.chest.x, z: defaults.chest.z, rot: FURNITURE_FORWARD };
+        }
+        return pose;
+      })(),
+      range: data.furniture.range
+        ? readPose(data.furniture.range, { ...SHOP.range, rot: FURNITURE_FORWARD })
+        : null,
       cauldron: data.furniture.cauldron
-        ? readPose(data.furniture.cauldron, SHOP.cauldron)
+        ? readPose(data.furniture.cauldron, { ...SHOP.cauldron, rot: FURNITURE_FORWARD })
         : null,
       furnace: data.furniture.furnace
-        ? readPose(data.furniture.furnace, SHOP.furnace)
-        : furnaceBesideAnvil(readPose(data.furniture.anvil, defaults.anvil)),
+        ? readPose(data.furniture.furnace, { ...SHOP.furnace, rot: FURNITURE_FORWARD })
+        : null,
       wheel: data.furniture.wheel
-        ? readPose(data.furniture.wheel, SHOP.wheel)
+        ? readPose(data.furniture.wheel, { ...SHOP.wheel, rot: FURNITURE_FORWARD })
         : null,
       displays: next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {
@@ -1143,7 +1282,11 @@ export function applyState(state, data) {
           z: 0.8,
           rot: FURNITURE_FORWARD,
         };
-        return readPose(savedFurnitureDisplays?.[index] ?? data.furniture.displays?.[index], fallback);
+        const pose = readPose(savedFurnitureDisplays?.[index] ?? data.furniture.displays?.[index], fallback);
+        if ((display.kind ?? SHOP.displays[index]?.kind) === 'shelf') {
+          return snapToWallGrid(pose.x, pose.z, next.expansions ?? [], pose.rot);
+        }
+        return pose;
       }),
     };
   }
@@ -1164,10 +1307,12 @@ export function applyState(state, data) {
   state.fullscreen = next.fullscreen;
   state.music = next.music;
   state.boughtFurniture = next.boughtFurniture;
+  state.freeFurnitureReplace = next.freeFurnitureReplace;
   state.shopXp = next.shopXp;
   state.shopLevel = next.shopLevel;
   state.skybox = next.skybox;
   state.brightness = next.brightness;
+  state.dungeonBrightness = next.dungeonBrightness;
   state.chefHat = next.chefHat;
   state.appearance = next.appearance;
   state.playTime = next.playTime;

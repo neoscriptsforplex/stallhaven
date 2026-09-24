@@ -1,11 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="is-booting">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rune Craft</title>
     <meta name="description" content="Rune Craft. Craft gear into a chest, then trade with travelers at the counter." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%236b4423' width='64' height='64' rx='10'/%3E%3Cpath fill='%23e8c37a' d='M12 40h40v8H12z'/%3E%3Cpath fill='%238b4336' d='M8 20h48l-6 12H14z'/%3E%3C/svg%3E" />
+    <style>
+      html.is-booting, html.is-booting body { background: #050403; }
+      html.is-booting #view,
+      html.is-booting #hud,
+      html.is-booting #save-bar { visibility: hidden !important; }
+    </style>
     <link rel="stylesheet" href="./src/style.css" />
     <script type="importmap">
       {
@@ -18,12 +24,16 @@
   </head>
   <body>
     <canvas id="view" aria-label="Rune Craft shop floor"></canvas>
+    <div id="boot-cover" role="status" aria-live="polite">
+      <p data-boot-label>Loading models…</p>
+      <div class="boot-track"><div class="boot-bar" data-boot-bar></div></div>
+    </div>
 
     <aside id="save-bar" aria-label="Save and load">
       <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
         <span class="expand-icon" aria-hidden="true">⛶</span>
       </button>
-      <button type="button" id="build-btn" title="Upgrade" aria-label="Upgrade">Upgrade</button>
+      <button type="button" id="build-btn" title="Build" aria-label="Build">Build</button>
       <button type="button" id="help-btn" title="Help" aria-label="Help">Help</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
@@ -53,6 +63,7 @@
         <div id="active-craft" class="active-craft" hidden>
           <p data-active-craft-name>Crafting</p>
           <span class="craft-bar"><i data-active-craft-bar></i></span>
+          <p data-active-craft-yield class="active-craft-yield" hidden>+5</p>
         </div>
       </header>
 
@@ -61,12 +72,12 @@
     <div id="help-modal" class="modal" hidden>
       <div class="sheet">
         <h2>Help</h2>
-        <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the map above the shop XP bar to walk there too; scroll or use +/− to zoom the map. Click the anvil, furnace, range, chest, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. Double-click a highlighted cell to confirm a new table, mannequin, spinning wheel, or cauldron. Scroll to zoom out for the roof and garden.</p>
-        <p>The camera follows you. You can walk behind the counter. Scroll or −/= to zoom; arrow keys change the angle. Zoom far out to see the roof and garden. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back. In the dungeon, left-click an Essence boulder or an ore rock to walk over, swing a pickaxe, and fill a Mining bar. Each fill grants 5 Essence or 5 ore of that tier (Bronze through Dragon). Ore rocks share an olive-brown jagged body; only the vein changes colour (bronze copper, iron grey, steel light grey, mithril blue, adamant green, runite light blue, dragon red). Essence stays pale with a light-blue glow. Right-click a boulder to read its name (Essence, Bronze Ore, Runite Ore, …). Ores and Essence do not restock for gold or refill on their own.</p>
-        <p>Click the anvil to smith Melee, Magic, Ranged, or Tools. Ranged has Weapons, Armour, and Ammo (arrows and cannonballs). Magic has Weapons, Armour, and Runes. Tools has Hatchet and Pickaxe (Bronze through Dragon, including Runite). Weapons, armour, and tools use metal bars. Each craft row has 1×, 5×, and Max — those count recipe actions (one arrow craft still makes 20). Cancel under the spinning preview stops a run and returns leftover actions (finished pieces stay). The starting shop already has a furnace beside the anvil — click it to smelt ores into bars. Higher bars unlock after enough smelts of the previous tier. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Click the cooking range for Food. Click a placed cauldron for Potions — the window matches the anvil (recipes on the left, preview on the right, materials along the bottom). Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
+        <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the map above the shop XP bar to walk there too; scroll or use +/− to zoom the map. Click the anvil, furnace, range, chest, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. While placing or moving furniture, scroll the wheel to rotate in the same 15° steps as Rotate. Double-click a highlighted cell to confirm a new table, mannequin, shelf, spinning wheel, furnace, range, or cauldron. Scroll to zoom out for the roof and garden when you are not placing furniture.</p>
+        <p>The camera follows you. You can walk behind the counter — click the counter to stand on the shopkeeper side. Scroll or −/= to zoom; arrow keys or hold the middle mouse button and drag to change the angle. Zoom far out to see the roof and garden. Click an outdoor tree to walk over and chop Logs — the bar shows +N for each fill, same as mining. Right-click a tree for Chop. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back. In the dungeon, left-click an Essence boulder or an ore rock to walk over, swing a pickaxe, and fill a Mining bar. Each fill grants 5 Essence or 5 ore of that tier (Bronze through Dragon), with +N under the bar. Ore rocks share an olive-brown jagged body; only the vein changes colour (bronze copper, iron grey, steel light grey, mithril blue, adamantite green, runite light blue, dragon red). Essence stays pale. Right-click a boulder to read its name (Essence, Bronze Ore, Adamantite, Runite, …) and choose Mine. Ores and Essence do not restock for gold or refill on their own.</p>
+        <p>Click the anvil to smith Melee, Magic, Ranged, or Tools. Ranged has Weapons, Armour, and Ammo (arrows and cannonballs). Magic has Weapons, Armour, and Runes. Tools has Hatchet and Pickaxe (Bronze through Dragon, including Rune). Weapons, armour, and tools use metal bars. Each craft row has 1×, 5×, and Max — those count recipe actions (one arrow craft still makes 20). Cancel under the spinning preview stops a run and returns leftover actions (finished pieces stay). Place a furnace from Build (free) to smelt ores into bars. Higher bars unlock after enough smelts of the previous tier. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Place a cooking range from Build (free) for Food. Click a placed cauldron for Potions — the window matches the anvil (recipes on the left, preview on the right, materials along the bottom). Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
         <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
-        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Runes and arrows (and cannonballs) can sit on tables or on any of the four shelf slots. Right-click furniture for Move or Rotate — wares travel with the piece. The counter only moves from a right-click.</p>
-        <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist you upload — Shuffle, Play, Pause, Skip, and Stop. The cog beside it opens Settings for the skybox, player look, and cheat codes. Upload a .glb/.gltf, or multi-select an .obj with its .mtl (and maps), as Furniture, Ware, Player, or Customer. Clear uploads restores the default player, customers, and furniture. A custom Player mesh uses the same walk cycle as the stock keeper (leg and arm swing, or a bob if the file has no limbs) and still swings a pickaxe when you mine.</p>
+        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Runes and arrows (and cannonballs) can sit on tables or on any of the four shelf slots. Right-click furniture for Move or Rotate — wares travel with the piece. Right-click a wall shelf, table, or mannequin for Delete. The first three shelves are included, so deleting one lets you place a replacement for free up to three. Up to two deleted tables and two deleted mannequins can be placed again for free. The counter only moves from a right-click.</p>
+        <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist of included tracks — they start on load (or on the first click if the browser blocks autoplay), with Shuffle, Loop, Play, Pause, Skip, and Stop — and you can upload more MP3, WAV, or OGG files. The cog beside it opens Settings for the skybox, a Player Avatar: Customize panel, and cheat codes. Upload a .glb/.gltf, or multi-select an .obj with its .mtl (and maps), as Furniture, Ware, Player, or Customer. Clear uploads restores the default player, customers, and furniture. A custom Player mesh uses the same walk cycle as the stock keeper (leg and arm swing, or a bob if the file has no limbs) and still swings a pickaxe when you mine.</p>
         <button type="button" data-dismiss>Close</button>
       </div>
     </div>
@@ -201,25 +212,19 @@
     </aside>
 
     <aside id="build-dock" class="expand-dock" hidden>
-      <h2>Upgrade</h2>
-      <p>Unlockables for the shop. Rooms use the same gold pads as before. The furnace is already beside the anvil. Bow string needs a spinning wheel. Potion brewing needs a cauldron. Extra tables and mannequins sit on the floor snap grid.</p>
+      <h2>Build</h2>
+      <p>Unlockables for the shop. Rooms use the same gold pads as before. A furnace and cooking range are free to place. Bow string needs a spinning wheel. Potion brewing needs a cauldron. Extra tables, mannequins, and shelves use the same 500g then ×3 curve; the first three shelves are included.</p>
       <article class="build-item">
-        <h3>Shop Room</h3>
-        <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
-        <p data-expand-status class="meta">Next room costs 10,000g.</p>
-        <button type="button" data-expand-buy>Place Room</button>
+        <h3>Furnace</h3>
+        <p>Smelt ores into metal bars. Place it on the floor snap grid, then confirm. Free.</p>
+        <p data-furnace-status class="meta" hidden></p>
+        <button type="button" data-furnace-buy>Place · Free</button>
       </article>
       <article class="build-item">
-        <h3>Table</h3>
-        <p>Buy another display table. The first extra costs 500g; each further table costs three times the last. Starting tables do not count.</p>
-        <p data-table-status class="meta">First extra table costs 500g.</p>
-        <button type="button" data-table-buy>Buy · 500 gp</button>
-      </article>
-      <article class="build-item">
-        <h3>Mannequin</h3>
-        <p>Buy another armour mannequin. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count.</p>
-        <p data-mannequin-status class="meta">First extra mannequin costs 500g.</p>
-        <button type="button" data-mannequin-buy>Buy · 500 gp</button>
+        <h3>Cooking Range</h3>
+        <p>Bake food. Place it on the floor snap grid, then confirm. Free.</p>
+        <p data-range-status class="meta" hidden></p>
+        <button type="button" data-range-buy>Place · Free</button>
       </article>
       <article class="build-item">
         <h3>Spinning Wheel</h3>
@@ -232,6 +237,30 @@
         <p>Unlocks potion crafting. Place it on the floor snap grid, then confirm. Click it afterward to brew.</p>
         <p data-cauldron-status class="meta">Costs 10,000 gp.</p>
         <button type="button" data-cauldron-buy>Buy · 10,000 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Table</h3>
+        <p>Buy another display table. The first extra costs 500g; each further table costs three times the last. Starting tables do not count. Delete up to two tables to replace them for free.</p>
+        <p data-table-status class="meta">First extra table costs 500g.</p>
+        <button type="button" data-table-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Shelf</h3>
+        <p>Buy another wall shelf. Place it on the wall grid. The starting three shelves are included; extras cost 500g, then ×3. Delete a shelf from its right-click menu — a deleted included shelf can be replaced for free until three are placed.</p>
+        <p data-shelf-status class="meta">First 3 shelves are included. The next costs 500g.</p>
+        <button type="button" data-shelf-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Mannequin</h3>
+        <p>Buy another armour mannequin. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count. Delete up to two mannequins to replace them for free.</p>
+        <p data-mannequin-status class="meta">First extra mannequin costs 500g.</p>
+        <button type="button" data-mannequin-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Shop Expansion</h3>
+        <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
+        <p data-expand-status class="meta">Next room costs 10,000g.</p>
+        <button type="button" data-expand-buy>Place Room</button>
       </article>
       <button type="button" class="ghost" data-build-close>Close</button>
     </aside>
@@ -280,11 +309,31 @@
       </div>
       <label class="settings-bright">
         Brightness
-        <input type="range" data-brightness min="50" max="150" value="100" step="5" aria-valuemin="50" aria-valuemax="150" aria-valuenow="100" aria-label="Scene brightness" />
-        <span data-brightness-label>100%</span>
+        <input type="range" data-brightness min="50" max="150" value="150" step="5" aria-valuemin="50" aria-valuemax="150" aria-valuenow="150" aria-label="Scene brightness" />
+        <span data-brightness-label>150%</span>
       </label>
-      <p class="meta">Overall shop lighting. 100% is the default brighter stall. The dungeon stays a bit darker at high values so it does not wash out.</p>
-      <h3>Player look</h3>
+      <p class="meta">Shop and outdoor lighting. New shops start at 150% (slider max).</p>
+      <label class="settings-bright">
+        Dungeon brightness
+        <input type="range" data-dungeon-brightness min="0" max="150" value="150" step="5" aria-valuemin="0" aria-valuemax="150" aria-valuenow="150" aria-label="Dungeon brightness" />
+        <span data-dungeon-brightness-label>150%</span>
+      </label>
+      <p class="meta">Cave lighting only. 100% is the dungeon baseline; new shops start at 150% (slider max). Does not change the shop.</p>
+      <h3>Player Avatar</h3>
+      <p class="meta">Hair, shirt, legs, boots, and face hair save with the shop.</p>
+      <button type="button" data-look-open>Player Avatar: Customize</button>
+      <h3>Cheats</h3>
+      <p class="meta">Type a code and press Enter. Codes are not case-sensitive.</p>
+      <form data-cheat-form class="cheat-form">
+        <input type="text" data-cheat-code autocomplete="off" spellcheck="false" placeholder="Enter code" aria-label="Cheat code" />
+        <button type="submit">Enter</button>
+      </form>
+      <p data-cheat-note class="craft-note" hidden></p>
+      <button type="button" class="ghost" data-settings-close>Close</button>
+    </aside>
+
+    <aside id="look-dock" class="expand-dock" hidden>
+      <h2>Player Avatar</h2>
       <p class="meta" data-look-note>Hair, shirt, legs, boots, and face hair save with the shop.</p>
       <p class="look-label">Hair</p>
       <div class="skybox-grid" data-look="hair"></div>
@@ -296,25 +345,22 @@
       <div class="skybox-grid" data-look="boots"></div>
       <p class="look-label">Face hair</p>
       <div class="skybox-grid" data-look="faceHair"></div>
-      <h3>Cheats</h3>
-      <p class="meta">Type a code and press Enter. Codes are not case-sensitive.</p>
-      <form data-cheat-form class="cheat-form">
-        <input type="text" data-cheat-code autocomplete="off" spellcheck="false" placeholder="Enter code" aria-label="Cheat code" />
-        <button type="submit">Enter</button>
-      </form>
-      <p data-cheat-note class="craft-note" hidden></p>
-      <button type="button" class="ghost" data-settings-close>Close</button>
+      <div class="row furn-row">
+        <button type="button" data-look-back>Back to Settings</button>
+        <button type="button" class="ghost" data-look-close>Close</button>
+      </div>
     </aside>
 
     <aside id="music-dock" class="expand-dock" hidden>
       <h2>Music</h2>
-      <div class="tabs">
+      <div class="tabs music-tabs">
         <button type="button" class="tab is-on" data-music-tab="play">Play</button>
         <button type="button" class="tab" data-music-tab="playlist">Playlist</button>
+        <button type="button" class="tab" data-music-loop aria-pressed="false" title="Repeat the current track">Loop</button>
       </div>
       <div data-music-pane="play">
         <p>Upload MP3, WAV, or OGG files. Several tracks can sit in the playlist.</p>
-        <p data-music-name class="meta">No track loaded. Upload MP3, WAV, or OGG files.</p>
+        <p data-music-name class="meta">Included tracks are ready. Press Play, or upload more MP3, WAV, or OGG files.</p>
         <p data-music-note class="craft-note" hidden></p>
         <label class="music-vol">
           Volume
@@ -388,6 +434,7 @@
     <div id="inspect-pop" class="inspect-pop" hidden>
       <p data-inspect-name>Rock</p>
       <p class="inspect-blurb" data-inspect-blurb></p>
+      <button type="button" data-inspect-mine>Mine</button>
       <button type="button" class="ghost" data-inspect-close>Close</button>
     </div>
     <div id="furn-menu" class="furn-menu" hidden>
@@ -396,6 +443,7 @@
       <button type="button" data-furn-upgrade hidden>Upgrade Chest</button>
       <button type="button" data-furn-display hidden>Display item…</button>
       <button type="button" data-furn-fill hidden>Fill</button>
+      <button type="button" data-furn-delete hidden>Delete</button>
       <button type="button" data-furn-move>Move Furniture</button>
       <button type="button" data-furn-rotate>Rotate 15°</button>
       <button type="button" class="ghost" data-furn-close>Close</button>

@@ -1,11 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHOP } from './catalog.js';
-import { createState } from './economy.js';
-import { defaultFurniture, gardenTrapdoorSpot } from './layout.js';
+import { createState, removePlacedFurniture } from './economy.js';
+import { defaultFurniture, gardenTrapdoorSpot, shopRugPose, shopRugRect, walkFloors } from './layout.js';
 import {
   FLOOR,
   isWalkable,
+  liveObstacles,
   nearestWalkable,
   placementBlocked,
   planPlayerWalk,
@@ -20,6 +21,26 @@ describe('shop navigation', () => {
   it('lets the shopkeeper stand behind the counter', () => {
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, obstacles), true);
     assert.equal(isWalkable(0, SHOP.counter.z - 0.82, obstacles), true);
+  });
+
+  it('lets the player walk on the shop rug like normal floor', () => {
+    const pose = shopRugPose();
+    const rug = shopRugRect();
+    assert.equal(isWalkable(pose.x, pose.z, obstacles), true);
+    assert.equal(isWalkable(pose.x - 0.6, pose.z, obstacles), true);
+    assert.equal(isWalkable(pose.x + 0.6, pose.z, obstacles), true);
+    const across = planWalk(
+      { x: pose.x, z: rug.minZ + 0.2 },
+      { x: pose.x, z: rug.maxZ - 0.2 },
+      obstacles,
+    );
+    assert.ok(across.length >= 1, 'should path across the rug');
+    const cluttered = shopObstacles({
+      ...SHOP,
+      clutter: [{ id: 'rug', kind: 'rug', x: pose.x, z: pose.z, w: 2.35, d: 1.55, walkable: true }],
+    }, defaultFurniture());
+    assert.equal(isWalkable(pose.x, pose.z, cluttered), true);
+    assert.equal(isWalkable(SHOP.counter.x, SHOP.counter.z, cluttered), false);
   });
 
   it('blocks the counter, walls, and the road outside', () => {
@@ -75,6 +96,27 @@ describe('shop navigation', () => {
     assert.equal(overlap, 'That spot overlaps other furniture.');
     const clear = placementBlocked({ x: -2.2, z: 0.4, rot: 0 }, 'table', [], floors, { checkAisle: false });
     assert.equal(clear, null);
+    const againstWall = placementBlocked(
+      { x: FLOOR.minX + 0.08, z: 0.2, rot: 0 },
+      'chest',
+      [],
+      floors,
+      { checkAisle: false },
+    );
+    assert.equal(againstWall, null);
+  });
+
+  it('frees a deleted shelf wall cell for a replacement', () => {
+    const state = createState();
+    const shelfIndex = SHOP.displays.findIndex((d) => d.kind === 'shelf');
+    assert.ok(shelfIndex >= 0);
+    const pose = state.furniture.displays[shelfIndex];
+    const floors = walkFloors([]);
+    const occupied = placementBlocked(pose, 'shelf', liveObstacles(state), floors, { checkAisle: false });
+    assert.equal(occupied, 'That spot overlaps other furniture.');
+    assert.equal(removePlacedFurniture(state, shelfIndex), true);
+    const free = placementBlocked(pose, 'shelf', liveObstacles(state), floors, { checkAisle: false });
+    assert.equal(free, null);
   });
 
   it('walks from behind the counter onto the outdoor path and to the trapdoor', () => {

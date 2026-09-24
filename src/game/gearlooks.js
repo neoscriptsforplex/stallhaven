@@ -1,4 +1,4 @@
-/** Luke weapon, armour, ammo, and tool OBJ dumps. Look id matches the recipe id. */
+/** Luke gear, material, and station OBJ dumps. Look id matches the recipe or fixture id. */
 export const LUKE_MODEL_FOLDERS = [
   { id: 'adamant_2h_sword', folder: 'gear/adamant-2h-sword' },
   { id: 'adamant_arrows', folder: 'gear/adamant-arrows' },
@@ -63,6 +63,8 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'dragon_sword', folder: 'gear/dragon-sword' },
   { id: 'earth_battlestaff', folder: 'gear/earth-battlestaff' },
   { id: 'fire_battlestaff', folder: 'gear/fire-battlestaff' },
+  { id: 'flax', folder: 'materials/flax' },
+  { id: 'fletch', folder: 'fletch' },
   { id: 'green_dhide_body', folder: 'gear/green-dhide-body' },
   { id: 'green_dhide_chaps', folder: 'gear/green-dhide-chaps' },
   { id: 'green_dhide_vambraces', folder: 'gear/green-dhide-vambraces' },
@@ -86,6 +88,7 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'iron_spear', folder: 'gear/iron-spear' },
   { id: 'iron_sword', folder: 'gear/iron-sword' },
   { id: 'longbow', folder: 'gear/longbow' },
+  { id: 'loom', folder: 'loom' },
   { id: 'magic_longbow', folder: 'gear/magic-longbow' },
   { id: 'magic_shortbow', folder: 'gear/magic-shortbow' },
   { id: 'magic_staff_air', folder: 'gear/magic-staff-air' },
@@ -123,6 +126,8 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'mystic_water_staff', folder: 'gear/mystic-water-staff' },
   { id: 'oak_longbow', folder: 'gear/oak-longbow' },
   { id: 'oak_shortbow', folder: 'gear/oak-shortbow' },
+  { id: 'orb', folder: 'materials/orb' },
+  { id: 'potter', folder: 'potter' },
   { id: 'red_dhide_body', folder: 'gear/red-dhide-body' },
   { id: 'red_dhide_chaps', folder: 'gear/red-dhide-chaps' },
   { id: 'red_dhide_vambraces', folder: 'gear/red-dhide-vambraces' },
@@ -171,6 +176,7 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'steel_spear', folder: 'gear/steel-spear' },
   { id: 'steel_sword', folder: 'gear/steel-sword' },
   { id: 'water_battlestaff', folder: 'gear/water-battlestaff' },
+  { id: 'weave_cloth', folder: 'materials/cloth' },
   { id: 'willow_longbow', folder: 'gear/willow-longbow' },
   { id: 'willow_shortbow', folder: 'gear/willow-shortbow' },
   { id: 'wizard_boots', folder: 'gear/wizard-boots' },

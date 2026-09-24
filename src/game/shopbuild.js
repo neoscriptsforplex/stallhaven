@@ -29,7 +29,7 @@ import { METALS } from './catalog.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
-import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp } from './models.js';
+import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp, dumpStandEuler } from './models.js';
 import { prepareDungeonRockMaterials } from './upload.js';
 
 export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
@@ -1068,7 +1068,21 @@ function buildWorkBench(name, topHex, accentHex) {
   return group;
 }
 
-export function buildLoom() {
+function fitBundledStation(id, procedural) {
+  const bundled = getBundledLook(id);
+  if (!bundled) return procedural;
+  const targetBox = new THREE.Box3().setFromObject(procedural);
+  const fitted = wrapBundledProp(bundled, procedural, {
+    name: id,
+    fit: 'max',
+    targetBox,
+    ...dumpStandEuler(bundled, targetBox),
+  });
+  sitVisibleOnY(fitted, 0);
+  return fitted;
+}
+
+function buildProceduralLoom() {
   const group = buildWorkBench('loom', 0x6b4423, 0xc4a05a);
   const frame = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.55, 0.08), wood(0x4a301c, 0.88)));
   frame.position.set(-0.28, 1.05, 0);
@@ -1082,7 +1096,11 @@ export function buildLoom() {
   return group;
 }
 
-export function buildFletchingBench() {
+export function buildLoom() {
+  return fitBundledStation('loom', buildProceduralLoom());
+}
+
+function buildProceduralFletchingBench() {
   const group = buildWorkBench('fletch', 0x5a3a22, 0xd7c09a);
   const stave = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.035, 0.035), wood(0xc4a05a, 0.7)));
   stave.position.set(0.05, 0.84, 0.08);
@@ -1091,7 +1109,11 @@ export function buildFletchingBench() {
   return group;
 }
 
-export function buildPotterWheel() {
+export function buildFletchingBench() {
+  return fitBundledStation('fletch', buildProceduralFletchingBench());
+}
+
+function buildProceduralPotterWheel() {
   const group = new THREE.Group();
   group.name = 'potter';
   const stand = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.62, 10), wood(0x4a301c, 0.88)));
@@ -1107,6 +1129,10 @@ export function buildPotterWheel() {
   clay.position.y = 0.73;
   group.add(clay);
   return group;
+}
+
+export function buildPotterWheel() {
+  return fitBundledStation('potter', buildProceduralPotterWheel());
 }
 
 export function buildSpinningWheel() {

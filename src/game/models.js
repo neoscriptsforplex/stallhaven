@@ -1159,8 +1159,8 @@ export function slotPose(slot) {
   return { x: 0, y: 0.62, z: 0 };
 }
 
-/** Stand a flat dump upright when the procedural weapon is taller than it is wide. */
-function dumpStandEuler(source, targetBox) {
+/** Stand a flat dump upright when the procedural mesh is taller than it is wide. */
+export function dumpStandEuler(source, targetBox) {
   const none = { rotateX: 0, rotateY: 0, rotateZ: 0 };
   if (!source || !targetBox || targetBox.isEmpty()) return none;
   const tsize = targetBox.getSize(new THREE.Vector3());
@@ -1180,6 +1180,13 @@ export function buildWare(recipeId) {
   group.name = recipeId;
   if (!recipe && isCraftOreId(recipeId)) {
     addOreWare(group, recipeId);
+    group.userData.recipeId = recipeId;
+    return group;
+  }
+  if (!recipe && (recipeId === 'flax' || recipeId === 'orb')) {
+    const host = new THREE.Group();
+    addMaterialToken(host, recipeId === 'flax' ? 0x3a8a45 : 0xc8d8ee);
+    attachBundledWare(group, host, getBundledLook(recipeId));
     group.userData.recipeId = recipeId;
     return group;
   }
@@ -1244,21 +1251,34 @@ export function buildWare(recipeId) {
   }
   if (recipe?.category !== 'food') {
     const bundled = recipe ? getBundledLook(recipe.id) : null;
-    if (bundled) {
-      const targetBox = new THREE.Box3().setFromObject(host);
-      group.add(wrapBundledProp(bundled, host, {
-        name: 'dump',
-        fit: 'max',
-        targetBox,
-        ...dumpStandEuler(bundled, targetBox),
-      }));
-    } else {
-      group.add(host);
-    }
+    attachBundledWare(group, host, bundled);
   }
   if (isShelfItem(recipe)) group.scale.setScalar(0.55);
   group.userData.recipeId = recipeId;
   return group;
+}
+
+function addMaterialToken(host, tint) {
+  const lump = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.18, 0.22),
+    new THREE.MeshStandardMaterial({ color: tint, roughness: 0.6 }),
+  ));
+  lump.position.y = 0.1;
+  host.add(lump);
+}
+
+function attachBundledWare(group, host, bundled) {
+  if (!bundled) {
+    group.add(host);
+    return;
+  }
+  const targetBox = new THREE.Box3().setFromObject(host);
+  group.add(wrapBundledProp(bundled, host, {
+    name: 'dump',
+    fit: 'max',
+    targetBox,
+    ...dumpStandEuler(bundled, targetBox),
+  }));
 }
 
 function metal(color) {

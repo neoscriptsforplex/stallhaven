@@ -122,6 +122,13 @@ export function canvasPointerStartsCamOrbit(event, flags = {}) {
 export function canvasPointerMovedPastHold(from, to, threshold = TOUCH_HOLD_MOVE_PX) {
   return Math.hypot((to?.x ?? to?.clientX ?? 0) - (from?.x ?? from?.clientX ?? 0), (to?.y ?? to?.clientY ?? 0) - (from?.y ?? from?.clientY ?? 0)) > threshold;
 }
+
+/** Shared mouse-drag / one-finger swipe orbit. Horizontal sign is drag-left → look left. */
+export function applyCanvasOrbitDelta(cam, dx, dy) {
+  cam.yaw += dx * CAM_ORBIT_YAW;
+  cam.pitch -= dy * CAM_ORBIT_PITCH;
+  return cam;
+}
 const CAM_ZOOM_STEP = 0.38;
 const CAM_MIN_DISTANCE = 2.05;
 const CAM_MAX_DISTANCE = 25.8;
@@ -1445,8 +1452,7 @@ export function createWorld(canvas, state, opts = {}) {
       const dx = event.clientX - camDrag.x;
       const dy = event.clientY - camDrag.y;
       camDrag = { x: event.clientX, y: event.clientY, pointerId: camDrag.pointerId };
-      cam.yaw -= dx * CAM_ORBIT_YAW;
-      cam.pitch -= dy * CAM_ORBIT_PITCH;
+      applyCanvasOrbitDelta(cam, dx, dy);
       clampCam();
       return;
     }

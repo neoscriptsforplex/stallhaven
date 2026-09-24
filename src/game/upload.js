@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, recipeList } from './catalog.js';
+import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
 import { UPLOADS_CLEARED, clearModels, saveModel } from './storage.js';
 import { normalizeImported } from './models.js';
@@ -262,6 +263,7 @@ export const BUNDLED_PROP_FOLDERS = [
     }),
   ...CRAFT_ORE_FOLDERS,
   ...BUYER_PACK_FOLDERS,
+  ...LUKE_MODEL_FOLDERS,
 ];
 
 export async function parseBundledPlayerBuffers(objBuffer, mtlBuffer) {

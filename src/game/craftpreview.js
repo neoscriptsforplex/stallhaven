@@ -15,7 +15,11 @@ export function isRunePreview(id) {
   return recipe?.category === 'rune' || recipe?.shape === 'rune';
 }
 
-/** Craft-preview only. World and worn meshes stay on the dumped orientation. */
+/**
+ * Craft-preview only. Robe tops and dragon masks are turned in the ware mesh
+ * (mannequin, shop, and this preview share that orientation), so they get no
+ * second turn here. Platebodies stay on their preview yaw.
+ */
 const PREVIEW_EULER = {
   robe_bottom: { x: 0, y: 0, z: -Math.PI / 4 },
   platelegs: { x: Math.PI, y: 0, z: 0 },
@@ -26,16 +30,16 @@ const PREVIEW_EULER = {
   plateskirt: { x: Math.PI / 2, y: 0, z: 0 },
 };
 
-/** Dumps that do not share their shape's facing. */
-const PREVIEW_EULER_BY_ID = {
-  wizard_robe: { x: 0, y: -Math.PI / 2, z: 0 },
-  mystic_robe_top: { x: 0, y: Math.PI / 2, z: 0 },
-};
+/** These dumps are oriented on the ware itself. Do not turn them again. */
+function usesWareDisplayYaw(id) {
+  return id === 'wizard_robe'
+    || id === 'mystic_robe_top'
+    || id === 'splitbark_robe_top'
+    || String(id).endsWith('_dragon_mask');
+}
 
 export function craftPreviewEuler(id) {
-  // Side profile: spikes up, snout to the right.
-  if (String(id).endsWith('_dragon_mask')) return { x: 0, y: 0, z: Math.PI / 2 };
-  if (PREVIEW_EULER_BY_ID[id]) return PREVIEW_EULER_BY_ID[id];
+  if (usesWareDisplayYaw(id)) return null;
   const shape = RECIPES[id]?.shape;
   return shape ? (PREVIEW_EULER[shape] ?? null) : null;
 }

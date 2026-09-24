@@ -27,6 +27,7 @@ import {
   updateWalkPose,
   setBundledLook,
   buildWare,
+  wareDisplayYaw,
   wrapBundledProp,
   wrapImportedCharacter,
   wrapShopPlayer,
@@ -1472,6 +1473,25 @@ describe('bundled prop swaps', () => {
     }
     assert.equal(byId.bronze_thrownaxe, undefined);
     assert.equal(buildWare('bronze_thrownaxe').getObjectByName('dump'), undefined);
+
+    async function thinAxis(recipeId) {
+      const bundled = await loadFolder(byId[recipeId]);
+      setBundledLook(recipeId, bundled);
+      try {
+        const size = new THREE.Box3().setFromObject(buildWare(recipeId)).getSize(new THREE.Vector3());
+        return [['x', size.x], ['y', size.y], ['z', size.z]].sort((a, b) => a[1] - b[1])[0][0];
+      } finally {
+        setBundledLook(recipeId, null);
+      }
+    }
+    assert.equal(wareDisplayYaw('bronze_platebody'), 0);
+    assert.equal(wareDisplayYaw('runite_platebody'), 0);
+    assert.equal(await thinAxis('bronze_platebody'), 'x');
+    assert.equal(await thinAxis('wizard_robe'), 'z');
+    assert.equal(await thinAxis('mystic_robe_top'), 'z');
+    assert.equal(await thinAxis('splitbark_robe_top'), 'z');
+    assert.equal(await thinAxis('green_dragon_mask'), 'z');
+    assert.equal(await thinAxis('red_dragon_mask'), 'z');
     for (const missingId of ['dragon_platebody', 'blue_dhide_boots', 'battlemage_hat', 'cannonballs']) {
       assert.equal(byId[missingId], undefined, missingId);
       assert.equal(buildWare(missingId).getObjectByName('dump'), undefined, missingId);

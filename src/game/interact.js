@@ -35,15 +35,16 @@ const APPROACH_DIST = 0.85;
 const STAND_FRONT = new Set(['counter', 'chest']);
 
 /**
- * Local +Z is the cook-face on the range, the shopkeeper side of the counter,
- * and the latch/front of the chest (into the room from the right-wall pad).
+ * Local +Z is the cook-face on the range and the shopkeeper side of the
+ * counter. The chest latch is dump local −X (into the room at visual yaw 0).
  */
 function facingApproachOffsets(kind, pose) {
   const yaw = furnitureVisualYaw(kind, pose?.rot ?? 0);
-  const fx = Math.sin(yaw);
-  const fz = Math.cos(yaw);
-  const rx = Math.cos(yaw);
-  const rz = -Math.sin(yaw);
+  const face = kind === 'chest' ? yaw - Math.PI / 2 : yaw;
+  const fx = Math.sin(face);
+  const fz = Math.cos(face);
+  const rx = Math.cos(face);
+  const rz = -Math.sin(face);
   return [
     [fx * APPROACH_DIST, fz * APPROACH_DIST],
     [fx * 0.7, fz * 0.7],

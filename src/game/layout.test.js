@@ -119,13 +119,13 @@ describe('layout numbers', () => {
     assert.ok(Math.abs(furnitureRotateDelta('shelf') - Math.PI / 2) < 1e-9);
     assert.ok(Math.abs(CHEST_YAW_CLOCKWISE - furnitureRotateDelta('chest') * 6) < 1e-9);
     assert.ok(Math.abs(CHEST_YAW_CLOCKWISE - Math.PI / 2) < 1e-9);
-    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE)) < 1e-9);
-    assert.ok(Math.abs(wrapTau(FURNITURE_START_YAW.chest) - wrapTau(-Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(FURNITURE_START_YAW.chest - (CHEST_UPRIGHT_YAW + CHEST_YAW_CLOCKWISE * 2)) < 1e-9);
+    assert.ok(Math.abs(wrapTau(FURNITURE_START_YAW.chest) - wrapTau(0)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.range - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.furnace - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(FURNITURE_START_YAW.counter - Math.PI) < 1e-9);
     assert.equal(FURNITURE_START_YAW.anvil, undefined);
-    assert.ok(Math.abs(wrapTau(furnitureVisualYaw('chest', 0)) - wrapTau(-Math.PI / 2)) < 1e-9);
+    assert.ok(Math.abs(wrapTau(furnitureVisualYaw('chest', 0)) - wrapTau(0)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('range', FURNITURE_ROT_STEP) - (-Math.PI / 2 + FURNITURE_ROT_STEP)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('furnace', 0) - (-Math.PI / 2)) < 1e-9);
     assert.ok(Math.abs(furnitureVisualYaw('counter', 0) - Math.PI) < 1e-9);
@@ -166,10 +166,10 @@ describe('layout numbers', () => {
     assert.ok(SHOP.chest.x > 3.4, 'chest should sit on the right wall, not mid-floor');
     assert.ok(SHOP.chest.z < SHOP.counter.z - 0.2, 'chest stays at the back-right depth');
     assert.ok(Math.abs(SHOP.chest.x - (interior.maxX - hw)) < 1e-6, 'back of chest flush on interior face');
-    assert.ok(box.maxX > interior.maxX - 0.15, `chest should meet the right wall, maxX=${box.maxX}`);
+    assert.ok(Math.abs(box.maxX - interior.maxX) < 0.04, `chest should sit flush on the right wall, maxX=${box.maxX}`);
     assert.ok(
-      Math.abs(wrapTau(furnitureVisualYaw('chest', 0)) - wrapTau(-Math.PI / 2)) < 1e-9,
-      'one 90° Rotate from door-wall upright; front into the shop',
+      Math.abs(wrapTau(furnitureVisualYaw('chest', 0)) - wrapTau(0)) < 1e-9,
+      'two 90° Rotates from door-wall upright; latch into the shop',
     );
     assert.ok(SHOP.anvil.x < -1.8, 'anvil should sit on the left half of the back wall');
   });

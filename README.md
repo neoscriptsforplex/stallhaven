@@ -1,6 +1,6 @@
-# Stallhaven
+# Rune Craft - A Runescape Tycoon Fan Game
 
-A free browser game. You keep **Rune Craft**.
+A free browser game.
 
 ## Play
 

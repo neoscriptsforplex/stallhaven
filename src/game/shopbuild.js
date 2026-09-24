@@ -20,6 +20,8 @@ import {
   occupiedCells,
   padConnects,
   roomCenter,
+  SHOP_RUG,
+  shopRugPose,
   doorwayFloor,
   wallVineMounts,
 } from './layout.js';
@@ -633,7 +635,8 @@ function addRoomTorches(root, center, neigh) {
 
 function addOriginDecor(root, center) {
   const rug = buildRug();
-  rug.position.set(center.x, 0.11, center.z + 0.15);
+  const pose = shopRugPose();
+  rug.position.set(center.x, pose.y, pose.z);
   root.add(rug);
 
   addWallVines(root, center);
@@ -734,6 +737,9 @@ function randAt(seed) {
 export function buildRug() {
   const group = new THREE.Group();
   group.name = 'rug';
+  group.userData.kind = 'ground';
+  group.userData.rug = true;
+  group.userData.walkable = true;
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 160;
@@ -750,10 +756,12 @@ export function buildRug() {
   ctx.fillRect(48, 40, 160, 80);
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
-  const rug = new THREE.Mesh(
-    new THREE.BoxGeometry(2.35, 0.025, 1.55),
+  const rug = markGround(new THREE.Mesh(
+    new THREE.BoxGeometry(SHOP_RUG.w, 0.025, SHOP_RUG.d),
     new THREE.MeshStandardMaterial({ map, roughness: 0.95 }),
-  );
+  ));
+  rug.userData.rug = true;
+  rug.userData.walkable = true;
   rug.receiveShadow = true;
   group.add(rug);
   return group;

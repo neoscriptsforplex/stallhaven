@@ -164,6 +164,30 @@ export function roomCenter(gx, gz) {
   return { x: gx * ROOM_W, z: 0.1 + gz * ROOM_D };
 }
 
+/** Origin-room rug: visual only. Never a nav / placement block. */
+export const SHOP_RUG = { w: 2.35, d: 1.55, y: 0.11, zOffset: 0.15 };
+
+export function shopRugPose(gx = 0, gz = 0) {
+  const c = roomCenter(gx, gz);
+  return {
+    x: c.x,
+    z: c.z + SHOP_RUG.zOffset,
+    y: SHOP_RUG.y,
+    hw: SHOP_RUG.w / 2,
+    hd: SHOP_RUG.d / 2,
+  };
+}
+
+export function shopRugRect(gx = 0, gz = 0) {
+  const pose = shopRugPose(gx, gz);
+  return {
+    minX: pose.x - pose.hw,
+    maxX: pose.x + pose.hw,
+    minZ: pose.z - pose.hd,
+    maxZ: pose.z + pose.hd,
+  };
+}
+
 export function roomFloor(gx, gz) {
   return {
     minX: ORIGIN_FLOOR.minX + gx * ROOM_W,

@@ -95,6 +95,7 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     blocks.push(blockFromPose(pose, hw, hd));
   }
   for (const item of shop.clutter ?? []) {
+    if (item?.walkable || item?.kind === 'rug' || item?.id === 'rug') continue;
     blocks.push(rectFromCenter(item.x, item.z, item.w, item.d));
   }
   return blocks;

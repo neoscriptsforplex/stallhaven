@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHOP } from './catalog.js';
 import { createState, removePlacedFurniture } from './economy.js';
-import { defaultFurniture, gardenTrapdoorSpot, walkFloors } from './layout.js';
+import { defaultFurniture, gardenTrapdoorSpot, shopRugPose, shopRugRect, walkFloors } from './layout.js';
 import {
   FLOOR,
   isWalkable,
@@ -21,6 +21,26 @@ describe('shop navigation', () => {
   it('lets the shopkeeper stand behind the counter', () => {
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, obstacles), true);
     assert.equal(isWalkable(0, SHOP.counter.z - 0.82, obstacles), true);
+  });
+
+  it('lets the player walk on the shop rug like normal floor', () => {
+    const pose = shopRugPose();
+    const rug = shopRugRect();
+    assert.equal(isWalkable(pose.x, pose.z, obstacles), true);
+    assert.equal(isWalkable(pose.x - 0.6, pose.z, obstacles), true);
+    assert.equal(isWalkable(pose.x + 0.6, pose.z, obstacles), true);
+    const across = planWalk(
+      { x: pose.x, z: rug.minZ + 0.2 },
+      { x: pose.x, z: rug.maxZ - 0.2 },
+      obstacles,
+    );
+    assert.ok(across.length >= 1, 'should path across the rug');
+    const cluttered = shopObstacles({
+      ...SHOP,
+      clutter: [{ id: 'rug', kind: 'rug', x: pose.x, z: pose.z, w: 2.35, d: 1.55, walkable: true }],
+    }, defaultFurniture());
+    assert.equal(isWalkable(pose.x, pose.z, cluttered), true);
+    assert.equal(isWalkable(SHOP.counter.x, SHOP.counter.z, cluttered), false);
   });
 
   it('blocks the counter, walls, and the road outside', () => {

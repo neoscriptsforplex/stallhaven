@@ -43,6 +43,8 @@ import {
   keepFountain,
   keepGardenSpot,
   FOUNTAIN,
+  shopRugPose,
+  shopRugRect,
   occupiedCells,
   padConnects,
   pointHitsShop,
@@ -108,6 +110,15 @@ describe('layout numbers', () => {
     const obstacles = shopObstacles(SHOP);
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, obstacles, 0.28, expanded), true);
     assert.equal(occupiedCells(['left', 'back']).length, 3);
+  });
+
+  it('keeps the origin rug on the shop floor and off furniture pads', () => {
+    const pose = shopRugPose();
+    const box = shopRugRect();
+    assert.ok(pose.x === 0);
+    assert.ok(pose.z > SHOP.counter.z);
+    assert.ok(box.maxX < 2);
+    assert.ok(box.minZ > SHOP.counter.z);
   });
 
   it('yaws the chest latch into the room toward the counter, and range/furnace −90° at start only', () => {

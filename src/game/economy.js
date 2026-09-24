@@ -27,6 +27,7 @@ import {
   MASTERY_SPEED,
   normalizeAppearance,
   offerClassLabel,
+  isCraftHidden,
   offerClassOf,
   recipeCost,
   recipeList,
@@ -334,6 +335,7 @@ export function isUnlocked(state, recipeId) {
 export function craftBlockReason(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 'Unknown recipe.';
+  if (isCraftHidden(recipe)) return 'That item cannot be crafted.';
   if (recipe.category === 'potion' && !ownsCauldron(state)) {
     return 'Place a cauldron from Build to brew potions.';
   }
@@ -408,6 +410,7 @@ export function canCraft(state, recipeId) {
 export function maxCraftActions(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 0;
+  if (isCraftHidden(recipe)) return 0;
   if (recipe.category === 'potion' && !ownsCauldron(state)) return 0;
   if (recipe.category === 'food' && !ownsRange(state)) return 0;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return 0;

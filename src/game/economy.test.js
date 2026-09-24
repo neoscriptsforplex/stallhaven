@@ -14,6 +14,7 @@ import {
   matchingArmourIds,
   mostExpensiveChestId,
   recipeCost,
+  isCraftHidden,
   recipeList,
   recipesForTab,
   stationForRecipe,
@@ -789,6 +790,37 @@ describe('catalog', () => {
     assert.equal(slots.helm, 'bronze_full_helm');
     assert.equal(slots.body, 'bronze_platebody');
     assert.equal(slots.legs, 'bronze_platelegs');
+  });
+
+  it('hides dragon platebody, thrown axes, ranged boots, and later magic armour from craft', () => {
+    assert.equal(isCraftHidden(RECIPES.dragon_platebody), true);
+    assert.equal(RECIPES.dragon_platebody.name, 'Dragon Platebody');
+    for (const metal of ['bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon']) {
+      assert.equal(isCraftHidden(RECIPES[`${metal}_thrownaxe`]), true, metal);
+      assert.equal(recipesForTab('ranged').some((recipe) => recipe.id === `${metal}_thrownaxe`), false);
+    }
+    for (const color of ['blue', 'green', 'red', 'black']) {
+      assert.equal(isCraftHidden(RECIPES[`${color}_dhide_boots`]), true, color);
+      assert.equal(isCraftHidden(RECIPES[`${color}_dhide_body`]), false, color);
+    }
+    assert.equal(recipesForTab('ranged', 'armour').some((recipe) => recipe.shape === 'dhide_boots'), false);
+    for (const set of ['battlemage', 'lunar', 'ancient']) {
+      for (const piece of ['hat', 'robe_top', 'robe_bottom', 'boots', 'gloves']) {
+        const id = `${set}_${piece}`;
+        assert.equal(isCraftHidden(RECIPES[id]), true, id);
+        assert.equal(recipesForTab('magic', 'armour').some((recipe) => recipe.id === id), false, id);
+      }
+    }
+    assert.equal(isCraftHidden(RECIPES.ancient_staff), false);
+    assert.equal(isCraftHidden(RECIPES.wizard_robe), false);
+    assert.equal(isCraftHidden(RECIPES.mystic_robe_top), false);
+    assert.equal(isCraftHidden(RECIPES.splitbark_boots), false);
+    assert.ok(recipesForTab('melee', 'armour').some((recipe) => recipe.id === 'bronze_platebody'));
+    const state = createState();
+    state.materials.dragon_bar = 20;
+    state.craftCounts.dragon_chainbody = 99;
+    assert.match(craftBlockReason(state, 'dragon_platebody'), /cannot be crafted/i);
+    assert.equal(maxCraftActions(state, 'bronze_thrownaxe'), 0);
   });
 });
 

@@ -1543,15 +1543,28 @@ export function recipeCost(recipe) {
   return { materials: {}, gold: 0 };
 }
 
+const HIDDEN_MAGIC_ARMOUR = new Set(['battlemage', 'lunar', 'ancient']);
+
+/** Kept in RECIPES for owned saves. Hidden from every craft list. */
+export function isCraftHidden(recipe) {
+  if (!recipe) return false;
+  if (recipe.id === 'dragon_platebody') return true;
+  if (recipe.shape === 'thrownaxe') return true;
+  if (recipe.shape === 'dhide_boots') return true;
+  if (recipe.category === 'armour' && HIDDEN_MAGIC_ARMOUR.has(recipe.setKey)) return true;
+  return false;
+}
+
 export function recipesForTab(tabId, subtabId = null) {
-  if (tabId === 'potion') return recipeList().filter((recipe) => recipe.category === 'potion');
-  if (tabId === 'food') return recipeList().filter((recipe) => recipe.category === 'food');
-  if (tabId === 'smelt') return recipeList().filter((recipe) => recipe.category === 'smelt');
-  if (tabId === 'spin') return recipeList().filter((recipe) => recipe.category === 'spin');
-  if (tabId === 'weave' || tabId === 'cloth') return recipeList().filter((recipe) => recipe.category === 'weave');
-  if (tabId === 'potter') return recipeList().filter((recipe) => recipe.category === 'potter');
+  const shown = (list) => list.filter((recipe) => !isCraftHidden(recipe));
+  if (tabId === 'potion') return shown(recipeList().filter((recipe) => recipe.category === 'potion'));
+  if (tabId === 'food') return shown(recipeList().filter((recipe) => recipe.category === 'food'));
+  if (tabId === 'smelt') return shown(recipeList().filter((recipe) => recipe.category === 'smelt'));
+  if (tabId === 'spin') return shown(recipeList().filter((recipe) => recipe.category === 'spin'));
+  if (tabId === 'weave' || tabId === 'cloth') return shown(recipeList().filter((recipe) => recipe.category === 'weave'));
+  if (tabId === 'potter') return shown(recipeList().filter((recipe) => recipe.category === 'potter'));
   const combatClass = tabId === 'ranged' ? 'range' : tabId;
-  const list = recipeList().filter((recipe) => recipe.combatClass === combatClass);
+  const list = recipeList().filter((recipe) => recipe.combatClass === combatClass && !isCraftHidden(recipe));
   if (subtabId === 'weapon' || subtabId === 'armour' || subtabId === 'ammo' || subtabId === 'rune' || subtabId === 'hatchet' || subtabId === 'pickaxe') {
     return list.filter((recipe) => recipe.category === subtabId);
   }

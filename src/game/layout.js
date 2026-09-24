@@ -448,6 +448,16 @@ export function cobblePathSpan(expansionIds = []) {
   };
 }
 
+/**
+ * How far the straight path must run past the ring's outer tangent so both
+ * side edges sit under the round cobble. The ring is wider than the path, so
+ * stopping at the outer radius leaves a grass gap on each side.
+ */
+export function cobbleRingTuck(apron = FOUNTAIN.apron ?? 1.42, halfW = PATH_HALF_W) {
+  const side = Math.sqrt(Math.max(0, apron * apron - halfW * halfW));
+  return (apron - side) + 0.14;
+}
+
 export function pointHitsShop(x, z, expansionIds = [], pad = 1.15) {
   return occupiedCells(expansionIds).some((cell) => {
     const c = roomCenter(cell.gx, cell.gz);

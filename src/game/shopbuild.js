@@ -6,6 +6,7 @@ import {
   ROOM_W,
   SHOP_FURNITURE_FLOOR_Y,
   cobblePathSpan,
+  cobbleRingTuck,
   gardenBedSpots,
   gardenBox,
   gardenGrassClusters,
@@ -1489,8 +1490,9 @@ function addCobblePath(root, expansionIds = []) {
     && FOUNTAIN.z < span.maxZ - 1.1;
   const apron = FOUNTAIN.apron ?? 1.42;
   if (fountainOn) {
-    addPathRect(root, span.minX, span.maxX, span.minZ, FOUNTAIN.z - apron);
-    addPathRect(root, span.minX, span.maxX, FOUNTAIN.z + apron, span.maxZ);
+    const tuck = cobbleRingTuck(apron, (span.maxX - span.minX) / 2);
+    addPathRect(root, span.minX, span.maxX, span.minZ, FOUNTAIN.z - apron + tuck);
+    addPathRect(root, span.minX, span.maxX, FOUNTAIN.z + apron - tuck, span.maxZ);
     const ring = addShadow(new THREE.Mesh(
       new THREE.RingGeometry(FOUNTAIN.radius + 0.04, apron, 28),
       cobbleMat(apron * 2 * PATH_COBBLE_U, apron * 2 * PATH_COBBLE_U),

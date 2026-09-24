@@ -40,6 +40,7 @@ import {
   gardenGrassClusters,
   gardenBox,
   cobblePathSpan,
+  cobbleRingTuck,
   keepFountain,
   keepGardenSpot,
   FOUNTAIN,
@@ -248,6 +249,10 @@ describe('layout numbers', () => {
     assert.ok(FOUNTAIN.x + apron <= grass.maxX);
     assert.ok(FOUNTAIN.z - apron >= path.minZ);
     assert.ok(FOUNTAIN.z + apron <= path.maxZ);
+    const tuck = cobbleRingTuck();
+    const side = Math.sqrt(apron * apron - PATH_HALF_W * PATH_HALF_W);
+    assert.ok(tuck > apron - side, 'straight path should pass the side intersection');
+    assert.ok(FOUNTAIN.z - apron + tuck < FOUNTAIN.z - (FOUNTAIN.radius + 0.04));
     assert.ok(FOUNTAIN.z + apron <= grass.maxZ);
   });
 

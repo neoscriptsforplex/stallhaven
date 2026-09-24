@@ -107,8 +107,20 @@ export const MASTERY_SPEED = 0.5;
 export const ANVIL_TABS = [
   { id: 'melee', label: 'Melee' },
   { id: 'magic', label: 'Magic' },
-  { id: 'ranged', label: 'Ranged' },
   { id: 'tools', label: 'Tools' },
+];
+
+/** Loom: cloth, then ranged and magic armour moved off the anvil. */
+export const LOOM_TABS = [
+  { id: 'cloth', label: 'Cloth' },
+  { id: 'ranged', label: 'Ranged' },
+  { id: 'magic', label: 'Magic' },
+];
+
+/** Fletching bench: ranged weapons and ammo. */
+export const FLETCH_TABS = [
+  { id: 'weapon', label: 'Weapons' },
+  { id: 'ammo', label: 'Ammo' },
 ];
 
 export const ANVIL_SUBTABS = [
@@ -139,7 +151,7 @@ const METAL_PIECE_WEIGHT = {
   mace: 0.92,
   spear: 1.05,
   '2h_sword': 1.28,
-  defender: 0.82,
+  kiteshield: 0.82,
   full_helm: 0.88,
   med_helm: 0.74,
   platebody: 1.32,
@@ -151,7 +163,6 @@ const METAL_PIECE_WEIGHT = {
   shortbow: 1,
   longbow: 1.08,
   crossbow: 1.04,
-  knives: 0.7,
   thrownaxe: 0.74,
   arrows: 0.18,
   hatchet: 0.86,
@@ -224,19 +235,29 @@ export const DHIDE = [
 ];
 
 export const MAGIC_SETS = [
-  { id: 'magic', name: 'Magic', tint: 0x3d4aaa, accent: 0xc4a05a },
+  { id: 'wizard', name: 'Wizard', tint: 0x3d4aaa, accent: 0xc4a05a },
   { id: 'mystic', name: 'Mystic', tint: 0x5a78d0, accent: 0xd8c878 },
+  { id: 'splitbark', name: 'Splitbark', tint: 0x6b4428, accent: 0xc4a05a },
   { id: 'battlemage', name: 'Battlemage', tint: 0x3a2a52, accent: 0xe3b34a },
   { id: 'lunar', name: 'Lunar', tint: 0xc8d2e4, accent: 0xf0f4fa },
   { id: 'ancient', name: 'Ancient', tint: 0xc4a05a, accent: 0x6a8f4e },
 ];
 
-export const MAGIC_STAVES = [
-  { id: 'staff', name: 'Staff', shape: 'staff_plain' },
-  { id: 'mystic_staff', name: 'Mystic Staff', shape: 'staff_mystic' },
-  { id: 'battle_staff', name: 'Battle Staff', shape: 'staff_battle' },
-  { id: 'lunar_staff', name: 'Lunar Staff', shape: 'staff_lunar' },
-  { id: 'ancient_staff', name: 'Ancient Staff', shape: 'staff_ancient' },
+/** Element staves. Lunar staff is not crafted; its model stays in the mesh library. */
+export const STAFF_ELEMENTS = [
+  { id: 'air', name: 'Air', rune: 'air_rune', tint: 0xd8e8f8 },
+  { id: 'water', name: 'Water', rune: 'water_rune', tint: 0x3a7ec8 },
+  { id: 'fire', name: 'Fire', rune: 'fire_rune', tint: 0xc42a22 },
+  { id: 'earth', name: 'Earth', rune: 'earth_rune', tint: 0x8a5a32 },
+];
+
+export const WOOD_BOWS = [
+  { id: 'wood', name: '', tint: 0x8a5a32 },
+  { id: 'oak', name: 'Oak', tint: 0xa67c52 },
+  { id: 'willow', name: 'Willow', tint: 0x6a8a4a },
+  { id: 'maple', name: 'Maple', tint: 0xc4a05a },
+  { id: 'yew', name: 'Yew', tint: 0x6a3a48 },
+  { id: 'magic', name: 'Magic', tint: 0x3a6ec8 },
 ];
 
 /** Seconds per +1 toward the 250 cap. Higher tier = slower. */
@@ -263,7 +284,26 @@ export const MATERIALS = {
     regenEvery: 0,
     crafted: true,
   },
-  cloth: { id: 'cloth', name: 'Cloth', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  cloth: {
+    id: 'cloth',
+    name: 'Cloth',
+    restock: 0,
+    start: 0,
+    tier: 1,
+    regenEvery: 0,
+    crafted: true,
+  },
+  soft_clay: { id: 'soft_clay', name: 'Soft Clay', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  hard_clay: {
+    id: 'hard_clay',
+    name: 'Hard Clay',
+    restock: 0,
+    start: 0,
+    tier: 1,
+    regenEvery: 0,
+    crafted: true,
+  },
+  orb: { id: 'orb', name: 'Unpowered Orb', restock: 6, start: 4, tier: 2, regenEvery: regenEvery(2) },
   hide: { id: 'hide', name: 'Hide', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   egg: { id: 'egg', name: 'Egg', restock: 4, start: 4, tier: 1, regenEvery: regenEvery(1) },
   flour: { id: 'flour', name: 'Flour', restock: 3, start: 10, tier: 1, regenEvery: regenEvery(1) },
@@ -299,7 +339,7 @@ export function barIdForMetal(metalId) {
   return `${metalId}_bar`;
 }
 
-export const ARMOUR_SLOTS = ['helm', 'body', 'legs', 'boots', 'gloves'];
+export const ARMOUR_SLOTS = ['helm', 'body', 'legs', 'boots', 'gloves', 'shield'];
 
 export const RECIPES = {};
 
@@ -330,6 +370,7 @@ function metalLine({
   outputCount = 1,
 }) {
   METALS.forEach((metal, index) => {
+    if (piece.id === 'full_helm' && metal.id === 'dragon') return;
     const id = `${metal.id}_${piece.id}`;
     const previousId = index === 0 ? null : `${METALS[index - 1].id}_${piece.id}`;
     addRecipe({
@@ -366,7 +407,6 @@ const MELEE_WEAPONS = [
   { id: 'mace', name: 'Mace', slot: 'mace', shape: 'mace' },
   { id: 'spear', name: 'Spear', slot: 'spear', shape: 'spear' },
   { id: '2h_sword', name: '2H Sword', slot: '2h', shape: '2h' },
-  { id: 'defender', name: 'Defender', slot: 'offhand', shape: 'defender' },
 ];
 
 const MELEE_ARMOUR = [
@@ -375,9 +415,9 @@ const MELEE_ARMOUR = [
   { id: 'platebody', name: 'Platebody', slot: 'body', shape: 'platebody', metalCost: 2 },
   { id: 'platelegs', name: 'Platelegs', slot: 'legs', shape: 'platelegs' },
   { id: 'boots', name: 'Boots', slot: 'boots', shape: 'boots' },
-  { id: 'gloves', name: 'Gloves', slot: 'gloves', shape: 'gloves' },
   { id: 'chainbody', name: 'Chainbody', slot: 'body', shape: 'chainbody' },
   { id: 'plateskirt', name: 'Plateskirt', slot: 'legs', shape: 'plateskirt' },
+  { id: 'kiteshield', name: 'Kiteshield', slot: 'shield', shape: 'kiteshield' },
 ];
 
 for (const piece of MELEE_WEAPONS) {
@@ -388,12 +428,45 @@ for (const piece of MELEE_ARMOUR) {
 }
 
 const RANGE_WEAPONS = [
-  { id: 'shortbow', name: 'Shortbow', slot: 'bow', shape: 'shortbow', extra: { logs: 1, bow_string: 1 } },
-  { id: 'longbow', name: 'Longbow', slot: 'bow', shape: 'longbow', extra: { logs: 1, bow_string: 1 } },
   { id: 'crossbow', name: 'Crossbow', slot: 'bow', shape: 'crossbow', extra: { logs: 1, bow_string: 1 } },
-  { id: 'knives', name: 'Knives', slot: 'thrown', shape: 'knives' },
   { id: 'thrownaxe', name: 'Thrown Axe', slot: 'thrown', shape: 'thrownaxe' },
 ];
+
+function woodBowName(wood, pieceName) {
+  return wood.name ? `${wood.name} ${pieceName}` : pieceName;
+}
+
+function addWoodBows(pieceId, pieceName, shape) {
+  WOOD_BOWS.forEach((wood, index) => {
+    const id = wood.id === 'wood' ? pieceId : `${wood.id}_${pieceId}`;
+    const previousId = index === 0
+      ? null
+      : (WOOD_BOWS[index - 1].id === 'wood' ? pieceId : `${WOOD_BOWS[index - 1].id}_${pieceId}`);
+    addRecipe({
+      id,
+      name: woodBowName(wood, pieceName),
+      category: 'weapon',
+      combatClass: 'range',
+      slot: 'bow',
+      shape,
+      setKey: wood.id,
+      lineId: `range-${pieceId}`,
+      lineName: pieceName,
+      lineIndex: index,
+      previousId,
+      unlockNeed: unlockNeed(index),
+      tier: index + 1,
+      cost: { materials: { logs: 1, bow_string: 1 }, gold: index * 2 },
+      time: 3 + index,
+      price: tierSellPrice(index, { count: WOOD_BOWS.length, weight: METAL_PIECE_WEIGHT[pieceId] ?? 1 }),
+      buyers: ['ranger'],
+      tint: wood.tint,
+    });
+  });
+}
+
+addWoodBows('shortbow', 'Shortbow', 'shortbow');
+addWoodBows('longbow', 'Longbow', 'longbow');
 
 for (const piece of RANGE_WEAPONS) {
   metalLine({
@@ -440,12 +513,43 @@ addRecipe({
 });
 
 const DHIDE_PIECES = [
-  { id: 'coif', name: 'Coif', slot: 'helm', shape: 'dhide_coif' },
   { id: 'body', name: 'Body', slot: 'body', shape: 'dhide_body' },
   { id: 'chaps', name: 'Chaps', slot: 'legs', shape: 'dhide_chaps' },
   { id: 'vambraces', name: 'Vambraces', slot: 'gloves', shape: 'dhide_vambraces' },
   { id: 'boots', name: 'Boots', slot: 'boots', shape: 'dhide_boots' },
 ];
+
+const DRAGON_MASKS = [
+  { id: 'green', name: 'Green', tint: 0x2d6a32 },
+  { id: 'blue', name: 'Blue', tint: 0x2a4a8a },
+  { id: 'red', name: 'Red', tint: 0x8a2424 },
+  { id: 'black', name: 'Black', tint: 0x1c1c1c },
+];
+
+DRAGON_MASKS.forEach((color, index) => {
+  const id = `${color.id}_dragon_mask`;
+  const previousId = index === 0 ? null : `${DRAGON_MASKS[index - 1].id}_dragon_mask`;
+  addRecipe({
+    id,
+    name: `${color.name} Dragon Mask`,
+    category: 'armour',
+    combatClass: 'range',
+    slot: 'helm',
+    shape: 'dhide_coif',
+    setKey: `${color.id}-mask`,
+    lineId: 'range-dragon-mask',
+    lineName: 'Dragon Mask',
+    lineIndex: index,
+    previousId,
+    unlockNeed: unlockNeed(index),
+    tier: index + 1,
+    cost: { materials: { hide: 1 }, gold: index * 2 },
+    time: 4 + index,
+    price: tierSellPrice(index, { count: DRAGON_MASKS.length, weight: DHIDE_PIECE_WEIGHT.coif ?? 1 }),
+    buyers: ['ranger'],
+    tint: color.tint,
+  });
+});
 
 DHIDE.forEach((color, index) => {
   for (const piece of DHIDE_PIECES) {
@@ -474,31 +578,134 @@ DHIDE.forEach((color, index) => {
   }
 });
 
-MAGIC_STAVES.forEach((staff, index) => {
-  const previousId = index === 0 ? null : MAGIC_STAVES[index - 1].id;
+const STAFF_TIER_COUNT = 5;
+
+addRecipe({
+  id: 'staff',
+  name: 'Staff',
+  category: 'weapon',
+  combatClass: 'magic',
+  slot: 'staff',
+  shape: 'staff_plain',
+  setKey: 'staff',
+  lineId: 'magic-staff',
+  lineName: 'Staff',
+  lineIndex: 0,
+  previousId: null,
+  unlockNeed: 0,
+  tier: 1,
+  cost: { materials: { logs: 50 }, gold: 0 },
+  time: 4,
+  price: tierSellPrice(0, { count: STAFF_TIER_COUNT }),
+  buyers: ['hedgemage'],
+  tint: 0x8a5a32,
+});
+
+STAFF_ELEMENTS.forEach((element) => {
+  const magicId = `magic_staff_${element.id}`;
+  const battleId = `${element.id}_battlestaff`;
+  const mysticId = `mystic_${element.id}_staff`;
   addRecipe({
-    id: staff.id,
-    name: staff.name,
+    id: magicId,
+    name: `Magic Staff of ${element.name}`,
     category: 'weapon',
     combatClass: 'magic',
     slot: 'staff',
-    shape: staff.shape,
-    setKey: staff.id,
-    lineId: 'magic-staff',
-    lineName: 'Staff',
-    lineIndex: index,
-    previousId,
-    unlockNeed: unlockNeed(index),
-    tier: index + 1,
+    shape: 'staff_plain',
+    setKey: magicId,
+    lineId: `magic-staff-${element.id}`,
+    lineName: `${element.name} Staff`,
+    lineIndex: 1,
+    previousId: 'staff',
+    unlockNeed: unlockNeed(1),
+    tier: 2,
     cost: {
-      materials: { logs: 1, ...(index > 0 ? { cloth: 1 } : {}) },
-      gold: index * 3,
+      materials: { orb: 1, cloth: 1 },
+      items: { [element.rune]: 1 },
+      gold: 0,
     },
-    time: 4 + index * 2,
-    price: tierSellPrice(index, { count: MAGIC_STAVES.length }),
+    time: 6,
+    price: tierSellPrice(1, { count: STAFF_TIER_COUNT }),
     buyers: ['hedgemage'],
-    tint: MAGIC_SETS[index].tint,
+    tint: element.tint,
   });
+  addRecipe({
+    id: battleId,
+    name: `${element.name} Battlestaff`,
+    category: 'weapon',
+    combatClass: 'magic',
+    slot: 'staff',
+    shape: 'staff_battle',
+    setKey: battleId,
+    lineId: `magic-staff-${element.id}`,
+    lineName: `${element.name} Staff`,
+    lineIndex: 2,
+    previousId: magicId,
+    unlockNeed: unlockNeed(2),
+    tier: 3,
+    cost: {
+      materials: { orb: 10, cloth: 1 },
+      items: { [element.rune]: 10 },
+      gold: 0,
+    },
+    time: 8,
+    price: tierSellPrice(2, { count: STAFF_TIER_COUNT }),
+    buyers: ['hedgemage'],
+    tint: element.tint,
+  });
+  addRecipe({
+    id: mysticId,
+    name: `Mystic ${element.name} Staff`,
+    category: 'weapon',
+    combatClass: 'magic',
+    slot: 'staff',
+    shape: 'staff_mystic',
+    setKey: mysticId,
+    lineId: `magic-staff-${element.id}`,
+    lineName: `${element.name} Staff`,
+    lineIndex: 3,
+    previousId: battleId,
+    unlockNeed: unlockNeed(3),
+    tier: 4,
+    cost: {
+      materials: { orb: 100, cloth: 1 },
+      items: { [element.rune]: 100 },
+      gold: 0,
+    },
+    time: 10,
+    price: tierSellPrice(3, { count: STAFF_TIER_COUNT }),
+    buyers: ['hedgemage'],
+    tint: element.tint,
+  });
+});
+
+const ANCIENT_BARS = Object.fromEntries(METALS.map((metal) => [`${metal.id}_bar`, 10]));
+const ANCIENT_RUNES = Object.fromEntries(STAFF_ELEMENTS.map((element) => [element.rune, 100]));
+
+addRecipe({
+  id: 'ancient_staff',
+  name: 'Ancient Staff',
+  category: 'weapon',
+  combatClass: 'magic',
+  slot: 'staff',
+  shape: 'staff_ancient',
+  setKey: 'ancient_staff',
+  lineId: 'magic-staff-ancient',
+  lineName: 'Ancient Staff',
+  lineIndex: 4,
+  previousId: null,
+  unlockAnyOf: STAFF_ELEMENTS.map((element) => `mystic_${element.id}_staff`),
+  unlockNeed: unlockNeed(1),
+  tier: 5,
+  cost: {
+    materials: { cloth: 100, orb: 100, ...ANCIENT_BARS },
+    items: ANCIENT_RUNES,
+    gold: 0,
+  },
+  time: 12,
+  price: tierSellPrice(4, { count: STAFF_TIER_COUNT }),
+  buyers: ['hedgemage'],
+  tint: 0xc4a05a,
 });
 
 const MAGIC_ARMOUR = [
@@ -1144,6 +1351,7 @@ export function recipeCost(recipe) {
   if (recipe.cost) {
     return {
       materials: { ...recipe.cost.materials },
+      items: { ...(recipe.cost.items ?? {}) },
       gold: recipe.cost.gold ?? 0,
     };
   }

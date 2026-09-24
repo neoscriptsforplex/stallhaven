@@ -295,6 +295,11 @@ export function craftCount(state, recipeId) {
 
 export function unlockRemaining(state, recipeId) {
   const recipe = RECIPES[recipeId];
+  if (recipe?.unlockAnyOf?.length) {
+    const need = recipe.unlockNeed ?? 0;
+    const best = Math.max(0, ...recipe.unlockAnyOf.map((id) => craftCount(state, id)));
+    return Math.max(0, need - best);
+  }
   if (!recipe?.previousId) return 0;
   return Math.max(0, (recipe.unlockNeed ?? 0) - craftCount(state, recipe.previousId));
 }
@@ -314,6 +319,10 @@ export function isUnlocked(state, recipeId) {
   if (recipe.category === 'food' && !ownsRange(state)) return false;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return false;
   if (recipe.category === 'spin' && !ownsWheel(state)) return false;
+  if (recipe.unlockAnyOf?.length) {
+    const need = recipe.unlockNeed ?? 0;
+    return recipe.unlockAnyOf.some((id) => craftCount(state, id) >= need);
+  }
   if (!recipe.previousId) return true;
   return craftCount(state, recipe.previousId) >= (recipe.unlockNeed ?? 0);
 }

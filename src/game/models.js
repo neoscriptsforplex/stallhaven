@@ -1177,6 +1177,7 @@ export function buildWare(recipeId) {
     spear: () => addSpear(group, tint),
     '2h': () => addSword(group, tint, 1.38),
     defender: () => addDefender(group, tint),
+    kiteshield: () => addDefender(group, tint),
     full_helm: () => addFullHelm(group, tint),
     med_helm: () => addMedHelm(group, tint),
     platebody: () => addPlatebody(group, tint),

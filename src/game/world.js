@@ -103,6 +103,16 @@ const CAM_YAW_SPEED = 2.175;
 const CAM_PITCH_SPEED = 1.425;
 const CAM_ORBIT_YAW = 0.0055;
 const CAM_ORBIT_PITCH = 0.0036;
+
+/** Middle-mouse on desktop; one-finger canvas swipe on touch. UI stays ignored. */
+export function canvasPointerStartsCamOrbit(event, flags = {}) {
+  if (event?.button === 1) return true;
+  if (event?.pointerType !== 'touch') return false;
+  if (flags.moveTarget || flags.expandMode || flags.modalOpen) return false;
+  if ((flags.touchCount ?? 1) > 1) return false;
+  if (event.isPrimary === false) return false;
+  return true;
+}
 const CAM_ZOOM_STEP = 0.38;
 const CAM_MIN_DISTANCE = 2.05;
 const CAM_MAX_DISTANCE = 25.8;
@@ -177,6 +187,8 @@ export function createWorld(canvas, state, opts = {}) {
   const camLook = new THREE.Vector3(SHOP.keeper.x, 0.95, SHOP.keeper.z);
   const camHeld = { left: false, right: false, up: false, down: false };
   let camDrag = null;
+  const canvasTouches = new Set();
+  let multiTouch = false;
   camera.position.set(SHOP.cameraStart.x, SHOP.cameraStart.y, SHOP.cameraStart.z);
   camera.lookAt(camLook);
 
@@ -1078,11 +1090,28 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   renderer.domElement.addEventListener('pointerdown', (event) => {
-    if (event.button === 1) {
+    if (event.pointerType === 'touch') {
+      canvasTouches.add(event.pointerId);
+      if (canvasTouches.size > 1) {
+        camDrag = null;
+        multiTouch = true;
+      }
+    }
+    if (canvasPointerStartsCamOrbit(event, {
+      moveTarget: Boolean(moveTarget),
+      expandMode,
+      modalOpen: modalBlocksWorld(),
+      touchCount: event.pointerType === 'touch' ? canvasTouches.size : 1,
+    })) {
       event.preventDefault();
-      camDrag = { x: event.clientX, y: event.clientY };
+      camDrag = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
       renderer.domElement.setPointerCapture?.(event.pointerId);
-      return;
+      if (event.pointerType === 'touch') {
+        pointerDown.x = event.clientX;
+        pointerDown.y = event.clientY;
+        pointerDown.t = performance.now();
+      }
+      if (event.button === 1 || event.pointerType === 'touch') return;
     }
     if (event.button !== 0) return;
     pointerDown.x = event.clientX;
@@ -1194,9 +1223,17 @@ export function createWorld(canvas, state, opts = {}) {
     return preferChest ? chestHit : closest;
   }
 
+  function releaseCanvasPointer(event) {
+    if (event?.pointerType === 'touch') canvasTouches.delete(event.pointerId);
+    if (canvasTouches.size === 0) multiTouch = false;
+    if (event?.button === 1 || camDrag?.pointerId === event?.pointerId) camDrag = null;
+  }
+
   renderer.domElement.addEventListener('pointerup', (event) => {
+    try {
     if (event.button !== 0) return;
     if (performance.now() < ignorePicksUntil) return;
+    if (multiTouch) return;
     if (modalBlocksWorld() && !moveTarget && !expandMode) return;
     const held = performance.now() - pointerDown.t;
     const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
@@ -1340,13 +1377,16 @@ export function createWorld(canvas, state, opts = {}) {
         refreshSelection(true);
       }
     }
+    } finally {
+      releaseCanvasPointer(event);
+    }
   });
 
   renderer.domElement.addEventListener('pointermove', (event) => {
-    if (camDrag) {
+    if (camDrag && (camDrag.pointerId == null || camDrag.pointerId === event.pointerId)) {
       const dx = event.clientX - camDrag.x;
       const dy = event.clientY - camDrag.y;
-      camDrag = { x: event.clientX, y: event.clientY };
+      camDrag = { x: event.clientX, y: event.clientY, pointerId: camDrag.pointerId };
       cam.yaw -= dx * CAM_ORBIT_YAW;
       cam.pitch -= dy * CAM_ORBIT_PITCH;
       clampCam();
@@ -1357,11 +1397,8 @@ export function createWorld(canvas, state, opts = {}) {
     if (point) previewFurnitureAt(point.x, point.z);
   });
 
-  renderer.domElement.addEventListener('pointerup', (event) => {
-    if (event.button === 1) camDrag = null;
-  });
-  renderer.domElement.addEventListener('pointercancel', () => {
-    camDrag = null;
+  renderer.domElement.addEventListener('pointercancel', (event) => {
+    releaseCanvasPointer(event);
   });
   renderer.domElement.addEventListener('auxclick', (event) => {
     if (event.button === 1) event.preventDefault();

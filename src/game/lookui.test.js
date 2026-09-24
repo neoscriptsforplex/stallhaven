@@ -115,6 +115,8 @@ describe('player look UI', () => {
     assert.match(settings, /<h3>Player Avatar<\/h3>/);
     assert.match(settings, /data-dungeon-brightness/);
     assert.match(settings, /Dungeon brightness/);
+    assert.match(settings, /data-photo-mode/);
+    assert.match(settings, /Photo mode/);
     assert.equal(settings.includes('data-look="hair"'), false);
     assert.equal(settings.includes('data-look="shirt"'), false);
     assert.equal(settings.includes('data-look="legs"'), false);

@@ -1080,6 +1080,19 @@ body.modal-open #view {
   width: 100%;
 }
 
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 6px;
+  font-size: 0.82rem;
+  color: #e6d3b2;
+}
+
+.settings-check input {
+  width: auto;
+}
+
 html.is-booting #view,
 html.is-booting #hud,
 html.is-booting #save-bar {

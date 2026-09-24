@@ -126,6 +126,7 @@ import {
   dungeonBrightnessPercent,
   writeStoredBrightness,
   writeStoredDungeonBrightness,
+  writeStoredPhotoMode,
   DEFAULT_DUNGEON_BRIGHTNESS,
 } from './lighting.js';
 
@@ -2113,6 +2114,7 @@ export function bindHud(root, state, world) {
       btn.classList.toggle('is-on', btn.dataset.skybox === current);
     }
     paintBrightness();
+    paintPhotoMode();
   }
 
   function openLookDock() {
@@ -2198,6 +2200,19 @@ export function bindHud(root, state, world) {
   });
   settingsDock?.querySelector('[data-dungeon-brightness]')?.addEventListener('input', (event) => {
     applyDungeonBrightnessFromSlider(event.target.value);
+  });
+
+  function paintPhotoMode() {
+    const box = settingsDock?.querySelector('[data-photo-mode]');
+    if (box) box.checked = Boolean(state.photoMode);
+  }
+
+  settingsDock?.querySelector('[data-photo-mode]')?.addEventListener('change', (event) => {
+    const on = Boolean(event.target.checked);
+    state.photoMode = on;
+    writeStoredPhotoMode(on);
+    world.setPhotoMode?.(on);
+    render(performance.now() / 1000);
   });
   settingsDock?.querySelector('[data-cheat-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -2337,8 +2352,10 @@ export function bindHud(root, state, world) {
         setLoop(Boolean(state.music?.loop));
         writeStoredBrightness(state.brightness ?? DEFAULT_BRIGHTNESS);
         writeStoredDungeonBrightness(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
+        writeStoredPhotoMode(Boolean(state.photoMode));
         world.setBrightness?.(state.brightness ?? DEFAULT_BRIGHTNESS);
         world.setDungeonBrightness?.(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
+        world.setPhotoMode?.(Boolean(state.photoMode));
         paintCrafts();
         paintMusic();
         paintSettings();

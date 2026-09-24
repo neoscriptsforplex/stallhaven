@@ -32,6 +32,7 @@ export const DUNGEON_BRIGHTNESS_MIN = 0;
 export const DUNGEON_BRIGHTNESS_MAX = 1.5;
 export const DEFAULT_DUNGEON_BRIGHTNESS = DUNGEON_BRIGHTNESS_MAX;
 export const DUNGEON_BRIGHTNESS_STORAGE_KEY = 'stallhaven-dungeon-brightness';
+export const PHOTO_MODE_STORAGE_KEY = 'stallhaven-photo-mode';
 
 export function clampBrightness(value, fallback = DEFAULT_BRIGHTNESS) {
   const n = Number(value);
@@ -80,6 +81,24 @@ export function writeStoredDungeonBrightness(value) {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(DUNGEON_BRIGHTNESS_STORAGE_KEY, String(clampDungeonBrightness(value)));
+  } catch {
+    // Private mode / quota — save JSON still keeps the value.
+  }
+}
+
+export function readStoredPhotoMode() {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    return localStorage.getItem(PHOTO_MODE_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeStoredPhotoMode(on) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(PHOTO_MODE_STORAGE_KEY, on ? '1' : '0');
   } catch {
     // Private mode / quota — save JSON still keeps the value.
   }

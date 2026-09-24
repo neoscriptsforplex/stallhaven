@@ -2009,8 +2009,17 @@ export function createWorld(canvas, state, opts = {}) {
     return count === 1 ? [first] : [first, second];
   }
 
+  function customersShown() {
+    return sceneMode === 'shop' && !state.photoMode;
+  }
+
+  function applyCustomerVisibility() {
+    const on = customersShown();
+    for (const actor of customers) actor.mesh.visible = on;
+  }
+
   function spawnCustomer(now) {
-    if (sceneMode !== 'shop') return;
+    if (!customersShown()) return;
     const inShop = customers.filter((actor) => actor.state !== 'leave').length;
     if (inShop >= MAX_CUSTOMERS) return;
     if (!state.kingRoaldAt) state.kingRoaldAt = scheduleKingRoald(state.playTime ?? 0);
@@ -2082,6 +2091,7 @@ export function createWorld(canvas, state, opts = {}) {
       royal: Boolean(request.royal),
     };
     customerSerial += 1;
+    actor.mesh.visible = customersShown();
     customers.push(actor);
     nextSpawnAt = now + SPAWN_GAP_MIN + Math.random() * (SPAWN_GAP_MAX - SPAWN_GAP_MIN);
     if (typeId === 'kingroald') {
@@ -2207,6 +2217,7 @@ export function createWorld(canvas, state, opts = {}) {
           }
         }
       }
+      actor.mesh.visible = customersShown();
     }
   }
 
@@ -2282,7 +2293,7 @@ export function createWorld(canvas, state, opts = {}) {
         const hand = actor.mesh.userData.hand ?? actor.mesh;
         hand.add(carried);
       }
-      actor.mesh.visible = sceneMode === 'shop';
+      actor.mesh.visible = customersShown();
       scene.add(actor.mesh);
     }
   }
@@ -2309,7 +2320,7 @@ export function createWorld(canvas, state, opts = {}) {
       });
     }
     customers.forEach((actor) => {
-      actor.mesh.visible = on;
+      actor.mesh.visible = on && !state.photoMode;
     });
     goblins.forEach((gob) => {
       gob.mesh.visible = on;
@@ -2570,6 +2581,11 @@ export function createWorld(canvas, state, opts = {}) {
       state.dungeonBrightness = clampDungeonBrightness(value);
       syncLighting(sceneMode);
       return state.dungeonBrightness;
+    },
+    setPhotoMode(on) {
+      state.photoMode = Boolean(on);
+      applyCustomerVisibility();
+      return state.photoMode;
     },
     setChefHat(on) {
       state.chefHat = Boolean(on);

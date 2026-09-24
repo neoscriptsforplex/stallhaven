@@ -68,6 +68,7 @@ import {
   clampDungeonBrightness,
   readStoredBrightness,
   readStoredDungeonBrightness,
+  readStoredPhotoMode,
 } from './lighting.js';
 
 export {
@@ -289,6 +290,7 @@ export function createState() {
     skybox: DEFAULT_SKYBOX,
     brightness: readStoredBrightness(),
     dungeonBrightness: readStoredDungeonBrightness(),
+    photoMode: readStoredPhotoMode(),
     chefHat: false,
     appearance: defaultAppearance(),
     playTime: 0,
@@ -1146,6 +1148,7 @@ export function serializeState(state) {
     skybox: skyboxId(state.skybox),
     brightness: clampBrightness(state.brightness),
     dungeonBrightness: clampDungeonBrightness(state.dungeonBrightness),
+    photoMode: Boolean(state.photoMode),
     chefHat: Boolean(state.chefHat),
     appearance: normalizeAppearance(state.appearance),
     playTime: Math.max(0, Number(state.playTime) || 0),
@@ -1297,6 +1300,7 @@ export function applyState(state, data) {
   next.dungeonBrightness = data.dungeonBrightness != null
     ? clampDungeonBrightness(data.dungeonBrightness)
     : DEFAULT_DUNGEON_BRIGHTNESS;
+  next.photoMode = typeof data.photoMode === 'boolean' ? data.photoMode : false;
   if (typeof data.chefHat === 'boolean') next.chefHat = data.chefHat;
   next.appearance = normalizeAppearance(data.appearance);
   if (typeof data.playTime === 'number' && Number.isFinite(data.playTime)) {
@@ -1391,6 +1395,7 @@ export function applyState(state, data) {
   state.skybox = next.skybox;
   state.brightness = next.brightness;
   state.dungeonBrightness = next.dungeonBrightness;
+  state.photoMode = next.photoMode;
   state.chefHat = next.chefHat;
   state.appearance = next.appearance;
   state.playTime = next.playTime;

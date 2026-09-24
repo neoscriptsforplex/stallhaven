@@ -1335,15 +1335,27 @@ describe('cheat codes', () => {
 
   it('resets unlocks and money for noob without wiping the chest', () => {
     const state = createState();
+    const anvilX = state.furniture.anvil.x;
     state.gold = 9000;
     state.chest.bread = 3;
     state.craftCounts.bronze_sword = 40;
+    state.expansions = ['left'];
+    state.chestLevel = 4;
+    state.furniture.furnace = { x: 1, z: 2, rot: 0 };
+    state.furniture.loom = { x: 0, z: 1, rot: 0 };
+    state.shopXp = 500;
     assert.equal(isUnlocked(state, 'iron_sword'), true);
     assert.equal(applyCheat(state, 'nOoB'), 'noob');
     assert.equal(state.gold, START_GOLD);
     assert.equal(state.chest.bread, 3);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
     assert.equal(isUnlocked(state, 'bronze_sword'), true);
+    assert.deepEqual(state.expansions, []);
+    assert.equal(state.chestLevel, 1);
+    assert.equal(state.furniture.furnace, null);
+    assert.equal(state.furniture.loom, null);
+    assert.equal(state.furniture.anvil.x, anvilX);
+    assert.equal(state.shopXp, 500);
   });
 
   it('subtracts gold for -motherlode and clamps at zero', () => {

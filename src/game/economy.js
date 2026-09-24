@@ -186,6 +186,11 @@ export function applyCheat(state, raw) {
     cancelCrafts(state);
     state.gold = START_GOLD;
     state.craftCounts = {};
+    state.expansions = [];
+    state.chestLevel = 1;
+    if (state.furniture) {
+      for (const station of STATION_UNLOCKS) state.furniture[station.id] = null;
+    }
     return 'noob';
   }
   if (code === 'freshstart') {

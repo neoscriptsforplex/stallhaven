@@ -2227,7 +2227,7 @@ export function bindHud(root, state, world) {
       }
       return;
     }
-    if (result === 'freshstart') {
+    if (result === 'freshstart' || result === 'noob') {
       world.applyLayout();
       world.syncDisplays();
       world.refreshSelection(true);
@@ -2235,7 +2235,7 @@ export function bindHud(root, state, world) {
       paintBuild();
     } else if (result === 'onesmallfavour') {
       world.setChefHat(true);
-    } else if (result === 'maxcape' || result === 'noob') {
+    } else if (result === 'maxcape') {
       paintCrafts();
     }
     const messages = {

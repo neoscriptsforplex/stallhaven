@@ -1469,6 +1469,7 @@ function addPathRect(root, minX, maxX, minZ, maxZ) {
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set((minX + maxX) / 2, -0.008, (minZ + maxZ) / 2);
   mesh.userData.kind = 'ground';
+  mesh.userData.pathCobble = true;
   root.add(mesh);
 }
 
@@ -1489,6 +1490,7 @@ function addCobblePath(root, expansionIds = []) {
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(FOUNTAIN.x, -0.006, FOUNTAIN.z);
     ring.userData.kind = 'ground';
+    ring.userData.pathCobble = true;
     root.add(ring);
   } else {
     addPathRect(root, span.minX, span.maxX, span.minZ, span.maxZ);

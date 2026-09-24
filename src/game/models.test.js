@@ -40,7 +40,7 @@ import {
 } from './models.js';
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
-import { furnitureVisualYaw, pointHitsShop, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
+import { cobblePathSpan, furnitureVisualYaw, pointHitsShop, ROOM_W, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
@@ -197,8 +197,42 @@ describe('outdoor and dungeon extras', () => {
     assert.equal(ground.material?.color?.getHex?.(), 0x4f7a3a);
   });
 
-  it('tiles the cobble path about 3× finer than the wall stone scale', () => {
+  it('tiles only the outdoor cobble path about 3× finer than shop wall stone', () => {
     assert.equal(PATH_COBBLE_SCALE, 3);
+    const shop = buildShop([]).root;
+    const span = cobblePathSpan([]);
+    const pathW = span.maxX - span.minX;
+    const want = pathW * (4.2 / ROOM_W) * PATH_COBBLE_SCALE;
+    let pathPlanes = 0;
+    let pathRing = 0;
+    let wallSlabs = 0;
+    shop.traverse((child) => {
+      const map = child.material?.map;
+      if (!map?.repeat) return;
+      if (child.userData?.pathCobble && child.geometry?.type === 'PlaneGeometry') {
+        assert.ok(Math.abs(map.repeat.x - want) < 1e-6, `path repeat.x ${map.repeat.x} vs ${want}`);
+        pathPlanes += 1;
+      }
+      if (child.userData?.pathCobble && child.geometry?.type === 'RingGeometry') {
+        const ringWant = 1.42 * 2 * (4.2 / ROOM_W) * PATH_COBBLE_SCALE;
+        assert.ok(Math.abs(map.repeat.x - ringWant) < 1e-6, `ring repeat.x ${map.repeat.x} vs ${ringWant}`);
+        pathRing += 1;
+      }
+      if (!child.userData?.pathCobble && Math.abs(map.repeat.y - 2.6) < 1e-6) wallSlabs += 1;
+    });
+    assert.ok(pathPlanes >= 1, 'path should have cobble planes');
+    assert.ok(pathRing >= 1, 'fountain apron ring should use the same finer cobble');
+    assert.ok(wallSlabs >= 1, 'shop wall cobble V scale should stay 2.6');
+
+    const dungeon = buildDungeon().root;
+    let dungeonFloor = 0;
+    dungeon.traverse((child) => {
+      const map = child.material?.map;
+      if (!map?.repeat) return;
+      assert.equal(Boolean(child.userData?.pathCobble), false);
+      if (Math.abs(map.repeat.x - 6.5) < 1e-6 && Math.abs(map.repeat.y - 5.2) < 1e-6) dungeonFloor += 1;
+    });
+    assert.ok(dungeonFloor >= 1, 'dungeon floor cobble scale should stay unchanged');
   });
 
   it('instances many grass blades and clears them inside a left expansion', () => {

@@ -44,6 +44,7 @@ import {
   keepFountain,
   keepGardenSpot,
   FOUNTAIN,
+  SHOP_RUG,
   shopRugPose,
   shopRugRect,
   occupiedCells,
@@ -156,6 +157,10 @@ describe('layout numbers', () => {
     assert.equal(furniture.cauldron, null);
     assert.equal(furniture.furnace, null);
     assert.equal(furniture.wheel, null);
+    assert.equal(furniture.rug.rot, FURNITURE_FORWARD);
+    assert.equal(furniture.rug.x, shopRugPose().x);
+    assert.equal(furniture.rug.z, shopRugPose().z);
+    assert.deepEqual(furnitureHalfSize('rug'), { hw: SHOP_RUG.w / 2, hd: SHOP_RUG.d / 2 });
   });
 
   it('keeps the spinning wheel footprint at half the prior 4× live size', () => {

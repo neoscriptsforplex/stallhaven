@@ -166,7 +166,7 @@ export function placementBlocked(pose, kind, obstacles, floors, { checkAisle = t
   } else if (!pointOnFloors(pose.x, pose.z, floors, FLOOR_SNAP_MARGIN)) {
     return 'That spot is off the shop floor.';
   }
-  if (checkAisle && kind !== 'counter' && rectHitsAisle(pose.x, pose.z, span.hw, span.hd)) {
+  if (checkAisle && kind !== 'counter' && kind !== 'rug' && rectHitsAisle(pose.x, pose.z, span.hw, span.hd)) {
     return 'That spot blocks the customer queue.';
   }
   const rect = rectFromCenter(pose.x, pose.z, span.hw * 2, span.hd * 2);

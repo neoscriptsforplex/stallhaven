@@ -89,6 +89,14 @@ describe('shop navigation', () => {
     assert.equal(isWalkable(behindChest.x, behindChest.z, obstacles), true);
   });
 
+  it('lets the rug sit on the customer aisle and still be walked', () => {
+    const pose = defaultFurniture().rug;
+    const floors = walkFloors([]);
+    const blocked = placementBlocked(pose, 'rug', obstacles, floors);
+    assert.equal(blocked, null);
+    assert.equal(isWalkable(pose.x, pose.z, liveObstacles({ furniture: defaultFurniture(), expansions: [], displays: [] })), true);
+  });
+
   it('refuses a placement that overlaps another obstacle', () => {
     const floors = [FLOOR];
     const blocks = [{ minX: -1, maxX: 1, minZ: -2.2, maxZ: -1.2 }];

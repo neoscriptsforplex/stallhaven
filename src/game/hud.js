@@ -1209,6 +1209,7 @@ export function bindHud(root, state, world) {
             : target.id === 'cauldron' ? 'Cauldron'
               : target.id === 'furnace' ? 'Furnace'
                 : target.id === 'wheel' ? 'Spinning Wheel'
+                  : target.id === 'rug' ? 'Rug'
                   : target.id === 'counter' ? 'Counter'
                     : target.id === 'display' && displayKind(target.index, state) === 'stand' ? 'Mannequin'
                       : target.id === 'display' && displayKind(target.index, state) === 'shelf' ? 'Shelf'

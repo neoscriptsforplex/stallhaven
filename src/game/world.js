@@ -44,6 +44,7 @@ import {
   playerWalkFloors,
   pointHitsShop,
   pointOnFloors,
+  SHOP_RUG,
   snapToFloor,
   snapToWallGrid,
   placeFloors,
@@ -93,7 +94,7 @@ import {
   PLAYER_WORLD_SCALE,
   UPLOADED_PLAYER_HEIGHT,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildRug, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 
@@ -407,6 +408,10 @@ export function createWorld(canvas, state, opts = {}) {
   scene.add(wheelMesh);
   const wheelPick = makePick(STATION_HIT.wheel.w, STATION_HIT.wheel.h, STATION_HIT.wheel.d, 'wheel');
 
+  const rugMesh = buildRug();
+  scene.add(rugMesh);
+  const rugPick = makePick(SHOP_RUG.w, 0.28, SHOP_RUG.d, 'rug');
+
   const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel'];
 
   const fixtureMeshes = {
@@ -417,6 +422,7 @@ export function createWorld(canvas, state, opts = {}) {
     cauldron: { mesh: cauldronMesh, pick: cauldronPick, glow: null, pickY: STATION_HIT.cauldron.pickY },
     furnace: { mesh: furnaceMesh, pick: furnacePick, glow: null, pickY: STATION_HIT.furnace.pickY },
     wheel: { mesh: wheelMesh, pick: wheelPick, glow: null, pickY: STATION_HIT.wheel.pickY },
+    rug: { mesh: rugMesh, pick: rugPick, glow: null, pickY: 0.18 },
   };
 
   function applyFixturePose(id) {
@@ -792,6 +798,7 @@ export function createWorld(canvas, state, opts = {}) {
       rangePick,
       ...UNLOCK_STATIONS.filter((id) => state.furniture[id]).map((id) => fixtureMeshes[id].pick),
       counterPick,
+      ...(state.furniture.rug ? [rugPick] : []),
       ...extra,
       ...shopUsePicks(),
       ...customers
@@ -809,6 +816,7 @@ export function createWorld(canvas, state, opts = {}) {
     };
     groundGroup?.children.forEach(add);
     architecture?.traverse((child) => add(child));
+    fixtureMeshes.rug?.mesh?.traverse((child) => add(child));
     return list;
   }
 
@@ -1190,7 +1198,9 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = placeKindOf(target);
     const skip = target.id === 'display' ? { id: 'display', index: target.index } : { id: target.id };
     const blocks = liveObstacles(state, SHOP, skip);
-    return placementBlocked(pose, kind, blocks, placeRects, { checkAisle: kind !== 'counter' });
+    return placementBlocked(pose, kind, blocks, placeRects, {
+      checkAisle: kind !== 'counter' && kind !== 'rug',
+    });
   }
 
   function visualPlacePose() {
@@ -1482,6 +1492,17 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     const picked = hitFurniture(hits);
+    const rugContext = hits.find((hit) => hit.object.userData.kind === 'rug');
+    if (!picked && rugContext && state.furniture.rug) {
+      playClick('ui');
+      pickHandler?.({
+        type: 'furn-menu',
+        furniture: { id: 'rug' },
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      return;
+    }
     if (!picked) return;
     const data = picked.object.userData;
     if (data.kind === 'boulder') {
@@ -2586,6 +2607,7 @@ export function createWorld(canvas, state, opts = {}) {
       replaceFixture('anvil', buildAnvil);
       replaceFixture('cauldron', buildCauldron);
       replaceFixture('wheel', buildSpinningWheel);
+      replaceFixture('rug', buildRug);
       try {
         const nextDoor = buildShopDoor();
         nextDoor.visible = shopDoor.visible;

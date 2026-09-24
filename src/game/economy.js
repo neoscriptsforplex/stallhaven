@@ -1304,6 +1304,7 @@ export function applyState(state, data) {
       wheel: data.furniture.wheel
         ? readPose(data.furniture.wheel, { ...SHOP.wheel, rot: FURNITURE_FORWARD })
         : null,
+      rug: readPose(data.furniture.rug, defaults.rug),
       displays: next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {
           x: 0,

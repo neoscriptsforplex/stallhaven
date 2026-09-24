@@ -167,7 +167,7 @@ export function roomCenter(gx, gz) {
   return { x: gx * ROOM_W, z: 0.1 + gz * ROOM_D };
 }
 
-/** Origin-room rug: visual only. Never a nav / placement block. */
+/** Origin-room rug: walkable furniture. Never a nav block. */
 export const SHOP_RUG = { w: 2.35, d: 1.55, y: 0.11, zOffset: 0.15 };
 
 export function shopRugPose(gx = 0, gz = 0) {
@@ -348,6 +348,7 @@ export function furnitureHalfSize(kind) {
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
   if (kind === 'stand') return { hw: 0.36, hd: 0.36 };
+  if (kind === 'rug') return { hw: SHOP_RUG.w / 2, hd: SHOP_RUG.d / 2 };
   return { hw: 0.76, hd: 0.51 };
 }
 
@@ -403,6 +404,7 @@ export function defaultFurniture() {
     cauldron: null,
     furnace: null,
     wheel: null,
+    rug: { x: shopRugPose().x, z: shopRugPose().z, rot: FURNITURE_FORWARD },
     displays: SHOP.displays.map((spot) => (
       (spot.kind ?? 'table') === 'shelf'
         ? snapToWallGrid(spot.x, spot.z, [])
@@ -425,6 +427,7 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     cauldron: clonePose(furniture.cauldron),
     furnace: clonePose(furniture.furnace),
     wheel: clonePose(furniture.wheel),
+    rug: { ...(furniture.rug ?? defaults.rug) },
     displays: (furniture.displays ?? defaults.displays).map((pose) => ({ ...pose })),
   };
 }

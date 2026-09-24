@@ -1,4 +1,4 @@
-# Rune Craft - A Runescape Tycoon Fan Game
+# Rune Craft - Legends of Gielenor - A Runescape Tycoon Fan Game
 
 A free browser game.
 

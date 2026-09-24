@@ -109,6 +109,32 @@ const CAM_ORBIT_PITCH = 0.0036;
 export const TOUCH_LONG_PRESS_MS = 2000;
 /** Movement past this cancels the hold and starts camera orbit. */
 export const TOUCH_HOLD_MOVE_PX = 8;
+/** Second tap inside this window opens the right-click menu. */
+export const TOUCH_DOUBLE_TAP_MS = 280;
+/** Second tap must land near the first. */
+export const TOUCH_DOUBLE_TAP_PX = 28;
+
+export function isCanvasDoubleTap(prev, next, now = 0) {
+  if (!prev || !next) return false;
+  const dt = now - (prev.t ?? 0);
+  if (dt < 0 || dt > TOUCH_DOUBLE_TAP_MS) return false;
+  const dist = Math.hypot(
+    (next.x ?? next.clientX ?? 0) - (prev.x ?? prev.clientX ?? 0),
+    (next.y ?? next.clientY ?? 0) - (prev.y ?? prev.clientY ?? 0),
+  );
+  return dist <= TOUCH_DOUBLE_TAP_PX;
+}
+
+/** Fingers moving apart returns a positive delta (zoom in). */
+export function pinchSpanDelta(prevDist, nextDist) {
+  if (!(prevDist > 0) || !(nextDist > 0)) return 0;
+  return nextDist - prevDist;
+}
+
+export function applyPinchZoom(cam, delta, scale = 0.02) {
+  cam.distance -= delta * scale;
+  return cam;
+}
 
 /** Middle-mouse on desktop; one-finger canvas swipe on touch after a small move. */
 export function canvasPointerStartsCamOrbit(event, flags = {}) {
@@ -205,8 +231,12 @@ export function createWorld(canvas, state, opts = {}) {
   const camHeld = { left: false, right: false, up: false, down: false };
   let camDrag = null;
   const canvasTouches = new Set();
+  const touchPoints = new Map();
   let multiTouch = false;
   let touchHold = null;
+  let lastCanvasTap = null;
+  let pendingTapTimer = null;
+  let pinchDist = 0;
   camera.position.set(SHOP.cameraStart.x, SHOP.cameraStart.y, SHOP.cameraStart.z);
   camera.lookAt(camLook);
 
@@ -1156,6 +1186,7 @@ export function createWorld(canvas, state, opts = {}) {
   renderer.domElement.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'touch') {
       canvasTouches.add(event.pointerId);
+      touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (canvasTouches.size > 1) {
         camDrag = null;
         multiTouch = true;
@@ -1295,7 +1326,11 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function releaseCanvasPointer(event) {
-    if (event?.pointerType === 'touch') canvasTouches.delete(event.pointerId);
+    if (event?.pointerType === 'touch') {
+      canvasTouches.delete(event.pointerId);
+      touchPoints.delete(event.pointerId);
+    }
+    if (canvasTouches.size < 2) pinchDist = 0;
     if (canvasTouches.size === 0) multiTouch = false;
     if (event?.button === 1 || camDrag?.pointerId === event?.pointerId) camDrag = null;
     if (touchHold && (event?.pointerId == null || touchHold.pointerId === event.pointerId)) {
@@ -1303,15 +1338,7 @@ export function createWorld(canvas, state, opts = {}) {
     }
   }
 
-  renderer.domElement.addEventListener('pointerup', (event) => {
-    try {
-    if (touchHold?.fired) return;
-    if (event.button !== 0) return;
-    if (performance.now() < ignorePicksUntil) return;
-    if (multiTouch) return;
-    if (modalBlocksWorld() && !moveTarget && !expandMode) return;
-    const held = performance.now() - pointerDown.t;
-    const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+  function finishCanvasClick(event, held, moved) {
     if (moveTarget) {
       const point = floorPointFromEvent(event);
       if (point) {
@@ -1452,12 +1479,60 @@ export function createWorld(canvas, state, opts = {}) {
         refreshSelection(true);
       }
     }
+  }
+
+  renderer.domElement.addEventListener('pointerup', (event) => {
+    try {
+    if (touchHold?.fired) return;
+    if (event.button !== 0) return;
+    if (performance.now() < ignorePicksUntil) return;
+    if (multiTouch) return;
+    if (modalBlocksWorld() && !moveTarget && !expandMode) return;
+    const held = performance.now() - pointerDown.t;
+    const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+    if (event.pointerType === 'touch' && moved <= TOUCH_HOLD_MOVE_PX && !moveTarget && !expandMode) {
+      if (pendingTapTimer) {
+        clearTimeout(pendingTapTimer);
+        pendingTapTimer = null;
+      }
+      const tapPoint = { x: event.clientX, y: event.clientY, t: performance.now() };
+      if (isCanvasDoubleTap(lastCanvasTap, tapPoint, tapPoint.t)) {
+        lastCanvasTap = null;
+        openCanvasContextAt(event);
+        ignorePicksUntil = performance.now() + 450;
+        return;
+      }
+      lastCanvasTap = tapPoint;
+      const tapEvent = { clientX: event.clientX, clientY: event.clientY, button: 0, pointerType: 'mouse' };
+      const heldNow = held;
+      pendingTapTimer = setTimeout(() => {
+        pendingTapTimer = null;
+        finishCanvasClick(tapEvent, heldNow, 0);
+      }, TOUCH_DOUBLE_TAP_MS);
+      return;
+    }
+    finishCanvasClick(event, held, moved);
     } finally {
       releaseCanvasPointer(event);
     }
   });
 
   renderer.domElement.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'touch') {
+      touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touchPoints.size >= 2) {
+        const pts = [...touchPoints.values()];
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        const delta = pinchSpanDelta(pinchDist, dist);
+        if (delta) {
+          applyPinchZoom(cam, delta);
+          clampCam();
+        }
+        pinchDist = dist;
+        camDrag = null;
+        return;
+      }
+    }
     if (touchHold && touchHold.pointerId === event.pointerId && !touchHold.fired) {
       if (canvasPointerMovedPastHold(touchHold, event)) {
         clearTimeout(touchHold.timer);

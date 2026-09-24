@@ -111,6 +111,24 @@ function drawDot(ctx, pt, r, fill, stroke) {
 export const TRAPDOOR_MARKER_RADIUS = 5;
 export const TRAPDOOR_MARKER_FILE = 'minimap/trapdoor.png';
 
+/**
+ * World XZ for the dungeon-entrance minimap icon.
+ *
+ * Luke's shot: shop at the top, blue fountain on the vertical cobble, old
+ * hatch icon on the LEFT of that path. The circled target is the same
+ * height on the RIGHT — opposite the leftover left-side mark, on the real
+ * outdoor +X hatch. Keep the 3D trapdoor where it is; only the map point
+ * is forced onto that path-right side so a mirrored X cannot sneak back.
+ */
+export function dungeonEntranceMarkerWorld(hatch = TRAPDOOR) {
+  const src = hatch ?? TRAPDOOR;
+  const offset = Math.abs(Number(src.x));
+  return {
+    x: offset > PATH_HALF_W ? offset : TRAPDOOR.x,
+    z: Number.isFinite(src.z) ? src.z : TRAPDOOR.z,
+  };
+}
+
 const BLACK_PUNCH = 24;
 let trapdoorIcon = null;
 let trapdoorIconTried = false;
@@ -259,9 +277,8 @@ export function drawMinimap(ctx, snap) {
   const fountain = toMap(FOUNTAIN.x, FOUNTAIN.z);
   drawDot(ctx, fountain, 5, '#6a8aa8', '#d8e8f0');
   const hatch = gardenTrapdoorSpot(snap.expansions ?? []) ?? TRAPDOOR;
-  // World hatch sits on +X (right of the cobble path). Project that same
-  // point — do not mirror X — so the icon sits on the entrance like the fountain.
-  drawTrapdoorMarker(ctx, toMap(hatch.x, hatch.z));
+  const mark = dungeonEntranceMarkerWorld(hatch);
+  drawTrapdoorMarker(ctx, toMap(mark.x, mark.z));
 
   const counter = toMap(SHOP.counter.x, SHOP.counter.z);
   ctx.fillStyle = '#6a4220';

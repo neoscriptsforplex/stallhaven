@@ -9,11 +9,13 @@ import {
   TRAPDOOR_MARKER_FILE,
   TRAPDOOR_MARKER_RADIUS,
   clampMapZoom,
+  dungeonEntranceMarkerWorld,
   mapToWorld,
   shopMapBounds,
   trapdoorMarkerUrls,
   worldToMap,
 } from './minimap.js';
+import { SHOP } from './catalog.js';
 import { FOUNTAIN, PATH_HALF_W, TRAPDOOR } from './layout.js';
 
 describe('minimap', () => {
@@ -70,20 +72,31 @@ describe('minimap', () => {
     const bounds = shopMapBounds([]);
     const size = 196;
     const camYaw = -0.06;
-    for (const yaw of [0, camYaw]) {
-      const path = worldToMap(0, TRAPDOOR.z, bounds, size, yaw);
-      const hatch = worldToMap(TRAPDOOR.x, TRAPDOOR.z, bounds, size, yaw);
-      const fountain = worldToMap(FOUNTAIN.x, FOUNTAIN.z, bounds, size, yaw);
-      const back = mapToWorld(hatch.x, hatch.y, bounds, size, yaw);
-      assert.ok(Math.abs(back.x - TRAPDOOR.x) < 1e-6, `round-trip x yaw=${yaw}`);
-      assert.ok(Math.abs(back.z - TRAPDOOR.z) < 1e-6, `round-trip z yaw=${yaw}`);
-      assert.ok(Math.hypot(hatch.x - fountain.x, hatch.y - fountain.y) > 8);
-      assert.ok(hatch.x > path.x, `icon stays on the hatch side of the path, yaw=${yaw}`);
-      assert.ok(Math.abs(hatch.y - path.y) < 4, `icon stays at hatch depth, yaw=${yaw}`);
-    }
+    const focus = { x: SHOP.keeper.x, z: SHOP.keeper.z };
+    const mark = dungeonEntranceMarkerWorld(TRAPDOOR);
+    const leftoverLeft = dungeonEntranceMarkerWorld({ x: -TRAPDOOR.x, z: TRAPDOOR.z });
+    assert.equal(mark.x, TRAPDOOR.x);
+    assert.equal(mark.z, TRAPDOOR.z);
+    assert.equal(leftoverLeft.x, TRAPDOOR.x, 'a mirrored −X hatch still maps to path-right');
     assert.equal(TRAPDOOR_MARKER_RADIUS, 5);
     assert.ok(TRAPDOOR.x > PATH_HALF_W, 'world hatch sits on the right of the cobble path');
-    assert.ok(TRAPDOOR.x > 0, 'do not mirror the entrance onto −X for the marker');
+    assert.ok(mark.x > PATH_HALF_W, 'marker uses the circled right-side of the path');
+    for (const yaw of [0, camYaw]) {
+      for (const origin of [null, focus]) {
+        const path = worldToMap(0, TRAPDOOR.z, bounds, size, yaw, 1, origin);
+        const hatch = worldToMap(mark.x, mark.z, bounds, size, yaw, 1, origin);
+        const oldLeft = worldToMap(-TRAPDOOR.x, TRAPDOOR.z, bounds, size, yaw, 1, origin);
+        const fountain = worldToMap(FOUNTAIN.x, FOUNTAIN.z, bounds, size, yaw, 1, origin);
+        const back = mapToWorld(hatch.x, hatch.y, bounds, size, yaw, 1, origin);
+        assert.ok(Math.abs(back.x - mark.x) < 1e-6, `round-trip x yaw=${yaw}`);
+        assert.ok(Math.abs(back.z - mark.z) < 1e-6, `round-trip z yaw=${yaw}`);
+        assert.ok(Math.hypot(hatch.x - fountain.x, hatch.y - fountain.y) > 8);
+        assert.ok(hatch.x > path.x, `icon sits on the circled right of the path, yaw=${yaw}`);
+        assert.ok(oldLeft.x < path.x, `the leftover left-side icon stays opposite, yaw=${yaw}`);
+        assert.ok(Math.abs(hatch.y - path.y) < 4, `icon stays at hatch depth, yaw=${yaw}`);
+        assert.ok(Math.abs(hatch.y - fountain.y) < 8, `icon stays near fountain height, yaw=${yaw}`);
+      }
+    }
   });
 
   it('ships a dungeon-entrance icon and looks it up from public/minimap', () => {

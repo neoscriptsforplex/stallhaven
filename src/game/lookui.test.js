@@ -20,8 +20,9 @@ describe('player look UI', () => {
 
   it('documents middle-mouse orbit next to the existing arrow-key rotate', () => {
     const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
-    assert.match(help, /middle mouse button and drag/);
-    assert.match(help, /arrow keys/);
+    assert.match(help, /middle mouse button or arrow keys/);
+    assert.match(help, /Controls:/);
+    assert.match(help, /The Goal:/);
   });
 
   it('covers the canvas with a black loading bar until models are ready', () => {
@@ -46,7 +47,7 @@ describe('player look UI', () => {
     assert.match(build, /<h2>Build<\/h2>/);
     assert.equal(build.includes('<h2>Upgrade</h2>'), false);
     const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
-    assert.match(help, /from Build/);
+    assert.match(help, /build menu/);
     assert.equal(help.includes('from Upgrade'), false);
     const chest = slice(html, 'id="chest-upgrade-modal"', 'id="expand-dock"');
     assert.match(chest, /<h2>Upgrade Chest<\/h2>/);
@@ -95,17 +96,18 @@ describe('player look UI', () => {
     assert.equal(help.includes('Hedge Mage'), false);
   });
 
-  it('names dungeon adamant rocks Adamantite in Help, not Adamant Ore', () => {
+  it('uses Luke\'s Help copy for controls, stations, and saving', () => {
     const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
-    assert.match(help, /Adamantite/);
-    assert.equal(help.includes('Adamant Ore'), false);
-  });
-
-  it('names runite rocks Runite in Help and gear Rune, not Rune Ore', () => {
-    const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
-    assert.match(help, /Adamantite, Runite/);
-    assert.match(help, /including Rune/);
-    assert.equal(help.includes('Rune Ore'), false);
+    assert.match(help, /Use Left click \(tap on phone\) to move/);
+    assert.match(help, /right click \(Double tap on phone\) to open menus/);
+    assert.match(help, /Furnace \(smelt ores to bars\)/);
+    assert.match(help, /Cooking Range \(make food\)/);
+    assert.match(help, /Fletching Bench \(craft Bows, Arrows and Ammo\)/);
+    assert.match(help, /Spinning Wheel \(turn flax into cloth or bowstring\)/);
+    assert.match(help, /Loom \(craft armour\)/);
+    assert.match(help, /Cauldron \(craft potions\)/);
+    assert.match(help, /Save your game file before closing game\./);
+    assert.match(help, /This will allow you to load it back again\./);
   });
 
   it('keeps Settings to a Player Avatar Customize button, not look grids', () => {

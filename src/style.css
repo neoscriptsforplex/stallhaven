@@ -218,6 +218,12 @@ body {
   font-weight: 700;
 }
 
+.help-copy {
+  white-space: pre-line;
+  margin: 0 0 12px;
+  line-height: 1.45;
+}
+
 .help-tip {
   padding: 8px 10px;
   border-radius: 6px;

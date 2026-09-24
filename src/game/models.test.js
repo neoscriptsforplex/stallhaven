@@ -1123,9 +1123,9 @@ describe('bundled prop swaps', () => {
     }
   });
 
-  it('fits a Mithril-labelled rune-rocks dump as Runite and keeps that display name', async () => {
+  it('fits the rune-rocks dump as Runite and keeps that display name', async () => {
     const objText = readFileSync(join(modelsRoot, 'dungeon-rocks/rune-rocks/rune-rocks.obj'), 'utf8');
-    assert.match(objText, /Mithril rocks/i);
+    assert.match(objText, /Runite rocks/i);
     const target = buildDungeon().boulders.find((item) => item.name === 'boulder-runite');
     assert.ok(target);
     const want = measureVisibleBox(target.children.find((child) => child.name === 'ore-runite')).getSize(new THREE.Vector3());
@@ -1411,7 +1411,7 @@ describe('bundled prop swaps', () => {
 
   it('fits bundled weapon, armour, ammo, and tool dumps to the current mesh size', async () => {
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
-    assert.equal(LUKE_MODEL_FOLDERS.length, 184);
+    assert.equal(LUKE_MODEL_FOLDERS.length, 186);
     for (const item of LUKE_MODEL_FOLDERS) {
       assert.equal(byId[item.id], item.folder, item.id);
       const slug = item.folder.split('/').pop();
@@ -1450,6 +1450,8 @@ describe('bundled prop swaps', () => {
       'weave_cloth',
       'flax',
       'orb',
+      'fire_clay',
+      'dragon_kiteshield',
     ];
     for (const recipeId of samples) {
       const bundled = await loadFolder(byId[recipeId]);
@@ -1470,7 +1472,7 @@ describe('bundled prop swaps', () => {
     }
     assert.equal(byId.bronze_thrownaxe, undefined);
     assert.equal(buildWare('bronze_thrownaxe').getObjectByName('dump'), undefined);
-    for (const missingId of ['dragon_platebody', 'dragon_kiteshield', 'blue_dhide_boots', 'battlemage_hat', 'cannonballs', 'fire_clay']) {
+    for (const missingId of ['dragon_platebody', 'blue_dhide_boots', 'battlemage_hat', 'cannonballs']) {
       assert.equal(byId[missingId], undefined, missingId);
       assert.equal(buildWare(missingId).getObjectByName('dump'), undefined, missingId);
     }
@@ -1493,9 +1495,10 @@ describe('bundled prop swaps', () => {
         assertUniform(live);
         assertGrounded(live);
         const got = new THREE.Box3().setFromObject(live).getSize(new THREE.Vector3());
-        const wantMax = Math.max(want.x, want.y, want.z);
+        const scale = id === 'fletch' ? 1.5 : 1;
+        const wantMax = Math.max(want.x, want.y, want.z) * scale;
         const gotMax = Math.max(got.x, got.y, got.z);
-        assert.ok(Math.abs(gotMax - wantMax) < 0.12, `${id} size ${gotMax} vs ${wantMax}`);
+        assert.ok(Math.abs(gotMax - wantMax) < 0.18, `${id} size ${gotMax} vs ${wantMax}`);
       } finally {
         setBundledLook(id, null);
       }

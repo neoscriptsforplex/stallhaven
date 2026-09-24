@@ -1110,7 +1110,12 @@ function buildProceduralFletchingBench() {
 }
 
 export function buildFletchingBench() {
-  return fitBundledStation('fletch', buildProceduralFletchingBench());
+  const fitted = fitBundledStation('fletch', buildProceduralFletchingBench());
+  if (!getBundledLook('fletch')) return fitted;
+  fitted.scale.multiplyScalar(1.5);
+  fitted.updateMatrixWorld(true);
+  sitVisibleOnY(fitted, 0);
+  return fitted;
 }
 
 function buildProceduralPotterWheel() {

@@ -1,48 +1,44 @@
 # Made by RuneLite Model-Dumper Plugin
 mtllib rune-rocks.mtl
-o Object Mithril rocks 2026-09-12_20-57-26
-v 22 47 -6
-v 34 46 -18
-v 40 22 -48
-v -8 25 0
-v 34 46 0
-v 38 46 -6
-v 56 21 0
-v 63 -3 5
-v 42 -2 -58
-v -20 2 5
-v 40 22 24
-v 42 -2 36
-v -16 25 24
-v 24 23 40
-v 41 -2 37
-v -16 1 14
-v -48 27 40
-v -16 37 40
-v 32 22 56
-v 53 -3 59
-v -40 27 56
-v -50 4 59
-v -62 4 37
-v -21 86 -33
-v -15 85 -27
-v 0 12 -32
-v -16 13 -48
-v -27 86 -33
-v -27 86 -15
-v -32 14 0
-v -36 3 12
-v 12 0 -36
-v -12 1 -60
-v -32 14 -48
-v -33 87 -21
-v -48 15 -16
-v -60 4 -12
-v -36 3 -60
-v -41 6 -45
-v 44 -2 -45
-v 44 -2 45
-v -41 6 45
+o Object Runite rocks 2026-09-24_20-20-55
+v -10 35 -53
+v 32 79 -40
+v 41 33 -56
+v 41 10 -63
+v -21 13 -59
+v 7 32 -38
+v 19 27 -14
+v 45 27 -16
+v 57 30 -41
+v 62 7 -44
+v 46 3 -13
+v 14 3 -11
+v 0 8 -41
+v 8 31 32
+v -48 -3 16
+v -24 -11 56
+v 56 -5 48
+v 48 -3 24
+v 8 0 8
+v -24 41 -4
+v -42 43 -13
+v -48 2 -7
+v -18 -1 8
+v -15 44 -22
+v -24 95 -22
+v -51 48 -31
+v -62 10 -36
+v -33 49 -40
+v -33 13 -51
+v -4 5 -22
+v 48 48 0
+v 16 0 0
+v 64 -3 24
+v 64 2 -16
+v 41 -3 45
+v -44 -9 45
+v -44 11 -45
+v 41 11 -45
 usemtl c0
 f 1 2 3
 usemtl c1
@@ -56,103 +52,75 @@ f 1 6 2
 usemtl c5
 f 2 6 7
 usemtl c6
-f 2 7 3
+f 2 7 8
 usemtl c7
-f 3 7 8
+f 2 8 9
 usemtl c8
-f 3 8 9
-usemtl c4
-f 3 9 4
+f 2 9 3
 usemtl c9
-f 4 9 10
+f 3 9 10
 usemtl c10
-f 4 10 11
+f 3 10 4
 usemtl c11
-f 4 11 5
+f 11 10 9
 usemtl c12
-f 5 11 6
-usemtl c4
-f 6 11 7
+f 11 9 8
 usemtl c13
-f 7 11 12
+f 11 8 12
 usemtl c14
-f 7 12 8
+f 12 8 7
 usemtl c15
-f 13 14 15
+f 12 7 13
 usemtl c16
-f 13 15 16
+f 13 7 6
 usemtl c17
-f 13 16 17
+f 13 6 5
 usemtl c18
-f 13 17 18
+f 14 15 16
 usemtl c19
-f 13 18 14
+f 14 16 17
 usemtl c20
+f 14 17 18
+usemtl c11
 f 14 18 19
 usemtl c21
-f 14 19 20
+f 14 19 15
 usemtl c22
-f 14 20 15
+f 20 21 22
 usemtl c23
-f 19 21 22
+f 20 22 23
 usemtl c24
-f 19 22 20
+f 20 23 24
 usemtl c25
-f 21 17 23
+f 20 24 25
 usemtl c26
-f 21 23 22
+f 20 25 21
 usemtl c27
-f 17 16 23
+f 21 25 26
 usemtl c28
-f 18 21 19
-f 21 18 17
-usemtl c29
-f 11 10 12
-usemtl c30
-f 24 25 26
-usemtl c31
-f 24 26 27
-usemtl c8
-f 24 27 28
-usemtl c14
-f 24 28 25
-usemtl c32
-f 25 28 29
-usemtl c33
-f 25 29 30
-usemtl c34
-f 25 30 26
-usemtl c35
-f 26 30 31
-usemtl c36
-f 26 31 32
-usemtl c37
-f 26 32 27
-usemtl c38
-f 27 32 33
-usemtl c39
-f 27 33 34
+f 21 26 27
 usemtl c17
-f 27 34 28
-usemtl c27
-f 28 34 35
-usemtl c9
-f 28 35 29
-usemtl c40
-f 29 35 36
-f 29 36 30
-usemtl c41
-f 30 36 37
-usemtl c42
-f 30 37 31
-usemtl c43
-f 35 34 36
-usemtl c44
-f 36 34 38
-usemtl c45
-f 36 38 37
+f 21 27 22
+usemtl c29
+f 26 28 29
+usemtl c30
+f 26 29 27
+usemtl c31
+f 28 24 30
+usemtl c32
+f 28 30 29
+usemtl c33
+f 24 23 30
+usemtl c34
+f 26 25 28
+usemtl c35
+f 28 25 24
+usemtl c30
+f 31 32 33
 usemtl c36
-f 34 33 38
-usemtl c46
-f 39 40 41
-f 39 41 42
+f 31 33 34
+usemtl c37
+f 31 34 32
+usemtl c38
+f 35 36 37
+f 35 37 38

@@ -14,8 +14,10 @@ import {
   matchingArmourIds,
   mostExpensiveChestId,
   recipeCost,
+  isCraftHidden,
   recipeList,
   recipesForTab,
+  stationForRecipe,
   unlockNeed,
   CRAFT_TABS,
   ANVIL_SUBTABS,
@@ -85,6 +87,7 @@ import {
   ownsRange,
   ownsWheel,
   placeFromChest,
+  clearDisplay,
   placeOnDisplay,
   nextFurnitureCost,
   removePlacedFurniture,
@@ -115,11 +118,14 @@ function placeStation(state, id) {
 
 function finishCraft(state, recipeId, at = 0) {
   const recipe = RECIPES[recipeId];
-  if (recipe.category === 'food' && !state.furniture.range) placeStation(state, 'range');
-  if (recipe.category === 'smelt' && !state.furniture.furnace) placeStation(state, 'furnace');
+  const station = stationForRecipe(recipe);
+  if (station !== 'anvil' && !state.furniture[station] && SHOP[station]) placeStation(state, station);
   const cost = recipeCost(recipe);
   for (const [id, n] of Object.entries(cost.materials)) {
     state.materials[id] = Math.max(state.materials[id] ?? 0, n);
+  }
+  for (const [id, n] of Object.entries(cost.items ?? {})) {
+    state.chest[id] = Math.max(state.chest[id] ?? 0, n);
   }
   assert.equal(startCraft(state, recipeId, at), true, `could not start ${recipeId}`);
   const done = completeCrafts(state, at + RECIPES[recipeId].time);
@@ -155,8 +161,8 @@ describe('stall economy', () => {
     assert.equal(canCraft(state, 'bread'), true);
     assert.equal(startCraft(state, 'bread', 0), true);
     assert.equal(state.materials.flour, 9);
-    assert.deepEqual(completeCrafts(state, 2.9), []);
-    assert.deepEqual(completeCrafts(state, 3), ['bread']);
+    assert.deepEqual(completeCrafts(state, 1.9), []);
+    assert.deepEqual(completeCrafts(state, 2), ['bread']);
     assert.equal(state.chest.bread, 1);
     assert.equal(state.craftCounts.bread, 1);
     assert.equal(state.displays.every((d) => !d.ware), true);
@@ -207,6 +213,23 @@ describe('stall economy', () => {
     assert.equal(state.displays[standIndex].slots.helm, 'bronze_full_helm');
     assert.equal(state.displays[standIndex].slots.body, 'bronze_platebody');
     assert.equal(state.displays[standIndex].slots.legs, 'bronze_platelegs');
+    assert.equal(clearDisplay(state, standIndex), true);
+    assert.equal(state.displays[standIndex].slots.helm, null);
+    assert.equal(state.displays[standIndex].ware, null);
+    assert.equal(state.displays[standIndex].removed, false);
+    assert.equal(state.chest.bronze_full_helm, 1);
+  });
+
+  it('clears a table display back into the chest', () => {
+    const state = createState();
+    finishCraft(state, 'bronze_sword');
+    const tableIndex = SHOP.displays.findIndex((d) => d.kind === 'table');
+    assert.equal(placeOnDisplay(state, 'bronze_sword', tableIndex), true);
+    assert.equal(state.chest.bronze_sword, undefined);
+    assert.equal(clearDisplay(state, tableIndex), true);
+    assert.equal(state.displays[tableIndex].ware, null);
+    assert.equal(state.chest.bronze_sword, 1);
+    assert.equal(state.displays[tableIndex].removed, false);
   });
 
   it('places food onto a chosen shelf slot and swaps the previous ware back to the chest', () => {
@@ -263,6 +286,8 @@ describe('unlock lines', () => {
     const state = createState();
     assert.equal(isUnlocked(state, 'bronze_sword'), true);
     assert.equal(isUnlocked(state, 'staff'), true);
+    assert.equal(isUnlocked(state, 'blue_dhide_body'), false);
+    placeStation(state, 'loom');
     assert.equal(isUnlocked(state, 'blue_dhide_body'), true);
     assert.equal(isUnlocked(state, 'bread'), false);
     placeStation(state, 'range');
@@ -274,7 +299,7 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'smelt_bronze'), true);
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
-    assert.equal(isUnlocked(state, 'mystic_staff'), false);
+    assert.equal(isUnlocked(state, 'magic_staff_air'), false);
     assert.equal(isUnlocked(state, 'green_dhide_body'), false);
     assert.equal(isUnlocked(state, 'pizza'), false);
     assert.equal(isUnlocked(state, 'salmon'), false);
@@ -318,6 +343,7 @@ describe('save and load', () => {
     state.skybox = 'black';
     state.brightness = 1.25;
     state.dungeonBrightness = 0.8;
+    state.photoMode = true;
     state.chefHat = true;
     const saved = serializeState(state);
     const other = createState();
@@ -342,6 +368,7 @@ describe('save and load', () => {
     assert.equal(other.skybox, 'black');
     assert.equal(other.brightness, 1.25);
     assert.equal(other.dungeonBrightness, 0.8);
+    assert.equal(other.photoMode, true);
     assert.equal(other.chefHat, true);
     assert.ok(other.shopXp > 0);
     assert.equal(other.shopLevel, shopProgress(other.shopXp).level);
@@ -370,6 +397,7 @@ describe('save and load', () => {
     assert.equal(state.skybox, 'blue');
     assert.equal(state.brightness, 1.5);
     assert.equal(state.dungeonBrightness, 1.5);
+    assert.equal(state.photoMode, false);
     assert.equal(state.chefHat, false);
     assert.equal(state.shopXp, 0);
     assert.equal(state.shopLevel, 1);
@@ -512,15 +540,15 @@ describe('customer trade', () => {
     finishCraft(state, 'bread');
     finishCraft(state, 'bronze_sword');
     finishCraft(state, 'staff');
-    finishCraft(state, 'bronze_shortbow');
+    finishCraft(state, 'shortbow');
     const melee = offerChoices(state, 'bronze_scimitar').map((choice) => choice.recipeId);
     assert.deepEqual(melee, ['bronze_sword']);
     const food = offerChoices(state, 'pizza').map((choice) => choice.recipeId);
     assert.deepEqual(food, ['bread']);
-    const magic = offerChoices(state, 'mystic_staff').map((choice) => choice.recipeId);
+    const magic = offerChoices(state, 'magic_staff_air').map((choice) => choice.recipeId);
     assert.deepEqual(magic, ['staff']);
-    const ranged = offerChoices(state, 'bronze_longbow').map((choice) => choice.recipeId);
-    assert.deepEqual(ranged, ['bronze_shortbow']);
+    const ranged = offerChoices(state, 'longbow').map((choice) => choice.recipeId);
+    assert.deepEqual(ranged, ['shortbow']);
     assert.equal(offerClassOf(RECIPES.staff), 'magic');
     assert.equal(offerChoices(state, 'bread').length, 0);
   });
@@ -581,23 +609,24 @@ describe('catalog', () => {
 
   it('covers the full melee, magic, range, and food catalog', () => {
     const recipes = recipeList();
-    assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'weapon').length, 49);
-    assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'armour').length, 56);
-    assert.equal(recipes.filter((r) => r.shape?.startsWith('staff')).length, 5);
-    assert.equal(recipes.filter((r) => r.combatClass === 'magic' && r.category === 'armour').length, 25);
-    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 35);
+    assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'weapon').length, 42);
+    assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'armour').length, 55);
+    assert.equal(recipes.filter((r) => r.shape?.startsWith('staff')).length, 14);
+    assert.equal(recipes.filter((r) => r.combatClass === 'magic' && r.category === 'armour').length, 28);
+    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 26);
     assert.equal(recipes.filter((r) => r.category === 'ammo').length, 8);
     assert.equal(recipes.filter((r) => r.category === 'rune').length, 4);
     assert.equal(recipes.filter((r) => r.combatClass === 'tools').length, 14);
-    assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 20);
+    assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 16);
     assert.deepEqual(DHIDE.map((color) => color.id), ['blue', 'green', 'red', 'black']);
-    assert.equal(RECIPES.blue_dhide_coif.name, "Blue D'hide Coif");
+    assert.equal(RECIPES.green_dragon_mask.name, 'Green Dragon Mask');
+    assert.equal(RECIPES.blue_dragon_mask.previousId, 'green_dragon_mask');
     assert.equal(RECIPES.blue_dhide_body.previousId, null);
     assert.equal(RECIPES.green_dhide_body.previousId, 'blue_dhide_body');
     assert.equal(RECIPES.blue_dhide_body.tier, 1);
     assert.equal(RECIPES.green_dhide_body.tier, 2);
-    assert.equal(RECIPES.green_dhide_coif.name, "Green D'hide Coif");
-    for (const piece of ['coif', 'body', 'chaps', 'vambraces', 'boots']) {
+    assert.equal(RECIPES.black_dragon_mask.name, 'Black Dragon Mask');
+    for (const piece of ['body', 'chaps', 'vambraces', 'boots']) {
       const green = RECIPES[`green_dhide_${piece}`];
       const blue = RECIPES[`blue_dhide_${piece}`];
       const red = RECIPES[`red_dhide_${piece}`];
@@ -612,10 +641,18 @@ describe('catalog', () => {
       assert.ok((blue.cost?.gold ?? 0) < (green.cost?.gold ?? 0), `${piece} blue gold cost`);
       assert.equal(blue.unlockNeed, 0);
       assert.equal(green.unlockNeed, 20);
-      assert.equal(isUnlocked(createState(), blue.id), true);
-      assert.equal(isUnlocked(createState(), green.id), false);
+      const withLoom = createState();
+      placeStation(withLoom, 'loom');
+      assert.equal(isUnlocked(withLoom, blue.id), true);
+      assert.equal(isUnlocked(createState(), blue.id), false);
+      assert.equal(isUnlocked(withLoom, green.id), false);
     }
-    assert.equal(RECIPES.black_dhide_coif.slot, 'helm');
+    assert.equal(RECIPES.black_dragon_mask.slot, 'helm');
+    assert.equal(RECIPES.wizard_gloves, undefined);
+    assert.equal(RECIPES.wizard_robe_bottom, undefined);
+    assert.equal(RECIPES.mystic_gloves.previousId, 'wizard_robe');
+    assert.equal(RECIPES.mystic_boots.previousId, 'wizard_robe');
+    assert.equal(RECIPES.wizard_robe.name, 'Wizard Robe');
     assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
     assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
     assert.equal(recipes.filter((r) => r.category === 'food').length, 13);
@@ -635,15 +672,23 @@ describe('catalog', () => {
     assert.equal(recipeCost(RECIPES.chocolate_cake).materials.chocolate, 1);
     assert.equal(RECIPES.bronze_scimitar.name, 'Bronze Scimitar');
     assert.equal(RECIPES.iron_platebody.name, 'Iron Platebody');
-    assert.equal(RECIPES.magic_hat.name, 'Magic Hat');
+    assert.equal(RECIPES.wizard_hat.name, 'Wizard Hat');
     assert.equal(RECIPES.mystic_robe_top.name, 'Mystic Robe Top');
+    assert.equal(RECIPES.splitbark_gauntlets.name, 'Splitbark Gauntlets');
     assert.equal(RECIPES.blue_dhide_body.name, "Blue D'hide Body");
     assert.equal(RECIPES.green_dhide_chaps.name, "Green D'hide Chaps");
     assert.equal(RECIPES.staff.name, 'Staff');
-    assert.equal(RECIPES.mystic_staff.name, 'Mystic Staff');
-    assert.equal(RECIPES.battle_staff.name, 'Battle Staff');
-    assert.equal(RECIPES.lunar_staff.name, 'Lunar Staff');
+    assert.equal(RECIPES.magic_staff_air.name, 'Magic Staff of Air');
+    assert.equal(RECIPES.air_battlestaff.name, 'Air Battlestaff');
+    assert.equal(RECIPES.mystic_air_staff.name, 'Mystic Air Staff');
+    assert.equal(RECIPES.lunar_staff, undefined);
     assert.equal(RECIPES.ancient_staff.name, 'Ancient Staff');
+    assert.equal(recipeCost(RECIPES.staff).materials.logs, 50);
+    assert.equal(recipeCost(RECIPES.magic_staff_air).items.air_rune, 1);
+    assert.equal(recipeCost(RECIPES.air_battlestaff).materials.orb, 10);
+    assert.equal(recipeCost(RECIPES.mystic_air_staff).materials.orb, 100);
+    assert.equal(recipeCost(RECIPES.ancient_staff).materials.cloth, 100);
+    assert.equal(recipeCost(RECIPES.ancient_staff).materials.dragon_bar, 10);
     assert.equal(RECIPES.fish_pie.name, 'Fish Pie');
     assert.equal(RECIPES.bronze_2h_sword.name, 'Bronze 2H Sword');
     assert.equal(RECIPES.bronze_thrownaxe.name, 'Bronze Thrown Axe');
@@ -653,7 +698,7 @@ describe('catalog', () => {
     for (const recipe of recipeList()) {
       for (const word of recipe.name.split(/\s+/)) {
         const letter = word.replace(/^[^A-Za-z]+/, '')[0];
-        if (!letter) continue;
+        if (!letter || word.toLowerCase() === 'of') continue;
         assert.equal(letter, letter.toUpperCase(), recipe.name);
       }
     }
@@ -699,7 +744,18 @@ describe('catalog', () => {
   });
 
   it('groups anvil recipes by melee, magic, ranged, and tools with weapons and armour subtabs', () => {
-    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Ranged', 'Tools']);
+    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Tools']);
+    assert.equal(stationForRecipe(RECIPES.shortbow), 'fletch');
+    assert.equal(stationForRecipe(RECIPES.bronze_arrows), 'fletch');
+    assert.equal(stationForRecipe(RECIPES.green_dragon_mask), 'loom');
+    assert.equal(stationForRecipe(RECIPES.wizard_robe), 'loom');
+    assert.equal(stationForRecipe(RECIPES.staff), 'anvil');
+    assert.equal(stationForRecipe(RECIPES.weave_cloth), 'loom');
+    assert.equal(stationForRecipe(RECIPES.fire_clay), 'potter');
+    assert.equal(recipeCost(RECIPES.weave_cloth).materials.flax, 1);
+    assert.equal(RECIPES.weave_cloth.outputMaterial, 'cloth');
+    assert.equal(recipeCost(RECIPES.fire_clay).materials.soft_clay, 1);
+    assert.equal(RECIPES.fire_clay.outputMaterial, 'hard_clay');
     assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Runes', 'Hatchet', 'Pickaxe']);
     const melee = recipesForTab('melee');
     const meleeWeapons = recipesForTab('melee', 'weapon');
@@ -720,13 +776,13 @@ describe('catalog', () => {
     assert.ok(melee.some((r) => r.id === 'bronze_sword'));
     assert.ok(!melee.some((r) => r.id === 'staff'));
     assert.ok(magic.some((r) => r.id === 'staff'));
-    assert.ok(ranged.some((r) => r.id === 'bronze_shortbow'));
-    assert.equal(recipeCost(RECIPES.bronze_shortbow).materials.bow_string, 1);
+    assert.ok(ranged.some((r) => r.id === 'shortbow'));
+    assert.equal(recipeCost(RECIPES.shortbow).materials.bow_string, 1);
     assert.equal(recipeCost(RECIPES.dragon_crossbow).materials.bow_string, 1);
     assert.equal(recipeCost(RECIPES.bronze_sword).materials.bronze_bar, 1);
     assert.equal(recipeCost(RECIPES.bronze_sword).materials.bronze, undefined);
     assert.ok(ranged.some((r) => r.id === 'bronze_arrows'));
-    assert.ok(ranged.some((r) => r.id === 'blue_dhide_coif'));
+    assert.ok(ranged.some((r) => r.id === 'green_dragon_mask'));
     assert.ok(food.some((r) => r.id === 'bread'));
     assert.ok(food.some((r) => r.id === 'salmon'));
     assert.ok(food.some((r) => r.id === 'anglerfish'));
@@ -755,6 +811,37 @@ describe('catalog', () => {
     assert.equal(slots.helm, 'bronze_full_helm');
     assert.equal(slots.body, 'bronze_platebody');
     assert.equal(slots.legs, 'bronze_platelegs');
+  });
+
+  it('hides dragon platebody, thrown axes, ranged boots, and later magic armour from craft', () => {
+    assert.equal(isCraftHidden(RECIPES.dragon_platebody), true);
+    assert.equal(RECIPES.dragon_platebody.name, 'Dragon Platebody');
+    for (const metal of ['bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon']) {
+      assert.equal(isCraftHidden(RECIPES[`${metal}_thrownaxe`]), true, metal);
+      assert.equal(recipesForTab('ranged').some((recipe) => recipe.id === `${metal}_thrownaxe`), false);
+    }
+    for (const color of ['blue', 'green', 'red', 'black']) {
+      assert.equal(isCraftHidden(RECIPES[`${color}_dhide_boots`]), true, color);
+      assert.equal(isCraftHidden(RECIPES[`${color}_dhide_body`]), false, color);
+    }
+    assert.equal(recipesForTab('ranged', 'armour').some((recipe) => recipe.shape === 'dhide_boots'), false);
+    for (const set of ['battlemage', 'lunar', 'ancient']) {
+      for (const piece of ['hat', 'robe_top', 'robe_bottom', 'boots', 'gloves']) {
+        const id = `${set}_${piece}`;
+        assert.equal(isCraftHidden(RECIPES[id]), true, id);
+        assert.equal(recipesForTab('magic', 'armour').some((recipe) => recipe.id === id), false, id);
+      }
+    }
+    assert.equal(isCraftHidden(RECIPES.ancient_staff), false);
+    assert.equal(isCraftHidden(RECIPES.wizard_robe), false);
+    assert.equal(isCraftHidden(RECIPES.mystic_robe_top), false);
+    assert.equal(isCraftHidden(RECIPES.splitbark_boots), false);
+    assert.ok(recipesForTab('melee', 'armour').some((recipe) => recipe.id === 'bronze_platebody'));
+    const state = createState();
+    state.materials.dragon_bar = 20;
+    state.craftCounts.dragon_chainbody = 99;
+    assert.match(craftBlockReason(state, 'dragon_platebody'), /cannot be crafted/i);
+    assert.equal(maxCraftActions(state, 'bronze_thrownaxe'), 0);
   });
 });
 
@@ -863,13 +950,13 @@ describe('material regen', () => {
 });
 
 describe('shop expansions', () => {
-  it('sells the first extra room for 10000g and the next for three times that', () => {
+  it('sells the first extra room for 500000g and the next for three times that', () => {
     const state = createState();
-    state.gold = 10000;
+    state.gold = 500000;
     assert.equal(buyExpansion(state, 'left'), true);
     assert.deepEqual(state.expansions, ['left']);
     assert.equal(state.gold, 0);
-    state.gold = 30000;
+    state.gold = 1500000;
     assert.equal(buyExpansion(state, 'back-left'), true);
     assert.equal(state.gold, 0);
     assert.ok(state.expansions.includes('back-left'));
@@ -877,7 +964,7 @@ describe('shop expansions', () => {
 
   it('will not sell a corner pad until it touches an owned room', () => {
     const state = createState();
-    state.gold = 50000;
+    state.gold = 2000000;
     assert.equal(buyExpansion(state, 'back-left'), false);
     assert.equal(buyExpansion(state, 'back'), true);
     assert.equal(buyExpansion(state, 'back-left'), true);
@@ -885,7 +972,7 @@ describe('shop expansions', () => {
 });
 
 describe('cauldron unlock', () => {
-  it('sells one cauldron for 10000 gp and keeps the pose in a save', () => {
+  it('sells one cauldron for 1000000 gp and keeps the pose in a save', () => {
     const state = createState();
     assert.equal(ownsCauldron(state), false);
     assert.equal(canBuyCauldron(state), false);
@@ -1021,7 +1108,7 @@ describe('furnace and spinning wheel', () => {
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
   });
 
-  it('sells a spinning wheel for 500 gp and spins flax into bow string', () => {
+  it('sells a spinning wheel for 100000 gp and spins flax into bow string', () => {
     const state = createState();
     assert.equal(ownsWheel(state), false);
     assert.match(craftBlockReason(state, 'spin_bow_string'), /spinning wheel/i);
@@ -1037,14 +1124,19 @@ describe('furnace and spinning wheel', () => {
   });
 
   it('requires bow string on every bow and crossbow tier', () => {
+    for (const id of ['shortbow', 'oak_shortbow', 'willow_shortbow', 'maple_shortbow', 'yew_shortbow', 'magic_shortbow', 'longbow', 'oak_longbow', 'willow_longbow', 'maple_longbow', 'yew_longbow', 'magic_longbow']) {
+      const recipe = RECIPES[id];
+      assert.ok(recipe, id);
+      assert.equal(recipeCost(recipe).materials.bow_string, 1, id);
+      assert.equal(recipeCost(recipe).materials.logs, 1, id);
+    }
+    assert.equal(RECIPES.magic_shortbow.tint, 0x3a6ec8);
+    assert.equal(RECIPES.magic_longbow.tint, 0x3a6ec8);
     for (const metal of METALS) {
-      for (const piece of ['shortbow', 'longbow', 'crossbow']) {
-        const recipe = RECIPES[`${metal.id}_${piece}`];
-        assert.ok(recipe, `${metal.id}_${piece}`);
-        assert.equal(recipeCost(recipe).materials.bow_string, 1, recipe.id);
-        assert.equal(recipeCost(recipe).materials.string, undefined, recipe.id);
-        assert.ok(recipeCost(recipe).materials[`${metal.id}_bar`] >= 1, recipe.id);
-      }
+      const recipe = RECIPES[`${metal.id}_crossbow`];
+      assert.ok(recipe, `${metal.id}_crossbow`);
+      assert.equal(recipeCost(recipe).materials.bow_string, 1, recipe.id);
+      assert.ok(recipeCost(recipe).materials[`${metal.id}_bar`] >= 1, recipe.id);
     }
   });
 
@@ -1226,7 +1318,7 @@ describe('cheat codes', () => {
     const state = createState();
     const gold = state.gold;
     assert.equal(applyCheat(state, 'MoThErLoDe'), 'motherlode');
-    assert.equal(state.gold, gold + 10000);
+    assert.equal(state.gold, gold + 1000000);
     assert.equal(applyCheat(state, 'onesmallfavour'), 'onesmallfavour');
     assert.equal(state.chefHat, true);
     assert.equal(applyCheat(state, 'MAXCAPE'), 'maxcape');
@@ -1239,6 +1331,19 @@ describe('cheat codes', () => {
     assert.equal(state.chest.bread, undefined);
     assert.equal(state.chefHat, false);
     assert.equal(state.shopXp, 0);
+  });
+
+  it('resets unlocks and money for noob without wiping the chest', () => {
+    const state = createState();
+    state.gold = 9000;
+    state.chest.bread = 3;
+    state.craftCounts.bronze_sword = 40;
+    assert.equal(isUnlocked(state, 'iron_sword'), true);
+    assert.equal(applyCheat(state, 'nOoB'), 'noob');
+    assert.equal(state.gold, START_GOLD);
+    assert.equal(state.chest.bread, 3);
+    assert.equal(isUnlocked(state, 'iron_sword'), false);
+    assert.equal(isUnlocked(state, 'bronze_sword'), true);
   });
 
   it('subtracts gold for -motherlode and clamps at zero', () => {
@@ -1472,7 +1577,7 @@ describe('ores, appearance, king, and chest bin', () => {
     finishCraft(state, 'bread');
     state.displays[center].shelfSlots = ['bread', 'bread', null, null];
     state.chest.bread = 0;
-    state.gold = 10000;
+    state.gold = 500000;
     assert.equal(buyExpansion(state, 'back'), true);
     assert.equal(state.displays[center].removed, true);
     assert.equal(chestCount(state, 'bread'), 2);
@@ -1533,7 +1638,7 @@ describe('anvil tools', () => {
     assert.equal(isUnlocked(state, 'iron_hatchet'), true);
     assert.equal(state.chest.bronze_hatchet, 20);
     assert.ok(CUSTOMERS.mercenary.prefers.includes('bronze_scimitar'));
-    assert.ok(CUSTOMERS.ranger.prefers.includes('bronze_shortbow'));
+    assert.ok(CUSTOMERS.ranger.prefers.includes('shortbow'));
     assert.equal(CUSTOMERS.mercenary.prefers.includes('bronze_pickaxe'), false);
     assert.equal(CUSTOMERS.ranger.prefers.includes('bronze_hatchet'), false);
     assert.equal(canDisplayOn('table', RECIPES.bronze_hatchet), true);
@@ -1718,6 +1823,7 @@ describe('craft batches', () => {
     const state = createState();
     state.materials.bronze_bar = 2;
     state.materials.logs = 40;
+    placeStation(state, 'fletch');
     assert.equal(maxCraftActions(state, 'bronze_arrows'), 2);
     assert.equal(startCraftBatch(state, 'bronze_arrows', 'max', 0), 2);
     assert.equal(completeCrafts(state, 100).length, 2);
@@ -1765,7 +1871,7 @@ describe('dungeon sky and remains', () => {
     assert.equal(byId.bronze.vein, 0xb56a28);
     assert.equal(byId.iron.vein, 0x8d939a);
     assert.equal(byId.steel.vein, 0xd4dbe2);
-    assert.equal(byId.mithril.vein, 0x2f6ad4);
+    assert.equal(byId.mithril.vein, 0x2458a6);
     assert.equal(byId.adamant.vein, 0x3a8a45);
     assert.equal(byId.runite.vein, 0x8fd4f5);
     assert.equal(byId.dragon.vein, 0xd41e1e);
@@ -1835,15 +1941,20 @@ describe('sell price rebalance', () => {
     METALS.forEach((metal, index) => {
       assert.equal(RECIPES[`${metal.id}_scimitar`].price, TIER_SELL[index], metal.id);
     });
-    assert.ok(RECIPES.bronze_gloves.price < RECIPES.bronze_scimitar.price);
+    assert.ok(RECIPES.bronze_kiteshield.price < RECIPES.bronze_scimitar.price);
+    assert.equal(RECIPES.bronze_gloves, undefined);
+    assert.equal(RECIPES.dragon_full_helm, undefined);
+    assert.equal(RECIPES.bronze_knives, undefined);
     assert.ok(RECIPES.bronze_platebody.price > RECIPES.bronze_scimitar.price);
     assert.ok(RECIPES.dragon_platebody.price > RECIPES.dragon_scimitar.price);
     assert.equal(RECIPES.bronze_scimitar.price, 5000);
     assert.equal(RECIPES.dragon_scimitar.price, 60000);
     assert.equal(RECIPES.smelt_bronze.price, 0);
     assert.equal(RECIPES.spin_bow_string.price, 0);
-    assert.ok(RECIPES.bread.price >= 5000);
-    assert.ok(RECIPES.anglerfish.price <= 60000);
+    assert.equal(RECIPES.bread.price, 50);
+    assert.equal(RECIPES.anglerfish.price, 5000);
+    assert.ok(RECIPES.bread.time < 3);
+    assert.ok(RECIPES.anglerfish.time < 12);
     assert.ok(RECIPES.green_dhide_body.price < RECIPES.black_dhide_body.price);
     assert.ok(RECIPES.blue_dhide_body.price < RECIPES.green_dhide_body.price);
   });

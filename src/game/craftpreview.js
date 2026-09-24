@@ -15,6 +15,28 @@ export function isRunePreview(id) {
   return recipe?.category === 'rune' || recipe?.shape === 'rune';
 }
 
+/** Craft-preview only. World and worn meshes stay on the dumped orientation. */
+const PREVIEW_EULER = {
+  robe_bottom: { x: 0, y: 0, z: -Math.PI / 4 },
+  platelegs: { x: Math.PI, y: 0, z: 0 },
+  dhide_chaps: { x: Math.PI, y: 0, z: 0 },
+  platebody: { x: Math.PI, y: 0, z: 0 },
+  robe_top: { x: Math.PI, y: 0, z: 0 },
+  plateskirt: { x: Math.PI / 2, y: 0, z: 0 },
+};
+
+export function craftPreviewEuler(id) {
+  if (String(id).endsWith('_dragon_mask')) return { x: 0, y: Math.PI, z: 0 };
+  const shape = RECIPES[id]?.shape;
+  return shape ? (PREVIEW_EULER[shape] ?? null) : null;
+}
+
+export function applyCraftPreviewEuler(object, id) {
+  const euler = craftPreviewEuler(id);
+  if (!object || !euler) return;
+  object.rotation.set(euler.x, euler.y, euler.z);
+}
+
 /**
  * Bundled/procedural runes sit as Y-up discs with the glyph on +Y.
  * Pitch +90° around X so that face points at a +Z camera. The previous −90°
@@ -110,6 +132,7 @@ export function createCraftPreview(canvas) {
     mesh.position.set(0, 0, 0);
     runeFront = isRunePreview(next);
     if (runeFront) poseRuneForFrontView(mesh, 0);
+    else applyCraftPreviewEuler(mesh, next);
     scene.add(mesh);
     frame = frameCraftPreview(mesh, camera, 1.42, null, previewOpts());
   }

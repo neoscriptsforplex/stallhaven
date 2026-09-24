@@ -31,7 +31,9 @@ export function clampMapZoom(zoom) {
 }
 
 function mapYaw(yaw) {
-  return (yaw ?? 0) + MAP_YAW_OFFSET;
+  // Camera yaw is negated so turning left spins the map left. The 180° offset
+  // still puts shop-forward (+Z) toward the bottom of the canvas at yaw 0.
+  return MAP_YAW_OFFSET - (yaw ?? 0);
 }
 
 function focusOf(bounds, focus) {

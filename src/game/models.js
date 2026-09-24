@@ -1155,7 +1155,23 @@ export function slotPose(slot) {
   if (slot === 'legs') return { x: 0, y: 0.32, z: 0 };
   if (slot === 'boots') return { x: 0, y: 0.08, z: 0.02 };
   if (slot === 'gloves') return { x: 0.24, y: 0.74, z: 0.04 };
+  if (slot === 'shield') return { x: 0.46, y: 0.72, z: 0.06 };
   return { x: 0, y: 0.62, z: 0 };
+}
+
+/** Stand a flat dump upright when the procedural mesh is taller than it is wide. */
+export function dumpStandEuler(source, targetBox) {
+  const none = { rotateX: 0, rotateY: 0, rotateZ: 0 };
+  if (!source || !targetBox || targetBox.isEmpty()) return none;
+  const tsize = targetBox.getSize(new THREE.Vector3());
+  const upright = tsize.y >= Math.max(tsize.x, tsize.z) * 0.95;
+  if (!upright) return none;
+  source.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(source).getSize(new THREE.Vector3());
+  const max = Math.max(size.x, size.y, size.z, 0.0001);
+  if (size.y >= max * 0.82) return none;
+  if (size.z >= size.x) return { rotateX: -Math.PI / 2, rotateY: 0, rotateZ: 0 };
+  return { rotateX: 0, rotateY: 0, rotateZ: Math.PI / 2 };
 }
 
 export function buildWare(recipeId) {
@@ -1167,52 +1183,61 @@ export function buildWare(recipeId) {
     group.userData.recipeId = recipeId;
     return group;
   }
+  if (!recipe && (recipeId === 'flax' || recipeId === 'orb')) {
+    const host = new THREE.Group();
+    addMaterialToken(host, recipeId === 'flax' ? 0x3a8a45 : 0xc8d8ee);
+    attachBundledWare(group, host, getBundledLook(recipeId));
+    group.userData.recipeId = recipeId;
+    return group;
+  }
   const shape = recipe?.shape;
   const tint = recipe?.tint ?? 0x888888;
+  const host = new THREE.Group();
   const builders = {
-    scimitar: () => addScimitar(group, tint),
-    dagger: () => addDagger(group, tint),
-    sword: () => addSword(group, tint, 1),
-    mace: () => addMace(group, tint),
-    spear: () => addSpear(group, tint),
-    '2h': () => addSword(group, tint, 1.38),
-    defender: () => addDefender(group, tint),
-    full_helm: () => addFullHelm(group, tint),
-    med_helm: () => addMedHelm(group, tint),
-    platebody: () => addPlatebody(group, tint),
-    platelegs: () => addPlatelegs(group, tint),
-    boots: () => addBoots(group, tint, true),
-    gloves: () => addGloves(group, tint, true),
-    chainbody: () => addChainbody(group, tint),
-    plateskirt: () => addPlateskirt(group, tint),
-    staff_plain: () => addMagicStaff(group, tint, 'plain'),
-    staff_mystic: () => addMagicStaff(group, tint, 'mystic'),
-    staff_battle: () => addMagicStaff(group, tint, 'battle'),
-    staff_lunar: () => addMagicStaff(group, tint, 'lunar'),
-    staff_ancient: () => addMagicStaff(group, tint, 'ancient'),
-    wizard_hat: () => addWizardHat(group, tint, recipe?.accent),
-    robe_top: () => addRobeTop(group, tint, recipe?.accent),
-    robe_bottom: () => addRobeBottom(group, tint, recipe?.accent),
-    magic_boots: () => addBoots(group, tint, false),
-    magic_gloves: () => addGloves(group, tint, false),
-    shortbow: () => addBow(group, tint, 0.78),
-    longbow: () => addBow(group, tint, 1.18),
-    crossbow: () => addCrossbow(group, tint),
-    knives: () => addKnives(group, tint),
-    thrownaxe: () => addThrownaxe(group, tint),
-    hatchet: () => addHatchet(group, tint),
-    pickaxe: () => addWarePickaxe(group, tint),
-    arrows: () => addArrows(group, tint),
-    cannonballs: () => addCannonballs(group, tint),
-    rune: () => addRune(group, recipe?.runeMark ?? 'air', tint),
-    dhide_coif: () => addDhideCoif(group, tint),
-    dhide_body: () => addDhideBody(group, tint),
-    dhide_chaps: () => addChaps(group, tint),
-    dhide_vambraces: () => addVambraces(group, tint),
-    dhide_boots: () => addBoots(group, tint, false),
-    potion: () => addPotion(group, tint),
-    bar: () => addMetalBar(group, tint),
-    bow_string: () => addBowStringCoil(group, tint),
+    scimitar: () => addScimitar(host, tint),
+    dagger: () => addDagger(host, tint),
+    sword: () => addSword(host, tint, 1),
+    mace: () => addMace(host, tint),
+    spear: () => addSpear(host, tint),
+    '2h': () => addSword(host, tint, 1.38),
+    defender: () => addDefender(host, tint),
+    kiteshield: () => addDefender(host, tint),
+    full_helm: () => addFullHelm(host, tint),
+    med_helm: () => addMedHelm(host, tint),
+    platebody: () => addPlatebody(host, tint),
+    platelegs: () => addPlatelegs(host, tint),
+    boots: () => addBoots(host, tint, true),
+    gloves: () => addGloves(host, tint, true),
+    chainbody: () => addChainbody(host, tint),
+    plateskirt: () => addPlateskirt(host, tint),
+    staff_plain: () => addMagicStaff(host, tint, 'plain'),
+    staff_mystic: () => addMagicStaff(host, tint, 'mystic'),
+    staff_battle: () => addMagicStaff(host, tint, 'battle'),
+    staff_lunar: () => addMagicStaff(host, tint, 'lunar'),
+    staff_ancient: () => addMagicStaff(host, tint, 'ancient'),
+    wizard_hat: () => addWizardHat(host, tint, recipe?.accent),
+    robe_top: () => addRobeTop(host, tint, recipe?.accent),
+    robe_bottom: () => addRobeBottom(host, tint, recipe?.accent),
+    magic_boots: () => addBoots(host, tint, false),
+    magic_gloves: () => addGloves(host, tint, false),
+    shortbow: () => addBow(host, tint, 0.78),
+    longbow: () => addBow(host, tint, 1.18),
+    crossbow: () => addCrossbow(host, tint),
+    knives: () => addKnives(host, tint),
+    thrownaxe: () => addThrownaxe(host, tint),
+    hatchet: () => addHatchet(host, tint),
+    pickaxe: () => addWarePickaxe(host, tint),
+    arrows: () => addArrows(host, tint),
+    cannonballs: () => addCannonballs(host, tint),
+    rune: () => addRune(host, recipe?.runeMark ?? 'air', tint),
+    dhide_coif: () => addDhideCoif(host, tint),
+    dhide_body: () => addDhideBody(host, tint),
+    dhide_chaps: () => addChaps(host, tint),
+    dhide_vambraces: () => addVambraces(host, tint),
+    dhide_boots: () => addBoots(host, tint, false),
+    potion: () => addPotion(host, tint),
+    bar: () => addMetalBar(host, tint),
+    bow_string: () => addBowStringCoil(host, tint),
   };
   if (recipe?.category === 'food') addFoodWare(group, recipe);
   else if (builders[shape]) builders[shape]();
@@ -1222,11 +1247,38 @@ export function buildWare(recipeId) {
       new THREE.MeshStandardMaterial({ color: tint, roughness: 0.6 }),
     ));
     lump.position.y = 0.1;
-    group.add(lump);
+    host.add(lump);
+  }
+  if (recipe?.category !== 'food') {
+    const bundled = recipe ? getBundledLook(recipe.id) : null;
+    attachBundledWare(group, host, bundled);
   }
   if (isShelfItem(recipe)) group.scale.setScalar(0.55);
   group.userData.recipeId = recipeId;
   return group;
+}
+
+function addMaterialToken(host, tint) {
+  const lump = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.18, 0.22),
+    new THREE.MeshStandardMaterial({ color: tint, roughness: 0.6 }),
+  ));
+  lump.position.y = 0.1;
+  host.add(lump);
+}
+
+function attachBundledWare(group, host, bundled) {
+  if (!bundled) {
+    group.add(host);
+    return;
+  }
+  const targetBox = new THREE.Box3().setFromObject(host);
+  group.add(wrapBundledProp(bundled, host, {
+    name: 'dump',
+    fit: 'max',
+    targetBox,
+    ...dumpStandEuler(bundled, targetBox),
+  }));
 }
 
 function metal(color) {
@@ -3056,11 +3108,14 @@ function speechTexture(text, bubble = false) {
   canvas.height = canvasH;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvasW, canvasH);
-  ctx.fillStyle = bubble ? 'rgba(248, 232, 196, 0.96)' : 'rgba(28, 18, 10, 0.78)';
+  ctx.fillStyle = bubble ? 'rgba(36, 22, 12, 0.94)' : 'rgba(28, 18, 10, 0.78)';
   const boxH = canvasH - tail;
   roundRect(ctx, 8, 6, canvasW - 16, boxH - 10, 14);
   ctx.fill();
   if (bubble) {
+    ctx.strokeStyle = '#e3b34a';
+    ctx.lineWidth = 3;
+    ctx.stroke();
     const mid = canvasW / 2;
     ctx.beginPath();
     ctx.moveTo(mid - 10, boxH - 8);
@@ -3068,8 +3123,9 @@ function speechTexture(text, bubble = false) {
     ctx.lineTo(mid, canvasH - 4);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
   }
-  ctx.fillStyle = bubble ? '#3a240e' : '#f6e4c4';
+  ctx.fillStyle = bubble ? '#ead8b8' : '#f6e4c4';
   ctx.font = font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

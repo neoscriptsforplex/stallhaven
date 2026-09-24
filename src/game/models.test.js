@@ -40,9 +40,10 @@ import {
 } from './models.js';
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
+import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { cobblePathSpan, furnitureVisualYaw, pointHitsShop, ROOM_W, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFountain, buildFurnace, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -1122,9 +1123,9 @@ describe('bundled prop swaps', () => {
     }
   });
 
-  it('fits a Mithril-labelled rune-rocks dump as Runite and keeps that display name', async () => {
+  it('fits the rune-rocks dump as Runite and keeps that display name', async () => {
     const objText = readFileSync(join(modelsRoot, 'dungeon-rocks/rune-rocks/rune-rocks.obj'), 'utf8');
-    assert.match(objText, /Mithril rocks/i);
+    assert.match(objText, /Runite rocks/i);
     const target = buildDungeon().boulders.find((item) => item.name === 'boulder-runite');
     assert.ok(target);
     const want = measureVisibleBox(target.children.find((child) => child.name === 'ore-runite')).getSize(new THREE.Vector3());
@@ -1405,6 +1406,102 @@ describe('bundled prop swaps', () => {
       setBundledLook('ore-essence', null);
       setBundledLook('ore-bronze', null);
       setBundledLook('skeleton', null);
+    }
+  });
+
+  it('fits bundled weapon, armour, ammo, and tool dumps to the current mesh size', async () => {
+    const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    assert.equal(LUKE_MODEL_FOLDERS.length, 186);
+    for (const item of LUKE_MODEL_FOLDERS) {
+      assert.equal(byId[item.id], item.folder, item.id);
+      const slug = item.folder.split('/').pop();
+      const folderPath = join(modelsRoot, item.folder);
+      assert.equal(existsSync(join(folderPath, `${slug}.obj`)), true, `${item.folder}.obj`);
+      assert.equal(existsSync(join(folderPath, `${slug}.mtl`)), true, `${item.folder}.mtl`);
+    }
+    const samples = [
+      'bronze_scimitar',
+      'runite_sword',
+      'dragon_2h_sword',
+      'shortbow',
+      'magic_longbow',
+      'bronze_crossbow',
+      'staff',
+      'magic_staff_air',
+      'fire_battlestaff',
+      'mystic_water_staff',
+      'ancient_staff',
+      'bronze_full_helm',
+      'bronze_platebody',
+      'bronze_kiteshield',
+      'dragon_med_helm',
+      'blue_dhide_body',
+      'green_dragon_mask',
+      'wizard_hat',
+      'wizard_robe',
+      'mystic_robe_top',
+      'splitbark_hat',
+      'splitbark_gauntlets',
+      'bronze_arrows',
+      'dragon_arrows',
+      'bronze_hatchet',
+      'dragon_pickaxe',
+      'runite_hatchet',
+      'weave_cloth',
+      'flax',
+      'orb',
+      'fire_clay',
+      'dragon_kiteshield',
+    ];
+    for (const recipeId of samples) {
+      const bundled = await loadFolder(byId[recipeId]);
+      const want = new THREE.Box3().setFromObject(buildWare(recipeId)).getSize(new THREE.Vector3());
+      setBundledLook(recipeId, bundled);
+      try {
+        const ware = buildWare(recipeId);
+        const dump = ware.getObjectByName('dump');
+        assert.ok(dump, recipeId);
+        assertUniform(dump);
+        const got = new THREE.Box3().setFromObject(ware).getSize(new THREE.Vector3());
+        const wantMax = Math.max(want.x, want.y, want.z);
+        const gotMax = Math.max(got.x, got.y, got.z);
+        assert.ok(Math.abs(gotMax - wantMax) < 0.08, `${recipeId} size ${gotMax} vs ${wantMax}`);
+      } finally {
+        setBundledLook(recipeId, null);
+      }
+    }
+    assert.equal(byId.bronze_thrownaxe, undefined);
+    assert.equal(buildWare('bronze_thrownaxe').getObjectByName('dump'), undefined);
+    for (const missingId of ['dragon_platebody', 'blue_dhide_boots', 'battlemage_hat', 'cannonballs']) {
+      assert.equal(byId[missingId], undefined, missingId);
+      assert.equal(buildWare(missingId).getObjectByName('dump'), undefined, missingId);
+    }
+  });
+
+  it('fits bundled loom, fletching bench, and potter wheel dumps to the current stations', async () => {
+    const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    const cases = [
+      ['loom', buildLoom],
+      ['fletch', buildFletchingBench],
+      ['potter', buildPotterWheel],
+    ];
+    for (const [id, build] of cases) {
+      const bundled = await loadFolder(byId[id]);
+      const want = new THREE.Box3().setFromObject(build()).getSize(new THREE.Vector3());
+      setBundledLook(id, bundled);
+      try {
+        const live = build();
+        assert.equal(live.name, id);
+        assertUniform(live);
+        assertGrounded(live);
+        const got = new THREE.Box3().setFromObject(live).getSize(new THREE.Vector3());
+        const scale = id === 'fletch' ? 1.5 : 1;
+        const wantMax = Math.max(want.x, want.y, want.z) * scale;
+        const gotMax = Math.max(got.x, got.y, got.z);
+        assert.ok(Math.abs(gotMax - wantMax) < 0.18, `${id} size ${gotMax} vs ${wantMax}`);
+      } finally {
+        setBundledLook(id, null);
+      }
     }
   });
 

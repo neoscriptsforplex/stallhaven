@@ -47,6 +47,9 @@
         <header class="ledger">
         <div class="minimap-wrap">
           <canvas id="minimap" class="minimap" width="196" height="196" aria-label="Shop map. Click to walk. Scroll to zoom."></canvas>
+          <div class="minimap-compass">
+            <button type="button" data-map-north aria-label="Reset camera">N</button>
+          </div>
           <div class="minimap-zoom">
             <button type="button" data-map-zoom="out" aria-label="Zoom map out">−</button>
             <button type="button" data-map-zoom="in" aria-label="Zoom map in">+</button>
@@ -58,7 +61,6 @@
         </div>
         <div class="ledger-row">
           <p id="gold" class="gold">Coins: 40</p>
-          <button type="button" id="upload-btn" title="Upload a .glb, .gltf, or .obj + .mtl">Upload</button>
         </div>
         <div id="active-craft" class="active-craft" hidden>
           <p data-active-craft-name>Crafting</p>
@@ -72,12 +74,29 @@
     <div id="help-modal" class="modal" hidden>
       <div class="sheet">
         <h2>Help</h2>
-        <p class="help-tip">Click the floor to walk — inside the shop and on the grass and path outside. Click the map above the shop XP bar to walk there too; scroll or use +/− to zoom the map. Click the anvil, furnace, range, chest, spinning wheel, or cauldron and you walk over first, then the window opens. Right-click furniture to move or rotate it. While placing or moving furniture, scroll the wheel to rotate in the same 15° steps as Rotate. Double-click a highlighted cell to confirm a new table, mannequin, shelf, spinning wheel, furnace, range, or cauldron. Scroll to zoom out for the roof and garden when you are not placing furniture.</p>
-        <p>The camera follows you. You can walk behind the counter — click the counter to stand on the shopkeeper side. Scroll or −/= to zoom; arrow keys or hold the middle mouse button and drag to change the angle. Zoom far out to see the roof and garden. Click an outdoor tree to walk over and chop Logs — the bar shows +N for each fill, same as mining. Right-click a tree for Chop. Click the outdoor trapdoor for a small dungeon; the wall ladder brings you back. In the dungeon, left-click an Essence boulder or an ore rock to walk over, swing a pickaxe, and fill a Mining bar. Each fill grants 5 Essence or 5 ore of that tier (Bronze through Dragon), with +N under the bar. Ore rocks share an olive-brown jagged body; only the vein changes colour (bronze copper, iron grey, steel light grey, mithril blue, adamantite green, runite light blue, dragon red). Essence stays pale. Right-click a boulder to read its name (Essence, Bronze Ore, Adamantite, Runite, …) and choose Mine. Ores and Essence do not restock for gold or refill on their own.</p>
-        <p>Click the anvil to smith Melee, Magic, Ranged, or Tools. Ranged has Weapons, Armour, and Ammo (arrows and cannonballs). Magic has Weapons, Armour, and Runes. Tools has Hatchet and Pickaxe (Bronze through Dragon, including Rune). Weapons, armour, and tools use metal bars. Each craft row has 1×, 5×, and Max — those count recipe actions (one arrow craft still makes 20). Cancel under the spinning preview stops a run and returns leftover actions (finished pieces stay). Place a furnace from Build (free) to smelt ores into bars. Higher bars unlock after enough smelts of the previous tier. Click a spinning wheel to turn flax into bow string (needed for every bow and crossbow). Place a cooking range from Build (free) for Food. Click a placed cauldron for Potions — the window matches the anvil (recipes on the left, preview on the right, materials along the bottom). Finished pieces land in the chest. Right-click the chest to upgrade its space, move, or rotate it.</p>
-        <p>Travelers line up at the counter. Click the one at the front to sell, offer a different chest item at a reduced price, craft what they asked for, refuse, or buy a scrap they offer.</p>
-        <p>Click a table or wall shelf to select it. Right-click a table or shelf and choose Display item… to place a chest ware. On a shelf, pick the item, then Top Left, Top Right, Bottom Left, or Bottom Right. If that slot is full, the old ware returns to the chest. Food and potions sit on wall shelves. Runes and arrows (and cannonballs) can sit on tables or on any of the four shelf slots. Right-click furniture for Move or Rotate — wares travel with the piece. Right-click a wall shelf, table, or mannequin for Delete. The first three shelves are included, so deleting one lets you place a replacement for free up to three. Up to two deleted tables and two deleted mannequins can be placed again for free. The counter only moves from a right-click.</p>
-        <p>The fullscreen button (top left of the toolbar) fills the window. Save and Load write a JSON file on your computer. The music-note button (right of Load) plays a playlist of included tracks — they start on load (or on the first click if the browser blocks autoplay), with Shuffle, Loop, Play, Pause, Skip, and Stop — and you can upload more MP3, WAV, or OGG files. The cog beside it opens Settings for the skybox, a Player Avatar: Customize panel, and cheat codes. Upload a .glb/.gltf, or multi-select an .obj with its .mtl (and maps), as Furniture, Ware, Player, or Customer. Clear uploads restores the default player, customers, and furniture. A custom Player mesh uses the same walk cycle as the stock keeper (leg and arm swing, or a bob if the file has no limbs) and still swings a pickaxe when you mine.</p>
+        <p class="help-copy">Controls:
+Use Left click (tap on phone) to move, right click (Double tap on phone) to open menus on items and upgrade them.
+Use middle mouse button or arrow keys to control the camera.
+
+The Goal:
+Use the Anvil to craft items or your townsfolk.
+You will need to cut down trees outside for wood and mine ores in the dungeon outside.
+
+Build crafting stations to help you make more items.
+In the build menu you can buy the below crafting stations:
+Furnace (smelt ores to bars)
+Cooking Range (make food)
+Fletching Bench (craft Bows, Arrows and Ammo)
+Spinning Wheel (turn flax into cloth or bowstring)
+Loom (craft armour)
+Cauldron (craft potions)
+
+Upgrade your shop after earning money.
+Buy more shelves, mannequins, tables and expand your shop!
+
+Save your game file before closing game.
+This will allow you to load it back again.
+</p>
         <button type="button" data-dismiss>Close</button>
       </div>
     </div>
@@ -227,16 +246,34 @@
         <button type="button" data-range-buy>Place · Free</button>
       </article>
       <article class="build-item">
+        <h3>Loom</h3>
+        <p>Weave flax into cloth, then ranged and magic armour. Place it on the floor snap grid, then confirm.</p>
+        <p data-loom-status class="meta">Costs 50,000 gp.</p>
+        <button type="button" data-loom-buy>Buy · 50,000 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Fletching Bench</h3>
+        <p>Craft ranged weapons and ammo. Place it on the floor snap grid, then confirm.</p>
+        <p data-fletch-status class="meta">Costs 50,000 gp.</p>
+        <button type="button" data-fletch-buy>Buy · 50,000 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Potter Wheel</h3>
+        <p>Turn soft clay into clay. Place it on the floor snap grid, then confirm.</p>
+        <p data-potter-status class="meta">Costs 50,000 gp.</p>
+        <button type="button" data-potter-buy>Buy · 50,000 gp</button>
+      </article>
+      <article class="build-item">
         <h3>Spinning Wheel</h3>
         <p>Spin flax into bow string. Place it on the floor snap grid, then confirm. The wheel turns while a string is spinning.</p>
-        <p data-wheel-status class="meta">Costs 500 gp.</p>
-        <button type="button" data-wheel-buy>Buy · 500 gp</button>
+        <p data-wheel-status class="meta">Costs 100,000 gp.</p>
+        <button type="button" data-wheel-buy>Buy · 100,000 gp</button>
       </article>
       <article class="build-item">
         <h3>Cauldron</h3>
         <p>Unlocks potion crafting. Place it on the floor snap grid, then confirm. Click it afterward to brew.</p>
-        <p data-cauldron-status class="meta">Costs 10,000 gp.</p>
-        <button type="button" data-cauldron-buy>Buy · 10,000 gp</button>
+        <p data-cauldron-status class="meta">Costs 1,000,000 gp.</p>
+        <button type="button" data-cauldron-buy>Buy · 1,000,000 gp</button>
       </article>
       <article class="build-item">
         <h3>Table</h3>
@@ -259,7 +296,7 @@
       <article class="build-item">
         <h3>Shop Expansion</h3>
         <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
-        <p data-expand-status class="meta">Next room costs 10,000g.</p>
+        <p data-expand-status class="meta">Next room costs 500,000g.</p>
         <button type="button" data-expand-buy>Place Room</button>
       </article>
       <button type="button" class="ghost" data-build-close>Close</button>
@@ -268,7 +305,7 @@
     <aside id="place-dock" class="expand-dock" hidden>
       <h2 data-place-title>Place Cauldron</h2>
       <p data-place-blurb>Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement.</p>
-      <p data-place-cost class="meta">Cost: 10,000 gp.</p>
+      <p data-place-cost class="meta">Cost: 1,000,000 gp.</p>
       <p data-place-note class="craft-note" hidden></p>
       <div class="row furn-row">
         <button type="button" data-place-confirm>Confirm Placement</button>
@@ -319,6 +356,11 @@
         <span data-dungeon-brightness-label>150%</span>
       </label>
       <p class="meta">Cave lighting only. 100% is the dungeon baseline; new shops start at 150% (slider max). Does not change the shop.</p>
+      <label class="settings-check">
+        <input type="checkbox" data-photo-mode />
+        Photo mode
+      </label>
+      <p class="meta">Hides shop customers and their speech bubbles.</p>
       <h3>Player Avatar</h3>
       <p class="meta">Hair, shirt, legs, boots, and face hair save with the shop.</p>
       <button type="button" data-look-open>Player Avatar: Customize</button>
@@ -443,6 +485,7 @@
       <button type="button" data-furn-upgrade hidden>Upgrade Chest</button>
       <button type="button" data-furn-display hidden>Display item…</button>
       <button type="button" data-furn-fill hidden>Fill</button>
+      <button type="button" data-furn-clear hidden>Clear display</button>
       <button type="button" data-furn-delete hidden>Delete</button>
       <button type="button" data-furn-move>Move Furniture</button>
       <button type="button" data-furn-rotate>Rotate 15°</button>

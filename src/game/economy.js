@@ -27,9 +27,11 @@ import {
   MASTERY_SPEED,
   normalizeAppearance,
   offerClassLabel,
+  isCraftHidden,
   offerClassOf,
   recipeCost,
   recipeList,
+  stationForRecipe,
   scheduleKingRoald,
 } from './catalog.js';
 import {
@@ -66,6 +68,7 @@ import {
   clampDungeonBrightness,
   readStoredBrightness,
   readStoredDungeonBrightness,
+  readStoredPhotoMode,
 } from './lighting.js';
 
 export {
@@ -176,8 +179,14 @@ export function applyCheat(state, raw) {
     return '-motherlode';
   }
   if (code === 'motherlode') {
-    state.gold = (state.gold ?? 0) + 10000;
+    state.gold = (state.gold ?? 0) + 1000000;
     return 'motherlode';
+  }
+  if (code === 'noob') {
+    cancelCrafts(state);
+    state.gold = START_GOLD;
+    state.craftCounts = {};
+    return 'noob';
   }
   if (code === 'freshstart') {
     const next = createState();
@@ -281,6 +290,7 @@ export function createState() {
     skybox: DEFAULT_SKYBOX,
     brightness: readStoredBrightness(),
     dungeonBrightness: readStoredDungeonBrightness(),
+    photoMode: readStoredPhotoMode(),
     chefHat: false,
     appearance: defaultAppearance(),
     playTime: 0,
@@ -295,6 +305,11 @@ export function craftCount(state, recipeId) {
 
 export function unlockRemaining(state, recipeId) {
   const recipe = RECIPES[recipeId];
+  if (recipe?.unlockAnyOf?.length) {
+    const need = recipe.unlockNeed ?? 0;
+    const best = Math.max(0, ...recipe.unlockAnyOf.map((id) => craftCount(state, id)));
+    return Math.max(0, need - best);
+  }
   if (!recipe?.previousId) return 0;
   return Math.max(0, (recipe.unlockNeed ?? 0) - craftCount(state, recipe.previousId));
 }
@@ -314,6 +329,13 @@ export function isUnlocked(state, recipeId) {
   if (recipe.category === 'food' && !ownsRange(state)) return false;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return false;
   if (recipe.category === 'spin' && !ownsWheel(state)) return false;
+  if (stationForRecipe(recipe) === 'loom' && !ownsStation(state, 'loom')) return false;
+  if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) return false;
+  if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) return false;
+  if (recipe.unlockAnyOf?.length) {
+    const need = recipe.unlockNeed ?? 0;
+    return recipe.unlockAnyOf.some((id) => craftCount(state, id) >= need);
+  }
   if (!recipe.previousId) return true;
   return craftCount(state, recipe.previousId) >= (recipe.unlockNeed ?? 0);
 }
@@ -321,6 +343,7 @@ export function isUnlocked(state, recipeId) {
 export function craftBlockReason(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 'Unknown recipe.';
+  if (isCraftHidden(recipe)) return 'That item cannot be crafted.';
   if (recipe.category === 'potion' && !ownsCauldron(state)) {
     return 'Place a cauldron from Build to brew potions.';
   }
@@ -332,6 +355,15 @@ export function craftBlockReason(state, recipeId) {
   }
   if (recipe.category === 'spin' && !ownsWheel(state)) {
     return 'Place a spinning wheel from Build to spin flax into bow string.';
+  }
+  if (stationForRecipe(recipe) === 'loom' && !ownsStation(state, 'loom')) {
+    return 'Place a loom from Build to weave cloth and armour.';
+  }
+  if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) {
+    return 'Place a fletching bench from Build to make ranged weapons and ammo.';
+  }
+  if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) {
+    return 'Place a Potter Wheel from Build to turn soft clay into clay.';
   }
   if (!isUnlocked(state, recipeId)) {
     const remain = unlockRemaining(state, recipeId);
@@ -348,6 +380,13 @@ export function craftBlockReason(state, recipeId) {
       const missing = need - have;
       const name = MATERIALS[materialId]?.name ?? materialId;
       return `Need ${missing} more ${name}.`;
+    }
+  }
+  for (const [itemId, need] of Object.entries(cost.items ?? {})) {
+    const have = chestCount(state, itemId);
+    if (have < need) {
+      const name = RECIPES[itemId]?.name ?? itemId;
+      return `Need ${need - have} more ${name}.`;
     }
   }
   return null;
@@ -379,16 +418,24 @@ export function canCraft(state, recipeId) {
 export function maxCraftActions(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 0;
+  if (isCraftHidden(recipe)) return 0;
   if (recipe.category === 'potion' && !ownsCauldron(state)) return 0;
   if (recipe.category === 'food' && !ownsRange(state)) return 0;
   if (recipe.category === 'smelt' && !ownsFurnace(state)) return 0;
   if (recipe.category === 'spin' && !ownsWheel(state)) return 0;
+  if (stationForRecipe(recipe) === 'loom' && !ownsStation(state, 'loom')) return 0;
+  if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) return 0;
+  if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) return 0;
   if (!isUnlocked(state, recipeId)) return 0;
   const cost = recipeCost(recipe);
   let max = Infinity;
   for (const [materialId, need] of Object.entries(cost.materials ?? {})) {
     if (!need) continue;
     max = Math.min(max, Math.floor((state.materials[materialId] ?? 0) / need));
+  }
+  for (const [itemId, need] of Object.entries(cost.items ?? {})) {
+    if (!need) continue;
+    max = Math.min(max, Math.floor(chestCount(state, itemId) / need));
   }
   if ((cost.gold || 0) > 0) {
     max = Math.min(max, Math.floor(state.gold / cost.gold));
@@ -410,6 +457,11 @@ function payCraftCost(state, recipe, times) {
   for (const [materialId, need] of Object.entries(cost.materials ?? {})) {
     state.materials[materialId] = (state.materials[materialId] ?? 0) - need * n;
   }
+  for (const [itemId, need] of Object.entries(cost.items ?? {})) {
+    const left = chestCount(state, itemId) - need * n;
+    if (left > 0) state.chest[itemId] = left;
+    else delete state.chest[itemId];
+  }
 }
 
 function refundCraftCost(state, recipe, times) {
@@ -418,6 +470,9 @@ function refundCraftCost(state, recipe, times) {
   state.gold += (cost.gold || 0) * n;
   for (const [materialId, need] of Object.entries(cost.materials ?? {})) {
     state.materials[materialId] = (state.materials[materialId] ?? 0) + need * n;
+  }
+  for (const [itemId, need] of Object.entries(cost.items ?? {})) {
+    addToChest(state, itemId, need * n);
   }
 }
 
@@ -732,6 +787,21 @@ function returnDisplayWares(state, display) {
   display.ware = null;
   display.slots = emptySlots();
   display.shelfSlots = display.kind === 'shelf' ? emptyShelfSlots() : null;
+}
+
+/** Clear a mannequin, table, or shelf. Table and shelf wares go back to the chest. */
+export function clearDisplay(state, index) {
+  const display = state.displays[index];
+  if (!display || display.removed) return false;
+  const kind = displayKind(index, state);
+  if (kind !== 'shelf' && kind !== 'table' && kind !== 'stand') return false;
+  if (kind === 'stand') {
+    display.ware = null;
+    display.slots = emptySlots();
+    return true;
+  }
+  returnDisplayWares(state, display);
+  return true;
 }
 
 export function removePlacedFurniture(state, index) {
@@ -1078,6 +1148,7 @@ export function serializeState(state) {
     skybox: skyboxId(state.skybox),
     brightness: clampBrightness(state.brightness),
     dungeonBrightness: clampDungeonBrightness(state.dungeonBrightness),
+    photoMode: Boolean(state.photoMode),
     chefHat: Boolean(state.chefHat),
     appearance: normalizeAppearance(state.appearance),
     playTime: Math.max(0, Number(state.playTime) || 0),
@@ -1229,6 +1300,7 @@ export function applyState(state, data) {
   next.dungeonBrightness = data.dungeonBrightness != null
     ? clampDungeonBrightness(data.dungeonBrightness)
     : DEFAULT_DUNGEON_BRIGHTNESS;
+  next.photoMode = typeof data.photoMode === 'boolean' ? data.photoMode : false;
   if (typeof data.chefHat === 'boolean') next.chefHat = data.chefHat;
   next.appearance = normalizeAppearance(data.appearance);
   if (typeof data.playTime === 'number' && Number.isFinite(data.playTime)) {
@@ -1276,6 +1348,16 @@ export function applyState(state, data) {
       wheel: data.furniture.wheel
         ? readPose(data.furniture.wheel, { ...SHOP.wheel, rot: FURNITURE_FORWARD })
         : null,
+      loom: data.furniture.loom
+        ? readPose(data.furniture.loom, { ...SHOP.loom, rot: FURNITURE_FORWARD })
+        : null,
+      fletch: data.furniture.fletch
+        ? readPose(data.furniture.fletch, { ...SHOP.fletch, rot: FURNITURE_FORWARD })
+        : null,
+      potter: data.furniture.potter
+        ? readPose(data.furniture.potter, { ...SHOP.potter, rot: FURNITURE_FORWARD })
+        : null,
+      rug: readPose(data.furniture.rug, defaults.rug),
       displays: next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {
           x: 0,
@@ -1313,6 +1395,7 @@ export function applyState(state, data) {
   state.skybox = next.skybox;
   state.brightness = next.brightness;
   state.dungeonBrightness = next.dungeonBrightness;
+  state.photoMode = next.photoMode;
   state.chefHat = next.chefHat;
   state.appearance = next.appearance;
   state.playTime = next.playTime;

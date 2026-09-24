@@ -1,0 +1,71 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib iron-spear.mtl
+o Item Iron spear 2026-09-24_13-41-08
+v 34 7 41
+v 34 2 41
+v 34 1 43
+v 34 10 43
+v 36 7 39
+v -56 7 -55
+v -59 7 -51
+v -59 0 -51
+v -56 0 -55
+v 36 2 39
+v 38 1 39
+v 46 5 50
+v 38 10 39
+usemtl c0
+f 1 2 3
+usemtl c1
+f 1 3 4
+usemtl c2
+f 1 4 5
+usemtl c3
+f 1 5 6
+usemtl c4
+f 1 6 7
+usemtl c5
+f 1 7 8
+usemtl c6
+f 1 8 2
+usemtl c7
+f 2 8 9
+usemtl c8
+f 2 9 10
+usemtl c9
+f 2 10 11
+usemtl c10
+f 2 11 3
+usemtl c11
+f 3 11 12
+usemtl c12
+f 3 12 12
+usemtl c13
+f 3 12 4
+usemtl c14
+f 4 12 13
+usemtl c15
+f 4 13 5
+usemtl c16
+f 5 13 10
+usemtl c17
+f 5 10 6
+usemtl c18
+f 6 10 9
+usemtl c19
+f 10 13 11
+usemtl c20
+f 11 13 12
+usemtl c21
+f 11 12 12
+usemtl c22
+f 12 12 13
+usemtl c23
+f 12 12 12
+f 12 12 12
+usemtl c10
+f 12 12 4
+usemtl c24
+f 7 8 9
+usemtl c25
+f 7 9 6

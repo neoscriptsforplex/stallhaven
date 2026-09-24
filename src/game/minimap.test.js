@@ -62,6 +62,23 @@ describe('minimap', () => {
     assert.ok(clickLeft.x < clickRight.x, 'clicking left should walk toward world −X');
   });
 
+  it('spins left/right the other way when the camera yaws, and clicks still match', () => {
+    const bounds = shopMapBounds([]);
+    const size = 196;
+    const cx = (bounds.minX + bounds.maxX) / 2;
+    const cz = (bounds.minZ + bounds.maxZ) / 2;
+    const yaw = 0.6;
+    const ahead = worldToMap(cx, cz + 2, bounds, size, yaw);
+    const center = worldToMap(cx, cz, bounds, size, yaw);
+    assert.ok(ahead.x < center.x, 'positive yaw should swing +Z toward the left');
+    const back = mapToWorld(ahead.x, ahead.y, bounds, size, yaw);
+    assert.ok(Math.abs(back.x - cx) < 1e-6);
+    assert.ok(Math.abs(back.z - (cz + 2)) < 1e-6);
+    const clickLeft = mapToWorld(size * 0.25, size * 0.5, bounds, size, yaw);
+    const clickRight = mapToWorld(size * 0.75, size * 0.5, bounds, size, yaw);
+    assert.ok(clickLeft.x < clickRight.x, 'a left click still walks to the lesser world X');
+  });
+
   it('clamps zoom to a usable range', () => {
     assert.equal(clampMapZoom(0), MAP_ZOOM_MIN);
     assert.equal(clampMapZoom(99), MAP_ZOOM_MAX);

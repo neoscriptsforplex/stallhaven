@@ -20,8 +20,9 @@ describe('player look UI', () => {
 
   it('documents middle-mouse orbit next to the existing arrow-key rotate', () => {
     const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
-    assert.match(help, /middle mouse button and drag/);
-    assert.match(help, /arrow keys/);
+    assert.match(help, /middle mouse button or arrow keys/);
+    assert.match(help, /Controls:/);
+    assert.match(help, /The Goal:/);
   });
 
   it('covers the canvas with a black loading bar until models are ready', () => {
@@ -46,7 +47,7 @@ describe('player look UI', () => {
     assert.match(build, /<h2>Build<\/h2>/);
     assert.equal(build.includes('<h2>Upgrade</h2>'), false);
     const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
-    assert.match(help, /from Build/);
+    assert.match(help, /build menu/);
     assert.equal(help.includes('from Upgrade'), false);
     const chest = slice(html, 'id="chest-upgrade-modal"', 'id="expand-dock"');
     assert.match(chest, /<h2>Upgrade Chest<\/h2>/);
@@ -55,7 +56,7 @@ describe('player look UI', () => {
 
   it('lists Build cards furnace-first and names the extra room Shop Expansion', () => {
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
-    const order = ['Furnace', 'Cooking Range', 'Spinning Wheel', 'Cauldron', 'Table', 'Shelf', 'Mannequin', 'Shop Expansion'];
+    const order = ['Furnace', 'Cooking Range', 'Loom', 'Fletching Bench', 'Potter Wheel', 'Spinning Wheel', 'Cauldron', 'Table', 'Shelf', 'Mannequin', 'Shop Expansion'];
     let last = -1;
     for (const label of order) {
       const at = build.indexOf(`<h3>${label}</h3>`);
@@ -68,7 +69,7 @@ describe('player look UI', () => {
   it('states furnace and range place/cost once on Build cards', () => {
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
     const furnace = build.slice(build.indexOf('Furnace'), build.indexOf('Cooking Range'));
-    const range = build.slice(build.indexOf('Cooking Range'), build.indexOf('Spinning Wheel'));
+    const range = build.slice(build.indexOf('Cooking Range'), build.indexOf('Loom'));
     assert.equal((furnace.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.equal((range.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.match(furnace, /data-furnace-status class="meta" hidden><\/p>/);
@@ -84,8 +85,8 @@ describe('player look UI', () => {
     const cauldron = build.slice(build.indexOf('Cauldron'), build.indexOf('Table'));
     assert.equal((wheel.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.equal((cauldron.match(/Place it on the floor snap grid/g) ?? []).length, 1);
-    assert.match(wheel, /data-wheel-status class="meta">Costs 500 gp\.</);
-    assert.match(cauldron, /data-cauldron-status class="meta">Costs 10,000 gp\.</);
+    assert.match(wheel, /data-wheel-status class="meta">Costs 100,000 gp\.</);
+    assert.match(cauldron, /data-cauldron-status class="meta">Costs 1,000,000 gp\.</);
   });
 
   it('does not show old buyer class names in Help', () => {
@@ -95,17 +96,18 @@ describe('player look UI', () => {
     assert.equal(help.includes('Hedge Mage'), false);
   });
 
-  it('names dungeon adamant rocks Adamantite in Help, not Adamant Ore', () => {
+  it('uses Luke\'s Help copy for controls, stations, and saving', () => {
     const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
-    assert.match(help, /Adamantite/);
-    assert.equal(help.includes('Adamant Ore'), false);
-  });
-
-  it('names runite rocks Runite in Help and gear Rune, not Rune Ore', () => {
-    const help = slice(html, 'id="help-modal"', 'id="chest-modal"');
-    assert.match(help, /Adamantite, Runite/);
-    assert.match(help, /including Rune/);
-    assert.equal(help.includes('Rune Ore'), false);
+    assert.match(help, /Use Left click \(tap on phone\) to move/);
+    assert.match(help, /right click \(Double tap on phone\) to open menus/);
+    assert.match(help, /Furnace \(smelt ores to bars\)/);
+    assert.match(help, /Cooking Range \(make food\)/);
+    assert.match(help, /Fletching Bench \(craft Bows, Arrows and Ammo\)/);
+    assert.match(help, /Spinning Wheel \(turn flax into cloth or bowstring\)/);
+    assert.match(help, /Loom \(craft armour\)/);
+    assert.match(help, /Cauldron \(craft potions\)/);
+    assert.match(help, /Save your game file before closing game\./);
+    assert.match(help, /This will allow you to load it back again\./);
   });
 
   it('keeps Settings to a Player Avatar Customize button, not look grids', () => {
@@ -113,6 +115,8 @@ describe('player look UI', () => {
     assert.match(settings, /<h3>Player Avatar<\/h3>/);
     assert.match(settings, /data-dungeon-brightness/);
     assert.match(settings, /Dungeon brightness/);
+    assert.match(settings, /data-photo-mode/);
+    assert.match(settings, /Photo mode/);
     assert.equal(settings.includes('data-look="hair"'), false);
     assert.equal(settings.includes('data-look="shirt"'), false);
     assert.equal(settings.includes('data-look="legs"'), false);

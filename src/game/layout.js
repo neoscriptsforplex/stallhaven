@@ -13,7 +13,7 @@ export const EXPANSION_PADS = [
   { id: 'right', gx: 1, gz: 0, label: 'Right' },
 ];
 
-export const FIRST_EXPANSION_COST = 10000;
+export const FIRST_EXPANSION_COST = 500000;
 export const EXPANSION_COST_MULT = 3;
 export const MAX_EXPANSIONS = 5;
 
@@ -65,13 +65,19 @@ export function furnitureVisualYaw(id, poseRot = FURNITURE_FORWARD) {
   return (poseRot ?? FURNITURE_FORWARD) + furnitureStartYaw(id);
 }
 export const SWAP_PRICE_RATIO = 0.65;
-export const CAULDRON_COST = 10000;
-export const WHEEL_COST = 500;
+export const CAULDRON_COST = 1000000;
+export const WHEEL_COST = 100000;
+export const LOOM_COST = 50000;
+export const FLETCH_COST = 50000;
+export const POTTER_COST = 50000;
 export const FURNACE_COST = 0;
 export const RANGE_COST = 0;
 export const STATION_UNLOCKS = [
   { id: 'furnace', label: 'Furnace', cost: FURNACE_COST },
   { id: 'range', label: 'Cooking Range', cost: RANGE_COST },
+  { id: 'loom', label: 'Loom', cost: LOOM_COST },
+  { id: 'fletch', label: 'Fletching Bench', cost: FLETCH_COST },
+  { id: 'potter', label: 'Potter Wheel', cost: POTTER_COST },
   { id: 'wheel', label: 'Spinning Wheel', cost: WHEEL_COST },
   { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
 ];
@@ -164,7 +170,7 @@ export function roomCenter(gx, gz) {
   return { x: gx * ROOM_W, z: 0.1 + gz * ROOM_D };
 }
 
-/** Origin-room rug: visual only. Never a nav / placement block. */
+/** Origin-room rug: walkable furniture. Never a nav block. */
 export const SHOP_RUG = { w: 2.35, d: 1.55, y: 0.11, zOffset: 0.15 };
 
 export function shopRugPose(gx = 0, gz = 0) {
@@ -342,9 +348,13 @@ export function furnitureHalfSize(kind) {
   if (kind === 'anvil') return { hw: 0.22, hd: 0.175 };
   if (kind === 'chest') return { hw: 0.3, hd: 0.22 };
   if (kind === 'range') return { hw: 0.68, hd: 0.56 };
+  if (kind === 'loom') return { hw: 0.48, hd: 0.36 };
+  if (kind === 'fletch') return { hw: 0.55, hd: 0.4 };
+  if (kind === 'potter') return { hw: 0.4, hd: 0.4 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
   if (kind === 'stand') return { hw: 0.36, hd: 0.36 };
+  if (kind === 'rug') return { hw: SHOP_RUG.w / 2, hd: SHOP_RUG.d / 2 };
   return { hw: 0.76, hd: 0.51 };
 }
 
@@ -400,6 +410,10 @@ export function defaultFurniture() {
     cauldron: null,
     furnace: null,
     wheel: null,
+    loom: null,
+    fletch: null,
+    potter: null,
+    rug: { x: shopRugPose().x, z: shopRugPose().z, rot: FURNITURE_FORWARD },
     displays: SHOP.displays.map((spot) => (
       (spot.kind ?? 'table') === 'shelf'
         ? snapToWallGrid(spot.x, spot.z, [])
@@ -422,6 +436,10 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     cauldron: clonePose(furniture.cauldron),
     furnace: clonePose(furniture.furnace),
     wheel: clonePose(furniture.wheel),
+    loom: clonePose(furniture.loom),
+    fletch: clonePose(furniture.fletch),
+    potter: clonePose(furniture.potter),
+    rug: { ...(furniture.rug ?? defaults.rug) },
     displays: (furniture.displays ?? defaults.displays).map((pose) => ({ ...pose })),
   };
 }
@@ -446,6 +464,16 @@ export function cobblePathSpan(expansionIds = []) {
     minZ: PATH_START_Z,
     maxZ: grass.maxZ - 0.16,
   };
+}
+
+/**
+ * How far the straight path must run past the ring's outer tangent so both
+ * side edges sit under the round cobble. The ring is wider than the path, so
+ * stopping at the outer radius leaves a grass gap on each side.
+ */
+export function cobbleRingTuck(apron = FOUNTAIN.apron ?? 1.42, halfW = PATH_HALF_W) {
+  const side = Math.sqrt(Math.max(0, apron * apron - halfW * halfW));
+  return (apron - side) + 0.14;
 }
 
 export function pointHitsShop(x, z, expansionIds = [], pad = 1.15) {

@@ -44,6 +44,7 @@ import {
   playerWalkFloors,
   pointHitsShop,
   pointOnFloors,
+  SHOP_RUG,
   snapToFloor,
   snapToWallGrid,
   placeFloors,
@@ -93,7 +94,7 @@ import {
   PLAYER_WORLD_SCALE,
   UPLOADED_PLAYER_HEIGHT,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFurnace, buildRange, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFletchingBench, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRug, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 
@@ -108,6 +109,32 @@ const CAM_ORBIT_PITCH = 0.0036;
 export const TOUCH_LONG_PRESS_MS = 2000;
 /** Movement past this cancels the hold and starts camera orbit. */
 export const TOUCH_HOLD_MOVE_PX = 8;
+/** Second tap inside this window opens the right-click menu. */
+export const TOUCH_DOUBLE_TAP_MS = 280;
+/** Second tap must land near the first. */
+export const TOUCH_DOUBLE_TAP_PX = 28;
+
+export function isCanvasDoubleTap(prev, next, now = 0) {
+  if (!prev || !next) return false;
+  const dt = now - (prev.t ?? 0);
+  if (dt < 0 || dt > TOUCH_DOUBLE_TAP_MS) return false;
+  const dist = Math.hypot(
+    (next.x ?? next.clientX ?? 0) - (prev.x ?? prev.clientX ?? 0),
+    (next.y ?? next.clientY ?? 0) - (prev.y ?? prev.clientY ?? 0),
+  );
+  return dist <= TOUCH_DOUBLE_TAP_PX;
+}
+
+/** Fingers moving apart returns a positive delta (zoom in). */
+export function pinchSpanDelta(prevDist, nextDist) {
+  if (!(prevDist > 0) || !(nextDist > 0)) return 0;
+  return nextDist - prevDist;
+}
+
+export function applyPinchZoom(cam, delta, scale = 0.02) {
+  cam.distance -= delta * scale;
+  return cam;
+}
 
 /** Middle-mouse on desktop; one-finger canvas swipe on touch after a small move. */
 export function canvasPointerStartsCamOrbit(event, flags = {}) {
@@ -129,6 +156,17 @@ export function applyCanvasOrbitDelta(cam, dx, dy) {
   cam.pitch -= dy * CAM_ORBIT_PITCH;
   return cam;
 }
+export const DEFAULT_CAM = Object.freeze({ yaw: -0.06, pitch: 0.62, distance: 6.85 });
+
+/** Put the follow camera back on the pose used when a shop first loads. */
+export function resetCamPose(cam) {
+  if (!cam) return cam;
+  cam.yaw = DEFAULT_CAM.yaw;
+  cam.pitch = DEFAULT_CAM.pitch;
+  cam.distance = DEFAULT_CAM.distance;
+  return cam;
+}
+
 const CAM_ZOOM_STEP = 0.38;
 const CAM_MIN_DISTANCE = 2.05;
 const CAM_MAX_DISTANCE = 25.8;
@@ -195,17 +233,17 @@ export function createWorld(canvas, state, opts = {}) {
   applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
 
   const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.08, 180);
-  const cam = {
-    yaw: -0.06,
-    pitch: 0.62,
-    distance: 6.85,
-  };
+  const cam = resetCamPose({});
   const camLook = new THREE.Vector3(SHOP.keeper.x, 0.95, SHOP.keeper.z);
   const camHeld = { left: false, right: false, up: false, down: false };
   let camDrag = null;
   const canvasTouches = new Set();
+  const touchPoints = new Map();
   let multiTouch = false;
   let touchHold = null;
+  let lastCanvasTap = null;
+  let pendingTapTimer = null;
+  let pinchDist = 0;
   camera.position.set(SHOP.cameraStart.x, SHOP.cameraStart.y, SHOP.cameraStart.z);
   camera.lookAt(camLook);
 
@@ -407,7 +445,23 @@ export function createWorld(canvas, state, opts = {}) {
   scene.add(wheelMesh);
   const wheelPick = makePick(STATION_HIT.wheel.w, STATION_HIT.wheel.h, STATION_HIT.wheel.d, 'wheel');
 
-  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel'];
+  const rugMesh = buildRug();
+  scene.add(rugMesh);
+  const rugPick = makePick(SHOP_RUG.w, 0.28, SHOP_RUG.d, 'rug');
+
+  const loomMesh = buildLoom();
+  scene.add(loomMesh);
+  const loomPick = makePick(STATION_HIT.loom.w, STATION_HIT.loom.h, STATION_HIT.loom.d, 'loom');
+
+  const fletchMesh = buildFletchingBench();
+  scene.add(fletchMesh);
+  const fletchPick = makePick(STATION_HIT.fletch.w, STATION_HIT.fletch.h, STATION_HIT.fletch.d, 'fletch');
+
+  const potterMesh = buildPotterWheel();
+  scene.add(potterMesh);
+  const potterPick = makePick(STATION_HIT.potter.w, STATION_HIT.potter.h, STATION_HIT.potter.d, 'potter');
+
+  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel', 'loom', 'fletch', 'potter'];
 
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
@@ -417,6 +471,10 @@ export function createWorld(canvas, state, opts = {}) {
     cauldron: { mesh: cauldronMesh, pick: cauldronPick, glow: null, pickY: STATION_HIT.cauldron.pickY },
     furnace: { mesh: furnaceMesh, pick: furnacePick, glow: null, pickY: STATION_HIT.furnace.pickY },
     wheel: { mesh: wheelMesh, pick: wheelPick, glow: null, pickY: STATION_HIT.wheel.pickY },
+    loom: { mesh: loomMesh, pick: loomPick, glow: null, pickY: STATION_HIT.loom.pickY },
+    fletch: { mesh: fletchMesh, pick: fletchPick, glow: null, pickY: STATION_HIT.fletch.pickY },
+    potter: { mesh: potterMesh, pick: potterPick, glow: null, pickY: STATION_HIT.potter.pickY },
+    rug: { mesh: rugMesh, pick: rugPick, glow: null, pickY: 0.18 },
   };
 
   function applyFixturePose(id) {
@@ -792,6 +850,7 @@ export function createWorld(canvas, state, opts = {}) {
       rangePick,
       ...UNLOCK_STATIONS.filter((id) => state.furniture[id]).map((id) => fixtureMeshes[id].pick),
       counterPick,
+      ...(state.furniture.rug ? [rugPick] : []),
       ...extra,
       ...shopUsePicks(),
       ...customers
@@ -809,6 +868,7 @@ export function createWorld(canvas, state, opts = {}) {
     };
     groundGroup?.children.forEach(add);
     architecture?.traverse((child) => add(child));
+    fixtureMeshes.rug?.mesh?.traverse((child) => add(child));
     return list;
   }
 
@@ -1133,6 +1193,7 @@ export function createWorld(canvas, state, opts = {}) {
   renderer.domElement.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'touch') {
       canvasTouches.add(event.pointerId);
+      touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (canvasTouches.size > 1) {
         camDrag = null;
         multiTouch = true;
@@ -1190,7 +1251,9 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = placeKindOf(target);
     const skip = target.id === 'display' ? { id: 'display', index: target.index } : { id: target.id };
     const blocks = liveObstacles(state, SHOP, skip);
-    return placementBlocked(pose, kind, blocks, placeRects, { checkAisle: kind !== 'counter' });
+    return placementBlocked(pose, kind, blocks, placeRects, {
+      checkAisle: kind !== 'counter' && kind !== 'rug',
+    });
   }
 
   function visualPlacePose() {
@@ -1270,7 +1333,11 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function releaseCanvasPointer(event) {
-    if (event?.pointerType === 'touch') canvasTouches.delete(event.pointerId);
+    if (event?.pointerType === 'touch') {
+      canvasTouches.delete(event.pointerId);
+      touchPoints.delete(event.pointerId);
+    }
+    if (canvasTouches.size < 2) pinchDist = 0;
     if (canvasTouches.size === 0) multiTouch = false;
     if (event?.button === 1 || camDrag?.pointerId === event?.pointerId) camDrag = null;
     if (touchHold && (event?.pointerId == null || touchHold.pointerId === event.pointerId)) {
@@ -1278,15 +1345,7 @@ export function createWorld(canvas, state, opts = {}) {
     }
   }
 
-  renderer.domElement.addEventListener('pointerup', (event) => {
-    try {
-    if (touchHold?.fired) return;
-    if (event.button !== 0) return;
-    if (performance.now() < ignorePicksUntil) return;
-    if (multiTouch) return;
-    if (modalBlocksWorld() && !moveTarget && !expandMode) return;
-    const held = performance.now() - pointerDown.t;
-    const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+  function finishCanvasClick(event, held, moved) {
     if (moveTarget) {
       const point = floorPointFromEvent(event);
       if (point) {
@@ -1427,12 +1486,60 @@ export function createWorld(canvas, state, opts = {}) {
         refreshSelection(true);
       }
     }
+  }
+
+  renderer.domElement.addEventListener('pointerup', (event) => {
+    try {
+    if (touchHold?.fired) return;
+    if (event.button !== 0) return;
+    if (performance.now() < ignorePicksUntil) return;
+    if (multiTouch) return;
+    if (modalBlocksWorld() && !moveTarget && !expandMode) return;
+    const held = performance.now() - pointerDown.t;
+    const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+    if (event.pointerType === 'touch' && moved <= TOUCH_HOLD_MOVE_PX && !moveTarget && !expandMode) {
+      if (pendingTapTimer) {
+        clearTimeout(pendingTapTimer);
+        pendingTapTimer = null;
+      }
+      const tapPoint = { x: event.clientX, y: event.clientY, t: performance.now() };
+      if (isCanvasDoubleTap(lastCanvasTap, tapPoint, tapPoint.t)) {
+        lastCanvasTap = null;
+        openCanvasContextAt(event);
+        ignorePicksUntil = performance.now() + 450;
+        return;
+      }
+      lastCanvasTap = tapPoint;
+      const tapEvent = { clientX: event.clientX, clientY: event.clientY, button: 0, pointerType: 'mouse' };
+      const heldNow = held;
+      pendingTapTimer = setTimeout(() => {
+        pendingTapTimer = null;
+        finishCanvasClick(tapEvent, heldNow, 0);
+      }, TOUCH_DOUBLE_TAP_MS);
+      return;
+    }
+    finishCanvasClick(event, held, moved);
     } finally {
       releaseCanvasPointer(event);
     }
   });
 
   renderer.domElement.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'touch') {
+      touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touchPoints.size >= 2) {
+        const pts = [...touchPoints.values()];
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        const delta = pinchSpanDelta(pinchDist, dist);
+        if (delta) {
+          applyPinchZoom(cam, delta);
+          clampCam();
+        }
+        pinchDist = dist;
+        camDrag = null;
+        return;
+      }
+    }
     if (touchHold && touchHold.pointerId === event.pointerId && !touchHold.fired) {
       if (canvasPointerMovedPastHold(touchHold, event)) {
         clearTimeout(touchHold.timer);
@@ -1482,6 +1589,17 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     const picked = hitFurniture(hits);
+    const rugContext = hits.find((hit) => hit.object.userData.kind === 'rug');
+    if (!picked && rugContext && state.furniture.rug) {
+      playClick('ui');
+      pickHandler?.({
+        type: 'furn-menu',
+        furniture: { id: 'rug' },
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      return;
+    }
     if (!picked) return;
     const data = picked.object.userData;
     if (data.kind === 'boulder') {
@@ -1891,8 +2009,17 @@ export function createWorld(canvas, state, opts = {}) {
     return count === 1 ? [first] : [first, second];
   }
 
+  function customersShown() {
+    return sceneMode === 'shop' && !state.photoMode;
+  }
+
+  function applyCustomerVisibility() {
+    const on = customersShown();
+    for (const actor of customers) actor.mesh.visible = on;
+  }
+
   function spawnCustomer(now) {
-    if (sceneMode !== 'shop') return;
+    if (!customersShown()) return;
     const inShop = customers.filter((actor) => actor.state !== 'leave').length;
     if (inShop >= MAX_CUSTOMERS) return;
     if (!state.kingRoaldAt) state.kingRoaldAt = scheduleKingRoald(state.playTime ?? 0);
@@ -1964,6 +2091,7 @@ export function createWorld(canvas, state, opts = {}) {
       royal: Boolean(request.royal),
     };
     customerSerial += 1;
+    actor.mesh.visible = customersShown();
     customers.push(actor);
     nextSpawnAt = now + SPAWN_GAP_MIN + Math.random() * (SPAWN_GAP_MAX - SPAWN_GAP_MIN);
     if (typeId === 'kingroald') {
@@ -2089,6 +2217,7 @@ export function createWorld(canvas, state, opts = {}) {
           }
         }
       }
+      actor.mesh.visible = customersShown();
     }
   }
 
@@ -2164,7 +2293,7 @@ export function createWorld(canvas, state, opts = {}) {
         const hand = actor.mesh.userData.hand ?? actor.mesh;
         hand.add(carried);
       }
-      actor.mesh.visible = sceneMode === 'shop';
+      actor.mesh.visible = customersShown();
       scene.add(actor.mesh);
     }
   }
@@ -2191,7 +2320,7 @@ export function createWorld(canvas, state, opts = {}) {
       });
     }
     customers.forEach((actor) => {
-      actor.mesh.visible = on;
+      actor.mesh.visible = on && !state.photoMode;
     });
     goblins.forEach((gob) => {
       gob.mesh.visible = on;
@@ -2440,6 +2569,9 @@ export function createWorld(canvas, state, opts = {}) {
       state.skybox = id;
       applySkyColor(scene, skyIdForScene(sceneMode, id));
     },
+    resetCamera() {
+      resetCamPose(cam);
+    },
     setBrightness(value) {
       state.brightness = clampBrightness(value);
       syncLighting(sceneMode);
@@ -2449,6 +2581,11 @@ export function createWorld(canvas, state, opts = {}) {
       state.dungeonBrightness = clampDungeonBrightness(value);
       syncLighting(sceneMode);
       return state.dungeonBrightness;
+    },
+    setPhotoMode(on) {
+      state.photoMode = Boolean(on);
+      applyCustomerVisibility();
+      return state.photoMode;
     },
     setChefHat(on) {
       state.chefHat = Boolean(on);
@@ -2586,6 +2723,10 @@ export function createWorld(canvas, state, opts = {}) {
       replaceFixture('anvil', buildAnvil);
       replaceFixture('cauldron', buildCauldron);
       replaceFixture('wheel', buildSpinningWheel);
+      replaceFixture('loom', buildLoom);
+      replaceFixture('fletch', buildFletchingBench);
+      replaceFixture('potter', buildPotterWheel);
+      replaceFixture('rug', buildRug);
       try {
         const nextDoor = buildShopDoor();
         nextDoor.visible = shopDoor.visible;

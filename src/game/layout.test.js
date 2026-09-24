@@ -40,9 +40,11 @@ import {
   gardenGrassClusters,
   gardenBox,
   cobblePathSpan,
+  cobbleRingTuck,
   keepFountain,
   keepGardenSpot,
   FOUNTAIN,
+  SHOP_RUG,
   shopRugPose,
   shopRugRect,
   occupiedCells,
@@ -79,10 +81,10 @@ describe('layout numbers', () => {
     assert.ok(EXPANSION_PADS.some((p) => p.id === 'right' && p.gx === 1 && p.gz === 0));
   });
 
-  it('prices expansions 10000 then ×3, and chest 500 then ×3', () => {
-    assert.equal(expansionCost(0), 10000);
-    assert.equal(expansionCost(1), 30000);
-    assert.equal(expansionCost(2), 90000);
+  it('prices expansions 500000 then ×3, and chest 500 then ×3', () => {
+    assert.equal(expansionCost(0), 500000);
+    assert.equal(expansionCost(1), 1500000);
+    assert.equal(expansionCost(2), 4500000);
     assert.equal(chestUpgradeCost(1), 500);
     assert.equal(chestUpgradeCost(2), 1500);
     assert.equal(furnitureBuyCost(0), 500);
@@ -155,6 +157,13 @@ describe('layout numbers', () => {
     assert.equal(furniture.cauldron, null);
     assert.equal(furniture.furnace, null);
     assert.equal(furniture.wheel, null);
+    assert.equal(furniture.loom, null);
+    assert.equal(furniture.fletch, null);
+    assert.equal(furniture.potter, null);
+    assert.equal(furniture.rug.rot, FURNITURE_FORWARD);
+    assert.equal(furniture.rug.x, shopRugPose().x);
+    assert.equal(furniture.rug.z, shopRugPose().z);
+    assert.deepEqual(furnitureHalfSize('rug'), { hw: SHOP_RUG.w / 2, hd: SHOP_RUG.d / 2 });
   });
 
   it('keeps the spinning wheel footprint at half the prior 4× live size', () => {
@@ -228,8 +237,8 @@ describe('layout numbers', () => {
     const right = gardenTreeSpots(['right']);
     assert.equal(right.some((spot) => spot.side === 'right' || spot.side === 'front-right'), false);
     assert.ok(right.some((spot) => spot.side === 'left'));
-    assert.equal(WHEEL_COST, 500);
-    assert.equal(CAULDRON_COST, 10000);
+    assert.equal(WHEEL_COST, 100000);
+    assert.equal(CAULDRON_COST, 1000000);
   });
 
   it('keeps the cobble path on the grass tile and puts the fountain mid-path', () => {
@@ -248,6 +257,10 @@ describe('layout numbers', () => {
     assert.ok(FOUNTAIN.x + apron <= grass.maxX);
     assert.ok(FOUNTAIN.z - apron >= path.minZ);
     assert.ok(FOUNTAIN.z + apron <= path.maxZ);
+    const tuck = cobbleRingTuck();
+    const side = Math.sqrt(apron * apron - PATH_HALF_W * PATH_HALF_W);
+    assert.ok(tuck > apron - side, 'straight path should pass the side intersection');
+    assert.ok(FOUNTAIN.z - apron + tuck < FOUNTAIN.z - (FOUNTAIN.radius + 0.04));
     assert.ok(FOUNTAIN.z + apron <= grass.maxZ);
   });
 

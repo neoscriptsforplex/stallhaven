@@ -181,6 +181,12 @@ export function applyCheat(state, raw) {
     state.gold = (state.gold ?? 0) + 1000000;
     return 'motherlode';
   }
+  if (code === 'noob') {
+    cancelCrafts(state);
+    state.gold = START_GOLD;
+    state.craftCounts = {};
+    return 'noob';
+  }
   if (code === 'freshstart') {
     const next = createState();
     for (const key of Object.keys(next)) {

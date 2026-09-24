@@ -156,6 +156,17 @@ export function applyCanvasOrbitDelta(cam, dx, dy) {
   cam.pitch -= dy * CAM_ORBIT_PITCH;
   return cam;
 }
+export const DEFAULT_CAM = Object.freeze({ yaw: -0.06, pitch: 0.62, distance: 6.85 });
+
+/** Put the follow camera back on the pose used when a shop first loads. */
+export function resetCamPose(cam) {
+  if (!cam) return cam;
+  cam.yaw = DEFAULT_CAM.yaw;
+  cam.pitch = DEFAULT_CAM.pitch;
+  cam.distance = DEFAULT_CAM.distance;
+  return cam;
+}
+
 const CAM_ZOOM_STEP = 0.38;
 const CAM_MIN_DISTANCE = 2.05;
 const CAM_MAX_DISTANCE = 25.8;
@@ -222,11 +233,7 @@ export function createWorld(canvas, state, opts = {}) {
   applySkyColor(scene, state.skybox ?? DEFAULT_SKYBOX);
 
   const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.08, 180);
-  const cam = {
-    yaw: -0.06,
-    pitch: 0.62,
-    distance: 6.85,
-  };
+  const cam = resetCamPose({});
   const camLook = new THREE.Vector3(SHOP.keeper.x, 0.95, SHOP.keeper.z);
   const camHeld = { left: false, right: false, up: false, down: false };
   let camDrag = null;
@@ -2550,6 +2557,9 @@ export function createWorld(canvas, state, opts = {}) {
     setSkybox(id) {
       state.skybox = id;
       applySkyColor(scene, skyIdForScene(sceneMode, id));
+    },
+    resetCamera() {
+      resetCamPose(cam);
     },
     setBrightness(value) {
       state.brightness = clampBrightness(value);

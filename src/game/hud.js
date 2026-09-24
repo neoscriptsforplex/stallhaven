@@ -162,6 +162,7 @@ export function bindHud(root, state, world) {
   let inspectTarget = null;
   const minimap = document.querySelector('#minimap');
   const minimapWrap = document.querySelector('.minimap-wrap');
+  const mapNorth = document.querySelector('[data-map-north]');
   const mapZoomIn = document.querySelector('[data-map-zoom="in"]');
   const mapZoomOut = document.querySelector('[data-map-zoom="out"]');
   let mapZoom = 1;
@@ -2356,6 +2357,11 @@ export function bindHud(root, state, world) {
     event.preventDefault();
     bumpMapZoom(event.deltaY > 0 ? 1 / 1.12 : 1.12);
   }, { passive: false });
+  mapNorth?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    world.resetCamera?.();
+    render(performance.now() / 1000);
+  });
   mapZoomIn?.addEventListener('click', (event) => {
     event.stopPropagation();
     bumpMapZoom(1.16);

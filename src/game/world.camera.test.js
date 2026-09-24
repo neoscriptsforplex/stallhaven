@@ -5,7 +5,9 @@ import {
   TOUCH_DOUBLE_TAP_PX,
   TOUCH_HOLD_MOVE_PX,
   TOUCH_LONG_PRESS_MS,
+  DEFAULT_CAM,
   applyCanvasOrbitDelta,
+  resetCamPose,
   applyPinchZoom,
   canvasPointerMovedPastHold,
   canvasPointerStartsCamOrbit,
@@ -14,6 +16,13 @@ import {
 } from './world.js';
 
 describe('canvas camera orbit pointers', () => {
+  it('resets the follow camera to the load pose', () => {
+    const cam = resetCamPose({ yaw: 2, pitch: 1, distance: 20 });
+    assert.equal(cam.yaw, DEFAULT_CAM.yaw);
+    assert.equal(cam.pitch, DEFAULT_CAM.pitch);
+    assert.equal(cam.distance, DEFAULT_CAM.distance);
+  });
+
   it('orbits on desktop middle-mouse and one-finger canvas swipe after a small move', () => {
     assert.equal(canvasPointerStartsCamOrbit({ button: 1, pointerType: 'mouse' }), true);
     assert.equal(canvasPointerStartsCamOrbit({ button: 0, pointerType: 'touch' }), false);

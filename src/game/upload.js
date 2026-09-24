@@ -218,7 +218,7 @@ export function parseModelBuffer(buffer, name, sidecars = {}) {
   });
 }
 
-export const FOUNTAIN_DUMP_REV = 'blender-4e9b2aee';
+export const FOUNTAIN_DUMP_REV = 'blender-4e9b2aee-overwrite';
 
 export const BUNDLED_PLAYER_DIR = 'models/player';
 

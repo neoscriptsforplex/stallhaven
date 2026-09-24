@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
@@ -549,9 +550,13 @@ describe('bundled prop swaps', () => {
   });
 
   it('force-replaces the outdoor fountain with the Blender dump and keeps its footprint', async () => {
-    const objText = readFileSync(join(modelsRoot, 'fountain', 'fountain.obj'), 'utf8');
+    const objPath = join(modelsRoot, 'fountain', 'fountain.obj');
+    const objText = readFileSync(objPath, 'utf8');
     assert.match(objText, /Blender/);
     assert.match(objText, /Object_Fountain_2026-09-12/);
+    const sha = createHash('sha256').update(readFileSync(objPath)).digest('hex');
+    assert.ok(sha.startsWith('4e9b2aee804dc814'), `fountain.obj sha ${sha.slice(0, 16)}`);
+    assert.match(FOUNTAIN_DUMP_REV, /4e9b2aee/);
     const fountainEntry = BUNDLED_PROP_FOLDERS.find((item) => item.id === 'fountain');
     assert.equal(fountainEntry?.folder, 'fountain');
     assert.equal(fountainEntry?.rev, FOUNTAIN_DUMP_REV);

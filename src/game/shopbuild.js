@@ -1269,6 +1269,7 @@ export function tickFountainWater(root, now) {
 export function buildFountain() {
   const group = new THREE.Group();
   group.name = 'fountain';
+  // Outdoor mesh is public/models/fountain/fountain.obj (Blender Object_Fountain_2026-09-12).
   const bundled = getBundledLook('fountain');
   if (bundled) {
     const target = buildProceduralFountain();

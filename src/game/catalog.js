@@ -252,7 +252,7 @@ export const MATERIALS = {
   adamant: { id: 'adamant', name: 'Adamantite', restock: 0, start: 0, tier: 5, regenEvery: 0 },
   runite: { id: 'runite', name: 'Runite Ore', restock: 0, start: 0, tier: 6, regenEvery: 0 },
   dragon: { id: 'dragon', name: 'Dragon Ore', restock: 0, start: 0, tier: 7, regenEvery: 0 },
-  logs: { id: 'logs', name: 'Logs', restock: 0, start: 8, tier: 1, regenEvery: 0 },
+  logs: { id: 'logs', name: 'Logs', restock: 0, start: 0, tier: 1, regenEvery: 0 },
   flax: { id: 'flax', name: 'Flax', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
   bow_string: {
     id: 'bow_string',

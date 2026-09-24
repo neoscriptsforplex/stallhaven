@@ -140,7 +140,7 @@ describe('stall economy', () => {
     assert.equal(state.materials.bow_string, 0);
     assert.equal(state.materials.flax, 8);
     assert.equal(state.materials.flour, 10);
-    assert.equal(state.materials.logs, 8);
+    assert.equal(state.materials.logs, 0);
     assert.equal(state.materials.hide, 8);
     assert.equal(state.materials.herbs, 8);
     assert.equal(state.materials.water, 12);
@@ -837,9 +837,13 @@ describe('material regen', () => {
     assert.equal(state.materials.runite, 250);
     assert.equal(grantMinedMaterial(state, 'flour'), 0);
     assert.equal(CHOP_YIELD, 5);
+    assert.equal(MATERIALS.logs.start, 0);
+    assert.equal(MATERIALS.logs.restock, 0);
+    assert.equal(MATERIALS.logs.regenEvery, 0);
     const logsBefore = state.materials.logs;
+    assert.equal(logsBefore, 0);
     assert.equal(grantChoppedLogs(state), 5);
-    assert.equal(state.materials.logs, logsBefore + 5);
+    assert.equal(state.materials.logs, 5);
   });
 
   it('does not regenerate or restock metal bars or bow string', () => {

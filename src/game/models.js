@@ -1155,6 +1155,7 @@ export function slotPose(slot) {
   if (slot === 'legs') return { x: 0, y: 0.32, z: 0 };
   if (slot === 'boots') return { x: 0, y: 0.08, z: 0.02 };
   if (slot === 'gloves') return { x: 0.24, y: 0.74, z: 0.04 };
+  if (slot === 'shield') return { x: 0.46, y: 0.72, z: 0.06 };
   return { x: 0, y: 0.62, z: 0 };
 }
 

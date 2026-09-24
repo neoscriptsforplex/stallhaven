@@ -155,8 +155,8 @@ describe('stall economy', () => {
     assert.equal(canCraft(state, 'bread'), true);
     assert.equal(startCraft(state, 'bread', 0), true);
     assert.equal(state.materials.flour, 9);
-    assert.deepEqual(completeCrafts(state, 2.9), []);
-    assert.deepEqual(completeCrafts(state, 3), ['bread']);
+    assert.deepEqual(completeCrafts(state, 1.9), []);
+    assert.deepEqual(completeCrafts(state, 2), ['bread']);
     assert.equal(state.chest.bread, 1);
     assert.equal(state.craftCounts.bread, 1);
     assert.equal(state.displays.every((d) => !d.ware), true);
@@ -274,7 +274,7 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'smelt_bronze'), true);
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
-    assert.equal(isUnlocked(state, 'mystic_staff'), false);
+    assert.equal(isUnlocked(state, 'magic_staff_air'), false);
     assert.equal(isUnlocked(state, 'green_dhide_body'), false);
     assert.equal(isUnlocked(state, 'pizza'), false);
     assert.equal(isUnlocked(state, 'salmon'), false);
@@ -512,15 +512,15 @@ describe('customer trade', () => {
     finishCraft(state, 'bread');
     finishCraft(state, 'bronze_sword');
     finishCraft(state, 'staff');
-    finishCraft(state, 'bronze_shortbow');
+    finishCraft(state, 'shortbow');
     const melee = offerChoices(state, 'bronze_scimitar').map((choice) => choice.recipeId);
     assert.deepEqual(melee, ['bronze_sword']);
     const food = offerChoices(state, 'pizza').map((choice) => choice.recipeId);
     assert.deepEqual(food, ['bread']);
-    const magic = offerChoices(state, 'mystic_staff').map((choice) => choice.recipeId);
+    const magic = offerChoices(state, 'magic_staff_air').map((choice) => choice.recipeId);
     assert.deepEqual(magic, ['staff']);
-    const ranged = offerChoices(state, 'bronze_longbow').map((choice) => choice.recipeId);
-    assert.deepEqual(ranged, ['bronze_shortbow']);
+    const ranged = offerChoices(state, 'longbow').map((choice) => choice.recipeId);
+    assert.deepEqual(ranged, ['shortbow']);
     assert.equal(offerClassOf(RECIPES.staff), 'magic');
     assert.equal(offerChoices(state, 'bread').length, 0);
   });
@@ -581,23 +581,24 @@ describe('catalog', () => {
 
   it('covers the full melee, magic, range, and food catalog', () => {
     const recipes = recipeList();
-    assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'weapon').length, 49);
-    assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'armour').length, 56);
-    assert.equal(recipes.filter((r) => r.shape?.startsWith('staff')).length, 5);
-    assert.equal(recipes.filter((r) => r.combatClass === 'magic' && r.category === 'armour').length, 25);
-    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 35);
+    assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'weapon').length, 42);
+    assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'armour').length, 55);
+    assert.equal(recipes.filter((r) => r.shape?.startsWith('staff')).length, 14);
+    assert.equal(recipes.filter((r) => r.combatClass === 'magic' && r.category === 'armour').length, 28);
+    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 26);
     assert.equal(recipes.filter((r) => r.category === 'ammo').length, 8);
     assert.equal(recipes.filter((r) => r.category === 'rune').length, 4);
     assert.equal(recipes.filter((r) => r.combatClass === 'tools').length, 14);
-    assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 20);
+    assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 16);
     assert.deepEqual(DHIDE.map((color) => color.id), ['blue', 'green', 'red', 'black']);
-    assert.equal(RECIPES.blue_dhide_coif.name, "Blue D'hide Coif");
+    assert.equal(RECIPES.green_dragon_mask.name, 'Green Dragon Mask');
+    assert.equal(RECIPES.blue_dragon_mask.previousId, 'green_dragon_mask');
     assert.equal(RECIPES.blue_dhide_body.previousId, null);
     assert.equal(RECIPES.green_dhide_body.previousId, 'blue_dhide_body');
     assert.equal(RECIPES.blue_dhide_body.tier, 1);
     assert.equal(RECIPES.green_dhide_body.tier, 2);
-    assert.equal(RECIPES.green_dhide_coif.name, "Green D'hide Coif");
-    for (const piece of ['coif', 'body', 'chaps', 'vambraces', 'boots']) {
+    assert.equal(RECIPES.black_dragon_mask.name, 'Black Dragon Mask');
+    for (const piece of ['body', 'chaps', 'vambraces', 'boots']) {
       const green = RECIPES[`green_dhide_${piece}`];
       const blue = RECIPES[`blue_dhide_${piece}`];
       const red = RECIPES[`red_dhide_${piece}`];
@@ -615,7 +616,12 @@ describe('catalog', () => {
       assert.equal(isUnlocked(createState(), blue.id), true);
       assert.equal(isUnlocked(createState(), green.id), false);
     }
-    assert.equal(RECIPES.black_dhide_coif.slot, 'helm');
+    assert.equal(RECIPES.black_dragon_mask.slot, 'helm');
+    assert.equal(RECIPES.wizard_gloves, undefined);
+    assert.equal(RECIPES.wizard_robe_bottom, undefined);
+    assert.equal(RECIPES.mystic_gloves.previousId, 'wizard_robe');
+    assert.equal(RECIPES.mystic_boots.previousId, 'wizard_robe');
+    assert.equal(RECIPES.wizard_robe.name, 'Wizard Robe');
     assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
     assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
     assert.equal(recipes.filter((r) => r.category === 'food').length, 13);
@@ -635,15 +641,23 @@ describe('catalog', () => {
     assert.equal(recipeCost(RECIPES.chocolate_cake).materials.chocolate, 1);
     assert.equal(RECIPES.bronze_scimitar.name, 'Bronze Scimitar');
     assert.equal(RECIPES.iron_platebody.name, 'Iron Platebody');
-    assert.equal(RECIPES.magic_hat.name, 'Magic Hat');
+    assert.equal(RECIPES.wizard_hat.name, 'Wizard Hat');
     assert.equal(RECIPES.mystic_robe_top.name, 'Mystic Robe Top');
+    assert.equal(RECIPES.splitbark_gauntlets.name, 'Splitbark Gauntlets');
     assert.equal(RECIPES.blue_dhide_body.name, "Blue D'hide Body");
     assert.equal(RECIPES.green_dhide_chaps.name, "Green D'hide Chaps");
     assert.equal(RECIPES.staff.name, 'Staff');
-    assert.equal(RECIPES.mystic_staff.name, 'Mystic Staff');
-    assert.equal(RECIPES.battle_staff.name, 'Battle Staff');
-    assert.equal(RECIPES.lunar_staff.name, 'Lunar Staff');
+    assert.equal(RECIPES.magic_staff_air.name, 'Magic Staff of Air');
+    assert.equal(RECIPES.air_battlestaff.name, 'Air Battlestaff');
+    assert.equal(RECIPES.mystic_air_staff.name, 'Mystic Air Staff');
+    assert.equal(RECIPES.lunar_staff, undefined);
     assert.equal(RECIPES.ancient_staff.name, 'Ancient Staff');
+    assert.equal(recipeCost(RECIPES.staff).materials.logs, 50);
+    assert.equal(recipeCost(RECIPES.magic_staff_air).items.air_rune, 1);
+    assert.equal(recipeCost(RECIPES.air_battlestaff).materials.orb, 10);
+    assert.equal(recipeCost(RECIPES.mystic_air_staff).materials.orb, 100);
+    assert.equal(recipeCost(RECIPES.ancient_staff).materials.cloth, 100);
+    assert.equal(recipeCost(RECIPES.ancient_staff).materials.dragon_bar, 10);
     assert.equal(RECIPES.fish_pie.name, 'Fish Pie');
     assert.equal(RECIPES.bronze_2h_sword.name, 'Bronze 2H Sword');
     assert.equal(RECIPES.bronze_thrownaxe.name, 'Bronze Thrown Axe');
@@ -653,7 +667,7 @@ describe('catalog', () => {
     for (const recipe of recipeList()) {
       for (const word of recipe.name.split(/\s+/)) {
         const letter = word.replace(/^[^A-Za-z]+/, '')[0];
-        if (!letter) continue;
+        if (!letter || word.toLowerCase() === 'of') continue;
         assert.equal(letter, letter.toUpperCase(), recipe.name);
       }
     }
@@ -720,13 +734,13 @@ describe('catalog', () => {
     assert.ok(melee.some((r) => r.id === 'bronze_sword'));
     assert.ok(!melee.some((r) => r.id === 'staff'));
     assert.ok(magic.some((r) => r.id === 'staff'));
-    assert.ok(ranged.some((r) => r.id === 'bronze_shortbow'));
-    assert.equal(recipeCost(RECIPES.bronze_shortbow).materials.bow_string, 1);
+    assert.ok(ranged.some((r) => r.id === 'shortbow'));
+    assert.equal(recipeCost(RECIPES.shortbow).materials.bow_string, 1);
     assert.equal(recipeCost(RECIPES.dragon_crossbow).materials.bow_string, 1);
     assert.equal(recipeCost(RECIPES.bronze_sword).materials.bronze_bar, 1);
     assert.equal(recipeCost(RECIPES.bronze_sword).materials.bronze, undefined);
     assert.ok(ranged.some((r) => r.id === 'bronze_arrows'));
-    assert.ok(ranged.some((r) => r.id === 'blue_dhide_coif'));
+    assert.ok(ranged.some((r) => r.id === 'green_dragon_mask'));
     assert.ok(food.some((r) => r.id === 'bread'));
     assert.ok(food.some((r) => r.id === 'salmon'));
     assert.ok(food.some((r) => r.id === 'anglerfish'));
@@ -877,7 +891,7 @@ describe('shop expansions', () => {
 
   it('will not sell a corner pad until it touches an owned room', () => {
     const state = createState();
-    state.gold = 50000;
+    state.gold = 2000000;
     assert.equal(buyExpansion(state, 'back-left'), false);
     assert.equal(buyExpansion(state, 'back'), true);
     assert.equal(buyExpansion(state, 'back-left'), true);
@@ -1037,14 +1051,19 @@ describe('furnace and spinning wheel', () => {
   });
 
   it('requires bow string on every bow and crossbow tier', () => {
+    for (const id of ['shortbow', 'oak_shortbow', 'willow_shortbow', 'maple_shortbow', 'yew_shortbow', 'magic_shortbow', 'longbow', 'oak_longbow', 'willow_longbow', 'maple_longbow', 'yew_longbow', 'magic_longbow']) {
+      const recipe = RECIPES[id];
+      assert.ok(recipe, id);
+      assert.equal(recipeCost(recipe).materials.bow_string, 1, id);
+      assert.equal(recipeCost(recipe).materials.logs, 1, id);
+    }
+    assert.equal(RECIPES.magic_shortbow.tint, 0x3a6ec8);
+    assert.equal(RECIPES.magic_longbow.tint, 0x3a6ec8);
     for (const metal of METALS) {
-      for (const piece of ['shortbow', 'longbow', 'crossbow']) {
-        const recipe = RECIPES[`${metal.id}_${piece}`];
-        assert.ok(recipe, `${metal.id}_${piece}`);
-        assert.equal(recipeCost(recipe).materials.bow_string, 1, recipe.id);
-        assert.equal(recipeCost(recipe).materials.string, undefined, recipe.id);
-        assert.ok(recipeCost(recipe).materials[`${metal.id}_bar`] >= 1, recipe.id);
-      }
+      const recipe = RECIPES[`${metal.id}_crossbow`];
+      assert.ok(recipe, `${metal.id}_crossbow`);
+      assert.equal(recipeCost(recipe).materials.bow_string, 1, recipe.id);
+      assert.ok(recipeCost(recipe).materials[`${metal.id}_bar`] >= 1, recipe.id);
     }
   });
 
@@ -1472,7 +1491,7 @@ describe('ores, appearance, king, and chest bin', () => {
     finishCraft(state, 'bread');
     state.displays[center].shelfSlots = ['bread', 'bread', null, null];
     state.chest.bread = 0;
-    state.gold = 10000;
+    state.gold = 500000;
     assert.equal(buyExpansion(state, 'back'), true);
     assert.equal(state.displays[center].removed, true);
     assert.equal(chestCount(state, 'bread'), 2);
@@ -1533,7 +1552,7 @@ describe('anvil tools', () => {
     assert.equal(isUnlocked(state, 'iron_hatchet'), true);
     assert.equal(state.chest.bronze_hatchet, 20);
     assert.ok(CUSTOMERS.mercenary.prefers.includes('bronze_scimitar'));
-    assert.ok(CUSTOMERS.ranger.prefers.includes('bronze_shortbow'));
+    assert.ok(CUSTOMERS.ranger.prefers.includes('shortbow'));
     assert.equal(CUSTOMERS.mercenary.prefers.includes('bronze_pickaxe'), false);
     assert.equal(CUSTOMERS.ranger.prefers.includes('bronze_hatchet'), false);
     assert.equal(canDisplayOn('table', RECIPES.bronze_hatchet), true);
@@ -1835,15 +1854,20 @@ describe('sell price rebalance', () => {
     METALS.forEach((metal, index) => {
       assert.equal(RECIPES[`${metal.id}_scimitar`].price, TIER_SELL[index], metal.id);
     });
-    assert.ok(RECIPES.bronze_gloves.price < RECIPES.bronze_scimitar.price);
+    assert.ok(RECIPES.bronze_kiteshield.price < RECIPES.bronze_scimitar.price);
+    assert.equal(RECIPES.bronze_gloves, undefined);
+    assert.equal(RECIPES.dragon_full_helm, undefined);
+    assert.equal(RECIPES.bronze_knives, undefined);
     assert.ok(RECIPES.bronze_platebody.price > RECIPES.bronze_scimitar.price);
     assert.ok(RECIPES.dragon_platebody.price > RECIPES.dragon_scimitar.price);
     assert.equal(RECIPES.bronze_scimitar.price, 5000);
     assert.equal(RECIPES.dragon_scimitar.price, 60000);
     assert.equal(RECIPES.smelt_bronze.price, 0);
     assert.equal(RECIPES.spin_bow_string.price, 0);
-    assert.ok(RECIPES.bread.price >= 5000);
-    assert.ok(RECIPES.anglerfish.price <= 60000);
+    assert.equal(RECIPES.bread.price, 50);
+    assert.equal(RECIPES.anglerfish.price, 5000);
+    assert.ok(RECIPES.bread.time < 3);
+    assert.ok(RECIPES.anglerfish.time < 12);
     assert.ok(RECIPES.green_dhide_body.price < RECIPES.black_dhide_body.price);
     assert.ok(RECIPES.blue_dhide_body.price < RECIPES.green_dhide_body.price);
   });

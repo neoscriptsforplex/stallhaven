@@ -107,6 +107,7 @@ export const MASTERY_SPEED = 0.5;
 export const ANVIL_TABS = [
   { id: 'melee', label: 'Melee' },
   { id: 'magic', label: 'Magic' },
+  { id: 'ranged', label: 'Ranged' },
   { id: 'tools', label: 'Tools' },
 ];
 
@@ -708,38 +709,147 @@ addRecipe({
   tint: 0xc4a05a,
 });
 
-const MAGIC_ARMOUR = [
-  { id: 'hat', name: 'Hat', slot: 'helm', shape: 'wizard_hat' },
-  { id: 'robe_top', name: 'Robe Top', slot: 'body', shape: 'robe_top' },
-  { id: 'robe_bottom', name: 'Robe Bottom', slot: 'legs', shape: 'robe_bottom' },
-  { id: 'boots', name: 'Boots', slot: 'boots', shape: 'magic_boots' },
-  { id: 'gloves', name: 'Gloves', slot: 'gloves', shape: 'magic_gloves' },
+function addMagicArmour({
+  id,
+  name,
+  slot,
+  shape,
+  setIndex,
+  lineId,
+  lineName,
+  lineIndex,
+  previousId = null,
+  unlockAt = null,
+  cloth = 1,
+  weightKey,
+}) {
+  const set = MAGIC_SETS[setIndex];
+  addRecipe({
+    id,
+    name,
+    category: 'armour',
+    combatClass: 'magic',
+    slot,
+    shape,
+    setKey: set.id,
+    lineId,
+    lineName,
+    lineIndex,
+    previousId,
+    unlockNeed: unlockAt ?? unlockNeed(lineIndex),
+    tier: lineIndex + 1,
+    cost: { materials: { cloth }, gold: setIndex * 2 },
+    time: 4 + setIndex,
+    price: tierSellPrice(setIndex, { count: MAGIC_SETS.length, weight: MAGIC_ARMOUR_WEIGHT[weightKey] ?? 1 }),
+    buyers: ['hedgemage'],
+    tint: set.tint,
+    accent: set.accent,
+  });
+}
+
+const LATER_MAGIC = MAGIC_SETS.filter((set) => set.id === 'battlemage' || set.id === 'lunar' || set.id === 'ancient');
+
+addMagicArmour({
+  id: 'wizard_hat', name: 'Wizard Hat', slot: 'helm', shape: 'wizard_hat',
+  setIndex: 0, lineId: 'magic-hat', lineName: 'Hat', lineIndex: 0, weightKey: 'hat',
+});
+addMagicArmour({
+  id: 'wizard_robe', name: 'Wizard Robe', slot: 'body', shape: 'robe_top',
+  setIndex: 0, lineId: 'magic-robe', lineName: 'Robe', lineIndex: 0, cloth: 2, weightKey: 'robe_top',
+});
+addMagicArmour({
+  id: 'wizard_boots', name: 'Wizard Boots', slot: 'boots', shape: 'magic_boots',
+  setIndex: 0, lineId: 'magic-boots', lineName: 'Boots', lineIndex: 0, weightKey: 'boots',
+});
+
+addMagicArmour({
+  id: 'mystic_hat', name: 'Mystic Hat', slot: 'helm', shape: 'wizard_hat',
+  setIndex: 1, lineId: 'magic-hat', lineName: 'Hat', lineIndex: 1,
+  previousId: 'wizard_hat', weightKey: 'hat',
+});
+addMagicArmour({
+  id: 'mystic_robe_top', name: 'Mystic Robe Top', slot: 'body', shape: 'robe_top',
+  setIndex: 1, lineId: 'magic-robe', lineName: 'Robe', lineIndex: 1,
+  previousId: 'wizard_robe', cloth: 2, weightKey: 'robe_top',
+});
+addMagicArmour({
+  id: 'mystic_robe_bottom', name: 'Mystic Robe Bottom', slot: 'legs', shape: 'robe_bottom',
+  setIndex: 1, lineId: 'magic-robe-bottom', lineName: 'Robe Bottom', lineIndex: 1,
+  previousId: 'wizard_robe', unlockAt: unlockNeed(1), weightKey: 'robe_bottom',
+});
+addMagicArmour({
+  id: 'mystic_boots', name: 'Mystic Boots', slot: 'boots', shape: 'magic_boots',
+  setIndex: 1, lineId: 'magic-boots', lineName: 'Boots', lineIndex: 1,
+  previousId: 'wizard_robe', unlockAt: unlockNeed(1), weightKey: 'boots',
+});
+addMagicArmour({
+  id: 'mystic_gloves', name: 'Mystic Gloves', slot: 'gloves', shape: 'magic_gloves',
+  setIndex: 1, lineId: 'magic-gloves', lineName: 'Gloves', lineIndex: 1,
+  previousId: 'wizard_robe', unlockAt: unlockNeed(1), weightKey: 'gloves',
+});
+
+addMagicArmour({
+  id: 'splitbark_hat', name: 'Splitbark Hat', slot: 'helm', shape: 'wizard_hat',
+  setIndex: 2, lineId: 'magic-hat', lineName: 'Hat', lineIndex: 2,
+  previousId: 'mystic_hat', weightKey: 'hat',
+});
+addMagicArmour({
+  id: 'splitbark_robe_top', name: 'Splitbark Robe Top', slot: 'body', shape: 'robe_top',
+  setIndex: 2, lineId: 'magic-robe', lineName: 'Robe', lineIndex: 2,
+  previousId: 'mystic_robe_top', cloth: 2, weightKey: 'robe_top',
+});
+addMagicArmour({
+  id: 'splitbark_robe_bottom', name: 'Splitbark Robe Bottom', slot: 'legs', shape: 'robe_bottom',
+  setIndex: 2, lineId: 'magic-robe-bottom', lineName: 'Robe Bottom', lineIndex: 2,
+  previousId: 'mystic_robe_bottom', weightKey: 'robe_bottom',
+});
+addMagicArmour({
+  id: 'splitbark_gauntlets', name: 'Splitbark Gauntlets', slot: 'gloves', shape: 'magic_gloves',
+  setIndex: 2, lineId: 'magic-gloves', lineName: 'Gloves', lineIndex: 2,
+  previousId: 'mystic_gloves', weightKey: 'gloves',
+});
+addMagicArmour({
+  id: 'splitbark_boots', name: 'Splitbark Boots', slot: 'boots', shape: 'magic_boots',
+  setIndex: 2, lineId: 'magic-boots', lineName: 'Boots', lineIndex: 2,
+  previousId: 'mystic_boots', weightKey: 'boots',
+});
+
+const LATER_PIECES = [
+  { id: 'hat', name: 'Hat', slot: 'helm', shape: 'wizard_hat', lineId: 'magic-hat', lineName: 'Hat', weightKey: 'hat', cloth: 1 },
+  { id: 'robe_top', name: 'Robe Top', slot: 'body', shape: 'robe_top', lineId: 'magic-robe', lineName: 'Robe', weightKey: 'robe_top', cloth: 2 },
+  { id: 'robe_bottom', name: 'Robe Bottom', slot: 'legs', shape: 'robe_bottom', lineId: 'magic-robe-bottom', lineName: 'Robe Bottom', weightKey: 'robe_bottom', cloth: 1 },
+  { id: 'boots', name: 'Boots', slot: 'boots', shape: 'magic_boots', lineId: 'magic-boots', lineName: 'Boots', weightKey: 'boots', cloth: 1 },
+  { id: 'gloves', name: 'Gloves', slot: 'gloves', shape: 'magic_gloves', lineId: 'magic-gloves', lineName: 'Gloves', weightKey: 'gloves', cloth: 1 },
 ];
 
-MAGIC_SETS.forEach((set, index) => {
-  for (const piece of MAGIC_ARMOUR) {
+const LATER_PREV = {
+  hat: 'splitbark_hat',
+  robe_top: 'splitbark_robe_top',
+  robe_bottom: 'splitbark_robe_bottom',
+  boots: 'splitbark_boots',
+  gloves: 'splitbark_gauntlets',
+};
+
+LATER_MAGIC.forEach((set) => {
+  const setIndex = MAGIC_SETS.findIndex((item) => item.id === set.id);
+  for (const piece of LATER_PIECES) {
     const id = `${set.id}_${piece.id}`;
-    const previousId = index === 0 ? null : `${MAGIC_SETS[index - 1].id}_${piece.id}`;
-    addRecipe({
+    const previousSet = MAGIC_SETS[setIndex - 1];
+    const previousId = previousSet.id === 'splitbark'
+      ? LATER_PREV[piece.id]
+      : `${previousSet.id}_${piece.id}`;
+    addMagicArmour({
       id,
       name: `${set.name} ${piece.name}`,
-      category: 'armour',
-      combatClass: 'magic',
       slot: piece.slot,
       shape: piece.shape,
-      setKey: set.id,
-      lineId: `magic-${piece.id}`,
-      lineName: piece.name,
-      lineIndex: index,
+      setIndex,
+      lineId: piece.lineId,
+      lineName: piece.lineName,
+      lineIndex: setIndex,
       previousId,
-      unlockNeed: unlockNeed(index),
-      tier: index + 1,
-      cost: { materials: { cloth: piece.id === 'robe_top' ? 2 : 1 }, gold: index * 2 },
-      time: 4 + index,
-      price: tierSellPrice(index, { count: MAGIC_SETS.length, weight: MAGIC_ARMOUR_WEIGHT[piece.id] ?? 1 }),
-      buyers: ['hedgemage'],
-      tint: set.tint,
-      accent: set.accent,
+      cloth: piece.cloth,
+      weightKey: piece.weightKey,
     });
   }
 });
@@ -813,6 +923,12 @@ const FEAST_LINE = [
   { id: 'anglerfish', name: 'Anglerfish', mats: { fish: 3 }, tint: 0xc8a04a, time: 12, price: 120 },
 ];
 
+/** Bread starts near 50 gp; the top of the feast line sits near 5,000 gp. */
+export function foodSellPrice(oldPrice) {
+  const t = Math.max(0, Math.min(1, ((Number(oldPrice) || 0) - 8) / (120 - 8)));
+  return Math.max(1, Math.round(50 + t * (5000 - 50)));
+}
+
 function addFoodLine(list, lineId, lineName, setKey, firstPreviousId = null) {
   list.forEach((food, index) => {
     const previousId = index === 0 ? firstPreviousId : list[index - 1].id;
@@ -832,8 +948,8 @@ function addFoodLine(list, lineId, lineName, setKey, firstPreviousId = null) {
       unlockNeed: need,
       tier: index + 1,
       cost: { materials: { ...food.mats }, gold: 0 },
-      time: food.time,
-      price: scaleSell(food.price, 8, 120),
+      time: Math.round((food.time * 2) / 3 * 10) / 10,
+      price: foodSellPrice(food.price),
       buyers: ['pilgrim'],
       tint: food.tint,
       shelfItem: true,
@@ -1183,7 +1299,7 @@ export const SHOP = {
 };
 
 export function emptySlots() {
-  return { helm: null, body: null, legs: null, boots: null, gloves: null };
+  return { helm: null, body: null, legs: null, boots: null, gloves: null, shield: null };
 }
 
 export function emptyShelfSlots() {
@@ -1382,9 +1498,11 @@ export function recipesInLine(lineId) {
 
 export function recipeMatsLabel(recipe) {
   const cost = recipeCost(recipe);
-  return Object.entries(cost.materials)
-    .map(([id, n]) => `${MATERIALS[id]?.name ?? id} ×${n}`)
-    .join(' · ');
+  const mats = Object.entries(cost.materials)
+    .map(([id, n]) => `${MATERIALS[id]?.name ?? id} ×${n}`);
+  const items = Object.entries(cost.items ?? {})
+    .map(([id, n]) => `${RECIPES[id]?.name ?? id} ×${n}`);
+  return [...mats, ...items].join(' · ');
 }
 
 /** Commas for prices of 1000 or more; smaller amounts stay plain. */
@@ -1479,6 +1597,11 @@ export function matchingArmourIds(recipeId, ownedIds) {
 
 function recipeUnlocked(state, recipe) {
   if (!recipe) return false;
+  if (recipe.unlockAnyOf?.length) {
+    if (!state) return false;
+    const need = recipe.unlockNeed ?? 0;
+    return recipe.unlockAnyOf.some((id) => (state.craftCounts?.[id] ?? 0) >= need);
+  }
   if (!recipe.previousId) return true;
   if (!state) return true;
   const count = state.craftCounts?.[recipe.previousId] ?? 0;

@@ -359,6 +359,13 @@ export function craftBlockReason(state, recipeId) {
       return `Need ${missing} more ${name}.`;
     }
   }
+  for (const [itemId, need] of Object.entries(cost.items ?? {})) {
+    const have = chestCount(state, itemId);
+    if (have < need) {
+      const name = RECIPES[itemId]?.name ?? itemId;
+      return `Need ${need - have} more ${name}.`;
+    }
+  }
   return null;
 }
 
@@ -399,6 +406,10 @@ export function maxCraftActions(state, recipeId) {
     if (!need) continue;
     max = Math.min(max, Math.floor((state.materials[materialId] ?? 0) / need));
   }
+  for (const [itemId, need] of Object.entries(cost.items ?? {})) {
+    if (!need) continue;
+    max = Math.min(max, Math.floor(chestCount(state, itemId) / need));
+  }
   if ((cost.gold || 0) > 0) {
     max = Math.min(max, Math.floor(state.gold / cost.gold));
   }
@@ -419,6 +430,11 @@ function payCraftCost(state, recipe, times) {
   for (const [materialId, need] of Object.entries(cost.materials ?? {})) {
     state.materials[materialId] = (state.materials[materialId] ?? 0) - need * n;
   }
+  for (const [itemId, need] of Object.entries(cost.items ?? {})) {
+    const left = chestCount(state, itemId) - need * n;
+    if (left > 0) state.chest[itemId] = left;
+    else delete state.chest[itemId];
+  }
 }
 
 function refundCraftCost(state, recipe, times) {
@@ -427,6 +443,9 @@ function refundCraftCost(state, recipe, times) {
   state.gold += (cost.gold || 0) * n;
   for (const [materialId, need] of Object.entries(cost.materials ?? {})) {
     state.materials[materialId] = (state.materials[materialId] ?? 0) + need * n;
+  }
+  for (const [itemId, need] of Object.entries(cost.items ?? {})) {
+    addToChest(state, itemId, need * n);
   }
 }
 

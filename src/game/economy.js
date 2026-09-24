@@ -177,7 +177,7 @@ export function applyCheat(state, raw) {
     return '-motherlode';
   }
   if (code === 'motherlode') {
-    state.gold = (state.gold ?? 0) + 10000;
+    state.gold = (state.gold ?? 0) + 1000000;
     return 'motherlode';
   }
   if (code === 'freshstart') {
@@ -353,7 +353,7 @@ export function craftBlockReason(state, recipeId) {
     return 'Place a fletching bench from Build to make ranged weapons and ammo.';
   }
   if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) {
-    return 'Place a Potter Wheel from Build to turn soft clay into hard clay.';
+    return 'Place a Potter Wheel from Build to turn soft clay into clay.';
   }
   if (!isUnlocked(state, recipeId)) {
     const remain = unlockRemaining(state, recipeId);

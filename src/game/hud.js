@@ -343,7 +343,7 @@ export function bindHud(root, state, world) {
                 : fletchMode
                   ? 'Fletch ranged weapons and ammo. Arrows still make 20 per craft action.'
                   : potterMode
-                    ? 'Turn soft clay into hard clay. This wheel does not make ranged gear.'
+                    ? 'Turn soft clay into clay. This wheel does not make ranged gear.'
                     : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons and runes stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
     }
     if (!simpleStation) paintSubtabs();
@@ -2202,7 +2202,7 @@ export function bindHud(root, state, world) {
       paintCrafts();
     }
     const messages = {
-      motherlode: 'Motherlode: +10,000 gp.',
+      motherlode: 'Motherlode: +1,000,000 gp.',
       '-motherlode': state.gold <= 0
         ? '−Motherlode: −10,000 gp (clamped at 0).'
         : '−Motherlode: −10,000 gp.',

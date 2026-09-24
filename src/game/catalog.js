@@ -296,7 +296,7 @@ export const MATERIALS = {
   soft_clay: { id: 'soft_clay', name: 'Soft Clay', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
   hard_clay: {
     id: 'hard_clay',
-    name: 'Hard Clay',
+    name: 'Clay',
     restock: 0,
     start: 0,
     tier: 1,
@@ -1073,7 +1073,7 @@ addRecipe({
 
 addRecipe({
   id: 'fire_clay',
-  name: 'Hard Clay',
+  name: 'Clay',
   category: 'potter',
   combatClass: null,
   slot: 'clay',

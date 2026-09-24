@@ -1265,7 +1265,7 @@ describe('cheat codes', () => {
     const state = createState();
     const gold = state.gold;
     assert.equal(applyCheat(state, 'MoThErLoDe'), 'motherlode');
-    assert.equal(state.gold, gold + 10000);
+    assert.equal(state.gold, gold + 1000000);
     assert.equal(applyCheat(state, 'onesmallfavour'), 'onesmallfavour');
     assert.equal(state.chefHat, true);
     assert.equal(applyCheat(state, 'MAXCAPE'), 'maxcape');

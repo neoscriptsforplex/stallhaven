@@ -1,0 +1,177 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib mystic-hat.mtl
+o Item Mystic hat 2026-09-24_18-00-33
+v 11 2 -1
+v 10 2 -10
+v 10 8 -1
+v 10 2 12
+v 11 1 6
+v 21 0 -7
+v 10 1 -5
+v -11 8 -1
+v -9 8 -12
+v -14 2 -1
+v -9 8 13
+v -5 19 6
+v -9 16 -14
+v -1 8 -12
+v -12 2 -12
+v -12 1 -5
+v -14 1 6
+v -12 3 12
+v -1 3 12
+v -1 8 13
+v 5 19 6
+v -1 23 0
+v -6 27 -4
+v -4 33 -5
+v -5 36 -12
+v 8 16 -14
+v 7 8 -12
+v -1 3 -14
+v 7 8 13
+v 6 27 -4
+v 4 33 -5
+v 2 42 -1
+v -2 42 -1
+v -3 46 0
+v 5 36 -12
+v 3 46 0
+v 0 39 11
+v 23 0 -2
+v 31 0 -3
+v -23 0 2
+v -21 0 8
+v -27 0 13
+usemtl c0
+f 1 2 3
+usemtl c1
+f 1 3 4
+usemtl c2
+f 1 4 5
+usemtl c3
+f 1 5 6
+usemtl c4
+f 1 6 7
+usemtl c5
+f 1 7 2
+usemtl c6
+f 8 9 10
+usemtl c7
+f 8 10 11
+usemtl c8
+f 8 11 12
+usemtl c9
+f 8 12 13
+usemtl c10
+f 8 13 9
+usemtl c11
+f 9 13 14
+usemtl c12
+f 9 14 15
+usemtl c13
+f 9 15 10
+usemtl c14
+f 10 15 16
+usemtl c15
+f 10 16 17
+usemtl c16
+f 10 17 18
+usemtl c17
+f 10 18 11
+usemtl c18
+f 11 18 19
+usemtl c19
+f 11 19 20
+usemtl c20
+f 11 20 12
+usemtl c21
+f 12 20 21
+usemtl c22
+f 12 21 22
+usemtl c23
+f 12 22 13
+usemtl c24
+f 13 22 23
+usemtl c25
+f 13 23 24
+usemtl c26
+f 13 24 25
+usemtl c27
+f 13 25 26
+usemtl c28
+f 13 26 14
+usemtl c29
+f 14 26 27
+usemtl c30
+f 14 27 2
+usemtl c31
+f 14 2 28
+usemtl c32
+f 14 28 15
+usemtl c33
+f 4 20 19
+usemtl c34
+f 20 4 29
+usemtl c35
+f 20 29 21
+usemtl c36
+f 21 29 3
+usemtl c37
+f 21 3 26
+usemtl c38
+f 21 26 22
+usemtl c39
+f 22 26 30
+usemtl c40
+f 22 30 23
+usemtl c41
+f 23 30 31
+usemtl c42
+f 23 31 24
+usemtl c43
+f 24 31 32
+usemtl c44
+f 24 32 33
+usemtl c45
+f 24 33 25
+usemtl c46
+f 25 33 34
+usemtl c47
+f 25 34 35
+usemtl c48
+f 25 35 26
+usemtl c49
+f 26 35 30
+usemtl c50
+f 30 35 31
+usemtl c51
+f 31 35 36
+usemtl c52
+f 31 36 32
+usemtl c53
+f 32 36 37
+usemtl c54
+f 32 37 33
+usemtl c55
+f 33 37 34
+usemtl c56
+f 34 37 36
+usemtl c57
+f 34 36 35
+usemtl c58
+f 29 4 3
+usemtl c59
+f 27 3 2
+usemtl c60
+f 3 27 26
+usemtl c61
+f 5 38 6
+usemtl c62
+f 6 38 39
+usemtl c63
+f 16 40 17
+usemtl c64
+f 17 40 41
+usemtl c65
+f 41 40 42

@@ -1,0 +1,236 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib black-dhide-vambraces.mtl
+o Item Black d'hide vambraces 2026-09-24_17-11-29
+v 0 5 16
+v 2 3 17
+v 2 3 -10
+v 0 5 -14
+v -4 6 15
+v -4 5 16
+v -1 4 16
+v 1 2 17
+v 4 0 13
+v 4 0 -6
+v 1 2 -10
+v -1 4 -14
+v -4 5 -16
+v -4 6 -16
+v -8 5 16
+v -7 4 16
+v -7 4 -14
+v 2 0 13
+v -8 5 -14
+v -10 3 -10
+v -10 3 17
+v -9 2 -10
+v -10 0 -6
+v -12 0 -6
+v -12 0 13
+v -10 0 13
+v -9 2 17
+v 2 0 -6
+v -24 5 16
+v -22 3 18
+v -14 3 -8
+v -15 5 -12
+v -27 6 14
+v -28 5 15
+v -25 4 16
+v -23 2 18
+v -19 0 15
+v -14 0 -4
+v -15 2 -8
+v -16 4 -13
+v -18 5 -15
+v -18 6 -15
+v -32 5 14
+v -31 4 14
+v -22 4 -14
+v -21 0 14
+v -23 5 -15
+v -26 3 -11
+v -34 3 14
+v -25 2 -11
+v -27 0 -8
+v -29 0 -8
+v -35 0 10
+v -33 0 11
+v -33 2 15
+v -16 0 -4
+usemtl c0
+f 1 2 3
+f 1 3 4
+usemtl c1
+f 1 4 5
+usemtl c2
+f 1 5 6
+usemtl c3
+f 1 6 7
+usemtl c4
+f 1 7 2
+usemtl c3
+f 2 7 8
+usemtl c5
+f 2 8 9
+usemtl c0
+f 2 9 10
+f 2 10 3
+usemtl c6
+f 3 10 11
+usemtl c7
+f 3 11 12
+usemtl c8
+f 3 12 4
+usemtl c9
+f 4 12 13
+usemtl c10
+f 4 13 14
+usemtl c1
+f 4 14 5
+usemtl c11
+f 5 14 15
+usemtl c3
+f 5 15 16
+usemtl c4
+f 5 16 6
+usemtl c0
+f 6 16 17
+f 6 17 13
+usemtl c1
+f 6 13 7
+f 7 13 12
+usemtl c11
+f 7 12 8
+usemtl c1
+f 8 12 11
+usemtl c11
+f 8 11 18
+usemtl c12
+f 8 18 9
+usemtl c1
+f 19 20 21
+usemtl c11
+f 19 21 15
+usemtl c1
+f 19 15 14
+usemtl c13
+f 19 14 17
+usemtl c14
+f 19 17 22
+usemtl c15
+f 19 22 20
+usemtl c14
+f 20 22 23
+usemtl c16
+f 20 23 24
+usemtl c1
+f 20 24 25
+usemtl c11
+f 20 25 21
+usemtl c17
+f 21 25 26
+usemtl c4
+f 21 26 27
+usemtl c18
+f 21 27 15
+usemtl c19
+f 15 27 16
+usemtl c0
+f 16 27 22
+f 16 22 17
+usemtl c1
+f 11 28 18
+usemtl c20
+f 28 11 10
+usemtl c0
+f 27 26 23
+f 27 23 22
+usemtl c7
+f 14 13 17
+usemtl c1
+f 29 30 31
+f 29 31 32
+usemtl c11
+f 29 32 33
+usemtl c18
+f 29 33 34
+usemtl c21
+f 29 34 35
+usemtl c17
+f 29 35 30
+f 30 35 36
+usemtl c4
+f 30 36 37
+usemtl c0
+f 30 37 38
+f 30 38 31
+usemtl c22
+f 31 38 39
+f 31 39 40
+usemtl c1
+f 31 40 32
+usemtl c11
+f 32 40 41
+usemtl c9
+f 32 41 42
+usemtl c1
+f 32 42 33
+usemtl c11
+f 33 42 43
+usemtl c18
+f 33 43 44
+usemtl c2
+f 33 44 34
+usemtl c0
+f 34 44 45
+f 34 45 41
+usemtl c1
+f 34 41 35
+f 35 41 40
+usemtl c11
+f 35 40 36
+usemtl c1
+f 36 40 39
+usemtl c11
+f 36 39 46
+usemtl c2
+f 36 46 37
+usemtl c1
+f 47 48 49
+usemtl c11
+f 47 49 43
+usemtl c1
+f 47 43 42
+usemtl c23
+f 47 42 45
+f 47 45 50
+usemtl c13
+f 47 50 48
+usemtl c24
+f 48 50 51
+usemtl c14
+f 48 51 52
+usemtl c1
+f 48 52 53
+usemtl c11
+f 48 53 49
+usemtl c25
+f 49 53 54
+usemtl c3
+f 49 54 55
+usemtl c17
+f 49 55 43
+usemtl c4
+f 43 55 44
+usemtl c0
+f 44 55 50
+f 44 50 45
+usemtl c1
+f 39 56 46
+usemtl c24
+f 56 39 38
+usemtl c0
+f 55 54 51
+f 55 51 50
+usemtl c22
+f 42 41 45

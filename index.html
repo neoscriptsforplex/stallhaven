@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en" class="is-booting">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rune Craft</title>
+    <meta name="description" content="Rune Craft. Craft gear into a chest, then trade with travelers at the counter." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%236b4423' width='64' height='64' rx='10'/%3E%3Cpath fill='%23e8c37a' d='M12 40h40v8H12z'/%3E%3Cpath fill='%238b4336' d='M8 20h48l-6 12H14z'/%3E%3C/svg%3E" />
+    <style>
+      html.is-booting, html.is-booting body { background: #050403; }
+      html.is-booting #view,
+      html.is-booting #hud,
+      html.is-booting #save-bar { visibility: hidden !important; }
+    </style>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" crossorigin src="/stallhaven/assets/index-DH0GsvIC.js"></script>
+    <link rel="stylesheet" crossorigin href="/stallhaven/assets/index-6QBaCIWF.css">
+  </head>
+  <body>
+    <canvas id="view" aria-label="Rune Craft shop floor"></canvas>
+    <div id="boot-cover" role="status" aria-live="polite">
+      <p data-boot-label>Loading models…</p>
+      <div class="boot-track"><div class="boot-bar" data-boot-bar></div></div>
+    </div>
+
+    <aside id="save-bar" aria-label="Save and load">
+      <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+        <span class="expand-icon" aria-hidden="true">⛶</span>
+      </button>
+      <button type="button" id="build-btn" title="Build" aria-label="Build">Build</button>
+      <button type="button" id="help-btn" title="Help" aria-label="Help">Help</button>
+      <button type="button" id="save-btn">Save</button>
+      <button type="button" id="load-btn">Load</button>
+      <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
+      <button type="button" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
+      <input id="load-file" type="file" accept="application/json,.json" hidden />
+      <input id="music-file" type="file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav" multiple hidden />
+    </aside>
+
+    <aside id="hud">
+        <header class="ledger">
+        <div class="minimap-wrap">
+          <canvas id="minimap" class="minimap" width="196" height="196" aria-label="Shop map. Click to walk. Scroll to zoom."></canvas>
+          <div class="minimap-compass">
+            <button type="button" data-map-north aria-label="Reset camera">N</button>
+          </div>
+          <div class="minimap-zoom">
+            <button type="button" data-map-zoom="out" aria-label="Zoom map out">−</button>
+            <button type="button" data-map-zoom="in" aria-label="Zoom map in">+</button>
+          </div>
+        </div>
+        <div class="shop-xp" aria-label="Shop level">
+          <span id="shop-level">Lv 1</span>
+          <span class="xp-bar" title="Shop XP"><i data-shop-xp-bar></i></span>
+        </div>
+        <div class="ledger-row">
+          <p id="gold" class="gold">Coins: 40</p>
+        </div>
+        <div id="active-craft" class="active-craft" hidden>
+          <p data-active-craft-name>Crafting</p>
+          <span class="craft-bar"><i data-active-craft-bar></i></span>
+          <p data-active-craft-yield class="active-craft-yield" hidden>+5</p>
+        </div>
+      </header>
+
+    </aside>
+
+    <div id="help-modal" class="modal" hidden>
+      <div class="sheet">
+        <h2>Help</h2>
+        <p class="help-copy">Controls:
+Use Left click (tap on phone) to move, right click (Double tap on phone) to open menus on items and upgrade them.
+Use middle mouse button or arrow keys to control the camera.
+
+The Goal:
+Use the Anvil to craft items or your townsfolk.
+You will need to cut down trees outside for wood and mine ores in the dungeon outside.
+
+Build crafting stations to help you make more items.
+In the build menu you can buy the below crafting stations:
+Furnace (smelt ores to bars)
+Cooking Range (make food)
+Fletching Bench (craft Bows, Arrows and Ammo)
+Spinning Wheel (turn flax into cloth or bowstring)
+Loom (craft armour)
+Cauldron (craft potions)
+
+Upgrade your shop after earning money.
+Buy more shelves, mannequins, tables and expand your shop!
+
+Save your game file before closing game.
+This will allow you to load it back again.
+</p>
+        <button type="button" data-dismiss>Close</button>
+      </div>
+    </div>
+
+    <div id="chest-modal" class="modal" hidden>
+      <div class="sheet chest-sheet">
+        <h2>Shop Chest</h2>
+        <p class="chest-tally" id="chest-count">0 pieces waiting</p>
+        <p id="chest-cap" class="meta">Level 1 · 100 slots</p>
+        <p>Crafted gear waits here. Right-click a table or shelf and choose Display item… to put a ware out. On a shelf you then pick Top Left, Top Right, Bottom Left, or Bottom Right. Armour stands still take a matching set from Place on Stand.</p>
+        <div id="chest-items"></div>
+        <div class="discard-confirm" data-discard-box hidden>
+          <p data-discard-msg>Throw this ware away? It cannot be undone.</p>
+          <div class="row">
+            <button type="button" data-discard-yes>Discard</button>
+            <button type="button" class="ghost" data-discard-no>Keep</button>
+          </div>
+        </div>
+        <div class="row">
+          <button type="button" data-chest-upgrade>Upgrade</button>
+        </div>
+        <button type="button" class="ghost" data-chest-close>Close</button>
+      </div>
+    </div>
+
+    <div id="craft-modal" class="modal" hidden>
+      <div class="sheet craft-sheet">
+        <h2 data-craft-title>Anvil</h2>
+        <p data-craft-blurb>Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
+        <div id="craft-tabs" class="tabs"></div>
+        <div id="craft-subtabs" class="tabs subtabs" hidden></div>
+        <p data-craft-note class="craft-note" hidden></p>
+        <div class="craft-body">
+          <div id="crafts"></div>
+          <aside class="craft-preview-pane">
+            <canvas data-craft-preview width="220" height="220" aria-label="Item preview"></canvas>
+            <p data-craft-preview-name class="meta">Select or hover a recipe.</p>
+            <p class="meta craft-qty-hint">1× / 5× / Max count craft actions.</p>
+            <p class="meta craft-qty-hint" data-ammo-hint hidden>Ammo makes 20 per action.</p>
+            <button type="button" class="ghost craft-cancel" data-craft-cancel disabled>Cancel</button>
+          </aside>
+        </div>
+        <div id="materials" class="craft-mats" aria-label="Materials"></div>
+        <button type="button" class="ghost" data-craft-close>Close</button>
+      </div>
+    </div>
+
+    <div id="trade-modal" class="modal" hidden>
+      <div class="sheet trade-sheet">
+        <h2 data-trade-title>Trade</h2>
+        <p data-trade-want></p>
+        <p data-trade-offer></p>
+        <p data-trade-have></p>
+        <p data-trade-buy hidden></p>
+        <p data-trade-offer-hint hidden></p>
+        <p data-trade-craft-note class="craft-note" hidden></p>
+        <div class="row">
+          <button type="button" data-trade-sell>Sell</button>
+          <button type="button" data-trade-offer-btn>Offer</button>
+          <button type="button" data-trade-craft-btn>Craft</button>
+          <button type="button" data-trade-buy-btn>Buy Their Goods</button>
+          <button type="button" data-trade-refuse>Refuse</button>
+        </div>
+        <button type="button" class="ghost" data-trade-close>Close</button>
+      </div>
+    </div>
+
+    <div id="offer-modal" class="modal" hidden>
+      <div class="sheet offer-sheet">
+        <h2>Choose an Offer</h2>
+        <p>Pick a chest item to offer at a reduced sale price.</p>
+        <p data-offer-pick class="meta">No item selected yet.</p>
+        <div id="offer-items" class="offer-list"></div>
+        <div class="row furn-row">
+          <button type="button" data-offer-confirm disabled>Confirm</button>
+          <button type="button" class="ghost" data-offer-cancel>Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="import-modal" class="modal" hidden>
+      <div class="sheet upload-sheet">
+        <h2>Upload a Model</h2>
+        <p class="meta">Prefer a single .glb (glTF), or multi-select an .obj with its .mtl and texture maps. Tag it Furniture, Ware, Player, or Customer. Failed loads leave the default look in place. A custom player mesh keeps walking and click targets; hair and colour customizer may not apply to it. A customer mesh is shared by every traveler, with their usual colours and name labels.</p>
+        <div data-upload-drop class="upload-drop">Drop files here, or choose them.</div>
+        <button type="button" data-upload-pick>Choose Files</button>
+        <button type="button" class="ghost" data-clear-uploads>Clear uploads</button>
+        <div class="discard-confirm" data-clear-box hidden>
+          <p>Remove every uploaded Furniture, Ware, Player, and Customer model? Defaults come back. This cannot be undone.</p>
+          <div class="row">
+            <button type="button" data-clear-yes>Clear uploads</button>
+            <button type="button" class="ghost" data-clear-no>Keep</button>
+          </div>
+        </div>
+        <p data-clear-note class="meta" hidden></p>
+        <input type="file" accept=".glb,.gltf,.obj,.mtl,.png,.jpg,.jpeg,.webp,model/gltf-binary,model/gltf+json" multiple hidden />
+        <p data-import-name></p>
+        <p data-error class="error" hidden></p>
+        <div class="row tag-grid" data-tags hidden>
+          <button type="button" data-tag="furniture">Furniture</button>
+          <button type="button" data-tag="ware">Ware</button>
+          <button type="button" data-tag="player">Player</button>
+          <button type="button" data-tag="customer">Customer</button>
+        </div>
+        <div data-recipes class="row" hidden></div>
+        <button type="button" class="ghost" data-cancel>Cancel</button>
+      </div>
+    </div>
+
+    <div id="chest-upgrade-modal" class="modal" hidden>
+      <div class="sheet">
+        <h2>Upgrade Chest</h2>
+        <p data-upgrade-now></p>
+        <p data-upgrade-next></p>
+        <p data-upgrade-cost></p>
+        <div class="row">
+          <button type="button" data-upgrade-buy>Upgrade</button>
+        </div>
+        <button type="button" class="ghost" data-upgrade-close>Close</button>
+      </div>
+    </div>
+
+    <aside id="expand-dock" class="expand-dock" hidden>
+      <h2>Expand the Shop</h2>
+      <p>Click a gold pad (three behind, one either side). Confirm before gold is spent. New rooms match the original size.</p>
+      <p data-expand-cost></p>
+      <p data-expand-pick class="meta">No pad selected yet.</p>
+      <div class="row furn-row">
+        <button type="button" data-expand-confirm disabled>Confirm</button>
+        <button type="button" class="ghost" data-expand-close>Cancel</button>
+      </div>
+    </aside>
+
+    <aside id="build-dock" class="expand-dock" hidden>
+      <h2>Build</h2>
+      <p>Unlockables for the shop. Rooms use the same gold pads as before. A furnace and cooking range are free to place. Bow string needs a spinning wheel. Potion brewing needs a cauldron. Extra tables, mannequins, and shelves use the same 500g then ×3 curve; the first three shelves are included.</p>
+      <article class="build-item">
+        <h3>Furnace</h3>
+        <p>Smelt ores into metal bars. Place it on the floor snap grid, then confirm. Free.</p>
+        <p data-furnace-status class="meta" hidden></p>
+        <button type="button" data-furnace-buy>Place · Free</button>
+      </article>
+      <article class="build-item">
+        <h3>Cooking Range</h3>
+        <p>Bake food. Place it on the floor snap grid, then confirm. Free.</p>
+        <p data-range-status class="meta" hidden></p>
+        <button type="button" data-range-buy>Place · Free</button>
+      </article>
+      <article class="build-item">
+        <h3>Loom</h3>
+        <p>Weave flax into cloth, then ranged and magic armour. Place it on the floor snap grid, then confirm.</p>
+        <p data-loom-status class="meta">Costs 50,000 gp.</p>
+        <button type="button" data-loom-buy>Buy · 50,000 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Fletching Bench</h3>
+        <p>Craft ranged weapons and ammo. Place it on the floor snap grid, then confirm.</p>
+        <p data-fletch-status class="meta">Costs 50,000 gp.</p>
+        <button type="button" data-fletch-buy>Buy · 50,000 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Potter Wheel</h3>
+        <p>Turn soft clay into clay. Place it on the floor snap grid, then confirm.</p>
+        <p data-potter-status class="meta">Costs 50,000 gp.</p>
+        <button type="button" data-potter-buy>Buy · 50,000 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Spinning Wheel</h3>
+        <p>Spin flax into bow string. Place it on the floor snap grid, then confirm. The wheel turns while a string is spinning.</p>
+        <p data-wheel-status class="meta">Costs 100,000 gp.</p>
+        <button type="button" data-wheel-buy>Buy · 100,000 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Cauldron</h3>
+        <p>Unlocks potion crafting. Place it on the floor snap grid, then confirm. Click it afterward to brew.</p>
+        <p data-cauldron-status class="meta">Costs 1,000,000 gp.</p>
+        <button type="button" data-cauldron-buy>Buy · 1,000,000 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Table</h3>
+        <p>Buy another display table. The first extra costs 500g; each further table costs three times the last. Starting tables do not count. Delete up to two tables to replace them for free.</p>
+        <p data-table-status class="meta">First extra table costs 500g.</p>
+        <button type="button" data-table-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Shelf</h3>
+        <p>Buy another wall shelf. Place it on the wall grid. The starting three shelves are included; extras cost 500g, then ×3. Delete a shelf from its right-click menu — a deleted included shelf can be replaced for free until three are placed.</p>
+        <p data-shelf-status class="meta">First 3 shelves are included. The next costs 500g.</p>
+        <button type="button" data-shelf-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Mannequin</h3>
+        <p>Buy another armour mannequin. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count. Delete up to two mannequins to replace them for free.</p>
+        <p data-mannequin-status class="meta">First extra mannequin costs 500g.</p>
+        <button type="button" data-mannequin-buy>Buy · 500 gp</button>
+      </article>
+      <article class="build-item">
+        <h3>Shop Expansion</h3>
+        <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
+        <p data-expand-status class="meta">Next room costs 500,000g.</p>
+        <button type="button" data-expand-buy>Place Room</button>
+      </article>
+      <button type="button" class="ghost" data-build-close>Close</button>
+    </aside>
+
+    <aside id="place-dock" class="expand-dock" hidden>
+      <h2 data-place-title>Place Cauldron</h2>
+      <p data-place-blurb>Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement.</p>
+      <p data-place-cost class="meta">Cost: 1,000,000 gp.</p>
+      <p data-place-note class="craft-note" hidden></p>
+      <div class="row furn-row">
+        <button type="button" data-place-confirm>Confirm Placement</button>
+        <button type="button" class="ghost" data-place-cancel>Cancel</button>
+      </div>
+    </aside>
+
+    <div id="potion-modal" class="modal" hidden>
+      <div class="sheet craft-sheet">
+        <h2>Cauldron</h2>
+        <p>Brew potions from herbs and water. Finished vials land in the chest and sit on wall shelves.</p>
+        <p data-potion-note class="craft-note" hidden></p>
+        <div class="craft-body">
+          <div id="potion-crafts"></div>
+          <aside class="craft-preview-pane">
+            <canvas data-potion-preview width="220" height="220" aria-label="Potion preview"></canvas>
+            <p data-potion-preview-name class="meta">Select or hover a potion.</p>
+            <p class="meta craft-qty-hint">1× / 5× / Max brew as many vials as herbs and water allow.</p>
+            <button type="button" class="ghost craft-cancel" data-potion-cancel disabled>Cancel</button>
+          </aside>
+        </div>
+        <div id="potion-materials" class="craft-mats" aria-label="Materials"></div>
+        <button type="button" class="ghost" data-potion-close>Close</button>
+      </div>
+    </div>
+
+    <aside id="settings-dock" class="expand-dock" hidden>
+      <h2>Settings</h2>
+      <h3>Skybox colour</h3>
+      <p class="meta">Fake white clouds sit in every sky. Default is Blue.</p>
+      <div class="skybox-grid" data-skybox-list>
+        <button type="button" data-skybox="white">White</button>
+        <button type="button" data-skybox="black">Black</button>
+        <button type="button" data-skybox="dark-grey">Dark Grey</button>
+        <button type="button" data-skybox="blue">Blue</button>
+        <button type="button" data-skybox="light-grey">Light Grey</button>
+        <button type="button" data-skybox="peach">Peach</button>
+      </div>
+      <label class="settings-bright">
+        Brightness
+        <input type="range" data-brightness min="50" max="150" value="150" step="5" aria-valuemin="50" aria-valuemax="150" aria-valuenow="150" aria-label="Scene brightness" />
+        <span data-brightness-label>150%</span>
+      </label>
+      <p class="meta">Shop and outdoor lighting. New shops start at 150% (slider max).</p>
+      <label class="settings-bright">
+        Dungeon brightness
+        <input type="range" data-dungeon-brightness min="0" max="150" value="150" step="5" aria-valuemin="0" aria-valuemax="150" aria-valuenow="150" aria-label="Dungeon brightness" />
+        <span data-dungeon-brightness-label>150%</span>
+      </label>
+      <p class="meta">Cave lighting only. 100% is the dungeon baseline; new shops start at 150% (slider max). Does not change the shop.</p>
+      <label class="settings-check">
+        <input type="checkbox" data-photo-mode />
+        Photo mode
+      </label>
+      <p class="meta">Hides shop customers and their speech bubbles.</p>
+      <h3>Player Avatar</h3>
+      <p class="meta">Hair, shirt, legs, boots, and face hair save with the shop.</p>
+      <button type="button" data-look-open>Player Avatar: Customize</button>
+      <h3>Cheats</h3>
+      <p class="meta">Type a code and press Enter. Codes are not case-sensitive.</p>
+      <form data-cheat-form class="cheat-form">
+        <input type="text" data-cheat-code autocomplete="off" spellcheck="false" placeholder="Enter code" aria-label="Cheat code" />
+        <button type="submit">Enter</button>
+      </form>
+      <p data-cheat-note class="craft-note" hidden></p>
+      <button type="button" class="ghost" data-settings-close>Close</button>
+    </aside>
+
+    <aside id="look-dock" class="expand-dock" hidden>
+      <h2>Player Avatar</h2>
+      <p class="meta" data-look-note>Hair, shirt, legs, boots, and face hair save with the shop.</p>
+      <p class="look-label">Hair</p>
+      <div class="skybox-grid" data-look="hair"></div>
+      <p class="look-label">Shirt</p>
+      <div class="skybox-grid" data-look="shirt"></div>
+      <p class="look-label">Legs</p>
+      <div class="skybox-grid" data-look="legs"></div>
+      <p class="look-label">Boots</p>
+      <div class="skybox-grid" data-look="boots"></div>
+      <p class="look-label">Face hair</p>
+      <div class="skybox-grid" data-look="faceHair"></div>
+      <div class="row furn-row">
+        <button type="button" data-look-back>Back to Settings</button>
+        <button type="button" class="ghost" data-look-close>Close</button>
+      </div>
+    </aside>
+
+    <aside id="music-dock" class="expand-dock" hidden>
+      <h2>Music</h2>
+      <div class="tabs music-tabs">
+        <button type="button" class="tab is-on" data-music-tab="play">Play</button>
+        <button type="button" class="tab" data-music-tab="playlist">Playlist</button>
+        <button type="button" class="tab" data-music-loop aria-pressed="false" title="Repeat the current track">Loop</button>
+      </div>
+      <div data-music-pane="play">
+        <p>Upload MP3, WAV, or OGG files. Several tracks can sit in the playlist.</p>
+        <p data-music-name class="meta">Included tracks are ready. Press Play, or upload more MP3, WAV, or OGG files.</p>
+        <p data-music-note class="craft-note" hidden></p>
+        <label class="music-vol">
+          Volume
+          <input type="range" data-music-volume min="0" max="100" value="75" />
+        </label>
+        <div class="row furn-row">
+          <button type="button" data-music-upload>Upload</button>
+          <button type="button" data-music-shuffle>Shuffle</button>
+          <button type="button" data-music-play>Play</button>
+          <button type="button" data-music-pause>Pause</button>
+          <button type="button" data-music-skip>Skip</button>
+          <button type="button" data-music-stop>Stop</button>
+        </div>
+      </div>
+      <div data-music-pane="playlist" hidden>
+        <p>Drag order with the arrows. Click a name to play it.</p>
+        <div data-playlist class="playlist"></div>
+      </div>
+      <button type="button" class="ghost" data-music-close>Close</button>
+    </aside>
+
+    <div id="display-modal" class="modal" hidden>
+      <div class="sheet offer-sheet">
+        <h2>Display an Item</h2>
+        <p data-display-slot>Choose a chest item to place here.</p>
+        <p data-display-pick class="meta">No item selected yet.</p>
+        <div id="display-items" class="offer-list"></div>
+        <div data-display-slots class="shelf-slot-grid" hidden>
+          <button type="button" data-shelf-slot="0" disabled>
+            <strong>Top Left</strong>
+            <span class="meta" data-shelf-occ>Empty</span>
+          </button>
+          <button type="button" data-shelf-slot="1" disabled>
+            <strong>Top Right</strong>
+            <span class="meta" data-shelf-occ>Empty</span>
+          </button>
+          <button type="button" data-shelf-slot="2" disabled>
+            <strong>Bottom Left</strong>
+            <span class="meta" data-shelf-occ>Empty</span>
+          </button>
+          <button type="button" data-shelf-slot="3" disabled>
+            <strong>Bottom Right</strong>
+            <span class="meta" data-shelf-occ>Empty</span>
+          </button>
+        </div>
+        <div class="row furn-row">
+          <button type="button" data-display-confirm disabled>Place</button>
+          <button type="button" class="ghost" data-display-cancel>Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="fill-modal" class="modal" hidden>
+      <div class="sheet offer-sheet">
+        <h2>Fill Mannequin</h2>
+        <p>Assign armour from the chest. Melee, Magic, and Ranged sets each have their own pieces.</p>
+        <div class="tabs">
+          <button type="button" class="tab is-on" data-fill-class="melee">Melee</button>
+          <button type="button" class="tab" data-fill-class="magic">Magic</button>
+          <button type="button" class="tab" data-fill-class="ranged">Ranged</button>
+        </div>
+        <p data-fill-pick class="meta">No piece selected yet.</p>
+        <div id="fill-items" class="offer-list"></div>
+        <div class="row furn-row">
+          <button type="button" data-fill-assign disabled>Assign Piece</button>
+          <button type="button" data-fill-set disabled>Fill Matching Set</button>
+          <button type="button" class="ghost" data-fill-cancel>Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div id="inspect-pop" class="inspect-pop" hidden>
+      <p data-inspect-name>Rock</p>
+      <p class="inspect-blurb" data-inspect-blurb></p>
+      <button type="button" data-inspect-mine>Mine</button>
+      <button type="button" class="ghost" data-inspect-close>Close</button>
+    </div>
+    <div id="furn-menu" class="furn-menu" hidden>
+      <p data-furn-name>Furniture</p>
+      <button type="button" data-furn-use hidden>Use</button>
+      <button type="button" data-furn-upgrade hidden>Upgrade Chest</button>
+      <button type="button" data-furn-display hidden>Display item…</button>
+      <button type="button" data-furn-fill hidden>Fill</button>
+      <button type="button" data-furn-clear hidden>Clear display</button>
+      <button type="button" data-furn-delete hidden>Delete</button>
+      <button type="button" data-furn-move>Move Furniture</button>
+      <button type="button" data-furn-rotate>Rotate 15°</button>
+      <button type="button" class="ghost" data-furn-close>Close</button>
+    </div>
+
+    <div id="shop-fade" hidden></div>
+
+    <p id="nowebgl" hidden>This stall needs WebGL. Try another browser, then open the same page again.</p>
+
+  </body>
+</html>

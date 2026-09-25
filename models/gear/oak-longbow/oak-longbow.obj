@@ -1,0 +1,123 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib oak-longbow.mtl
+o Item Oak longbow 2026-09-24_13-47-45
+v -22 10 -12
+v -4 7 5
+v -2 7 4
+v -18 10 -17
+v -32 8 -59
+v -35 8 -56
+v -23 2 -12
+v -4 3 5
+v 6 1 26
+v 7 9 26
+v 12 9 22
+v 11 1 23
+v -3 3 4
+v -18 2 -17
+v -33 4 -58
+v -47 6 -63
+v -35 4 -56
+v 46 1 46
+v 43 2 47
+v 43 6 46
+v 47 5 46
+v 47 4 61
+v -32 8 -56
+v 44 8 44
+v 48 8 44
+v -32 8 -60
+usemtl c0
+f 1 2 3
+usemtl c1
+f 1 3 4
+usemtl c2
+f 1 4 5
+usemtl c3
+f 1 5 6
+usemtl c4
+f 1 6 7
+usemtl c5
+f 1 7 2
+usemtl c6
+f 2 7 8
+usemtl c7
+f 2 8 9
+usemtl c8
+f 2 9 10
+usemtl c4
+f 2 10 3
+usemtl c9
+f 3 10 11
+usemtl c10
+f 3 11 12
+usemtl c11
+f 3 12 13
+usemtl c12
+f 3 13 14
+usemtl c13
+f 3 14 4
+usemtl c14
+f 4 14 15
+usemtl c15
+f 4 15 5
+usemtl c16
+f 5 15 6
+usemtl c17
+f 5 6 16
+usemtl c18
+f 5 16 15
+usemtl c19
+f 15 16 17
+usemtl c20
+f 15 17 6
+usemtl c21
+f 6 17 7
+usemtl c22
+f 7 17 14
+usemtl c23
+f 7 14 8
+usemtl c24
+f 8 14 13
+usemtl c25
+f 8 13 12
+usemtl c26
+f 8 12 9
+usemtl c27
+f 9 12 18
+usemtl c28
+f 9 18 19
+usemtl c29
+f 9 19 10
+usemtl c30
+f 10 19 20
+usemtl c31
+f 10 20 11
+usemtl c32
+f 11 20 21
+usemtl c33
+f 11 21 12
+usemtl c34
+f 12 21 18
+usemtl c35
+f 18 21 19
+usemtl c36
+f 19 21 20
+usemtl c37
+f 14 17 15
+usemtl c38
+f 6 17 16
+usemtl c39
+f 19 18 22
+usemtl c40
+f 19 22 20
+usemtl c41
+f 20 22 21
+usemtl c42
+f 21 22 18
+usemtl c43
+f 23 24 25
+f 23 25 26
+usemtl c44
+f 23 26 24
+f 24 26 25

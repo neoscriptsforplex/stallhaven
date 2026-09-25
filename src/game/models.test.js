@@ -1498,6 +1498,69 @@ describe('bundled prop swaps', () => {
     }
   });
 
+  it('grounds the fire battlestaff on the same tilt as the other battlestaves', async () => {
+    const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    const fireObj = readFileSync(join(modelsRoot, 'gear/fire-battlestaff/fire-battlestaff.obj'), 'utf8');
+    const fireMtl = readFileSync(join(modelsRoot, 'gear/fire-battlestaff/fire-battlestaff.mtl'), 'utf8');
+    assert.match(fireObj, /^mtllib fire-battlestaff\.mtl/m);
+    assert.match(fireObj, /Object Fire battlestaff 2026-09-24_19-52-47/);
+    assert.match(fireMtl, /newmtl c0\r?\nKd 0\.1451 0\.2275 0\.0706/);
+    for (const id of ['air_battlestaff', 'water_battlestaff', 'earth_battlestaff']) {
+      const obj = readFileSync(join(modelsRoot, byId[id], `${id.replaceAll('_', '-')}.obj`), 'utf8');
+      assert.match(obj, new RegExp(`Item ${id.split('_')[0][0].toUpperCase()}${id.split('_')[0].slice(1)} battlestaff`, 'i'));
+      assert.doesNotMatch(obj, /fire-battlestaff/);
+    }
+
+    function shaftAxis(mesh) {
+      mesh.updateMatrixWorld(true);
+      const pts = [];
+      mesh.traverse((child) => {
+        if (!child.isMesh) return;
+        const pos = child.geometry.getAttribute('position');
+        for (let i = 0; i < pos.count; i += 1) {
+          pts.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld));
+        }
+      });
+      const center = new THREE.Vector3();
+      for (const p of pts) center.add(p);
+      center.multiplyScalar(1 / pts.length);
+      let xx = 0; let yy = 0; let zz = 0; let xy = 0; let xz = 0; let yz = 0;
+      for (const p of pts) {
+        const x = p.x - center.x; const y = p.y - center.y; const z = p.z - center.z;
+        xx += x * x; yy += y * y; zz += z * z; xy += x * y; xz += x * z; yz += y * z;
+      }
+      const axis = new THREE.Vector3(0, 1, 0);
+      for (let k = 0; k < 40; k += 1) {
+        axis.set(xx * axis.x + xy * axis.y + xz * axis.z, xy * axis.x + yy * axis.y + yz * axis.z, xz * axis.x + yz * axis.y + zz * axis.z).normalize();
+      }
+      if (axis.y < 0) axis.negate();
+      return axis;
+    }
+
+    async function fitted(id) {
+      const bundled = await loadFolder(byId[id]);
+      setBundledLook(id, bundled);
+      try {
+        const ware = buildWare(id);
+        const box = measureVisibleBox(ware);
+        const size = box.getSize(new THREE.Vector3());
+        return {
+          minY: box.min.y,
+          max: Math.max(size.x, size.y, size.z),
+          axis: shaftAxis(ware.getObjectByName('dump')),
+        };
+      } finally {
+        setBundledLook(id, null);
+      }
+    }
+
+    const air = await fitted('air_battlestaff');
+    const fire = await fitted('fire_battlestaff');
+    assert.ok(Math.abs(fire.minY) < 0.02, `fire minY=${fire.minY}`);
+    assert.ok(Math.abs(fire.max - air.max) < 0.08, `fire size ${fire.max} vs air ${air.max}`);
+    assert.ok(fire.axis.dot(air.axis) > 0.98, `fire axis ${fire.axis.toArray()} vs air ${air.axis.toArray()}`);
+  });
+
   it('fits bundled loom, fletching bench, and potter wheel dumps to the current stations', async () => {
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
     const cases = [

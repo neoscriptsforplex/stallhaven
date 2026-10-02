@@ -635,7 +635,7 @@ STAFF_ELEMENTS.forEach((element) => {
     category: 'weapon',
     combatClass: 'magic',
     slot: 'staff',
-    shape: 'staff_battle',
+    shape: element.id === 'fire' ? 'staff_mystic' : 'staff_battle',
     setKey: battleId,
     lineId: `magic-staff-${element.id}`,
     lineName: `${element.name} Staff`,

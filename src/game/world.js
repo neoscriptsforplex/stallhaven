@@ -64,6 +64,7 @@ import {
   STATION_ARRIVE,
   STATION_HIT,
   pickUseHit,
+  rangeFaceYaw,
   resolveStationUse,
   stationAtFloor,
 } from './interact.js';
@@ -1006,7 +1007,7 @@ export function createWorld(canvas, state, opts = {}) {
         planWalk(start, dest, [], PLAYER_RADIUS, sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors)
       ), type)
       : resolveStationUse(from, pose, state, planPlayerWalk, type);
-    const standFront = type === 'counter' || type === 'chest';
+    const standFront = type === 'counter' || type === 'chest' || type === 'range';
     const atStation = standFront
       ? plan.action === 'open'
       : (plan.action === 'open' || isNearPose(pose, arrive));
@@ -1018,6 +1019,7 @@ export function createWorld(canvas, state, opts = {}) {
         playClick('ui');
         return;
       }
+      if (type === 'range') shopkeeper.rotation.y = rangeFaceYaw(pose);
       if (type === 'boulder') {
         startMining(pose.materialId, pose);
         playClick('ui');
@@ -1077,6 +1079,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pendingUse) return;
     const { type, materialId, x, z } = pendingUse;
     pendingUse = null;
+    if (type === 'range') shopkeeper.rotation.y = rangeFaceYaw(state.furniture?.range);
     if (type === 'counter') return;
     if (type === 'boulder') startMining(materialId, { x, z, materialId });
     else if (type === 'tree') startChopping({ x, z, materialId: 'logs' });

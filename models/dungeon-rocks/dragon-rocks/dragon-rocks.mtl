@@ -1,0 +1,720 @@
+newmtl c0
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c0 - Default Texture.psd 
+
+newmtl c1
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c1 - Default Texture.psd 
+
+newmtl c2
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c2 - Default Texture.psd 
+
+newmtl c3
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c3 - Default Texture.psd 
+
+newmtl c4
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c4 - Default Texture.psd 
+
+newmtl c5
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c5 - Default Texture.psd 
+
+newmtl c6
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c6 - Default Texture.psd 
+
+newmtl c7
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c7 - Default Texture.psd 
+
+newmtl c8
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c8 - Default Texture.psd 
+
+newmtl c9
+Ka 0.000000 0.000000 0.000000
+Kd 0.729412 0.042908 0.042908
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c9 - Default Texture.psd 
+
+newmtl c10
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c10 - Default Texture.psd 
+
+newmtl c11
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c11 - Default Texture.psd 
+
+newmtl c12
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c12 - Default Texture.psd 
+
+newmtl c13
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c13 - Default Texture.psd 
+
+newmtl c14
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c14 - Default Texture.psd 
+
+newmtl c15
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c15 - Default Texture.psd 
+
+newmtl c16
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c16 - Default Texture.psd 
+
+newmtl c17
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c17 - Default Texture.psd 
+
+newmtl c18
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c18 - Default Texture.psd 
+
+newmtl c19
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c19 - Default Texture.psd 
+
+newmtl c20
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c20 - Default Texture.psd 
+
+newmtl c21
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c21 - Default Texture.psd 
+
+newmtl c22
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c22 - Default Texture.psd 
+
+newmtl c23
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c23 - Default Texture.psd 
+
+newmtl c24
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c24 - Default Texture.psd 
+
+newmtl c25
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c25 - Default Texture.psd 
+
+newmtl c26
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c26 - Default Texture.psd 
+
+newmtl c27
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c27 - Default Texture.psd 
+
+newmtl c28
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c28 - Default Texture.psd 
+
+newmtl c29
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c29 - Default Texture.psd 
+
+newmtl c30
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c30 - Default Texture.psd 
+
+newmtl c31
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c31 - Default Texture.psd 
+
+newmtl c32
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c32 - Default Texture.psd 
+
+newmtl c33
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c33 - Default Texture.psd 
+
+newmtl c34
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c34 - Default Texture.psd 
+
+newmtl c35
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c35 - Default Texture.psd 
+
+newmtl c36
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c36 - Default Texture.psd 
+
+newmtl c37
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c37 - Default Texture.psd 
+
+newmtl c38
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c38 - Default Texture.psd 
+
+newmtl c39
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c39 - Default Texture.psd 
+
+newmtl c40
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c40 - Default Texture.psd 
+
+newmtl c41
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c41 - Default Texture.psd 
+
+newmtl c42
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c42 - Default Texture.psd 
+
+newmtl c43
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c43 - Default Texture.psd 
+
+newmtl c44
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c44 - Default Texture.psd 
+
+newmtl c45
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c45 - Default Texture.psd 
+
+newmtl c46
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c46 - Default Texture.psd 
+
+newmtl c47
+Ka 0.000000 0.000000 0.000000
+Kd 0.596078 0.078264 0.021042
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.266667
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c47 - Default Texture.psd 
+

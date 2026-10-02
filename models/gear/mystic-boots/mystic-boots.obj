@@ -1,0 +1,152 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib mystic-boots.mtl
+o Item Mystic boots 2026-09-24_18-00-21
+v 16 25 1
+v 11 25 -3
+v 5 24 5
+v 10 24 9
+v 20 5 1
+v 12 5 -6
+v 2 25 -10
+v -3 25 -14
+v -9 24 -6
+v -4 24 -3
+v 5 5 -12
+v -3 5 -18
+v 6 9 4
+v 13 9 10
+v 19 0 2
+v 11 0 -4
+v -4 0 16
+v -2 8 13
+v 6 8 20
+v 4 0 22
+v -4 13 24
+v -4 9 -3
+v -11 9 -9
+v -19 8 -1
+v -11 8 6
+v -13 0 8
+v 3 0 -11
+v -4 0 -17
+v -21 0 2
+v -21 13 10
+usemtl c0
+f 1 2 3
+usemtl c1
+f 1 3 4
+usemtl c2
+f 1 4 5
+usemtl c3
+f 1 5 2
+usemtl c4
+f 2 5 6
+usemtl c5
+f 2 6 3
+usemtl c6
+f 2 3 2
+usemtl c7
+f 2 3 3
+usemtl c8
+f 7 8 9
+usemtl c1
+f 7 9 10
+usemtl c9
+f 7 10 7
+usemtl c10
+f 7 10 10
+usemtl c11
+f 7 10 11
+usemtl c12
+f 7 11 12
+usemtl c13
+f 7 12 8
+usemtl c14
+f 8 12 9
+usemtl c15
+f 8 9 8
+usemtl c16
+f 8 9 9
+usemtl c17
+f 3 6 13
+usemtl c18
+f 3 13 14
+usemtl c19
+f 3 14 4
+usemtl c6
+f 4 14 5
+usemtl c20
+f 5 14 15
+usemtl c21
+f 5 15 6
+usemtl c4
+f 6 15 16
+usemtl c5
+f 6 16 13
+usemtl c22
+f 13 16 17
+usemtl c23
+f 13 17 18
+usemtl c24
+f 13 18 19
+usemtl c22
+f 13 19 14
+usemtl c25
+f 14 19 20
+usemtl c10
+f 14 20 15
+usemtl c26
+f 4 1 1
+usemtl c27
+f 4 1 4
+usemtl c28
+f 21 20 19
+usemtl c29
+f 21 19 18
+usemtl c30
+f 21 18 17
+usemtl c31
+f 21 17 20
+usemtl c32
+f 20 19 18
+usemtl c33
+f 20 18 17
+usemtl c34
+f 22 11 10
+usemtl c35
+f 22 10 23
+f 22 23 24
+usemtl c36
+f 22 24 25
+usemtl c29
+f 22 25 26
+usemtl c17
+f 22 26 27
+usemtl c37
+f 22 27 11
+usemtl c38
+f 11 27 28
+usemtl c39
+f 11 28 12
+usemtl c2
+f 12 28 23
+usemtl c40
+f 12 23 9
+usemtl c35
+f 9 23 10
+usemtl c41
+f 28 29 23
+usemtl c42
+f 23 29 24
+usemtl c43
+f 24 29 30
+usemtl c44
+f 24 30 25
+usemtl c45
+f 25 30 26
+usemtl c46
+f 26 30 29
+usemtl c43
+f 25 24 29
+usemtl c46
+f 25 29 26

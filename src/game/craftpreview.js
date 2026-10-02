@@ -16,30 +16,40 @@ export function isRunePreview(id) {
 }
 
 /**
- * Craft-preview only. Robe tops and dragon masks are turned in the ware mesh
- * (mannequin, shop, and this preview share that orientation), so they get no
- * second turn here. Platebodies stay on their preview yaw.
+ * Craft-preview only. The shop mannequin keeps the ware mesh as built
+ * (including wareDisplayYaw). These turns are applied on the preview object.
+ *
+ * Platebodies, wizard robes, mystic robe tops, and the splitbark top sit
+ * sideways (sleeves up and down). A clockwise quarter-turn, as seen from the
+ * +Z camera, stands them upright: collar at the top, sleeves left and right,
+ * chest toward the camera. Dragon masks are tipped a quarter-turn forward so
+ * the face points at that camera.
  */
 const PREVIEW_EULER = {
   robe_bottom: { x: 0, y: 0, z: -Math.PI / 4 },
   platelegs: { x: Math.PI, y: 0, z: 0 },
   dhide_chaps: { x: Math.PI, y: 0, z: 0 },
-  // Chest faces the camera; shoulders run left-right.
-  platebody: { x: 0, y: Math.PI / 2, z: 0 },
+  // Existing yaw brings the chest toward the camera; clockwise roll stands it up.
+  platebody: { x: 0, y: Math.PI / 2, z: -Math.PI / 2 },
   robe_top: { x: Math.PI, y: 0, z: 0 },
   plateskirt: { x: Math.PI / 2, y: 0, z: 0 },
 };
 
-/** These dumps are oriented on the ware itself. Do not turn them again. */
-function usesWareDisplayYaw(id) {
-  return id === 'wizard_robe'
-    || id === 'mystic_robe_top'
-    || id === 'splitbark_robe_top'
-    || String(id).endsWith('_dragon_mask');
+const CLOCKWISE_QUARTER = { x: 0, y: 0, z: -Math.PI / 2 };
+const TIP_FORWARD = { x: Math.PI / 2, y: 0, z: 0 };
+
+/** Preview-only pose for dumps whose mannequin yaw is already baked in. */
+function previewOnlyEuler(id) {
+  if (id === 'wizard_robe' || id === 'mystic_robe_top' || id === 'splitbark_robe_top') {
+    return CLOCKWISE_QUARTER;
+  }
+  if (String(id).endsWith('_dragon_mask')) return TIP_FORWARD;
+  return null;
 }
 
 export function craftPreviewEuler(id) {
-  if (usesWareDisplayYaw(id)) return null;
+  const keyed = previewOnlyEuler(id);
+  if (keyed) return keyed;
   const shape = RECIPES[id]?.shape;
   return shape ? (PREVIEW_EULER[shape] ?? null) : null;
 }

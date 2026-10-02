@@ -1412,7 +1412,7 @@ describe('bundled prop swaps', () => {
 
   it('fits bundled weapon, armour, ammo, and tool dumps to the current mesh size', async () => {
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
-    assert.equal(LUKE_MODEL_FOLDERS.length, 186);
+    assert.equal(LUKE_MODEL_FOLDERS.length, 194);
     for (const item of LUKE_MODEL_FOLDERS) {
       assert.equal(byId[item.id], item.folder, item.id);
       const slug = item.folder.split('/').pop();
@@ -1559,6 +1559,90 @@ describe('bundled prop swaps', () => {
     assert.ok(Math.abs(fire.minY) < 0.02, `fire minY=${fire.minY}`);
     assert.ok(Math.abs(fire.max - air.max) < 0.08, `fire size ${fire.max} vs air ${air.max}`);
     assert.ok(fire.axis.dot(air.axis) > 0.98, `fire axis ${fire.axis.toArray()} vs air ${air.axis.toArray()}`);
+  });
+
+  it('grounds uploaded potion vials upright at the current potion size', async () => {
+    const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    const sources = {
+      attack_potion: 'Item Attack potion(4) 2026-09-24_21-31-07',
+      strength_potion: 'Item Strength potion(4) 2026-09-24_21-31-12',
+      energy_potion: 'Item Energy potion(4) 2026-09-24_21-31-16',
+      prayer_potion: 'Item Prayer potion(4) 2026-09-24_21-31-30',
+      ranging_potion: 'Item Ranging potion(4) 2026-09-24_21-31-34',
+      magic_potion: 'Item Magic potion(4) 2026-09-24_21-31-38',
+      antifire_potion: 'Item Antifire potion(4) 2026-09-24_21-31-42',
+      anti_poison_potion: 'Item Antipoison(4) 2026-09-24_21-31-45',
+    };
+
+    function shaftAxis(mesh) {
+      mesh.updateMatrixWorld(true);
+      const pts = [];
+      mesh.traverse((child) => {
+        if (!child.isMesh) return;
+        const pos = child.geometry.getAttribute('position');
+        for (let i = 0; i < pos.count; i += 1) {
+          pts.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld));
+        }
+      });
+      const center = new THREE.Vector3();
+      for (const p of pts) center.add(p);
+      center.multiplyScalar(1 / pts.length);
+      let xx = 0; let yy = 0; let zz = 0; let xy = 0; let xz = 0; let yz = 0;
+      for (const p of pts) {
+        const x = p.x - center.x; const y = p.y - center.y; const z = p.z - center.z;
+        xx += x * x; yy += y * y; zz += z * z; xy += x * y; xz += x * z; yz += y * z;
+      }
+      const axis = new THREE.Vector3(0, 1, 0);
+      for (let k = 0; k < 40; k += 1) {
+        axis.set(
+          xx * axis.x + xy * axis.y + xz * axis.z,
+          xy * axis.x + yy * axis.y + yz * axis.z,
+          xz * axis.x + yz * axis.y + zz * axis.z,
+        ).normalize();
+      }
+      if (axis.y < 0) axis.negate();
+      const ys = pts.map((p) => p.y);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const span = Math.max(maxY - minY, 0.0001);
+      const radius = (arr) => {
+        const cx = arr.reduce((sum, p) => sum + p.x, 0) / arr.length;
+        const cz = arr.reduce((sum, p) => sum + p.z, 0) / arr.length;
+        return Math.max(...arr.map((p) => Math.hypot(p.x - cx, p.z - cz)));
+      };
+      const top = pts.filter((p) => p.y > minY + span * 0.75);
+      const bottom = pts.filter((p) => p.y < minY + span * 0.4);
+      return { axis, corkUp: radius(top) < radius(bottom) };
+    }
+
+    for (const [id, sourceName] of Object.entries(sources)) {
+      const folder = byId[id];
+      const slug = id.replaceAll('_', '-');
+      assert.equal(folder, `gear/${slug}`, id);
+      const obj = readFileSync(join(modelsRoot, folder, `${slug}.obj`), 'utf8');
+      assert.match(obj, new RegExp(`^mtllib ${slug}\\.mtl`, 'm'), id);
+      assert.match(obj, new RegExp(`^o ${sourceName.replace(/[()]/g, '\\$&')}$`, 'm'), id);
+      const want = measureVisibleBox(buildWare(id)).getSize(new THREE.Vector3());
+      const bundled = await loadFolder(folder);
+      setBundledLook(id, bundled);
+      try {
+        const ware = buildWare(id);
+        const dump = ware.getObjectByName('dump');
+        assert.ok(dump, id);
+        const box = measureVisibleBox(ware);
+        const size = box.getSize(new THREE.Vector3());
+        const gotMax = Math.max(size.x, size.y, size.z);
+        const wantMax = Math.max(want.x, want.y, want.z);
+        assert.ok(Math.abs(box.min.y) < 0.02, `${id} minY=${box.min.y}`);
+        assert.ok(Math.abs(gotMax - wantMax) < 0.08, `${id} size ${gotMax} vs ${wantMax}`);
+        assert.ok(size.y >= Math.max(size.x, size.z), `${id} should stay taller than it is wide`);
+        const pose = shaftAxis(dump);
+        assert.ok(pose.axis.y > 0.98, `${id} axis ${pose.axis.toArray()}`);
+        assert.equal(pose.corkUp, true, id);
+      } finally {
+        setBundledLook(id, null);
+      }
+    }
   });
 
   it('fits bundled loom, fletching bench, and potter wheel dumps to the current stations', async () => {

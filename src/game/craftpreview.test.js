@@ -70,18 +70,31 @@ describe('craft preview framing', () => {
     assert.equal(craftPreviewEuler('bronze_platebody').y, Math.PI / 2);
     assert.equal(craftPreviewEuler('runite_platebody').y, Math.PI / 2);
     assert.equal(craftPreviewEuler('bronze_platebody').x, 0);
-    assert.equal(craftPreviewEuler('wizard_robe'), null);
-    assert.equal(craftPreviewEuler('mystic_robe_top'), null);
-    assert.equal(craftPreviewEuler('splitbark_robe_top'), null);
+    assert.equal(craftPreviewEuler('bronze_platebody').z, -Math.PI / 2);
+    assert.equal(craftPreviewEuler('adamant_platebody').z, -Math.PI / 2);
+    assert.equal(craftPreviewEuler('wizard_robe').z, -Math.PI / 2);
+    assert.equal(craftPreviewEuler('mystic_robe_top').z, -Math.PI / 2);
+    assert.equal(craftPreviewEuler('splitbark_robe_top').z, -Math.PI / 2);
+    assert.equal(craftPreviewEuler('wizard_robe').x, 0);
+    assert.equal(craftPreviewEuler('wizard_robe').y, 0);
     assert.equal(craftPreviewEuler('bronze_plateskirt').x, Math.PI / 2);
     assert.equal(craftPreviewEuler('dragon_plateskirt').x, Math.PI / 2);
-    assert.equal(craftPreviewEuler('green_dragon_mask'), null);
-    assert.equal(craftPreviewEuler('black_dragon_mask'), null);
-    assert.equal(craftPreviewEuler('blue_dragon_mask'), null);
+    assert.equal(craftPreviewEuler('green_dragon_mask').x, Math.PI / 2);
+    assert.equal(craftPreviewEuler('black_dragon_mask').x, Math.PI / 2);
+    assert.equal(craftPreviewEuler('blue_dragon_mask').x, Math.PI / 2);
+    assert.equal(craftPreviewEuler('red_dragon_mask').x, Math.PI / 2);
+    assert.equal(craftPreviewEuler('green_dragon_mask').y, 0);
+    assert.equal(craftPreviewEuler('green_dragon_mask').z, 0);
     assert.equal(craftPreviewEuler('bronze_sword'), null);
     const ware = buildWare('bronze_platelegs');
     assert.equal(ware.rotation.x, 0);
     assert.equal(ware.rotation.y, 0);
     assert.equal(ware.rotation.z, 0);
+    for (const id of ['bronze_platebody', 'wizard_robe', 'mystic_robe_top', 'splitbark_robe_top', 'green_dragon_mask']) {
+      const mesh = buildWare(id);
+      assert.equal(mesh.rotation.x, 0, id);
+      assert.equal(mesh.rotation.y, 0, id);
+      assert.equal(mesh.rotation.z, 0, id);
+    }
   });
 });

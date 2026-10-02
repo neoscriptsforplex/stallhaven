@@ -1498,8 +1498,10 @@ describe('bundled prop swaps', () => {
     }
   });
 
-  it('grounds the fire battlestaff on the same tilt as the other battlestaves', async () => {
+  it('shows the fire battlestaff with the mystic fire staff mesh', async () => {
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    assert.equal(byId.fire_battlestaff, 'gear/mystic-fire-staff');
+    assert.equal(byId.mystic_fire_staff, 'gear/mystic-fire-staff');
     const fireObj = readFileSync(join(modelsRoot, 'gear/fire-battlestaff/fire-battlestaff.obj'), 'utf8');
     const fireMtl = readFileSync(join(modelsRoot, 'gear/fire-battlestaff/fire-battlestaff.mtl'), 'utf8');
     assert.match(fireObj, /^mtllib fire-battlestaff\.mtl/m);
@@ -1509,6 +1511,7 @@ describe('bundled prop swaps', () => {
       const obj = readFileSync(join(modelsRoot, byId[id], `${id.replaceAll('_', '-')}.obj`), 'utf8');
       assert.match(obj, new RegExp(`Item ${id.split('_')[0][0].toUpperCase()}${id.split('_')[0].slice(1)} battlestaff`, 'i'));
       assert.doesNotMatch(obj, /fire-battlestaff/);
+      assert.notEqual(byId[id], 'gear/mystic-fire-staff');
     }
 
     function shaftAxis(mesh) {
@@ -1554,11 +1557,12 @@ describe('bundled prop swaps', () => {
       }
     }
 
-    const air = await fitted('air_battlestaff');
+    const mystic = await fitted('mystic_fire_staff');
     const fire = await fitted('fire_battlestaff');
     assert.ok(Math.abs(fire.minY) < 0.02, `fire minY=${fire.minY}`);
-    assert.ok(Math.abs(fire.max - air.max) < 0.08, `fire size ${fire.max} vs air ${air.max}`);
-    assert.ok(fire.axis.dot(air.axis) > 0.98, `fire axis ${fire.axis.toArray()} vs air ${air.axis.toArray()}`);
+    assert.ok(Math.abs(fire.minY - mystic.minY) < 0.001, `fire minY=${fire.minY} mystic=${mystic.minY}`);
+    assert.ok(Math.abs(fire.max - mystic.max) < 0.001, `fire size ${fire.max} vs mystic ${mystic.max}`);
+    assert.ok(fire.axis.dot(mystic.axis) > 0.999, `fire axis ${fire.axis.toArray()} vs mystic ${mystic.axis.toArray()}`);
   });
 
   it('fits bundled loom, fletching bench, and potter wheel dumps to the current stations', async () => {

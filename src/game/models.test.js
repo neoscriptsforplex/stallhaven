@@ -452,16 +452,30 @@ describe('outdoor and dungeon extras', () => {
       assert.ok(Math.abs((maxV - minV) - (maxY - minY) * SHOP_WALL_REPEAT) < 1e-4);
     });
     assert.ok(gables >= 2, `expected front and side gables, got ${gables}`);
+    const originFascia = origin.root.getObjectByName('fascia');
+    assert.ok(originFascia, 'origin front fascia should use the stone brick');
+    assertBrickFaces(originFascia);
 
     for (const ids of [['left'], ['right'], ['back'], ['left', 'back']]) {
       const built = buildShop(ids);
       let walls = 0;
       let rooms = 0;
+      let fasciaCount = 0;
+      let oldFasciaCobble = 0;
       built.root.traverse((child) => {
-        if (!child.userData?.shopWall) return;
-        walls += 1;
-        assertBrickFaces(child);
+        if (child.userData?.shopWall) {
+          walls += 1;
+          assertBrickFaces(child);
+        }
+        if (child.name === 'fascia') {
+          fasciaCount += 1;
+          assertBrickFaces(child);
+        }
+        const repeat = child.material?.map?.repeat;
+        if (repeat && Math.abs(repeat.x - 4.2) < 1e-6 && Math.abs(repeat.y - 0.4) < 1e-6) oldFasciaCobble += 1;
       });
+      assert.equal(fasciaCount, 1, `${ids.join('+')} keeps the origin fascia only`);
+      assert.equal(oldFasciaCobble, 0, `${ids.join('+')} should not keep the cobble fascia`);
       built.roofs.traverse((child) => {
         if (child.userData?.isRoof && child.children?.length) rooms += 1;
       });
@@ -633,7 +647,13 @@ describe('outdoor and dungeon extras', () => {
           assert.ok(box.min.z >= interiorZ - 0.01, `awning enters the room at z=${box.min.z}`);
         }
         if (width > ROOM_W && height > 0.2 && Math.abs(child.position.y - 2.64) < 0.05) join = true;
-        if (width > ROOM_W && height === 0.16 && Math.abs(child.position.y - 2.78) < 1e-6) fascia = true;
+        if (width > ROOM_W && height === 0.16 && Math.abs(child.position.y - 2.78) < 1e-6) {
+          fascia = true;
+          assert.equal(child.name, 'fascia');
+          assert.equal(child.material?.map?.userData?.kind, 'shop-wall');
+          assert.equal(child.material.map.wrapS, THREE.RepeatWrapping);
+          assert.equal(child.material.map.wrapT, THREE.RepeatWrapping);
+        }
         if (color === 0xead3ae && width > 7) cream += 1;
       });
       assert.equal(awnings, 1, `origin awning only for ${ids.join('+') || 'origin'}`);

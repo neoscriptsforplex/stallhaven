@@ -12,7 +12,7 @@ import {
   isMaterialCraft,
   CHOP_YIELD,
   FLAX_YIELD,
-  mineTiming,
+  mineYield,
   SHOP,
   SHELF_SLOT_COUNT,
   SHOP_MAX_LEVEL,
@@ -1101,7 +1101,7 @@ function grantMaterial(state, materialId, amount) {
   return add;
 }
 
-export function grantMinedMaterial(state, materialId, amount = mineTiming(materialId).yield) {
+export function grantMinedMaterial(state, materialId, amount = mineYield(materialId)) {
   if (!isMinedMaterial(materialId)) return 0;
   return grantMaterial(state, materialId, amount);
 }

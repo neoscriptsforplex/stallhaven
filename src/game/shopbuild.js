@@ -2015,7 +2015,7 @@ export const DUNGEON_BOULDERS = [
 ];
 
 export function treeInspect() {
-  return { name: 'Tree', blurb: 'An outdoor pine. Chop it for Logs.' };
+  return { name: 'Tree', blurb: 'An outdoor pine. Chop it for 5 Logs.' };
 }
 
 export function flaxInspect() {

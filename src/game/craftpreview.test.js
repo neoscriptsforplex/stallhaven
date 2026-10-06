@@ -75,7 +75,7 @@ describe('craft preview framing', () => {
     assert.equal(craftPreviewEuler('adamant_platebody').z, -Math.PI / 2);
     assert.equal(craftPreviewEuler('wizard_robe').z, Math.PI / 2);
     assert.equal(craftPreviewEuler('mystic_robe_top').z, -Math.PI / 2);
-    assert.equal(craftPreviewEuler('splitbark_robe_top').z, -Math.PI / 4);
+    assert.equal(craftPreviewEuler('splitbark_robe_top').z, -Math.PI / 4 - Math.PI / 2);
     assert.equal(craftPreviewEuler('wizard_robe').x, 0);
     assert.equal(craftPreviewEuler('wizard_robe').y, 0);
     assert.equal(craftPreviewEuler('bronze_plateskirt').x, Math.PI / 2);

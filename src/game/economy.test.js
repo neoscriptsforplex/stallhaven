@@ -979,7 +979,7 @@ describe('material regen', () => {
     assert.equal(isMinedMaterial('flour'), false);
     assert.equal(grantMinedMaterial(state, 'essence'), 1);
     assert.equal(state.materials.essence, 1);
-    assert.equal(mineTiming('essence'), { duration: 3.2, yield: 1 });
+    assert.deepEqual(mineTiming('essence'), { duration: 3.2, yield: 1 });
     assert.equal(grantMinedMaterial(state, 'bronze'), 5);
     assert.equal(state.materials.bronze, 17);
     for (const [id, amount] of [
@@ -991,7 +991,7 @@ describe('material regen', () => {
       ['dragon', 1],
     ]) {
       state.materials[id] = 0;
-      assert.equal(mineTiming(id), { duration: 3.2, yield: amount });
+      assert.deepEqual(mineTiming(id), { duration: 3.2, yield: amount });
       assert.equal(grantMinedMaterial(state, id), amount);
       assert.equal(state.materials[id], amount);
     }

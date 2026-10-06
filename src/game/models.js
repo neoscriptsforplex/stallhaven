@@ -712,6 +712,22 @@ function restScaleY(mesh, body) {
   return body?.scale?.y ?? 1;
 }
 
+/** Feet plane. groundY is the surface under the actor; unset means outdoor y=0. */
+function stanceY(mesh) {
+  const y = mesh?.userData?.groundY;
+  return Number.isFinite(y) ? y : 0;
+}
+
+function setStanceY(mesh, bob = 0) {
+  mesh.position.y = stanceY(mesh) + bob;
+}
+
+function settleStanceY(mesh, dt) {
+  const ground = stanceY(mesh);
+  mesh.position.y += (ground - mesh.position.y) * (1 - Math.exp(-dt * 16));
+  if (Math.abs(mesh.position.y - ground) < 0.002) mesh.position.y = ground;
+}
+
 /** In-place Walk clip speed of character_rigged.glb at scale 1. */
 export const RIGGED_WALK_SPEED = 0.834;
 /** Crossfade between Walk and Idle. */
@@ -742,6 +758,7 @@ function updateClipLocomotion(mesh, moving, dt) {
 export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
   if (mesh?.userData?.clipLocomotion) {
     updateClipLocomotion(mesh, moving, dt);
+    setStanceY(mesh, 0);
     return;
   }
   const rig = mesh?.userData?.rig;
@@ -764,7 +781,7 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
     if (moving) {
       mesh.userData.walkPhase = (mesh.userData.walkPhase ?? 0) + dt * 9.2;
       const phase = mesh.userData.walkPhase;
-      mesh.position.y = Math.abs(Math.sin(phase * 2)) * 0.046;
+      setStanceY(mesh, Math.abs(Math.sin(phase * 2)) * 0.046);
       if (body) {
         body.rotation.z = Math.sin(phase) * 0.07;
         body.rotation.x = Math.abs(Math.sin(phase * 2)) * 0.035;
@@ -773,8 +790,7 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
       return;
     }
     mesh.userData.walkPhase = 0;
-    mesh.position.y += (0 - mesh.position.y) * (1 - Math.exp(-dt * 16));
-    if (Math.abs(mesh.position.y) < 0.002) mesh.position.y = 0;
+    settleStanceY(mesh, dt);
     settleBody();
     return;
   }
@@ -786,7 +802,7 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
     rig.legR.rotation.x = restX(mesh, 'legR') - swing;
     if (rig.armL) rig.armL.rotation.x = restX(mesh, 'armL') - swing * 0.72;
     if (rig.armR) rig.armR.rotation.x = restX(mesh, 'armR') + swing * 0.72;
-    mesh.position.y = Math.abs(Math.sin(mesh.userData.walkPhase * 2)) * 0.028;
+    setStanceY(mesh, Math.abs(Math.sin(mesh.userData.walkPhase * 2)) * 0.028);
     if (body) {
       body.rotation.z = Math.sin(mesh.userData.walkPhase) * 0.04;
       body.scale.y = restScaleY(mesh, body) * (1 - Math.abs(Math.sin(mesh.userData.walkPhase * 2)) * 0.02);
@@ -799,8 +815,7 @@ export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
   settle(rig.armL, restX(mesh, 'armL'));
   settle(rig.armR, restX(mesh, 'armR'));
   settleBody();
-  mesh.position.y += (0 - mesh.position.y) * (1 - Math.exp(-dt * 16));
-  if (Math.abs(mesh.position.y) < 0.002) mesh.position.y = 0;
+  settleStanceY(mesh, dt);
 }
 
 function shaftTip(posY, rotZ, halfLen) {
@@ -1095,6 +1110,7 @@ export function setHeldTool(mesh, tool) {
 export function updateMinePose(mesh, dt = 0.016, now = 0) {
   if (mesh?.userData?.clipLocomotion) {
     updateClipLocomotion(mesh, false, dt);
+    setStanceY(mesh, 0);
     return;
   }
   const rig = mesh?.userData?.rig;
@@ -1106,7 +1122,7 @@ export function updateMinePose(mesh, dt = 0.016, now = 0) {
   } else if (body && body !== mesh) {
     body.rotation.x = swing * 0.35;
   }
-  mesh.position.y = Math.abs(Math.sin(now * 16.4)) * 0.014;
+  setStanceY(mesh, Math.abs(Math.sin(now * 16.4)) * 0.014);
 }
 
 function hashStyle(seed) {

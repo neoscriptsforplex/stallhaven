@@ -45,9 +45,9 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { cobblePathSpan, furnitureVisualYaw, pointHitsShop, ROOM_W, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
+import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, OUTDOOR_GROUND_Y, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -316,6 +316,50 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(walls.south >= 2, `south ${walls.south}`);
   });
 
+  it('builds shop boards whose top is the walkable floor', () => {
+    const shop = buildShop(['left']).root;
+    const top = measureShopFloorTop(shop);
+    assert.ok(Number.isFinite(top), 'shop should have floorboards');
+    assert.ok(Math.abs(top - shopFloorTopY()) < 1e-4, `mesh top ${top} vs config ${shopFloorTopY()}`);
+    const feet = [shopFloorFootprint(0, 0), shopFloorFootprint(-1, 0)];
+    let boards = 0;
+    let maxZ = -Infinity;
+    shop.traverse((child) => {
+      if (!child.isMesh || (child.userData?.shopFloor !== 'plank' && child.userData?.shopFloor !== 'slab')) return;
+      boards += 1;
+      const box = new THREE.Box3().setFromObject(child);
+      if (child.userData.shopFloor === 'plank') maxZ = Math.max(maxZ, box.max.z);
+      const inside = feet.some((foot) => (
+        box.min.x >= foot.minX - 1e-3
+        && box.max.x <= foot.maxX + 1e-3
+        && box.min.z >= foot.minZ - 1e-3
+        && box.max.z <= foot.maxZ + 1e-3
+      ));
+      assert.ok(inside, `floor mesh outside the walk area z ${box.min.z}..${box.max.z}`);
+    });
+    assert.ok(boards > 10);
+    assert.ok(Math.abs(maxZ - shopFloorFootprint(0, 0).maxZ) < 1e-3, `lip ${maxZ}`);
+  });
+
+  it('builds a floor piece for every expansion room', () => {
+    const ids = EXPANSION_PADS.map((pad) => pad.id);
+    const pieces = measureShopFloorPieces(buildShop(ids).root);
+    const rooms = [{ id: 'origin', gx: 0, gz: 0 }, ...EXPANSION_PADS];
+    assert.equal(pieces.length, rooms.length);
+    for (const room of rooms) {
+      const piece = pieces.find((item) => item.gx === room.gx && item.gz === room.gz);
+      assert.ok(piece, room.id);
+      assert.ok(Math.abs(piece.top - shopFloorTopY()) < 1e-4, `${room.id} top ${piece.top}`);
+      const spot = roomCenter(room.gx, room.gz);
+      assert.ok(spot.x > piece.minX && spot.x < piece.maxX && spot.z > piece.minZ && spot.z < piece.maxZ);
+      assert.ok(Math.abs(characterGroundY(spot.x, spot.z, ids) - piece.top) < 1e-4, room.id);
+      if (room.id !== 'origin') {
+        assert.equal(characterGroundY(spot.x, spot.z, []), OUTDOOR_GROUND_Y, `${room.id} after reset`);
+      }
+    }
+    assert.ok(Math.abs(measureShopFloorTop(buildShop([]).root) - shopFloorTopY()) < 1e-4);
+  });
+
   it('pours water from the fountain spout', () => {
     const shop = buildShop([]).root;
     let fountain = null;
@@ -353,6 +397,12 @@ describe('uploaded player walk', () => {
     updateWalkPose(wrapped, true, 0.2, 1);
     assert.notEqual(wrapped.userData.rig.legL.rotation.x, rest);
     assert.ok(wrapped.userData.walkPhase > 0);
+    const floor = shopFloorTopY();
+    wrapped.userData.groundY = floor;
+    updateWalkPose(wrapped, true, 0.05, 1);
+    assert.ok(wrapped.position.y >= floor - 1e-6, `walk feet ${wrapped.position.y}`);
+    for (let i = 0; i < 12; i += 1) updateWalkPose(wrapped, false, 0.2, 1);
+    assert.ok(Math.abs(wrapped.position.y - floor) < 0.01, `settled feet ${wrapped.position.y}`);
     const countSticks = (root) => {
       let n = 0;
       root.traverse((child) => {
@@ -396,6 +446,36 @@ describe('uploaded player walk', () => {
     const rest = wrapped.userData.rig.armR.rotation.x;
     updateMinePose(wrapped, 0.2, 0.4);
     assert.notEqual(wrapped.userData.rig.armR.rotation.x, rest);
+  });
+
+  it('plants a rigged clip on the shop floor instead of y=0', () => {
+    const action = () => ({
+      enabled: true,
+      timeScale: 1,
+      setEffectiveWeight() {},
+      reset() { return this; },
+      play() {},
+      crossFadeTo() {},
+    });
+    const mesh = new THREE.Group();
+    mesh.userData.clipLocomotion = {
+      mode: 'walk',
+      walk: action(),
+      idle: action(),
+      mixer: { update() {} },
+      modelScale: 1,
+      speed: 1.2,
+    };
+    mesh.userData.groundY = shopFloorTopY();
+    mesh.position.y = 0;
+    updateWalkPose(mesh, true, 0.016, 1);
+    assert.ok(Math.abs(mesh.position.y - shopFloorTopY()) < 1e-6);
+    mesh.position.y = 0;
+    updateMinePose(mesh, 0.016, 1);
+    assert.ok(Math.abs(mesh.position.y - shopFloorTopY()) < 1e-6);
+    mesh.userData.groundY = 0;
+    updateWalkPose(mesh, false, 0.016, 1);
+    assert.ok(Math.abs(mesh.position.y) < 1e-6);
   });
 
   it('keeps imported player scale while walking', () => {

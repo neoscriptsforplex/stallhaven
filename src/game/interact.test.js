@@ -7,6 +7,7 @@ import {
   STATION_HIT,
   USE_KINDS,
   pickUseHit,
+  rangeFaceYaw,
   resolveStationUse,
   stationAtFloor,
 } from './interact.js';
@@ -106,7 +107,7 @@ describe('station walk-then-open', () => {
     assert.ok(end.x > 5);
   });
 
-  it('walks to the cook-face of the range, not behind it', () => {
+  it('walks to the floor in front of the range pan, facing the cook face', () => {
     const state = createState();
     state.furniture.range = { x: SHOP.range.x, z: SHOP.range.z, rot: 0 };
     const plan = resolveStationUse(
@@ -117,8 +118,35 @@ describe('station walk-then-open', () => {
       'range',
     );
     assert.equal(plan.action, 'walk');
-    assert.ok(plan.dest.x < state.furniture.range.x - 0.4, 'stand on the cook-face (−X after start yaw)');
-    assert.ok(Math.abs(plan.dest.z - state.furniture.range.z) < 0.35);
+    // Start yaw −90°: local −X (front) becomes world −Z, local −Z (pan) becomes world +X.
+    assert.ok(plan.dest.z < state.furniture.range.z - 0.85, 'one step out from the front face');
+    assert.ok(plan.dest.x > state.furniture.range.x + 0.3, 'in front of the pan, not the chimney');
+    assert.ok(Math.abs(plan.dest.x - (state.furniture.range.x + 0.48)) < 0.2);
+    const chimneyside = resolveStationUse(
+      { x: state.furniture.range.x - 0.85, z: state.furniture.range.z },
+      state.furniture.range,
+      state,
+      undefined,
+      'range',
+    );
+    assert.equal(chimneyside.action, 'walk');
+    assert.ok(chimneyside.dest.z < state.furniture.range.z - 0.85);
+    const already = resolveStationUse(plan.dest, state.furniture.range, state, undefined, 'range');
+    assert.equal(already.action, 'open');
+    assert.ok(Math.abs(rangeFaceYaw(state.furniture.range)) < 1e-9);
+
+    state.furniture.range = { x: 0.4, z: 1.2, rot: Math.PI / 2 };
+    const turned = resolveStationUse(
+      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+      state.furniture.range,
+      state,
+      undefined,
+      'range',
+    );
+    assert.equal(turned.action, 'walk');
+    assert.ok(turned.dest.x < state.furniture.range.x - 0.85, 'front stays on local −X after a quarter turn');
+    assert.ok(turned.dest.z < state.furniture.range.z - 0.3, 'pan stays on local −Z after a quarter turn');
+    assert.ok(Math.abs(rangeFaceYaw(state.furniture.range) - Math.PI / 2) < 1e-9);
   });
 
   it('walks behind the counter to the shopkeeper side, not the buyer queue', () => {

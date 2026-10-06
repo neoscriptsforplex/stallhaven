@@ -3203,7 +3203,7 @@ export function createWorld(canvas, state, opts = {}) {
       const visual = shopkeeper.getObjectByName('uploaded-player')
         || shopkeeper.getObjectByName('rigged-player')
         || shopkeeper;
-      visual.updateMatrixWorld(true);
+      shopkeeper.updateMatrixWorld(true);
       const box = new THREE.Box3();
       let any = false;
       const gearName = /pickaxe|hatchet|chef-hat|importedGrip|hammer/i;

@@ -8,11 +8,13 @@ import {
   gardenTrapdoorSpot,
   gardenTreeSpots,
   playerWalkFloors,
+  rollFlaxSpots,
   roomCenter,
   shopRugPose,
   shopRugRect,
   walkFloors,
 } from './layout.js';
+import { gatherStandCandidates } from './interact.js';
 import {
   CELL,
   FLOOR,
@@ -319,6 +321,97 @@ describe('shop navigation', () => {
       }
     }
     assert.ok(Math.hypot(x - goal.x, z - goal.z) < 1.2);
+  });
+
+  function crossesFrontDoor(from, path) {
+    const wallZ = 3.65;
+    const pts = [from, ...path];
+    for (let i = 1; i < pts.length; i += 1) {
+      const a = pts[i - 1];
+      const b = pts[i];
+      if ((a.z - wallZ) * (b.z - wallZ) > 0) continue;
+      const dz = b.z - a.z;
+      const t = dz === 0 ? 0 : (wallZ - a.z) / dz;
+      if (Math.abs(a.x + (b.x - a.x) * t) <= 0.5) return true;
+    }
+    return false;
+  }
+
+  function flaxRng(seed) {
+    let s = seed;
+    return () => {
+      s = (s * 16807) % 2147483647;
+      return (s - 1) / 2147483646;
+    };
+  }
+
+  it('reaches every outdoor tree, flax plant, and gather stand via the front door', () => {
+    const layouts = [
+      [],
+      ['left'],
+      ['right'],
+      ['back'],
+      ['back', 'back-left'],
+      ['back', 'back-right'],
+      ['right', 'back-right'],
+      ['left', 'right', 'back', 'back-left', 'back-right'],
+    ];
+    const keeper = { x: SHOP.keeper.x, z: SHOP.keeper.z };
+    for (const expansions of layouts) {
+      const state = createState();
+      state.expansions = expansions;
+      if (expansions.includes('back')) clearBackWallShelf(state);
+      const obstacles = playerObstacles(state);
+      const floors = playerWalkFloors(expansions);
+      const trees = gardenTreeSpots(expansions);
+      if (expansions.length === 0) {
+        for (const side of ['left', 'right', 'rear', 'edge']) {
+          assert.ok(trees.some((tree) => tree.side === side), `${side} trees should ring the shop`);
+        }
+      }
+      const flax = rollFlaxSpots(expansions, {
+        rng: flaxRng(11 + expansions.length),
+        furniture: state.furniture,
+      });
+      assert.ok(flax.length >= 8, `flax field too small for [${expansions}]`);
+      const nodes = [
+        ...trees.map((spot) => ({ ...spot, kind: 'tree' })),
+        ...flax.map((spot) => ({ ...spot, kind: 'flax', side: 'flax' })),
+      ];
+      for (const node of nodes) {
+        const label = `${node.kind} ${node.side} ${node.x.toFixed(2)},${node.z.toFixed(2)} [${expansions}]`;
+        const path = planPlayerWalk(keeper, node, state);
+        assert.ok(path.length >= 1, `no path to ${label}`);
+        sampleClear(keeper, path, obstacles, floors);
+        assert.equal(crossesFrontDoor(keeper, path), true, `${label} should leave through the front door`);
+        const end = path[path.length - 1];
+        assert.ok(Math.hypot(end.x - node.x, end.z - node.z) < 1.5, `stopped far from ${label}`);
+        const around = expansions.length === 0 && (
+          node.side === 'left' || node.side === 'right'
+          || node.side === 'rear' || node.side === 'edge' || node.kind === 'flax'
+        );
+        const stands = gatherStandCandidates(node.kind, node).filter((dest) => (
+          isWalkable(dest.x, dest.z, obstacles, PLAYER_RADIUS, floors)
+        ));
+        assert.ok(stands.length >= 1, `no gather stand for ${label}`);
+        const checked = around ? stands : stands.slice(0, 1);
+        for (const dest of checked) {
+          const standPath = planPlayerWalk(keeper, dest, state);
+          const standEnd = standPath[standPath.length - 1];
+          assert.ok(standEnd, `no path to gather stand for ${label}`);
+          assert.ok(
+            Math.hypot(standEnd.x - dest.x, standEnd.z - dest.z) < 0.45,
+            `gather stand missed for ${label}`,
+          );
+          sampleClear(keeper, standPath, obstacles, floors);
+          assert.equal(
+            crossesFrontDoor(keeper, standPath),
+            true,
+            `gather stand for ${label} should leave through the front door`,
+          );
+        }
+      }
+    }
   });
 
   it('blocks the dungeon walls without sealing the floor', () => {

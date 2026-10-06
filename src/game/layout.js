@@ -461,7 +461,11 @@ export function outdoorWalkFloors(expansionIds = []) {
   };
   const sideMinZ = Math.max(grass.minZ, shop.minZ - OUTDOOR_CORNER_LINK);
   const sideMaxZ = Math.min(grass.maxZ, shop.maxZ + OUTDOOR_CORNER_LINK);
+  // One lawn rect, not only the strips around the room box. An L-shaped
+  // expansion leaves grass in the notch, and strip seams drop the corners.
+  const lawn = { minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: grass.maxZ };
   return [
+    lawn,
     { minX: grass.minX, maxX: grass.maxX, minZ: shop.maxZ, maxZ: grass.maxZ },
     { minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: shop.minZ },
     { minX: grass.minX, maxX: shop.minX, minZ: sideMinZ, maxZ: sideMaxZ },

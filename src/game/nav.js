@@ -353,10 +353,12 @@ export function hasLineOfSight(from, to, obstacles, radius = PLAYER_RADIUS, floo
   const dz = to.z - from.z;
   const dist = Math.hypot(dx, dz);
   if (dist < 0.001) return true;
-  const steps = Math.max(2, Math.ceil(dist / 0.1));
+  // Sample tighter than the obstacle pad so a shortcut cannot graze a tree or wall.
+  const steps = Math.max(2, Math.ceil(dist / 0.05));
+  const pad = radius + 0.04;
   for (let i = 1; i <= steps; i += 1) {
     const t = i / steps;
-    if (!isWalkable(from.x + dx * t, from.z + dz * t, obstacles, radius, floors)) return false;
+    if (!isWalkable(from.x + dx * t, from.z + dz * t, obstacles, pad, floors)) return false;
   }
   return true;
 }
@@ -481,7 +483,11 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
       }
       cells.reverse();
       const points = cells.map((cell) => cellWorld(cell.ix, cell.iz));
-      points[points.length - 1] = goal;
+      const tail = points[points.length - 1];
+      if (tail && Math.hypot(tail.x - goal.x, tail.z - goal.z) > 0.001
+        && hasLineOfSight(tail, goal, obstacles, radius, floors)) {
+        points.push(goal);
+      }
       return smoothPath(start, points, obstacles, radius, floors);
     }
     for (const [dx, dz, cost] of NEIGHBORS) {

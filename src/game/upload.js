@@ -519,6 +519,43 @@ export async function loadBundledPlayerScene() {
   return fetchObjMtl('player', 'player.obj', 'player.mtl');
 }
 
+/** Fetch character_rigged.glb from the same models roots as the OBJ player. */
+export async function loadBundledRiggedPlayer() {
+  await resolveBundledModelRoot();
+  const roots = cachedModelsRoot ? [cachedModelsRoot] : bundledModelRoots();
+  const file = 'player/character_rigged.glb';
+  let lastMissing = missingModel(`models/${file}`);
+  for (const root of roots) {
+    try {
+      const res = await fetch(`${root}${file}`);
+      if (!res.ok) {
+        lastMissing = missingModel(`models/${file}`);
+        continue;
+      }
+      const buffer = await res.arrayBuffer();
+      const magic = new Uint8Array(buffer, 0, Math.min(4, buffer.byteLength));
+      const tag = String.fromCharCode(magic[0] ?? 0, magic[1] ?? 0, magic[2] ?? 0, magic[3] ?? 0);
+      if (tag !== 'glTF') {
+        lastMissing = missingModel(`models/${file}`);
+        continue;
+      }
+      const gltf = await new Promise((resolve, reject) => {
+        gltfLoader.parse(buffer, `${root}player/`, resolve, reject);
+      });
+      if (!gltf?.scene) throw new Error('Rigged player has no scene.');
+      cachedModelsRoot = root;
+      return gltf;
+    } catch (err) {
+      if (err?.code === 'MISSING_MODEL') {
+        lastMissing = err;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastMissing;
+}
+
 export async function loadBundledPropScene(folder, rev) {
   const baseName = String(folder).split('/').pop();
   const names = [`${baseName}.obj`, `${folder}.obj`, 'model.obj', 'player.obj'];

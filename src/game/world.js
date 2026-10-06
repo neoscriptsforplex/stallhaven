@@ -94,6 +94,7 @@ import {
   updateWalkPose,
   wareTopY,
   wrapImportedCharacter,
+  wrapRiggedShopkeeper,
   wrapShopPlayer,
   PLAYER_WORLD_SCALE,
   UPLOADED_PLAYER_HEIGHT,
@@ -352,11 +353,22 @@ export function createWorld(canvas, state, opts = {}) {
   const dust = buildDust();
   scene.add(dust);
 
+  let riggedPlayerGltf = opts.riggedPlayer ?? null;
   let bundledPlayerSource = opts.bundledPlayer ?? null;
   let customPlayerSource = null;
   let customCustomerSource = null;
 
   function makeDefaultKeeper() {
+    if (riggedPlayerGltf) {
+      try {
+        return wrapRiggedShopkeeper(riggedPlayerGltf, {
+          chefHatOn: Boolean(state.chefHat),
+        });
+      } catch (err) {
+        console.warn('Rigged player skipped:', err?.message || err);
+        riggedPlayerGltf = null;
+      }
+    }
     if (bundledPlayerSource) {
       return wrapShopPlayer(bundledPlayerSource, {
         chefHatOn: Boolean(state.chefHat),
@@ -976,14 +988,17 @@ export function createWorld(canvas, state, opts = {}) {
     const dz = goal.z - pos.z;
     const dist = Math.hypot(dx, dz);
     if (dist < 0.08) {
+      if (actor.mesh.userData.clipLocomotion) actor.mesh.userData.clipLocomotion.speed = 0;
       updateWalkPose(actor.mesh, false, dt, performance.now() / 1000);
       return true;
     }
-    const step = speed * dt;
-    const t = Math.min(1, step / dist);
+    const step = Math.min(speed * dt, dist);
+    const actualSpeed = dt > 0 ? step / dt : 0;
+    const t = dist > 0 ? step / dist : 1;
     pos.x += dx * t;
     pos.z += dz * t;
     actor.mesh.rotation.y = Math.atan2(dx, dz);
+    if (actor.mesh.userData.clipLocomotion) actor.mesh.userData.clipLocomotion.speed = actualSpeed;
     updateWalkPose(actor.mesh, true, dt, performance.now() / 1000);
     return false;
   }
@@ -2607,7 +2622,7 @@ export function createWorld(canvas, state, opts = {}) {
     },
     setAppearance(look) {
       state.appearance = look;
-      if (customPlayerSource || bundledPlayerSource) return false;
+      if (customPlayerSource || bundledPlayerSource || riggedPlayerGltf) return false;
       const next = buildShopkeeper({
         chefHat: Boolean(state.chefHat),
         appearance: state.appearance,
@@ -2620,7 +2635,7 @@ export function createWorld(canvas, state, opts = {}) {
       return Boolean(customPlayerSource);
     },
     usesBundledPlayer() {
-      return Boolean(bundledPlayerSource) && !customPlayerSource;
+      return Boolean(riggedPlayerGltf || bundledPlayerSource) && !customPlayerSource;
     },
     setPlayerLook(model) {
       try {

@@ -63,14 +63,17 @@ import {
 } from './layout.js';
 import {
   PLAYER_RADIUS,
+  dungeonWallObstacles,
   floorsForState,
   isWalkable,
   liveObstacles,
+  moveWithCollision,
   placementBlocked,
   planPlayerWalk,
   planWalk,
   playerObstacles,
   queueSlot,
+  rebuildShopWalls,
 } from './nav.js';
 import { playClick } from './audio.js';
 import {
@@ -361,10 +364,14 @@ export function createWorld(canvas, state, opts = {}) {
     if (flaxReady) refillFlaxField();
   }
 
+  let collideObstacles = [];
+
   function rebuildNav() {
     const next = liveObstacles(state);
     obstacles.length = 0;
     obstacles.push(...next);
+    rebuildShopWalls(state.expansions ?? []);
+    collideObstacles = playerObstacles(state);
   }
 
   rebuildArchitecture();
@@ -421,6 +428,21 @@ export function createWorld(canvas, state, opts = {}) {
   refillFlaxField();
   let lastPlaceClickAt = 0;
   const DUNGEON_FLOOR = { minX: -5.2, maxX: 5.2, minZ: -4.2, maxZ: 4.2 };
+  const DUNGEON_WALLS = dungeonWallObstacles();
+
+  function planSceneWalk(from, to) {
+    if (sceneMode === 'dungeon') {
+      return planWalk(from, to, DUNGEON_WALLS, PLAYER_RADIUS, [DUNGEON_FLOOR]);
+    }
+    return planPlayerWalk(from, to, state, PLAYER_RADIUS);
+  }
+
+  function playerCollide() {
+    if (sceneMode === 'dungeon') {
+      return { obstacles: DUNGEON_WALLS, floors: [DUNGEON_FLOOR] };
+    }
+    return { obstacles: collideObstacles, floors: playerFloors };
+  }
   const shopReturnPos = { x: SHOP.keeper.x, z: SHOP.keeper.z };
   const playerPath = [];
   const moveMarker = new THREE.Mesh(
@@ -1196,9 +1218,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function setMoveTarget(x, z) {
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
-    const path = sceneMode === 'dungeon'
-      ? planWalk(from, { x, z }, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
-      : planPlayerWalk(from, { x, z }, state, PLAYER_RADIUS);
+    const path = planSceneWalk(from, { x, z });
     if (!path.length) {
       playerPath.length = 0;
       moveMarker.visible = false;
@@ -1229,21 +1249,38 @@ export function createWorld(canvas, state, opts = {}) {
     const step = Math.min(speed * dt, dist);
     const actualSpeed = dt > 0 ? step / dt : 0;
     const t = dist > 0 ? step / dist : 1;
-    pos.x += dx * t;
-    pos.z += dz * t;
+    let nx = pos.x + dx * t;
+    let nz = pos.z + dz * t;
+    let blocked = false;
+    if (actor.collide) {
+      const moved = moveWithCollision(
+        pos.x,
+        pos.z,
+        nx,
+        nz,
+        actor.collide.obstacles,
+        PLAYER_RADIUS,
+        actor.collide.floors,
+      );
+      nx = moved.x;
+      nz = moved.z;
+      blocked = moved.blocked && Math.hypot(nx - pos.x, nz - pos.z) < 1e-4;
+    }
+    pos.x = nx;
+    pos.z = nz;
     actor.mesh.rotation.y = Math.atan2(dx, dz);
-    if (actor.mesh.userData.clipLocomotion) actor.mesh.userData.clipLocomotion.speed = actualSpeed;
+    if (actor.mesh.userData.clipLocomotion) {
+      actor.mesh.userData.clipLocomotion.speed = blocked ? 0 : actualSpeed;
+    }
     syncStance(actor.mesh);
-    updateWalkPose(actor.mesh, true, dt, performance.now() / 1000);
-    return false;
+    updateWalkPose(actor.mesh, !blocked, dt, performance.now() / 1000);
+    return blocked ? 'blocked' : false;
   }
 
   function approachPoint(pose) {
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
     const near = { x: pose.x, z: pose.z + 0.85 };
-    const snapped = sceneMode === 'dungeon'
-      ? planWalk(from, near, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
-      : planPlayerWalk(from, near, state, PLAYER_RADIUS);
+    const snapped = planSceneWalk(from, near);
     if (snapped.length) return snapped[snapped.length - 1];
     return near;
   }
@@ -1256,20 +1293,10 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pose) return;
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
     const arrive = type === 'flax' ? FLAX_ARRIVE : type === 'trapdoor' || type === 'ladder' ? 1.35 : STATION_ARRIVE;
-    const dungeonUse = sceneMode === 'dungeon' || type === 'trapdoor' || type === 'ladder';
     const standFloors = sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors;
-    const canStand = (x, z) => isWalkable(
-      x,
-      z,
-      dungeonUse ? [] : playerObstacles(state),
-      PLAYER_RADIUS,
-      standFloors,
-    );
-    const plan = dungeonUse
-      ? resolveStationUse(from, pose, state, (start, dest) => (
-        planWalk(start, dest, [], PLAYER_RADIUS, standFloors)
-      ), type, canStand)
-      : resolveStationUse(from, pose, state, planPlayerWalk, type, canStand);
+    const standBlocks = sceneMode === 'dungeon' ? DUNGEON_WALLS : playerObstacles(state);
+    const canStand = (x, z) => isWalkable(x, z, standBlocks, PLAYER_RADIUS, standFloors);
+    const plan = resolveStationUse(from, pose, state, planSceneWalk, type, canStand);
     const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax';
     const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch' || gatherKind;
     const faceYaw = plan.face != null
@@ -1332,9 +1359,7 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     const fallbackDest = standFront && plan.dest ? plan.dest : { x: pose.x, z: pose.z };
-    const fallback = sceneMode === 'dungeon'
-      ? planWalk(from, fallbackDest, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
-      : planPlayerWalk(from, fallbackDest, state, PLAYER_RADIUS);
+    const fallback = planSceneWalk(from, fallbackDest);
     if (applyWalkPath(fallback)) {
       remember(fallbackDest, standFront ? standArrive : arrive, type !== 'counter');
       playClick('move');
@@ -1364,7 +1389,18 @@ export function createWorld(canvas, state, opts = {}) {
 
   function updatePlayer(dt, now) {
     if (playerPath.length) {
-      if (walkToward({ mesh: shopkeeper }, playerPath[0], dt, PLAYER_SPEED)) {
+      const step = walkToward(
+        { mesh: shopkeeper, collide: playerCollide() },
+        playerPath[0],
+        dt,
+        PLAYER_SPEED,
+      );
+      if (step === 'blocked') {
+        playerPath.length = 0;
+        moveMarker.visible = false;
+        return;
+      }
+      if (step) {
         playerPath.shift();
         if (!playerPath.length) {
           moveMarker.visible = false;

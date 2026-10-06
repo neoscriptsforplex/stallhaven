@@ -1,18 +1,36 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHOP } from './catalog.js';
-import { createState, removePlacedFurniture } from './economy.js';
-import { defaultFurniture, gardenTrapdoorSpot, shopRugPose, shopRugRect, walkFloors } from './layout.js';
+import { clearBackWallShelf, createState, removePlacedFurniture } from './economy.js';
 import {
+  defaultFurniture,
+  gardenBedSpots,
+  gardenTrapdoorSpot,
+  gardenTreeSpots,
+  playerWalkFloors,
+  roomCenter,
+  shopRugPose,
+  shopRugRect,
+  walkFloors,
+} from './layout.js';
+import {
+  CELL,
   FLOOR,
+  PLAYER_RADIUS,
+  dungeonWallObstacles,
   isWalkable,
   liveObstacles,
+  moveWithCollision,
   nearestWalkable,
   placementBlocked,
   planPlayerWalk,
   planWalk,
+  playerObstacles,
   queueSlot,
+  rebuildShopWalls,
   shopObstacles,
+  shopWallNavGrid,
+  shopWallObstacles,
 } from './nav.js';
 
 describe('shop navigation', () => {
@@ -162,6 +180,7 @@ describe('shop navigation', () => {
 
     const back = createState();
     back.expansions = ['back'];
+    clearBackWallShelf(back);
     const backPath = planPlayerWalk(
       { x: SHOP.keeper.x, z: SHOP.keeper.z },
       { x: 0, z: -7 },
@@ -170,5 +189,146 @@ describe('shop navigation', () => {
     assert.ok(backPath.length >= 1, 'should path into the rear expansion');
     const endBack = backPath[backPath.length - 1];
     assert.ok(endBack.z < -4, 'should finish inside the rear room');
+  });
+
+  function sampleClear(from, path, obstacles, floors) {
+    let prev = from;
+    for (const point of path) {
+      const dx = point.x - prev.x;
+      const dz = point.z - prev.z;
+      const dist = Math.hypot(dx, dz);
+      const steps = Math.max(1, Math.ceil(dist / 0.1));
+      for (let i = 0; i <= steps; i += 1) {
+        const t = i / steps;
+        const x = prev.x + dx * t;
+        const z = prev.z + dz * t;
+        assert.equal(
+          isWalkable(x, z, obstacles, PLAYER_RADIUS, floors),
+          true,
+          `path clips a wall at ${x.toFixed(2)},${z.toFixed(2)}`,
+        );
+      }
+      prev = point;
+    }
+  }
+
+  it('keeps the storefront door open and the wall beside it shut', () => {
+    const walls = shopWallObstacles([]);
+    const floors = playerWalkFloors([]);
+    const grid = shopWallNavGrid([]);
+    assert.equal(isWalkable(0, 3.6, walls, PLAYER_RADIUS, floors), true);
+    assert.equal(isWalkable(1.4, 3.6, walls, PLAYER_RADIUS, floors), false);
+    assert.equal(grid.has(`${Math.round(0 / CELL)},${Math.round(3.6 / CELL)}`), false);
+    assert.equal(grid.has(`${Math.round(1.4 / CELL)},${Math.round(3.6 / CELL)}`), true);
+    const moved = moveWithCollision(1.6, 2.4, 1.6, 4.6, walls, PLAYER_RADIUS, floors);
+    assert.ok(moved.z < 3.55, 'collision should stop beside the front wall');
+    assert.ok(moved.z > 2.5, 'the player should walk up to the wall');
+    const through = moveWithCollision(0, 2.9, 0, 4.4, walls, PLAYER_RADIUS, floors);
+    assert.ok(through.z > 4, 'the door opening should let the player through');
+    const state = createState();
+    const bed = gardenBedSpots([])[0];
+    const backInside = planPlayerWalk(bed, { x: SHOP.anvil.x, z: SHOP.anvil.z + 0.75 }, state);
+    assert.ok(backInside.length >= 1, 'a yard click should path back through the door');
+    sampleClear(bed, backInside, playerObstacles(state), floors);
+    const end = backInside[backInside.length - 1];
+    assert.ok(end.z < FLOOR.maxZ, 'should finish inside the shop');
+  });
+
+  it('rebuilds expansion doors into the wall grid', () => {
+    rebuildShopWalls([]);
+    const shut = shopWallNavGrid([]);
+    const doorCell = `${Math.round(4.1 / CELL)},${Math.round(0.1 / CELL)}`;
+    assert.equal(shut.has(doorCell), true, 'the right wall is solid before the expansion');
+    rebuildShopWalls(['right']);
+    const open = shopWallNavGrid(['right']);
+    assert.equal(open.has(doorCell), false, 'buying the right room cuts a door');
+    const stone = `${Math.round(4.1 / CELL)},${Math.round(2.2 / CELL)}`;
+    assert.equal(open.has(stone), true, 'the rest of that wall stays solid');
+    rebuildShopWalls([]);
+    assert.equal(shopWallNavGrid([]).has(doorCell), true, 'resetting the shop seals the door');
+  });
+
+  it('paths through doors and around walls at every expansion level', () => {
+    const levels = [
+      [],
+      ['left'],
+      ['right'],
+      ['back'],
+      ['left', 'back', 'back-left'],
+      ['right', 'back', 'back-right'],
+      ['left', 'right', 'back', 'back-left', 'back-right'],
+    ];
+    const keeper = { x: SHOP.keeper.x, z: SHOP.keeper.z };
+    for (const expansions of levels) {
+      const state = createState();
+      state.expansions = expansions;
+      if (expansions.includes('back')) clearBackWallShelf(state);
+      rebuildShopWalls(expansions);
+      const obstacles = playerObstacles(state);
+      const floors = playerWalkFloors(expansions);
+      const targets = [
+        ...expansions.map((id) => {
+          const pad = { left: [-1, 0], right: [1, 0], back: [0, -1], 'back-left': [-1, -1], 'back-right': [1, -1] }[id];
+          return roomCenter(pad[0], pad[1]);
+        }),
+        ...gardenBedSpots(expansions).slice(0, 2),
+        ...gardenTreeSpots(expansions).filter((spot) => spot.side === 'left' || spot.side === 'rear').slice(0, 2),
+      ];
+      for (const target of targets) {
+        const path = planPlayerWalk(keeper, target, state);
+        assert.ok(path.length >= 1, `no path to ${target.x},${target.z} with [${expansions}]`);
+        sampleClear(keeper, path, obstacles, floors);
+        const end = path[path.length - 1];
+        assert.ok(
+          Math.hypot(end.x - target.x, end.z - target.z) < 1.5,
+          `stopped far from ${target.x},${target.z}`,
+        );
+      }
+    }
+  });
+
+  it('follows a wall-aware path without clipping while moving', () => {
+    const state = createState();
+    state.expansions = ['right', 'back'];
+    const obstacles = playerObstacles(state);
+    const floors = playerWalkFloors(state.expansions);
+    const goal = roomCenter(1, 0);
+    const path = planPlayerWalk({ x: SHOP.keeper.x, z: SHOP.keeper.z }, goal, state);
+    let x = SHOP.keeper.x;
+    let z = SHOP.keeper.z;
+    for (const point of path) {
+      let guard = 0;
+      while (Math.hypot(point.x - x, point.z - z) > 0.08 && guard < 80) {
+        guard += 1;
+        const dx = point.x - x;
+        const dz = point.z - z;
+        const dist = Math.hypot(dx, dz);
+        const step = Math.min(0.18, dist);
+        const moved = moveWithCollision(
+          x,
+          z,
+          x + (dx / dist) * step,
+          z + (dz / dist) * step,
+          obstacles,
+          PLAYER_RADIUS,
+          floors,
+        );
+        assert.equal(moved.blocked, false, `stuck at ${x.toFixed(2)},${z.toFixed(2)}`);
+        x = moved.x;
+        z = moved.z;
+      }
+    }
+    assert.ok(Math.hypot(x - goal.x, z - goal.z) < 1.2);
+  });
+
+  it('blocks the dungeon walls without sealing the floor', () => {
+    const walls = dungeonWallObstacles();
+    const floor = { minX: -5.2, maxX: 5.2, minZ: -4.2, maxZ: 4.2 };
+    assert.equal(isWalkable(0, 0, walls, PLAYER_RADIUS, [floor]), true);
+    assert.equal(isWalkable(4.7, 0, walls, PLAYER_RADIUS, [floor]), true);
+    const wide = { minX: -8, maxX: 8, minZ: -6, maxZ: 6 };
+    const moved = moveWithCollision(4.6, 0, 6.4, 0, walls, PLAYER_RADIUS, [wide]);
+    assert.ok(moved.x < 5.2, 'the east dungeon wall should stop the player');
+    assert.ok(moved.x > 4.6, 'the player should walk up to the wall');
   });
 });

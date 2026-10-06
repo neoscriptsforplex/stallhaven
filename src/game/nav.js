@@ -1,14 +1,20 @@
 import { SHOP } from './catalog.js';
 import {
   FOUNTAIN,
+  ROOM_D,
+  ROOM_W,
+  WALL_THICK,
   defaultFurniture,
   furnitureHalfSize,
   furnitureVisualYaw,
   gardenTreeSpots,
   gardenRockSpots,
   keepFountain,
+  neighborsOf,
+  occupiedCells,
   playerWalkFloors,
   pointOnFloors,
+  roomCenter,
   rotatedFootprint,
   walkFloors,
   FLOOR_SNAP_MARGIN,
@@ -150,8 +156,132 @@ export function gardenObstacles(expansionIds = []) {
   return blocks;
 }
 
+/** Interior door width cut by addWallWithDoor (shopbuild.js). */
+export const EXPANSION_DOOR_W = 1.28;
+/** Origin storefront opening: doorHalf 0.58 on each side of the front wall. */
+export const ORIGIN_DOOR_W = 1.16;
+
+/** Dungeon shell from buildDungeon: 11×9 room, walls 0.22 thick. */
+const DUNGEON_W = 11;
+const DUNGEON_D = 9;
+const DUNGEON_WALL_T = 0.22;
+
+function wallPieces(axis, x, z, span, thick, doorAlong, doorW) {
+  const halfT = thick / 2;
+  const halfS = span / 2;
+  if (axis === 'x') {
+    const z0 = z - halfT;
+    const z1 = z + halfT;
+    const x0 = x - halfS;
+    const x1 = x + halfS;
+    if (doorAlong == null) return [{ minX: x0, maxX: x1, minZ: z0, maxZ: z1 }];
+    const d0 = doorAlong - doorW / 2;
+    const d1 = doorAlong + doorW / 2;
+    const parts = [];
+    if (d0 - x0 > 0.02) parts.push({ minX: x0, maxX: d0, minZ: z0, maxZ: z1 });
+    if (x1 - d1 > 0.02) parts.push({ minX: d1, maxX: x1, minZ: z0, maxZ: z1 });
+    return parts;
+  }
+  const x0 = x - halfT;
+  const x1 = x + halfT;
+  const z0 = z - halfS;
+  const z1 = z + halfS;
+  if (doorAlong == null) return [{ minX: x0, maxX: x1, minZ: z0, maxZ: z1 }];
+  const d0 = doorAlong - doorW / 2;
+  const d1 = doorAlong + doorW / 2;
+  const parts = [];
+  if (d0 - z0 > 0.02) parts.push({ minX: x0, maxX: x1, minZ: z0, maxZ: d0 });
+  if (z1 - d1 > 0.02) parts.push({ minX: x0, maxX: x1, minZ: d1, maxZ: z1 });
+  return parts;
+}
+
+/** Solid shop walls for the current rooms. Door gaps stay open. Matches addRoomWalls. */
+export function buildShopWallRects(expansionIds = []) {
+  const blocks = [];
+  const thick = WALL_THICK;
+  for (const cell of occupiedCells(expansionIds)) {
+    const c = roomCenter(cell.gx, cell.gz);
+    const neigh = neighborsOf(cell.gx, cell.gz, expansionIds);
+    const isOrigin = cell.gx === 0 && cell.gz === 0;
+    const leftX = c.x - ROOM_W / 2;
+    const rightX = c.x + ROOM_W / 2;
+    const backZ = c.z - ROOM_D / 2;
+    const frontZ = c.z + ROOM_D / 2;
+    if (!neigh.left) blocks.push(...wallPieces('z', leftX, c.z, ROOM_D, thick, null, 0));
+    if (neigh.right) blocks.push(...wallPieces('z', rightX, c.z, ROOM_D, thick, c.z, EXPANSION_DOOR_W));
+    else blocks.push(...wallPieces('z', rightX, c.z, ROOM_D, thick, null, 0));
+    if (neigh.back) blocks.push(...wallPieces('x', c.x, backZ, ROOM_W, thick, c.x, EXPANSION_DOOR_W));
+    else blocks.push(...wallPieces('x', c.x, backZ, ROOM_W, thick, null, 0));
+    if (!neigh.front) {
+      if (isOrigin) blocks.push(...wallPieces('x', c.x, frontZ, ROOM_W, thick, c.x, ORIGIN_DOOR_W));
+      else blocks.push(...wallPieces('x', c.x, frontZ, ROOM_W, thick, null, 0));
+    }
+  }
+  return blocks;
+}
+
+function rasterizeBlockedCells(walls, radius) {
+  const blocked = new Set();
+  for (const block of walls) {
+    const ix0 = Math.floor((block.minX - radius) / CELL);
+    const ix1 = Math.ceil((block.maxX + radius) / CELL);
+    const iz0 = Math.floor((block.minZ - radius) / CELL);
+    const iz1 = Math.ceil((block.maxZ + radius) / CELL);
+    for (let ix = ix0; ix <= ix1; ix += 1) {
+      for (let iz = iz0; iz <= iz1; iz += 1) {
+        if (pointInRect(ix * CELL, iz * CELL, block, radius)) blocked.add(`${ix},${iz}`);
+      }
+    }
+  }
+  return blocked;
+}
+
+function expansionKey(expansionIds = []) {
+  return [...expansionIds].slice().sort().join(',');
+}
+
+let wallNavCache = null;
+
+/** Rebuild the wall grid. Called when an expansion is bought or the shop is reset. */
+export function rebuildShopWalls(expansionIds = [], radius = PLAYER_RADIUS) {
+  const walls = buildShopWallRects(expansionIds);
+  wallNavCache = {
+    key: `${radius}|${expansionKey(expansionIds)}`,
+    walls,
+    blocked: rasterizeBlockedCells(walls, radius),
+  };
+  return wallNavCache.walls;
+}
+
+function shopWallNav(expansionIds = [], radius = PLAYER_RADIUS) {
+  const key = `${radius}|${expansionKey(expansionIds)}`;
+  if (!wallNavCache || wallNavCache.key !== key) rebuildShopWalls(expansionIds, radius);
+  return wallNavCache;
+}
+
+export function shopWallObstacles(expansionIds = [], radius = PLAYER_RADIUS) {
+  return shopWallNav(expansionIds, radius).walls;
+}
+
+export function shopWallNavGrid(expansionIds = [], radius = PLAYER_RADIUS) {
+  return shopWallNav(expansionIds, radius).blocked;
+}
+
+export function dungeonWallObstacles() {
+  return [
+    rectFromCenter(0, -DUNGEON_D / 2, DUNGEON_W, DUNGEON_WALL_T),
+    rectFromCenter(0, DUNGEON_D / 2, DUNGEON_W, DUNGEON_WALL_T),
+    rectFromCenter(-DUNGEON_W / 2, 0, DUNGEON_WALL_T, DUNGEON_D),
+    rectFromCenter(DUNGEON_W / 2, 0, DUNGEON_WALL_T, DUNGEON_D),
+  ];
+}
+
 export function playerObstacles(state, shop = SHOP) {
-  return [...liveObstacles(state, shop), ...gardenObstacles(state?.expansions ?? [])];
+  return [
+    ...liveObstacles(state, shop),
+    ...gardenObstacles(state?.expansions ?? []),
+    ...shopWallObstacles(state?.expansions ?? []),
+  ];
 }
 
 function rectsOverlap(a, b, pad = 0) {
@@ -235,6 +365,40 @@ function toCell(x, z) {
   return [Math.round(x / CELL), Math.round(z / CELL)];
 }
 
+function heapPush(heap, node) {
+  heap.push(node);
+  let i = heap.length - 1;
+  while (i > 0) {
+    const parent = (i - 1) >> 1;
+    if (heap[parent].f <= heap[i].f) break;
+    const tmp = heap[parent];
+    heap[parent] = heap[i];
+    heap[i] = tmp;
+    i = parent;
+  }
+}
+
+function heapPop(heap) {
+  const top = heap[0];
+  const last = heap.pop();
+  if (!heap.length) return top;
+  heap[0] = last;
+  let i = 0;
+  for (;;) {
+    const left = i * 2 + 1;
+    const right = left + 1;
+    let smallest = i;
+    if (left < heap.length && heap[left].f < heap[smallest].f) smallest = left;
+    if (right < heap.length && heap[right].f < heap[smallest].f) smallest = right;
+    if (smallest === i) break;
+    const tmp = heap[smallest];
+    heap[smallest] = heap[i];
+    heap[i] = tmp;
+    i = smallest;
+  }
+  return top;
+}
+
 function cellWorld(ix, iz) {
   return { x: ix * CELL, z: iz * CELL };
 }
@@ -285,7 +449,7 @@ function smoothPath(start, points, obstacles, radius, floors) {
   return out;
 }
 
-export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR]) {
+export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR], wallBlocked = null) {
   const start = nearestWalkable(from.x, from.z, obstacles, radius, floors) ?? from;
   const goal = nearestWalkable(to.x, to.z, obstacles, radius, floors);
   if (!goal) return [];
@@ -303,11 +467,7 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
 
   while (open.length && steps < 40000) {
     steps += 1;
-    let best = 0;
-    for (let i = 1; i < open.length; i += 1) {
-      if (open[i].f < open[best].f) best = i;
-    }
-    const cur = open.splice(best, 1)[0];
+    const cur = heapPop(open);
     const key = `${cur.ix},${cur.iz}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -329,7 +489,10 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
       const niz = cur.iz + dz;
       const nKey = `${nix},${niz}`;
       if (seen.has(nKey)) continue;
+      if (wallBlocked?.has(nKey)) continue;
       if (dx !== 0 && dz !== 0) {
+        if (wallBlocked?.has(`${cur.ix + dx},${cur.iz}`)) continue;
+        if (wallBlocked?.has(`${cur.ix},${cur.iz + dz}`)) continue;
         if (!isWalkable((cur.ix + dx) * CELL, cur.iz * CELL, obstacles, radius, floors)) continue;
         if (!isWalkable(cur.ix * CELL, (cur.iz + dz) * CELL, obstacles, radius, floors)) continue;
       }
@@ -339,7 +502,7 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
       if (g >= (gScore.get(nKey) ?? Infinity)) continue;
       gScore.set(nKey, g);
       came.set(nKey, { ix: cur.ix, iz: cur.iz });
-      open.push({
+      heapPush(open, {
         ix: nix,
         iz: niz,
         g,
@@ -355,24 +518,53 @@ export function planWalk(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
 }
 
 export function planPlayerWalk(from, to, state, radius = PLAYER_RADIUS) {
-  const indoor = walkFloors(state?.expansions ?? []);
-  const floors = playerWalkFloors(state?.expansions ?? []);
+  const ids = state?.expansions ?? [];
+  const floors = playerWalkFloors(ids);
   const obstacles = playerObstacles(state);
-  const doorIn = { x: 0, z: FLOOR.maxZ - radius - 0.08 };
-  const doorOut = { x: 0, z: FLOOR.maxZ + radius + 0.35 };
-  const fromInside = indoor.some((rect) => pointInRect(from.x, from.z, rect, -0.05));
-  const toInside = indoor.some((rect) => pointInRect(to.x, to.z, rect, -0.05));
-  if (fromInside && toInside) {
-    const indoorPath = findPath(from, to, obstacles, radius, indoor);
-    if (indoorPath.length) return indoorPath;
+  const wallBlocked = shopWallNavGrid(ids, radius);
+  return findPath(from, to, obstacles, radius, floors, wallBlocked);
+}
+
+function slideStep(x, z, nx, nz, obstacles, radius, floors) {
+  const ok = (px, pz) => isWalkable(px, pz, obstacles, radius, floors);
+  const hitsBlock = (px, pz) => obstacles.some((block) => pointInRect(px, pz, block, radius));
+  if (ok(nx, nz)) return { x: nx, z: nz, blocked: false };
+  if (!ok(x, z)) {
+    if (!hitsBlock(nx, nz)) return { x: nx, z: nz, blocked: false };
+    if (!hitsBlock(nx, z)) return { x: nx, z, blocked: true };
+    if (!hitsBlock(x, nz)) return { x, z: nz, blocked: true };
+    return { x, z, blocked: true };
   }
-  if (fromInside !== toInside) {
-    const first = findPath(from, fromInside ? doorIn : doorOut, obstacles, radius, floors);
-    const second = findPath(fromInside ? doorOut : doorIn, to, obstacles, radius, floors);
-    const joined = [...first, ...second];
-    if (joined.length) return joined;
+  if (ok(nx, z)) return { x: nx, z, blocked: true };
+  if (ok(x, nz)) return { x, z: nz, blocked: true };
+  return { x, z, blocked: true };
+}
+
+/** Step toward a point without entering a wall or other blocker. Slides along a face. */
+export function moveWithCollision(x, z, nx, nz, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR]) {
+  const dist = Math.hypot(nx - x, nz - z);
+  if (dist < 1e-6) return { x, z, blocked: false };
+  const steps = Math.max(1, Math.ceil(dist / (CELL * 0.45)));
+  let cx = x;
+  let cz = z;
+  let blocked = false;
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    const next = slideStep(
+      cx,
+      cz,
+      x + (nx - x) * t,
+      z + (nz - z) * t,
+      obstacles,
+      radius,
+      floors,
+    );
+    if (next.blocked) blocked = true;
+    if (next.x === cx && next.z === cz) break;
+    cx = next.x;
+    cz = next.z;
   }
-  return findPath(from, to, obstacles, radius, floors);
+  return { x: cx, z: cz, blocked };
 }
 
 export function queueSlot(index, shop = SHOP, counter = null) {

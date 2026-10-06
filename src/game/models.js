@@ -714,6 +714,8 @@ function restScaleY(mesh, body) {
 
 /** In-place Walk clip speed of character_rigged.glb at scale 1. */
 export const RIGGED_WALK_SPEED = 0.834;
+/** Playback multiplier for the Walk clip. Movement speed is unchanged. */
+export const WALK_ANIM_SPEED_MULT = 0.5;
 /** Crossfade between Walk and Idle. */
 export const RIGGED_CLIP_FADE = 0.2;
 /** Both the old shopkeeper and the rig face +Z, so atan2(dx, dz) needs no extra yaw. */
@@ -734,7 +736,7 @@ function updateClipLocomotion(mesh, moving, dt) {
   }
   if (moving) {
     const scale = loco.modelScale || 1;
-    loco.walk.timeScale = (loco.speed ?? 0) / (RIGGED_WALK_SPEED * scale);
+    loco.walk.timeScale = ((loco.speed ?? 0) / (RIGGED_WALK_SPEED * scale)) * WALK_ANIM_SPEED_MULT;
   }
   loco.mixer.update(dt);
 }

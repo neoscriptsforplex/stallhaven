@@ -655,9 +655,24 @@ function addOriginFront(root, center) {
     post.position.set(x, 1.2, z);
     root.add(post);
   }
-  const awning = addShadow(new THREE.Mesh(new THREE.BoxGeometry(8.1, 0.06, 1.7), cloth(0x8b4336)));
-  awning.position.set(center.x, 2.32, center.z + ROOM_D / 2 + 0.47);
-  awning.rotation.x = -0.18;
+  // The red canopy used to run through the wall and hang inside the room. Keep its
+  // outer lip and stop the cloth on the exterior face so that inside bar is gone.
+  const awningTilt = -0.18;
+  const awningCos = Math.cos(awningTilt);
+  const awningSin = Math.sin(awningTilt);
+  const oldHalf = 0.85;
+  const oldCenterY = 2.32;
+  const oldCenterZ = center.z + ROOM_D / 2 + 0.47;
+  const outerZ = oldCenterZ + oldHalf * awningCos;
+  const outerY = oldCenterY - oldHalf * awningSin;
+  const wallOuterZ = center.z + ROOM_D / 2 + 0.08;
+  const awningHalf = (outerZ - wallOuterZ) / (2 * awningCos);
+  const awning = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(8.1, 0.06, awningHalf * 2),
+    cloth(0x8b4336),
+  ));
+  awning.position.set(center.x, outerY + awningHalf * awningSin, wallOuterZ + awningHalf * awningCos);
+  awning.rotation.x = awningTilt;
   root.add(awning);
   const stripe = addShadow(new THREE.Mesh(new THREE.BoxGeometry(8.12, 0.02, 0.28), cloth(0xead3ae)));
   stripe.position.set(center.x, 2.36, center.z + ROOM_D / 2 - 0.03);
@@ -673,6 +688,7 @@ function addOriginFront(root, center) {
   ));
   join.position.set(center.x, 2.64, center.z + ROOM_D / 2 + 0.1);
   root.add(join);
+
   const fascia = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(ROOM_W + 0.12, 0.16, 0.28),
     cobbleMat(4.2, 0.4),

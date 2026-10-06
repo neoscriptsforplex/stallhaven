@@ -117,6 +117,28 @@ export const TRAPDOOR_HOLE_CLEAR = 0.96;
 export const TRAPDOOR_CLUSTER_CLEAR = 1.22;
 /** Shop plank / station floor plane. Bundled chests sit on this, not at y=0. */
 export const SHOP_FURNITURE_FLOOR_Y = 0.09;
+/**
+ * Shop floor mesh. The slab is the room footprint; the boards are the walk
+ * surface. Character feet use the board top, which sits above y=0.
+ */
+export const SHOP_FLOOR_SLAB = { thickness: 0.08, centerY: 0.04 };
+export const SHOP_FLOOR_PLANK = {
+  thickness: 0.025,
+  centerY: 0.085,
+  pitch: 0.28,
+  gap: 0.03,
+  insetX: 0.18,
+};
+/** Lawn and path height. Feet already rest here outdoors. */
+export const OUTDOOR_GROUND_Y = 0;
+/** Distance in front of the boards where the doorway eases up onto the floor. */
+export const SHOP_DOOR_STEP = 0.46;
+
+export function shopFloorTopY() {
+  const plankTop = SHOP_FLOOR_PLANK.centerY + SHOP_FLOOR_PLANK.thickness / 2;
+  const slabTop = SHOP_FLOOR_SLAB.centerY + SHOP_FLOOR_SLAB.thickness / 2;
+  return Math.max(plankTop, slabTop);
+}
 
 export function furnitureBuyCost(boughtCount = 0) {
   const n = Math.max(0, Math.round(Number(boughtCount) || 0));
@@ -201,6 +223,34 @@ export function roomFloor(gx, gz) {
     minZ: ORIGIN_FLOOR.minZ + gz * ROOM_D,
     maxZ: ORIGIN_FLOOR.maxZ + gz * ROOM_D,
   };
+}
+
+/** World XZ covered by one room's slab and floorboards, including the door lip. */
+export function shopFloorFootprint(gx = 0, gz = 0) {
+  const c = roomCenter(gx, gz);
+  const slab = {
+    minX: c.x - ROOM_W / 2,
+    maxX: c.x + ROOM_W / 2,
+    minZ: c.z - ROOM_D / 2,
+    maxZ: c.z + ROOM_D / 2,
+  };
+  const { pitch, gap, insetX } = SHOP_FLOOR_PLANK;
+  const count = Math.max(1, Math.ceil(ROOM_D / pitch));
+  const depth = pitch - gap;
+  const first = c.z - ROOM_D / 2 + pitch * 0.5;
+  const last = first + (count - 1) * pitch;
+  const half = depth / 2;
+  const span = ROOM_W - insetX;
+  return {
+    minX: Math.min(slab.minX, c.x - span / 2),
+    maxX: Math.max(slab.maxX, c.x + span / 2),
+    minZ: Math.min(slab.minZ, first - half),
+    maxZ: Math.max(slab.maxZ, last + half),
+  };
+}
+
+export function shopFloorFootprints(expansionIds = []) {
+  return occupiedCells(expansionIds).map((cell) => shopFloorFootprint(cell.gx, cell.gz));
 }
 
 /** True interior wall faces of a room (stone inner plane, before snap expansion). */
@@ -304,6 +354,49 @@ export function placeFloors(expansionIds = []) {
 }
 
 const DOOR_HALF = 1.05;
+
+function smooth01(t) {
+  const x = Math.min(1, Math.max(0, t));
+  return x * x * (3 - 2 * x);
+}
+
+/** Positive when (x, z) is inside the shop floor union, negative outside. */
+export function shopFloorInset(x, z, floors) {
+  let best = -Infinity;
+  for (const rect of floors) {
+    const ox = x < rect.minX ? rect.minX - x : x > rect.maxX ? x - rect.maxX : 0;
+    const oz = z < rect.minZ ? rect.minZ - z : z > rect.maxZ ? z - rect.maxZ : 0;
+    if (ox === 0 && oz === 0) {
+      const inset = Math.min(x - rect.minX, rect.maxX - x, z - rect.minZ, rect.maxZ - z);
+      best = Math.max(best, inset);
+    } else {
+      best = Math.max(best, -Math.hypot(ox, oz));
+    }
+  }
+  return best;
+}
+
+/**
+ * Feet height: shop board top over the floor, outdoor ground outside, and a
+ * smooth step across the front doorway instead of a pop.
+ */
+export function characterGroundY(
+  x,
+  z,
+  expansionIds = [],
+  floorTop = shopFloorTopY(),
+  outdoorY = OUTDOOR_GROUND_Y,
+  step = SHOP_DOOR_STEP,
+) {
+  const floors = shopFloorFootprints(expansionIds);
+  if (shopFloorInset(x, z, floors) >= -1e-6) return floorTop;
+  const front = shopFloorFootprint(0, 0).maxZ;
+  const beyond = z - front;
+  const inDoor = Math.abs(x - SHOP.door.x) <= DOOR_HALF;
+  if (!inDoor || !(step > 0) || beyond <= 0 || beyond >= step) return outdoorY;
+  const t = smooth01(1 - beyond / step);
+  return outdoorY + (floorTop - outdoorY) * t;
+}
 
 /** Grass, path, and a door corridor wide enough for the player radius. */
 export function outdoorWalkFloors(expansionIds = []) {

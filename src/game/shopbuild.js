@@ -4,6 +4,8 @@ import {
   FOUNTAIN,
   ROOM_D,
   ROOM_W,
+  SHOP_FLOOR_PLANK,
+  SHOP_FLOOR_SLAB,
   SHOP_FURNITURE_FLOOR_Y,
   cobblePathSpan,
   cobbleRingTuck,
@@ -433,15 +435,17 @@ function markGround(mesh) {
 }
 
 function addFloor(root, center) {
+  const slab = SHOP_FLOOR_SLAB;
+  const board = SHOP_FLOOR_PLANK;
   const base = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(ROOM_W, 0.08, ROOM_D),
+    new THREE.BoxGeometry(ROOM_W, slab.thickness, ROOM_D),
     wood(0x5a3a22, 0.92),
   ));
-  base.position.set(center.x, 0.04, center.z);
+  base.position.set(center.x, slab.centerY, center.z);
   markGround(base);
+  base.userData.shopFloor = 'slab';
   root.add(base);
-  const plankW = 0.28;
-  const count = Math.ceil(ROOM_D / plankW);
+  const count = Math.ceil(ROOM_D / board.pitch);
   for (let i = 0; i < count; i += 1) {
     const map = woodFloorMap();
     map.repeat.set(ROOM_W / 1.4, 1);
@@ -452,14 +456,27 @@ function addFloor(root, center) {
       metalness: 0.04,
     });
     const plank = addShadow(new THREE.Mesh(
-      new THREE.BoxGeometry(ROOM_W - 0.18, 0.025, plankW - 0.03),
+      new THREE.BoxGeometry(ROOM_W - board.insetX, board.thickness, board.pitch - board.gap),
       mat,
     ));
-    const z = center.z - ROOM_D / 2 + plankW * 0.5 + i * plankW;
-    plank.position.set(center.x, 0.085, z);
+    const z = center.z - ROOM_D / 2 + board.pitch * 0.5 + i * board.pitch;
+    plank.position.set(center.x, board.centerY, z);
     markGround(plank);
+    plank.userData.shopFloor = 'plank';
     root.add(plank);
   }
+}
+
+/** Top face of the shop floorboards, from the built meshes. */
+export function measureShopFloorTop(root) {
+  let top = -Infinity;
+  root?.updateMatrixWorld?.(true);
+  root?.traverse((child) => {
+    if (!child.isMesh || child.userData?.shopFloor !== 'plank') return;
+    const box = new THREE.Box3().setFromObject(child);
+    if (Number.isFinite(box.max.y)) top = Math.max(top, box.max.y);
+  });
+  return top;
 }
 
 function addBeams(root, center) {

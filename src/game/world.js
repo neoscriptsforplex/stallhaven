@@ -49,7 +49,9 @@ import {
   pickFlaxNode,
   rollFlaxSpots,
   sproutDueFlax,
+  characterGroundY,
   interiorFloors,
+  OUTDOOR_GROUND_Y,
   playerWalkFloors,
   pointHitsShop,
   pointOnFloors,
@@ -397,7 +399,9 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   let shopkeeper = makeDefaultKeeper();
-  shopkeeper.position.set(SHOP.keeper.x, 0, SHOP.keeper.z);
+  const keeperGround = characterGroundY(SHOP.keeper.x, SHOP.keeper.z, state.expansions ?? []);
+  shopkeeper.position.set(SHOP.keeper.x, keeperGround, SHOP.keeper.z);
+  shopkeeper.userData.groundY = keeperGround;
   shopkeeper.rotation.y = 0.35;
   scene.add(shopkeeper);
   const clouds = buildClouds();
@@ -1130,6 +1134,13 @@ export function createWorld(canvas, state, opts = {}) {
     return applyWalkPath(path);
   }
 
+  function syncStance(mesh) {
+    mesh.userData.groundY = sceneMode === 'shop'
+      ? characterGroundY(mesh.position.x, mesh.position.z, state.expansions ?? [])
+      : OUTDOOR_GROUND_Y;
+    return mesh.userData.groundY;
+  }
+
   function walkToward(actor, goal, dt, speed = CUSTOMER_SPEED) {
     const pos = actor.mesh.position;
     const dx = goal.x - pos.x;
@@ -1137,6 +1148,7 @@ export function createWorld(canvas, state, opts = {}) {
     const dist = Math.hypot(dx, dz);
     if (dist < 0.08) {
       if (actor.mesh.userData.clipLocomotion) actor.mesh.userData.clipLocomotion.speed = 0;
+      syncStance(actor.mesh);
       updateWalkPose(actor.mesh, false, dt, performance.now() / 1000);
       return true;
     }
@@ -1147,6 +1159,7 @@ export function createWorld(canvas, state, opts = {}) {
     pos.z += dz * t;
     actor.mesh.rotation.y = Math.atan2(dx, dz);
     if (actor.mesh.userData.clipLocomotion) actor.mesh.userData.clipLocomotion.speed = actualSpeed;
+    syncStance(actor.mesh);
     updateWalkPose(actor.mesh, true, dt, performance.now() / 1000);
     return false;
   }
@@ -1279,6 +1292,7 @@ export function createWorld(canvas, state, opts = {}) {
       }
       return;
     }
+    syncStance(shopkeeper);
     if (mining) {
       shopkeeper.rotation.y = Math.atan2(mining.x - shopkeeper.position.x, mining.z - shopkeeper.position.z);
       updateMinePose(shopkeeper, dt, now);
@@ -1304,7 +1318,11 @@ export function createWorld(canvas, state, opts = {}) {
     if (camHeld.up) cam.pitch += CAM_PITCH_SPEED * dt;
     if (camHeld.down) cam.pitch -= CAM_PITCH_SPEED * dt;
     clampCam();
-    const look = new THREE.Vector3(shopkeeper.position.x, 0.95, shopkeeper.position.z);
+    const look = new THREE.Vector3(
+      shopkeeper.position.x,
+      0.95 + (shopkeeper.userData.groundY || 0),
+      shopkeeper.position.z,
+    );
     const flat = Math.cos(cam.pitch) * cam.distance;
     const desired = new THREE.Vector3(
       look.x + Math.sin(cam.yaw) * flat,
@@ -2399,13 +2417,14 @@ export function createWorld(canvas, state, opts = {}) {
         }
       } else if (actor.state === 'browse') {
         actor.mesh.rotation.y += dt * 0.35;
-        actor.mesh.position.y = Math.abs(Math.sin(now * 1.4 + actor.id)) * 0.012;
+        actor.mesh.position.y = syncStance(actor.mesh) + Math.abs(Math.sin(now * 1.4 + actor.id)) * 0.012;
         if (now >= actor.waitUntil) joinQueue(actor, now);
       } else if (actor.state === 'queue') {
         actor.mesh.rotation.y = Math.PI + Math.sin(now * 1.1 + actor.id) * 0.06;
-        actor.mesh.position.y = Math.abs(Math.sin(now * 1.6 + actor.id)) * 0.012;
+        actor.mesh.position.y = syncStance(actor.mesh) + Math.abs(Math.sin(now * 1.6 + actor.id)) * 0.012;
       } else if (actor.state === 'request') {
         actor.mesh.rotation.y = Math.PI + Math.sin(now * 1.4 + actor.id) * 0.12;
+        actor.mesh.position.y = syncStance(actor.mesh) + Math.abs(Math.sin(now * 1.5 + actor.id)) * 0.012;
         const have = hasStock(state, actor.requestRecipeId);
         actor.mesh.userData.ring.material.opacity = actor.id === tradingId ? 0.95 : have ? 0.8 : 0.4;
         actor.mesh.userData.ring.material.color.setHex(
@@ -2480,6 +2499,7 @@ export function createWorld(canvas, state, opts = {}) {
     next.position.copy(shopkeeper.position);
     next.rotation.copy(shopkeeper.rotation);
     next.scale.copy(shopkeeper.scale);
+    next.userData.groundY = shopkeeper.userData.groundY ?? next.position.y;
     scene.add(next);
     scene.remove(shopkeeper);
     shopkeeper = next;
@@ -2566,7 +2586,8 @@ export function createWorld(canvas, state, opts = {}) {
     dungeon.grounds.visible = true;
     applySkyColor(scene, skyIdForScene('dungeon', state.skybox));
     syncLighting('dungeon');
-    shopkeeper.position.set(-4.15, 0, 0.4);
+    shopkeeper.userData.groundY = OUTDOOR_GROUND_Y;
+    shopkeeper.position.set(-4.15, OUTDOOR_GROUND_Y, 0.4);
     shopkeeper.rotation.y = Math.PI / 2;
   }
 
@@ -2583,7 +2604,8 @@ export function createWorld(canvas, state, opts = {}) {
     setShopLayerVisible(true);
     applySkyColor(scene, skyIdForScene('shop', state.skybox));
     syncLighting('shop');
-    shopkeeper.position.set(shopReturnPos.x, 0, shopReturnPos.z);
+    shopkeeper.userData.groundY = characterGroundY(shopReturnPos.x, shopReturnPos.z, state.expansions ?? []);
+    shopkeeper.position.set(shopReturnPos.x, shopkeeper.userData.groundY, shopReturnPos.z);
     shopkeeper.rotation.y = Math.PI;
   }
 

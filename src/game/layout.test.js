@@ -77,6 +77,12 @@ import {
   roomPlaceFloor,
   SHELF_FROM_WALL,
   ORIGIN_FLOOR,
+  SHOP_DOOR_STEP,
+  SHOP_FURNITURE_FLOOR_Y,
+  OUTDOOR_GROUND_Y,
+  shopFloorTopY,
+  shopFloorFootprint,
+  characterGroundY,
 } from './layout.js';
 import { FLOOR, isWalkable, shopObstacles } from './nav.js';
 import { SHOP } from './catalog.js';
@@ -474,6 +480,35 @@ describe('layout numbers', () => {
     const backCorner = snapToWallGrid(0.2, -3.2, []);
     assert.ok(Math.abs(backCorner.rot) < 1e-6, `back snap rot=${backCorner.rot}`);
     assert.ok(Math.abs(backCorner.z - back.z) < 1e-9);
+  });
+
+  it('stands on the shop boards and eases up at the front door', () => {
+    const top = shopFloorTopY();
+    assert.ok(top > OUTDOOR_GROUND_Y);
+    assert.ok(top > SHOP_FURNITURE_FLOOR_Y - 0.001, `board top ${top} should meet the furniture plane`);
+    assert.equal(characterGroundY(0, 0, []), top);
+    assert.equal(characterGroundY(SHOP.keeper.x, SHOP.keeper.z, []), top);
+    assert.equal(characterGroundY(0, 8, []), OUTDOOR_GROUND_Y);
+    const foot = shopFloorFootprint(0, 0);
+    assert.equal(characterGroundY(SHOP.door.x, foot.maxZ, []), top);
+    const mid = characterGroundY(SHOP.door.x, foot.maxZ + SHOP_DOOR_STEP * 0.5, []);
+    assert.ok(mid > OUTDOOR_GROUND_Y && mid < top, `doorway step ${mid}`);
+    assert.equal(characterGroundY(SHOP.door.x, foot.maxZ + SHOP_DOOR_STEP, []), OUTDOOR_GROUND_Y);
+    assert.equal(characterGroundY(2.4, foot.maxZ + 0.2, []), OUTDOOR_GROUND_Y);
+    const side = roomCenter(1, 0);
+    assert.equal(characterGroundY(side.x, side.z, ['right']), top);
+    const linkX = (shopFloorFootprint(0, 0).maxX + shopFloorFootprint(1, 0).minX) / 2;
+    assert.equal(characterGroundY(linkX, 0.1, ['right']), top);
+    let prev = top;
+    const samples = 24;
+    for (let i = 0; i <= samples; i += 1) {
+      const z = foot.maxZ + (SHOP_DOOR_STEP * i) / samples;
+      const y = characterGroundY(0, z, []);
+      assert.ok(y <= prev + 1e-9, `step rose at z=${z}`);
+      assert.ok(prev - y < top * 0.25, `pop of ${prev - y} at z=${z}`);
+      prev = y;
+    }
+    assert.equal(prev, OUTDOOR_GROUND_Y);
   });
 
   it('lists furnace and range as free upgrade stations and shelves in the furniture shop', () => {

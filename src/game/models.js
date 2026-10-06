@@ -734,6 +734,17 @@ export const RIGGED_WALK_SPEED = 0.834;
 export const GOBLIN_MODEL_SCALE = 0.863;
 /** No-slide Walk speed of goblin_rigged.glb at GOBLIN_MODEL_SCALE, metres/second. */
 export const GOBLIN_WALK_SPEED = 0.549;
+/**
+ * Dungeon rat length today: the bundled OBJ, fitted to the procedural rat,
+ * measures 0.3764958443895918 m nose-to-tail and 0.08235846596022328 m tall.
+ * rat_rigged.glb at scale 1 is 0.5841326300106426 m long and 0.11584158338694467 m tall.
+ * Match the length (the axis the old fit locked). Do not use the 0.863 goblin scale.
+ */
+export const RAT_MODEL_SCALE = 0.3764958443895918 / 0.5841326300106426;
+/** In-place Walk speed of rat_rigged.glb at scale 1, metres/second. */
+export const RAT_WALK_UNIT_SPEED = 0.3119;
+/** No-slide Walk speed at RAT_MODEL_SCALE. timeScale = moveSpeed / this. */
+export const RAT_WALK_SPEED = RAT_WALK_UNIT_SPEED * RAT_MODEL_SCALE;
 /** Crossfade between Walk, Idle, and the gathering clips. */
 export const RIGGED_CLIP_FADE = 0.2;
 /** Both the old shopkeeper and the rig face +Z, so atan2(dx, dz) needs no extra yaw. */
@@ -3693,6 +3704,58 @@ export function wrapRiggedGoblin(gltf) {
   };
   group.userData.modelScale = GOBLIN_MODEL_SCALE;
   group.userData.pick = pick;
+  group.userData.walkPhase = 0;
+  return group;
+}
+
+/**
+ * Dungeon rat from rat_rigged.glb. Faces +Z, paws on local y=0.
+ * Walk and Idle crossfade on the same mixer path. No attacks, no click box.
+ */
+export function wrapRiggedRat(gltf) {
+  if (!gltf?.scene) throw new Error('Rigged rat has no scene.');
+  const walkClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Walk');
+  const idleClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Idle');
+  if (!walkClip || !idleClip) throw new Error('Rigged rat is missing Walk or Idle.');
+
+  const visual = cloneSkinned(gltf.scene);
+  visual.name = 'rigged-rat';
+  visual.rotation.y = RIGGED_FACING_YAW;
+  hideWalkDebug(visual);
+  prepareRiggedSurface(visual);
+  visual.updateMatrixWorld(true);
+  const rawBox = new THREE.Box3().setFromObject(visual);
+  if (Number.isFinite(rawBox.min.y) && Math.abs(rawBox.min.y) > 1e-4) {
+    visual.position.y -= rawBox.min.y;
+  }
+  visual.scale.setScalar(RAT_MODEL_SCALE);
+
+  const mixer = new THREE.AnimationMixer(visual);
+  const walk = mixer.clipAction(walkClip);
+  const idle = mixer.clipAction(idleClip);
+  for (const action of [walk, idle]) {
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.enabled = true;
+  }
+  idle.play();
+  mixer.update(0);
+
+  const group = new THREE.Group();
+  group.name = 'rat';
+  group.add(visual);
+  group.userData.clipLocomotion = {
+    mixer,
+    walk,
+    idle,
+    modelScale: RAT_MODEL_SCALE,
+    walkStride: RAT_WALK_SPEED,
+    mode: 'idle',
+    speed: 0,
+    gather: null,
+    eventPrev: null,
+  };
+  group.userData.modelScale = RAT_MODEL_SCALE;
   group.userData.walkPhase = 0;
   return group;
 }

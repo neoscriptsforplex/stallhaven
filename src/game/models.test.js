@@ -21,6 +21,10 @@ import {
   wrapRiggedGoblin,
   GOBLIN_MODEL_SCALE,
   GOBLIN_WALK_SPEED,
+  wrapRiggedRat,
+  RAT_MODEL_SCALE,
+  RAT_WALK_SPEED,
+  RAT_WALK_UNIT_SPEED,
   buildPickaxe,
   buildHeldTool,
   buildShopkeeper,
@@ -201,6 +205,55 @@ describe('outdoor and dungeon extras', () => {
     const box = new THREE.Box3().setFromObject(goblin);
     const height = box.max.y - box.min.y;
     assert.ok(Math.abs(height - 1.319 * GOBLIN_MODEL_SCALE) < 0.02, `height ${height}`);
+  });
+
+  it('plays Walk and Idle on the rigged dungeon rat at the current rat length', async () => {
+    const glb = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/models/npc/rat_rigged.glb'));
+    const gltf = await new Promise((resolve, reject) => {
+      new GLTFLoader().parse(
+        glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength),
+        '',
+        resolve,
+        reject,
+      );
+    });
+    const rat = wrapRiggedRat(gltf);
+    assert.equal(rat.name, 'rat');
+    assert.equal(rat.userData.pick, undefined);
+    assert.ok(Math.abs(rat.userData.modelScale - RAT_MODEL_SCALE) < 1e-9);
+    assert.ok(Math.abs(RAT_MODEL_SCALE - 0.863) > 0.1, 'rat scale is not the goblin convention');
+    const loco = rat.userData.clipLocomotion;
+    assert.ok(Math.abs(loco.walk.getClip().duration - 0.4) < 1e-3);
+    assert.ok(Math.abs(loco.idle.getClip().duration - 4) < 1e-3);
+    assert.equal(loco.walkStride, RAT_WALK_SPEED);
+    assert.ok(Math.abs(RAT_WALK_SPEED - (RAT_WALK_UNIT_SPEED * RAT_MODEL_SCALE)) < 1e-12);
+    let skinned = 0;
+    let bones = 0;
+    rat.traverse((child) => {
+      if (child.isBone) bones += 1;
+      if (!child.isSkinnedMesh) return;
+      skinned += 1;
+      assert.equal(child.frustumCulled, false);
+    });
+    assert.equal(skinned, 1);
+    assert.equal(bones, 24);
+    loco.speed = 0.52;
+    updateWalkPose(rat, true, 0.05, 1);
+    assert.equal(loco.mode, 'walk');
+    assert.ok(Math.abs(loco.walk.timeScale - (0.52 / RAT_WALK_SPEED)) < 1e-6);
+    updateWalkPose(rat, false, 0.2, 1.2);
+    assert.equal(loco.mode, 'idle');
+    const box = new THREE.Box3().setFromObject(rat);
+    const size = box.getSize(new THREE.Vector3());
+    assert.ok(Math.abs(size.z - 0.3764958443895918) < 0.01, `length ${size.z}`);
+    assert.ok(Math.abs(size.y - 0.11584158338694467 * RAT_MODEL_SCALE) < 0.01, `height ${size.y}`);
+    const built = buildDungeon({ riggedRat: gltf });
+    assert.equal(built.rats.length, 4);
+    for (const live of built.rats) {
+      assert.equal(live.userData.clipLocomotion.walkStride, RAT_WALK_SPEED);
+      assert.equal(live.userData.groundY, 0.06);
+      assert.equal(live.userData.pick, undefined);
+    }
   });
 
   it('builds dark grey dungeon rats with red triangle eyes and a tan tail', () => {

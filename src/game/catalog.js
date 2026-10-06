@@ -551,12 +551,11 @@ DRAGON_MASKS.forEach((color, index) => {
   });
 });
 
-/** Body, chaps, and vambraces follow the dragon masks. Boots stay on DHIDE order. */
+/** Same ladder as the dragon masks: green, then blue, red, black. */
 const DHIDE_MASK_TIER = ['green', 'blue', 'red', 'black'];
 
 for (const piece of DHIDE_PIECES) {
-  const tierIds = piece.id === 'boots' ? DHIDE.map((color) => color.id) : DHIDE_MASK_TIER;
-  const colors = tierIds.map((id) => DHIDE.find((color) => color.id === id));
+  const colors = DHIDE_MASK_TIER.map((id) => DHIDE.find((color) => color.id === id));
   colors.forEach((color, index) => {
     const id = `${color.id}_dhide_${piece.id}`;
     const previousId = index === 0 ? null : `${colors[index - 1].id}_dhide_${piece.id}`;

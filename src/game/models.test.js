@@ -1412,7 +1412,7 @@ describe('bundled prop swaps', () => {
 
   it('fits bundled weapon, armour, ammo, and tool dumps to the current mesh size', async () => {
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
-    assert.equal(LUKE_MODEL_FOLDERS.length, 186);
+    assert.equal(LUKE_MODEL_FOLDERS.length, 194);
     for (const item of LUKE_MODEL_FOLDERS) {
       assert.equal(byId[item.id], item.folder, item.id);
       const slug = item.folder.split('/').pop();

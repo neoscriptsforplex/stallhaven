@@ -53,7 +53,7 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
+import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
@@ -451,25 +451,34 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(Math.abs(bottom - opening.topY) < 1e-6, `lintel underside ${bottom}`);
   });
 
-  it('drops the full-width timber beam inside the front wall and keeps the fascia', () => {
+  it('keeps the red awning outside the room and keeps the inside timber and fascia', () => {
+    const front = roomCenter(0, 0);
+    const interiorZ = front.z + ROOM_D / 2 - 0.08;
     for (const ids of [[], ['left', 'right', 'back']]) {
       const shop = buildShop(ids).root;
+      shop.updateMatrixWorld(true);
+      let awnings = 0;
+      let join = false;
+      let fascia = false;
+      let cream = 0;
       shop.traverse((child) => {
         if (!child.isMesh || child.geometry?.type !== 'BoxGeometry') return;
-        const { width, height, depth } = child.geometry.parameters;
-        const longInsideBeam = width > ROOM_W && height > 0.2 && depth > 0.3
-          && Math.abs(child.position.y - 2.64) < 0.08;
-        assert.equal(longInsideBeam, false, `front beam remains for ${ids.join('+') || 'origin'}`);
+        const { width, height } = child.geometry.parameters;
+        const color = child.material?.color?.getHex?.();
+        if (color === 0x8b4336 && width > 7) {
+          awnings += 1;
+          const box = new THREE.Box3().setFromObject(child);
+          assert.ok(box.min.z >= interiorZ - 0.01, `awning enters the room at z=${box.min.z}`);
+        }
+        if (width > ROOM_W && height > 0.2 && Math.abs(child.position.y - 2.64) < 0.05) join = true;
+        if (width > ROOM_W && height === 0.16 && Math.abs(child.position.y - 2.78) < 1e-6) fascia = true;
+        if (color === 0xead3ae && width > 7) cream += 1;
       });
+      assert.equal(awnings, 1, `origin awning only for ${ids.join('+') || 'origin'}`);
+      assert.equal(join, true);
+      assert.equal(fascia, true);
+      assert.equal(cream, 2);
     }
-    const origin = buildShop([]).root;
-    let fascia = false;
-    origin.traverse((child) => {
-      if (!child.isMesh || child.geometry?.type !== 'BoxGeometry') return;
-      const { width, height } = child.geometry.parameters;
-      if (width > ROOM_W && height === 0.16 && Math.abs(child.position.y - 2.78) < 1e-6) fascia = true;
-    });
-    assert.equal(fascia, true);
   });
 
   it('builds a floor piece for every expansion room', () => {

@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { SHOP } from './catalog.js';
 import { createState } from './economy.js';
 import { PLAYER_RADIUS, isWalkable, playerObstacles } from './nav.js';
-import { playerWalkFloors } from './layout.js';
+import { furnitureHalfSize, playerWalkFloors } from './layout.js';
 import {
   STATION_ARRIVE,
   STATION_HIT,
   USE_KINDS,
+  floorClickPoint,
+  ignoredClickObject,
   pickUseHit,
   fletchFaceYaw,
   fletchStandWorld,
@@ -22,26 +24,30 @@ function hit(kind, distance, x = 0, z = 0) {
 }
 
 describe('station walk-then-open', () => {
-  it('gives the anvil a larger click box and floor radius than the old 0.62 steal zone', () => {
-    assert.ok(STATION_HIT.anvil.w >= 1.4);
-    assert.ok(STATION_HIT.anvil.d >= 1.2);
-    assert.ok(STATION_HIT.anvil.floorR > 0.62);
+  it('keeps station click boxes on the visible footprint', () => {
+    for (const id of ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter']) {
+      const { hw, hd } = furnitureHalfSize(id);
+      const hit = STATION_HIT[id];
+      assert.ok(hit.w <= hw * 2 + 0.2, `${id} click width`);
+      assert.ok(hit.d <= hd * 2 + 0.2, `${id} click depth`);
+      assert.ok(hit.w >= hw * 2, `${id} still covers its width`);
+      assert.ok(hit.floorR <= Math.hypot(hw, hd) + 0.2, `${id} floor radius`);
+      assert.ok(hit.floorR >= Math.hypot(hw, hd), `${id} floor radius still reaches the base`);
+    }
     assert.ok(STATION_ARRIVE > 1.15);
+    assert.equal(STATION_HIT.wheel.pickY, 1);
   });
 
-  it('keeps the spinning wheel click box at half the prior 4× live size', () => {
-    assert.equal(STATION_HIT.wheel.w, 1.85);
-    assert.equal(STATION_HIT.wheel.h, 2.4);
-    assert.equal(STATION_HIT.wheel.d, 1.8);
-    assert.equal(STATION_HIT.wheel.pickY, 1.1);
-    assert.equal(STATION_HIT.wheel.floorR, 1.35);
-  });
-
-  it('lets a ground hit in front of the anvil count as an anvil click', () => {
-    const state = createState();
-    const near = stationAtFloor(SHOP.anvil.x, SHOP.anvil.z + 0.7, state.furniture);
-    assert.equal(near?.type, 'anvil');
-    const far = stationAtFloor(0, 2.4, state.furniture);
+  it('does not treat the ground beside a station as a station click', () => {
+    const onlyAnvil = { anvil: { x: SHOP.anvil.x, z: SHOP.anvil.z, rot: 0 } };
+    const onAnvil = stationAtFloor(SHOP.anvil.x, SHOP.anvil.z + 0.15, onlyAnvil);
+    assert.equal(onAnvil?.type, 'anvil');
+    const besideAnvil = stationAtFloor(SHOP.anvil.x, SHOP.anvil.z + 0.7, onlyAnvil);
+    assert.equal(besideAnvil, null);
+    const rangePose = { range: { x: 0, z: 0, rot: 0 } };
+    assert.equal(stationAtFloor(0.4, 0, rangePose)?.type, 'range');
+    assert.equal(stationAtFloor(1.35, 0, rangePose), null);
+    const far = stationAtFloor(0, 2.4, createState().furniture);
     assert.equal(far, null);
   });
 
@@ -56,6 +62,47 @@ describe('station walk-then-open', () => {
       hit('anvil', 4.4, SHOP.anvil.x, SHOP.anvil.z),
     ]);
     assert.equal(anvilThroughRug.object.userData.kind, 'anvil');
+  });
+
+  it('ignores faded roofs and walls and keeps the raised shop floor', () => {
+    const roof = {
+      name: 'roof-gable',
+      visible: true,
+      userData: {},
+      material: { transparent: true, opacity: 0.15, userData: { isRoof: true } },
+      parent: { name: 'roofs', visible: true, userData: { isRoof: true }, parent: null },
+    };
+    const wall = { name: 'wall', visible: true, userData: { shopWall: true }, material: {}, parent: null };
+    const hidden = { name: 'roof', visible: false, userData: {}, material: {}, parent: null };
+    assert.equal(ignoredClickObject(roof), true);
+    assert.equal(ignoredClickObject(wall), true);
+    assert.equal(ignoredClickObject(hidden), true);
+    const floor = {
+      visible: true,
+      userData: { kind: 'ground', shopFloor: 'plank' },
+      material: {},
+      parent: null,
+    };
+    const lawn = {
+      visible: true,
+      name: 'grass-ground',
+      userData: { kind: 'ground' },
+      material: {},
+      parent: null,
+    };
+    assert.equal(ignoredClickObject(floor), false);
+    const point = floorClickPoint([
+      { distance: 4.2, point: { x: 0.2, y: -0.02, z: 0.4 }, object: lawn },
+      { distance: 4.05, point: { x: 1, y: 2.8, z: 4 }, object: roof },
+      { distance: 5.1, point: { x: 0.15, y: 0.1, z: 0.35 }, object: floor },
+    ]);
+    assert.equal(point.y, 0.1);
+    assert.ok(Math.hypot(point.x - 0.15, point.z - 0.35) < 0.01);
+    const yard = floorClickPoint([
+      { distance: 3, point: { x: 0, y: -0.02, z: 8 }, object: lawn },
+      { distance: 8, point: { x: 0, y: 0.1, z: 0 }, object: floor },
+    ]);
+    assert.equal(yard.z, 8);
   });
 
   it('does not let a closer floor ray steal an anvil pick', () => {

@@ -154,6 +154,7 @@ function addWallSlab(root, mat, x, y, z, sx, sy, sz, uvAlong = null, uvY = null)
     : cobbleSlabMat(uvAlong.size, sy, uvAlong.origin - uvAlong.size / 2, (uvY ?? y) - sy / 2);
   const mesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), slabMat));
   mesh.position.set(x, y, z);
+  mesh.userData.shopWall = true;
   root.add(mesh);
 }
 
@@ -528,6 +529,7 @@ function addBeams(root, center) {
 
 function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
   const group = new THREE.Group();
+  group.userData.isRoof = true;
   group.position.copy(new THREE.Vector3(center.x, 0, center.z));
   const thatch = new THREE.MeshStandardMaterial({
     color: 0x6b3a24,
@@ -758,6 +760,7 @@ function addRoomWalls(root, cell, neigh, isOrigin) {
   } else {
     const back = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W, h, t), stoneBack));
     back.position.set(c.x, y, backZ);
+    back.userData.shopWall = true;
     root.add(back);
     const cap = addShadow(new THREE.Mesh(
       new THREE.BoxGeometry(ROOM_W + 0.08, 0.14, 0.22),

@@ -2964,6 +2964,7 @@ export function createWorld(canvas, state, opts = {}) {
           if (child.frustumCulled) culled += 1;
         });
         const handR = mesh?.getObjectByName('Hand_R');
+        const handL = mesh?.getObjectByName('Hand_L');
         const visual = mesh?.getObjectByName('rigged-buyer');
         let height = null;
         let footY = null;
@@ -2989,6 +2990,7 @@ export function createWorld(canvas, state, opts = {}) {
           skinned,
           frustumCulled: culled,
           handRChildren: (handR?.children ?? []).map((child) => child.name),
+          handLChildren: (handL?.children ?? []).map((child) => child.name),
           height,
           footY,
           footL: foot('Foot_L'),

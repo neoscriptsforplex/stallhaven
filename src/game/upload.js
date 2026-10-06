@@ -573,7 +573,7 @@ export async function loadBundledRiggedRat() {
   return loadBundledGltf('npc/rat_rigged.glb');
 }
 
-/** Fetch the five adventurer buyer GLBs. A missing file is omitted so that look keeps its dump. */
+/** Fetch the rigged buyer GLBs. A missing file is omitted so that look keeps its dump. */
 export async function loadBundledRiggedBuyers() {
   const entries = await Promise.all(RIGGED_BUYER_MODELS.map(async (spec) => {
     try {

@@ -1882,7 +1882,7 @@ export function createWorld(canvas, state, opts = {}) {
     for (const name of ARMOUR_SLOTS) {
       const recipeId = want[name];
       if (!recipeId) continue;
-      const mesh = mountDisplayBasePose(makeWareMesh(recipeId), recipeId);
+      const mesh = mountDisplayBasePose(makeWareMesh(recipeId), recipeId, { mannequin: true });
       const pose = slotPose(name);
       mesh.position.set(pose.x, pose.y, pose.z);
       slot.wareAnchor.add(mesh);

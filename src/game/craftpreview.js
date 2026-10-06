@@ -100,11 +100,15 @@ export function wrapCraftPreviewSpin(ware, id) {
 /**
  * Mannequin and table mount. Same base pose as the craft preview, in the
  * caller's local space, so it follows the display when the furniture yaws.
+ * Mystic and splitbark robe bottoms use that pose on a mannequin only.
  * Does not apply wareDisplayYaw; that yaw is already baked into the mesh.
  * Reseats the posed item so its bottom center stays on the slot origin.
+ * Does not change scale.
  */
-export function mountDisplayBasePose(ware, id) {
-  if (!ware || !displayUsesPreviewBasePose(id)) return ware;
+export function mountDisplayBasePose(ware, id, opts = {}) {
+  const robeBottomOnMannequin = opts.mannequin
+    && (id === 'mystic_robe_bottom' || id === 'splitbark_robe_bottom');
+  if (!ware || (!displayUsesPreviewBasePose(id) && !robeBottomOnMannequin)) return ware;
   const euler = previewBasePose(id);
   if (!euler) return ware;
   const pose = new THREE.Group();

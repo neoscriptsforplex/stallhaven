@@ -3,16 +3,12 @@ import {
   FLETCH_TABS,
   LOOM_TABS,
   anvilSubtabsForTab,
-  FACE_HAIR,
-  HAIR_STYLES,
   MATERIALS,
-  PLAYER_COLORS,
   RECIPES,
   SKYBOXES,
   classLabel,
   costLabel,
   customerName,
-  defaultAppearance,
   displayKind,
   isHandOrFootWare,
   formatGold,
@@ -21,7 +17,6 @@ import {
   isCraftOreId,
   isMinedMaterial,
   materialList,
-  normalizeAppearance,
   offerClassLabel,
   offerClassOf,
   recipeMatsLabel,
@@ -52,6 +47,8 @@ import {
   toggleLoop,
   toggleShuffle,
 } from './audio.js';
+import { deleteModel, loadModels, saveModel } from './storage.js';
+import { parseModelBuffer, validatePlayerModelFile } from './upload.js';
 import {
   assignStandPiece,
   applyCheat,
@@ -158,7 +155,6 @@ export function bindHud(root, state, world) {
   const potionModal = document.querySelector('#potion-modal');
   const musicDock = document.querySelector('#music-dock');
   const settingsDock = document.querySelector('#settings-dock');
-  const lookDock = document.querySelector('#look-dock');
   const settingsBtn = document.querySelector('#settings-btn');
   const furnMenu = document.querySelector('#furn-menu');
   const inspectPop = document.querySelector('#inspect-pop');
@@ -610,12 +606,7 @@ export function bindHud(root, state, world) {
     if (musicDock) musicDock.hidden = true;
   }
 
-  function closeLookDock() {
-    if (lookDock) lookDock.hidden = true;
-  }
-
   function closeSettingsDock() {
-    closeLookDock();
     if (settingsDock) settingsDock.hidden = true;
   }
 
@@ -2053,64 +2044,28 @@ export function bindHud(root, state, world) {
   setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
   setLoop(Boolean(state.music?.loop));
 
-  function lookOptions(slot) {
-    if (slot === 'hair') return HAIR_STYLES;
-    if (slot === 'faceHair') return FACE_HAIR;
-    return PLAYER_COLORS[slot] ?? [];
+  const PLAYER_MODEL_ID = 'player-look';
+
+  function playerNote(text) {
+    const note = settingsDock?.querySelector('[data-player-model-note]');
+    if (!note) return;
+    note.textContent = text || '';
+    note.hidden = !text;
   }
 
-  function lookRoot() {
-    return lookDock;
-  }
-
-  function fillLookGrids() {
-    const root = lookRoot();
-    if (!root) return;
-    for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
-      const row = root.querySelector(`[data-look="${slot}"]`);
-      if (!row || row.dataset.ready) continue;
-      row.innerHTML = lookOptions(slot).map((item) => (
-        `<button type="button" data-look-id="${item.id}">${item.label}</button>`
-      )).join('');
-      row.dataset.ready = '1';
-      row.addEventListener('click', (event) => {
-        const btn = event.target.closest('[data-look-id]');
-        if (!btn) return;
-        const next = normalizeAppearance({
-          ...(state.appearance ?? defaultAppearance()),
-          [slot]: btn.dataset.lookId,
-        });
-        const applied = world.setAppearance?.(next);
-        if (applied === false) {
-          state.appearance = next;
-        }
-        paintLook();
-        paintSettings();
-        render(performance.now() / 1000);
-      });
+  function paintPlayerModel() {
+    if (!settingsDock) return;
+    const custom = Boolean(world.hasCustomPlayer?.());
+    const yaw = Boolean(world.playerYaw180?.());
+    const hint = world.playerOrientationHint?.();
+    const yawBtn = settingsDock.querySelector('[data-player-model-yaw]');
+    const hintEl = settingsDock.querySelector('[data-player-model-hint]');
+    if (yawBtn) {
+      yawBtn.hidden = !custom;
+      yawBtn.setAttribute('aria-pressed', yaw ? 'true' : 'false');
+      yawBtn.classList.toggle('is-on', yaw);
     }
-  }
-
-  function paintLook() {
-    const root = lookRoot();
-    if (!root) return;
-    fillLookGrids();
-    const look = normalizeAppearance(state.appearance);
-    for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
-      const row = root.querySelector(`[data-look="${slot}"]`);
-      if (!row) continue;
-      for (const btn of row.querySelectorAll('[data-look-id]')) {
-        btn.classList.toggle('is-on', btn.dataset.lookId === look[slot]);
-      }
-    }
-    const note = root.querySelector('[data-look-note]');
-    if (note) {
-      note.textContent = world.hasCustomPlayer?.()
-        ? 'A custom player mesh is active. Walking still works; hair and colour customizer may not apply until you clear the upload.'
-        : world.usesBundledPlayer?.()
-          ? 'The default adventurer is a baked mesh; hair and colour customizer does not change it.'
-          : 'Hair, shirt, legs, boots, and face hair save with the shop.';
-    }
+    if (hintEl) hintEl.hidden = !(custom && hint?.suggestRotate);
   }
 
   function paintSettings() {
@@ -2121,43 +2076,105 @@ export function bindHud(root, state, world) {
     }
     paintBrightness();
     paintPhotoMode();
-  }
-
-  function openLookDock() {
-    closeBuild();
-    closeExpand();
-    closeMusicDock();
-    hideFurnMenu();
-    paintLook();
-    if (settingsDock) settingsDock.hidden = true;
-    if (lookDock) lookDock.hidden = false;
-  }
-
-  function backToSettings() {
-    closeLookDock();
-    paintSettings();
-    if (settingsDock) settingsDock.hidden = false;
+    paintPlayerModel();
   }
 
   function openSettings() {
     closeBuild();
     closeExpand();
     closeMusicDock();
-    closeLookDock();
     hideFurnMenu();
     paintSettings();
     if (settingsDock) settingsDock.hidden = false;
   }
 
+  async function rememberPlayerYaw(yaw180) {
+    const records = await loadModels();
+    const player = records.find((record) => record.id === PLAYER_MODEL_ID || record.kind === 'player');
+    if (!player) return;
+    player.id = PLAYER_MODEL_ID;
+    player.kind = 'player';
+    player.yaw180 = Boolean(yaw180);
+    await saveModel(player);
+  }
+
+  async function receivePlayerModel(file) {
+    const problem = validatePlayerModelFile(file);
+    if (problem) {
+      playerNote(problem);
+      return;
+    }
+    try {
+      const buffer = await file.arrayBuffer();
+      const scene = await parseModelBuffer(buffer.slice(0), file.name);
+      const result = world.setPlayerLook(scene, { yaw180: false, name: file.name });
+      if (!result?.ok) {
+        playerNote(result?.reason || 'Could not use that model. The current model is unchanged.');
+        return;
+      }
+      try {
+        await saveModel({
+          id: PLAYER_MODEL_ID,
+          name: file.name,
+          kind: 'player',
+          buffer,
+          sidecars: {},
+          yaw180: false,
+        });
+        playerNote(`Using ${file.name}.`);
+      } catch {
+        playerNote(`${file.name} is on for this visit, but it could not be saved in this browser.`);
+      }
+      paintPlayerModel();
+      render(performance.now() / 1000);
+    } catch {
+      playerNote('Could not read that model. The current model is unchanged.');
+    }
+  }
+
   settingsBtn?.addEventListener('click', () => {
-    if (settingsDock?.hidden === false || lookDock?.hidden === false) closeSettingsDock();
+    if (settingsDock?.hidden === false) closeSettingsDock();
     else openSettings();
   });
   settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
-  settingsDock?.querySelector('[data-look-open]')?.addEventListener('click', openLookDock);
-  lookDock?.querySelector('[data-look-back]')?.addEventListener('click', backToSettings);
-  lookDock?.querySelector('[data-look-close]')?.addEventListener('click', closeSettingsDock);
-  paintLook();
+  const playerFile = settingsDock?.querySelector('[data-player-model-file]');
+  settingsDock?.querySelector('[data-player-model-upload]')?.addEventListener('click', () => playerFile?.click());
+  playerFile?.addEventListener('change', () => {
+    const file = playerFile.files?.[0];
+    playerFile.value = '';
+    if (file) receivePlayerModel(file);
+  });
+  settingsDock?.querySelector('[data-player-model-reset]')?.addEventListener('click', async () => {
+    try {
+      await deleteModel(PLAYER_MODEL_ID);
+    } catch {
+      // Still restore the rigged adventurer if the browser store is unavailable.
+    }
+    const result = world.setPlayerLook(null);
+    if (!result?.ok) {
+      playerNote(result?.reason || 'Could not restore the default adventurer.');
+      return;
+    }
+    playerNote('Default adventurer restored.');
+    paintPlayerModel();
+    render(performance.now() / 1000);
+  });
+  settingsDock?.querySelector('[data-player-model-yaw]')?.addEventListener('click', async () => {
+    const next = !world.playerYaw180?.();
+    const result = world.setPlayerYaw180?.(next);
+    if (!result?.ok) {
+      playerNote(result?.reason || 'Could not turn that model. The current model is unchanged.');
+      return;
+    }
+    try {
+      await rememberPlayerYaw(next);
+    } catch {
+      playerNote('The turn is on for this visit, but it could not be saved in this browser.');
+    }
+    paintPlayerModel();
+    render(performance.now() / 1000);
+  });
+  paintPlayerModel();
   settingsDock?.querySelector('[data-skybox-list]')?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-skybox]');
     if (!btn) return;
@@ -2368,7 +2385,6 @@ export function bindHud(root, state, world) {
         paintCrafts();
         paintMusic();
         paintSettings();
-        paintLook();
         pushLog(state, 'Shop loaded from a file.');
       }
     } catch {

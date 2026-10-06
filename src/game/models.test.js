@@ -49,6 +49,10 @@ import {
   wrapImportedCharacter,
   wrapRiggedShopkeeper,
   wrapShopPlayer,
+  wrapUploadedPlayer,
+  findNamedClip,
+  playerOrientationHint,
+  defaultPlayerWorldHeight,
   wrapBuyerDump,
   sitVisibleOnY,
   nextBuyerLookId,
@@ -60,7 +64,7 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
+import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
@@ -584,6 +588,36 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(Math.abs(bottom - opening.topY) < 1e-6, `lintel underside ${bottom}`);
   });
 
+  it('keeps the red awning outside the room and keeps the inside timber and fascia', () => {
+    const front = roomCenter(0, 0);
+    const interiorZ = front.z + ROOM_D / 2 - 0.08;
+    for (const ids of [[], ['left', 'right', 'back']]) {
+      const shop = buildShop(ids).root;
+      shop.updateMatrixWorld(true);
+      let awnings = 0;
+      let join = false;
+      let fascia = false;
+      let cream = 0;
+      shop.traverse((child) => {
+        if (!child.isMesh || child.geometry?.type !== 'BoxGeometry') return;
+        const { width, height } = child.geometry.parameters;
+        const color = child.material?.color?.getHex?.();
+        if (color === 0x8b4336 && width > 7) {
+          awnings += 1;
+          const box = new THREE.Box3().setFromObject(child);
+          assert.ok(box.min.z >= interiorZ - 0.01, `awning enters the room at z=${box.min.z}`);
+        }
+        if (width > ROOM_W && height > 0.2 && Math.abs(child.position.y - 2.64) < 0.05) join = true;
+        if (width > ROOM_W && height === 0.16 && Math.abs(child.position.y - 2.78) < 1e-6) fascia = true;
+        if (color === 0xead3ae && width > 7) cream += 1;
+      });
+      assert.equal(awnings, 1, `origin awning only for ${ids.join('+') || 'origin'}`);
+      assert.equal(join, true);
+      assert.equal(fascia, true);
+      assert.equal(cream, 2);
+    }
+  });
+
   it('builds a floor piece for every expansion room', () => {
     const ids = EXPANSION_PADS.map((pad) => pad.id);
     const pieces = measureShopFloorPieces(buildShop(ids).root);
@@ -786,6 +820,140 @@ describe('bundled default player', () => {
     const restArm = wrapped.userData.rig.armR.rotation.x;
     updateMinePose(wrapped, 0.2, 0.4);
     assert.notEqual(wrapped.userData.rig.armR.rotation.x, restArm);
+  });
+});
+
+function bodyBox(root, name = 'uploaded-player') {
+  const visual = root.getObjectByName(name) ?? root;
+  visual.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  const gearName = /pickaxe|hatchet|chef-hat|importedGrip|hammer/i;
+  visual.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    let node = child;
+    while (node && node !== visual) {
+      if (gearName.test(node.name || '')) return;
+      node = node.parent;
+    }
+    box.expandByObject(child);
+  });
+  return box;
+}
+
+describe('uploaded player model', () => {
+  it('matches Walk and Idle clips by partial name', () => {
+    const clips = [
+      new THREE.AnimationClip('Walking_Forward', 1, []),
+      new THREE.AnimationClip('IdleBreath', 1, []),
+      new THREE.AnimationClip('Mine', 1, []),
+    ];
+    assert.equal(findNamedClip(clips, ['walk']).name, 'Walking_Forward');
+    assert.equal(findNamedClip(clips, ['idle']).name, 'IdleBreath');
+    assert.equal(findNamedClip(clips, ['mine']).name, 'Mine');
+    assert.equal(findNamedClip(clips, ['run']), null);
+  });
+
+  it('fits a static mesh to the default height, grounds the feet, and bobs while walking', () => {
+    const source = new THREE.Group();
+    const torso = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 2, 0.3),
+      new THREE.MeshBasicMaterial(),
+    );
+    torso.position.y = 0.2;
+    torso.name = 'torso';
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), new THREE.MeshBasicMaterial());
+    nose.position.set(0.4, 1.4, 0.5);
+    nose.name = 'nose';
+    source.add(torso, nose);
+    const height = defaultPlayerWorldHeight();
+    const wrapped = wrapUploadedPlayer(source, { height, chefHatOn: false });
+    wrapped.updateMatrixWorld(true);
+    const box = bodyBox(wrapped);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    assert.ok(Math.abs(size.y - height) < 0.02, `height ${size.y} vs ${height}`);
+    assert.ok(Math.abs(box.min.y) < 0.02, `feet ${box.min.y}`);
+    assert.ok(Math.abs(center.x) < 0.02, `center x ${center.x}`);
+    assert.ok(Math.abs(center.z) < 0.02, `center z ${center.z}`);
+    assert.equal(wrapped.userData.clipLocomotion, undefined);
+    assert.ok(wrapped.userData.hand);
+    assert.ok(wrapped.userData.chefHat);
+    assert.notEqual(wrapped.userData.hand.parent?.name, 'Hand_R');
+    const nosePos = new THREE.Vector3();
+    const torsoPos = new THREE.Vector3();
+    wrapped.getObjectByName('nose').getWorldPosition(nosePos);
+    wrapped.getObjectByName('torso').getWorldPosition(torsoPos);
+    assert.ok(nosePos.z > torsoPos.z, 'default facing stays +Z');
+    updateWalkPose(wrapped, true, 0.2, 1);
+    assert.ok(wrapped.position.y > 0.01, 'a model with no clips bobs while walking');
+  });
+
+  it('turns 180 degrees only when asked, and flags a Z-up box without guessing', () => {
+    const lying = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 2), new THREE.MeshBasicMaterial());
+    const hint = playerOrientationHint(lying);
+    assert.equal(hint.zUp, true);
+    assert.equal(hint.suggestRotate, true);
+    const plain = wrapUploadedPlayer(lying, { height: 1.7 });
+    assert.equal(plain.userData.yaw180, false);
+    assert.equal(plain.getObjectByName('uploaded-turn').rotation.y, 0);
+
+    const source = new THREE.Group();
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.6, 0.3), new THREE.MeshBasicMaterial());
+    torso.position.y = 0.8;
+    torso.name = 'torso';
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), new THREE.MeshBasicMaterial());
+    nose.position.set(0, 1.4, 0.45);
+    nose.name = 'nose';
+    source.add(torso, nose);
+    const turned = wrapUploadedPlayer(source, { yaw180: true, height: 1.7 });
+    turned.updateMatrixWorld(true);
+    const nosePos = new THREE.Vector3();
+    const torsoPos = new THREE.Vector3();
+    turned.getObjectByName('nose').getWorldPosition(nosePos);
+    turned.getObjectByName('torso').getWorldPosition(torsoPos);
+    assert.ok(nosePos.z < torsoPos.z, 'Rotate 180° faces the nose toward -Z');
+  });
+
+  it('plays the rigged Walk clip at the same stride scale and keeps tools on Hand_R', async () => {
+    const glb = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/models/player/character_rigged.glb'));
+    const gltf = await new Promise((resolve, reject) => {
+      new GLTFLoader().parse(
+        glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength),
+        '',
+        resolve,
+        reject,
+      );
+    });
+    const height = defaultPlayerWorldHeight();
+    const wrapped = wrapUploadedPlayer(gltf.scene, {
+      animations: gltf.animations,
+      height,
+      chefHatOn: true,
+    });
+    const rigged = wrapRiggedShopkeeper(gltf, { height, chefHatOn: false });
+    wrapped.updateMatrixWorld(true);
+    rigged.updateMatrixWorld(true);
+    const uploadedBox = bodyBox(wrapped);
+    const riggedBox = bodyBox(rigged, 'rigged-player');
+    const uploadedSize = uploadedBox.getSize(new THREE.Vector3());
+    const riggedSize = riggedBox.getSize(new THREE.Vector3());
+    assert.ok(Math.abs(uploadedSize.y - riggedSize.y) < 0.03, `height ${uploadedSize.y} vs rig ${riggedSize.y}`);
+    assert.ok(Math.abs(uploadedBox.min.y) < 0.03, `feet ${uploadedBox.min.y}`);
+    const center = uploadedBox.getCenter(new THREE.Vector3());
+    assert.ok(Math.abs(center.x) < 0.04 && Math.abs(center.z) < 0.04, `center ${center.x}, ${center.z}`);
+    assert.equal(playerOrientationHint(gltf.scene).suggestRotate, false);
+    assert.equal(wrapped.userData.hand.parent?.name, 'Hand_R');
+    assert.equal(wrapped.userData.chefHat.parent?.name, 'Head');
+    assert.equal(wrapped.userData.chefHat.visible, true);
+    const loco = wrapped.userData.clipLocomotion;
+    assert.ok(loco.walk && loco.idle);
+    assert.equal(loco.mode, 'idle');
+    loco.speed = 1.85;
+    updateWalkPose(wrapped, true, 0.05, 1);
+    const walkScale = 1.85 / (0.834 * loco.modelScale);
+    assert.equal(loco.mode, 'walk');
+    assert.ok(Math.abs(loco.walk.timeScale - walkScale) < 1e-6);
+    assert.ok(Math.abs(wrapped.position.y) < 1e-6, 'clip walking stays on the ground');
   });
 });
 

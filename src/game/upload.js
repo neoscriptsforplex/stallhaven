@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -298,7 +299,38 @@ export function prepareDungeonRockMaterials(root) {
 function friendlyParseError(err, kind) {
   const raw = err?.message || String(err || '');
   if (kind === 'obj') return raw || 'Could not parse that .obj file.';
+  if (kind === 'fbx') return 'Could not read that .fbx file.';
   return raw || 'Could not parse that model.';
+}
+
+/** Uploads larger than this stay off the player so a huge file cannot stall the tab. */
+export const PLAYER_MODEL_MAX_BYTES = 32 * 1024 * 1024;
+
+/** Empty string when the file can be tried. Otherwise a message that keeps the current model. */
+export function validatePlayerModelFile(file) {
+  const name = String(file?.name || '');
+  if (!/\.(glb|gltf|fbx|obj)$/i.test(name)) {
+    return 'Use a .glb, .gltf, .fbx, or .obj file. The current model is unchanged.';
+  }
+  const size = Number(file?.size ?? 0);
+  if (!Number.isFinite(size) || size <= 0) {
+    return 'That file is empty. The current model is unchanged.';
+  }
+  if (size > PLAYER_MODEL_MAX_BYTES) {
+    return 'That file is too large. The current model is unchanged.';
+  }
+  return '';
+}
+
+function rememberClips(scene, animations) {
+  if (scene) scene.animations = animations ?? scene.animations ?? [];
+  return scene;
+}
+
+function parseFbxBuffer(buffer) {
+  const group = new FBXLoader().parse(buffer, '');
+  if (!hasMesh(group)) throw new Error('That .fbx has no mesh.');
+  return rememberClips(group, group.animations);
 }
 
 export function parseModelFile(file) {
@@ -318,6 +350,14 @@ export function parseModelBuffer(buffer, name, sidecars = {}) {
       reject(new Error('That .mtl needs its .obj. Select both files together.'));
       return;
     }
+    if (ext.endsWith('.fbx')) {
+      try {
+        resolve(parseFbxBuffer(buffer));
+      } catch (err) {
+        reject(new Error(friendlyParseError(err, 'fbx')));
+      }
+      return;
+    }
     const onError = (err) => reject(new Error(friendlyParseError(err, 'gltf')));
     if (ext.endsWith('.gltf')) {
       const text = decodeText(buffer);
@@ -325,10 +365,10 @@ export function parseModelBuffer(buffer, name, sidecars = {}) {
         reject(new Error('That .gltf needs extra files. Use a single .glb instead.'));
         return;
       }
-      gltfLoader.parse(text, '', (gltf) => resolve(gltf.scene), onError);
+      gltfLoader.parse(text, '', (gltf) => resolve(rememberClips(gltf.scene, gltf.animations)), onError);
       return;
     }
-    gltfLoader.parse(buffer, '', (gltf) => resolve(gltf.scene), onError);
+    gltfLoader.parse(buffer, '', (gltf) => resolve(rememberClips(gltf.scene, gltf.animations)), onError);
   });
 }
 

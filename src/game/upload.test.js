@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
-import { bundledModelBases, bundledModelRoots, isDungeonRockDump, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
+import { bundledModelBases, bundledModelRoots, isDungeonRockDump, parseModelBuffer, prepareDungeonRockMaterials, validatePlayerModelFile, PLAYER_MODEL_MAX_BYTES } from './upload.js';
 import { UPLOADS_CLEARED } from './storage.js';
 
 function file(name) {
@@ -40,6 +40,29 @@ describe('model upload classify', () => {
     assert.match(classifyModelFiles([file('a.obj'), file('b.glb')]).error, /not both/i);
     assert.match(classifyModelFiles([file('a.obj'), file('b.obj')]).error, /one \.obj/i);
     assert.match(classifyModelFiles([file('notes.txt')]).error, /glb|obj/i);
+  });
+});
+
+describe('player model file checks', () => {
+  it('accepts glb, gltf, fbx, and obj, and refuses empty, huge, or other files', () => {
+    assert.equal(validatePlayerModelFile({ name: 'hero.glb', size: 1200 }), '');
+    assert.equal(validatePlayerModelFile({ name: 'hero.GLTF', size: 80 }), '');
+    assert.equal(validatePlayerModelFile({ name: 'hero.fbx', size: 80 }), '');
+    assert.equal(validatePlayerModelFile({ name: 'hero.obj', size: 80 }), '');
+    assert.match(validatePlayerModelFile({ name: 'notes.txt', size: 20 }), /unchanged/);
+    assert.match(validatePlayerModelFile({ name: 'empty.glb', size: 0 }), /empty/);
+    assert.match(validatePlayerModelFile({ name: 'huge.glb', size: PLAYER_MODEL_MAX_BYTES + 1 }), /too large/);
+  });
+
+  it('keeps Walk and Idle clips on a parsed glb and rejects a bad fbx', async () => {
+    const glb = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/models/player/character_rigged.glb'));
+    const scene = await parseModelBuffer(glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength), 'character_rigged.glb');
+    assert.ok(scene.animations.some((clip) => clip.name === 'Walk'));
+    assert.ok(scene.animations.some((clip) => clip.name === 'Idle'));
+    await assert.rejects(
+      () => parseModelBuffer(new Uint8Array([1, 2, 3, 4]).buffer, 'broken.fbx'),
+      /fbx/i,
+    );
   });
 });
 

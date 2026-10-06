@@ -604,12 +604,6 @@ button:disabled {
   grid-template-columns: 1fr 1fr;
 }
 
-.look-label {
-  margin: 8px 0 4px;
-  font-size: 0.78rem;
-  color: #d7c09a;
-}
-
 .chest-actions {
   display: flex;
   gap: 6px;
@@ -1158,9 +1152,15 @@ html.is-booting #save-bar {
   50% { opacity: 1; }
 }
 
-[data-look-open] {
-  width: 100%;
-  margin: 6px 0 12px;
+[data-player-model-upload],
+[data-player-model-reset],
+[data-player-model-yaw] {
+  margin: 6px 0;
+}
+
+[data-player-model-yaw].is-on {
+  border-color: var(--gold);
+  background: linear-gradient(#8a5a30, #5a3518);
 }
 
 .cheat-form {

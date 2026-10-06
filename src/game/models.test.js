@@ -2786,7 +2786,7 @@ describe('shop props', () => {
   });
 });
 
-describe('rigged adventurer buyers', () => {
+describe('rigged buyer looks', () => {
   async function loadBuyer(file) {
     const glb = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/models', file));
     return new Promise((resolve, reject) => {
@@ -2802,12 +2802,13 @@ describe('rigged adventurer buyers', () => {
   it('plays Walk and Idle on each rigged adventurer at the player scale', async () => {
     assert.equal(BUYER_MODEL_SCALE, 0.863);
     assert.equal(RIGGED_CLIP_FADE, 0.2);
-    assert.equal(RIGGED_BUYER_MODELS.length, 5);
+    assert.equal(RIGGED_BUYER_MODELS.length, 7);
     try {
       for (const spec of RIGGED_BUYER_MODELS) {
+        const typeId = spec.lookId.startsWith('buyer-guard-') ? 'mercenary' : 'pilgrim';
         const gltf = await loadBuyer(spec.file);
-        const buyer = wrapRiggedBuyer(gltf, 'pilgrim', { lookId: spec.lookId });
-        assert.equal(buyer.name, 'pilgrim');
+        const buyer = wrapRiggedBuyer(gltf, typeId, { lookId: spec.lookId });
+        assert.equal(buyer.name, typeId);
         assert.equal(buyer.userData.buyerLookId, spec.lookId);
         assert.equal(buyer.userData.pick?.userData.kind, 'customer');
         assert.ok(buyer.userData.speech);
@@ -2835,13 +2836,20 @@ describe('rigged adventurer buyers', () => {
         assert.equal(skinned, 1, spec.lookId);
         assert.equal(bones, 18, spec.lookId);
         const handR = buyer.getObjectByName('Hand_R');
+        const handL = buyer.getObjectByName('Hand_L');
         assert.ok(handR);
-        if (spec.carryHand === 'Hand_L') {
+        assert.ok(handL);
+        if (spec.carryHand === false) {
+          assert.equal(handR.children.length, 0, `${spec.lookId} leaves the baked weapon on Hand_R`);
+          assert.equal(handL.children.length, 0, `${spec.lookId} leaves the baked weapon on Hand_L`);
+          assert.equal(buyer.userData.hand.parent, buyer);
+        } else if (spec.carryHand === 'Hand_L') {
           assert.equal(handR.children.length, 0, 'Donie staff stays on Hand_R with no attached tool');
           assert.equal(buyer.userData.hand.parent?.name, 'Hand_L');
         } else {
           assert.equal(buyer.userData.hand.parent?.name, 'Hand_R');
           assert.equal(handR.children.some((child) => child.isMesh), false);
+          assert.equal(handL.children.length, 0);
         }
         const moveSpeed = 1.35;
         loco.speed = moveSpeed;
@@ -2857,7 +2865,7 @@ describe('rigged adventurer buyers', () => {
         assert.ok(Math.abs(box.min.y) < 0.03, `${spec.lookId} feet ${box.min.y}`);
         assert.ok(Math.abs(height - expected) < 0.08, `${spec.lookId} height ${height} expected ${expected}`);
         setRiggedBuyer(spec.lookId, gltf);
-        const built = buildAdventurer('pilgrim', { lookId: spec.lookId, seed: 0.2 });
+        const built = buildAdventurer(typeId, { lookId: spec.lookId, seed: 0.2 });
         assert.equal(built.userData.buyerLookId, spec.lookId);
         assert.equal(built.userData.clipLocomotion.walkStride, loco.walkStride);
       }
@@ -2868,11 +2876,17 @@ describe('rigged adventurer buyers', () => {
 
   it('keeps the old adventurer dump when a rigged buyer fails to wrap', () => {
     setRiggedBuyer('buyer-adventurer-bob', { scene: new THREE.Group(), animations: [] });
+    setRiggedBuyer('buyer-guard-barbarian-level-17', { scene: new THREE.Group(), animations: [] });
     try {
       const fallback = buildAdventurer('pilgrim', { lookId: 'buyer-adventurer-bob', seed: 0.2 });
       assert.equal(fallback.userData.clipLocomotion, undefined);
       assert.equal(fallback.userData.pick?.userData.kind, 'customer');
       assert.equal(getRiggedBuyer('buyer-adventurer-bob'), null);
+      const guard = buildAdventurer('mercenary', { lookId: 'buyer-guard-barbarian-level-17', seed: 0.2 });
+      assert.equal(guard.name, 'mercenary');
+      assert.equal(guard.userData.clipLocomotion, undefined);
+      assert.equal(guard.userData.pick?.userData.kind, 'customer');
+      assert.equal(getRiggedBuyer('buyer-guard-barbarian-level-17'), null);
     } finally {
       clearRiggedBuyers();
     }

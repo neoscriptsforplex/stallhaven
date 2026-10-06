@@ -771,16 +771,18 @@ export const RAT_WALK_SPEED = RAT_WALK_UNIT_SPEED * RAT_MODEL_SCALE;
 /** Crossfade between Walk, Idle, and the gathering clips. */
 export const RIGGED_CLIP_FADE = 0.2;
 /**
- * World scale for the five rigged adventurer buyers.
+ * World scale for the rigged buyer looks.
  * Same 0.863 used for the player rig and the yard goblin.
  */
 export const BUYER_MODEL_SCALE = 0.863;
 /**
- * Rigged looks that replace the adventurer OBJ dumps.
- * speed is the no-slide Walk rate at scale 1 (m/s). Playback is
- * timeScale = moveSpeed / (speed * BUYER_MODEL_SCALE).
- * height is the mesh top at scale 1 (Donie includes the staff tip).
+ * Rigged looks that replace the adventurer and melee OBJ dumps.
+ * speed is the no-slide Walk rate at scale 1 (m/s), matching extras.walk_speed_mps.
+ * Playback is timeScale = moveSpeed / (speed * BUYER_MODEL_SCALE).
+ * height is the mesh top at scale 1 (Donie's staff tip, the barbarian's horns and mace).
  * Donie's staff is rigid on Hand_R, so the carry grip uses Hand_L.
+ * The barbarian's mace and the guard's sword and shield are already on the hands,
+ * so those looks set carryHand to false and the purchase grip stays on the group.
  */
 export const RIGGED_BUYER_MODELS = [
   {
@@ -813,6 +815,20 @@ export const RIGGED_BUYER_MODELS = [
     file: 'npc/woman_level_2_rigged.glb',
     speed: 0.8394186217945104,
     height: 1.765324631383086,
+  },
+  {
+    lookId: 'buyer-guard-barbarian-level-17',
+    file: 'npc/barbarian_level_17_rigged.glb',
+    speed: 0.8556815242761757,
+    height: 1.8433586656809673,
+    carryHand: false,
+  },
+  {
+    lookId: 'buyer-guard-guard-level-21',
+    file: 'npc/guard_level_21_rigged.glb',
+    speed: 0.849001881856245,
+    height: 1.797281847145991,
+    carryHand: false,
   },
 ];
 /** Both the old shopkeeper and the rig face +Z, so atan2(dx, dz) needs no extra yaw. */
@@ -3845,10 +3861,11 @@ function riggedBuyerSpec(lookId) {
 }
 
 /**
- * One adventurer buyer from a rigged GLB. The group keeps the customer
+ * One buyer from a rigged GLB. The group keeps the customer
  * nameplate, speech bubble, click box, and ring. Walk and Idle crossfade
  * on the same mixer path as the goblin. Facing stays +Z; walkToward yaws the group.
- * Donie's staff is already on Hand_R, so no grip or tool is parented there.
+ * Donie's staff is already on Hand_R, so her purchase grip uses Hand_L.
+ * Melee weapons are baked onto both hands, so those grips stay off the skeleton.
  */
 export function wrapRiggedBuyer(gltf, typeId, opts = {}) {
   const spec = riggedBuyerSpec(opts.lookId);
@@ -3922,7 +3939,8 @@ export function wrapRiggedBuyer(gltf, typeId, opts = {}) {
 
   const grip = new THREE.Group();
   grip.name = 'importedGrip';
-  const carryHand = visual.getObjectByName(spec.carryHand ?? 'Hand_R');
+  const carryName = spec.carryHand === false ? null : (spec.carryHand ?? 'Hand_R');
+  const carryHand = carryName ? visual.getObjectByName(carryName) : null;
   if (carryHand) {
     grip.position.set(RIGGED_FIST.x, RIGGED_FIST.y, RIGGED_FIST.z);
     carryHand.add(grip);

@@ -53,9 +53,9 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_WALK_BLOCK } from './layout.js';
+import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_WALL_H, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_WALL_H, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles, PLAYER_RADIUS } from './nav.js';
 import { GATHER_CONTACT, GATHER_MODEL_SCALE, gatherStandCandidates } from './interact.js';
 
@@ -695,9 +695,10 @@ describe('bundled prop swaps', () => {
       const half = measureVisibleBox(buildTree(0.5)).getSize(new THREE.Vector3());
       tree.position.set(-2.4, 0, 6.1);
       tree.rotation.y = 0.7;
-      tree.updateMatrixWorld(true);
+      tree.scale.setScalar(1 + TREE_SCALE_SPREAD);
+      seatTreeOnGround(tree);
       const box = measureVisibleBox(tree);
-      assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `bundled base minY=${box.min.y}`);
+      assert.ok(box.min.y < -0.02 && box.min.y > -0.05, `bundled roots should sink into the grass, minY=${box.min.y}`);
       assert.ok(half.y > 1.4 && half.y < 3.2, `half-scale pine should stay the old size, got ${half.y}`);
       for (const axis of ['x', 'y', 'z']) {
         assert.ok(
@@ -1126,9 +1127,10 @@ describe('bundled prop swaps', () => {
     const half = measureVisibleBox(buildTree(0.5)).getSize(new THREE.Vector3());
     tree.position.set(4.2, 0, -3.4);
     tree.rotation.y = 1.1;
-    tree.updateMatrixWorld(true);
+    tree.scale.setScalar(1 - TREE_SCALE_SPREAD);
+    seatTreeOnGround(tree);
     const box = measureVisibleBox(tree);
-    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `base should sit on the grass, minY=${box.min.y}`);
+    assert.ok(box.min.y < -0.02 && box.min.y > -0.05, `base should sink into the grass, minY=${box.min.y}`);
     assert.ok(half.y > 1.5 && half.y < 2.4, `half scale should stay the old pine, got ${half.y}`);
     for (const axis of ['x', 'y', 'z']) {
       assert.ok(
@@ -1137,11 +1139,17 @@ describe('bundled prop swaps', () => {
       );
     }
     const reach = Math.hypot(GATHER_CONTACT.tree.x, GATHER_CONTACT.tree.z) * GATHER_MODEL_SCALE;
-    const stand = gatherStandCandidates('tree', { x: 0, z: 0 })[0];
-    const standDist = Math.hypot(stand.x, stand.z);
-    assert.ok(standDist > TREE_WALK_BLOCK / 2 + PLAYER_RADIUS, `stand ${standDist} is inside the trunk block`);
-    const gap = standDist - reach;
-    assert.ok(gap < 0.5, `chop stand stepped too far from the trunk, gap=${gap}`);
+    const bite = (radius) => {
+      const stand = gatherStandCandidates('tree', { x: 0, z: 0, trunkRadius: radius })[0];
+      const standDist = Math.hypot(stand.x, stand.z);
+      assert.ok(standDist > treeWalkBlock(radius) / 2 + PLAYER_RADIUS, `stand ${standDist} is inside the ${radius} trunk block`);
+      return radius - (standDist - reach);
+    };
+    assert.ok(bite(TREE_TRUNK_RADIUS) > 0.02, 'the default chop should meet the bark');
+    assert.ok(bite(TREE_TRUNK_RADIUS * 1.15) > 0.02, 'a larger trunk should still be in reach');
+    const slim = Math.hypot(...['x', 'z'].map((axis) => gatherStandCandidates('tree', { trunkRadius: 0.16 })[0][axis]));
+    const thick = Math.hypot(...['x', 'z'].map((axis) => gatherStandCandidates('tree', { trunkRadius: 0.28 })[0][axis]));
+    assert.ok(thick > slim + 0.05, 'a thicker trunk steps the chop stand back');
     let roofMarked = 0;
     let transparentMats = 0;
     tree.traverse((child) => {
@@ -1175,7 +1183,10 @@ describe('bundled prop swaps', () => {
       const box = measureVisibleBox(pine);
       pine.rotation.y = yaw;
       pine.updateMatrixWorld(true);
-      assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `placed tree should stay grounded, minY=${box.min.y}`);
+      assert.ok(box.min.y < -0.02 && box.min.y > -0.05, `placed roots should sink into the grass, minY=${box.min.y}`);
+      assert.ok(pine.userData.uniformScale >= 1 - TREE_SCALE_SPREAD - 1e-6);
+      assert.ok(pine.userData.uniformScale <= 1 + TREE_SCALE_SPREAD + 1e-6);
+      assert.ok(Math.abs(pine.scale.x - pine.scale.y) < 1e-6 && Math.abs(pine.scale.y - pine.scale.z) < 1e-6);
       assert.ok(params.height + 0.05 >= box.max.y - box.min.y, 'pick should reach the crown');
       const wide = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
       assert.ok(params.width + 0.15 >= wide * 0.45, `pick should cover the wider trunk, width=${params.width} crown=${wide}`);
@@ -1195,7 +1206,9 @@ describe('bundled prop swaps', () => {
       assert.ok(block, `missing walk block for tree at ${spot.x},${spot.z}`);
       const w = block.maxX - block.minX;
       const d = block.maxZ - block.minZ;
-      assert.ok(Math.abs(w - TREE_WALK_BLOCK) < 1e-6 && Math.abs(d - TREE_WALK_BLOCK) < 1e-6, `tree block ${w}x${d}`);
+      const want = treeWalkBlock(plantedTrunkRadius(spot.x, spot.z));
+      assert.ok(Math.abs(w - want) < 1e-6 && Math.abs(d - want) < 1e-6, `tree block ${w}x${d} vs ${want}`);
+      assert.ok(Math.abs(want - TREE_WALK_BLOCK) / TREE_WALK_BLOCK <= TREE_SCALE_SPREAD + 0.02, `block ${want} drifted from the 2× trunk`);
     }
   });
 

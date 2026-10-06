@@ -47,6 +47,7 @@ import {
   gardenBox,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  plantedTrunkRadius,
   TREE_CLICK_RADIUS,
   pickFlaxNode,
   rollFlaxSpots,
@@ -1788,7 +1789,12 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (data.kind === 'tree') {
-        queueUse('tree', { x: data.x, z: data.z, materialId: 'logs' });
+        queueUse('tree', {
+          x: data.x,
+          z: data.z,
+          materialId: 'logs',
+          trunkRadius: data.trunkRadius ?? plantedTrunkRadius(data.x, data.z),
+        });
         return;
       }
       if (data.kind === 'flax') {
@@ -1845,7 +1851,12 @@ export function createWorld(canvas, state, opts = {}) {
           Math.hypot(point.x - spot.x, point.z - spot.z) <= TREE_CLICK_RADIUS
         ));
         if (tree) {
-          queueUse('tree', { x: tree.x, z: tree.z, materialId: 'logs' });
+          queueUse('tree', {
+            x: tree.x,
+            z: tree.z,
+            materialId: 'logs',
+            trunkRadius: plantedTrunkRadius(tree.x, tree.z),
+          });
           return;
         }
         const plant = flaxNodes.find((node) => (
@@ -2845,7 +2856,12 @@ export function createWorld(canvas, state, opts = {}) {
     useBoulder(pose) {
       if (!pose) return;
       if (pose.kind === 'tree') {
-        queueUse('tree', { x: pose.x, z: pose.z, materialId: 'logs' });
+        queueUse('tree', {
+          x: pose.x,
+          z: pose.z,
+          materialId: 'logs',
+          trunkRadius: pose.trunkRadius ?? plantedTrunkRadius(pose.x, pose.z),
+        });
         return;
       }
       if (pose.kind === 'flax') {

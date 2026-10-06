@@ -108,13 +108,16 @@ export const TREE_BED_CLEAR = 1.7;
 
 /** Uniform scale for every outdoor pine, all axes, versus the pre-stretch fit. */
 export const OUTDOOR_TREE_SCALE = 2;
-/** Walk-block width before the pines grew. Doubles with the trunk. */
-export const TREE_WALK_BLOCK = 0.62 * OUTDOOR_TREE_SCALE;
 /**
- * Trunk radius the chop swing was measured against (procedural bark).
- * The live dump is thicker; both grow with the uniform scale.
+ * Bundled trunk column at the 2× fit, measured on the bark above the root fins.
+ * Each planted pine can override this with its own measured radius.
  */
-export const TREE_TRUNK_RADIUS = 0.12 * OUTDOOR_TREE_SCALE;
+export const TREE_TRUNK_RADIUS = 0.18;
+/**
+ * Walk block for that column. Wide enough to keep a body off the bark, and
+ * narrow enough that the chop stand can still reach it.
+ */
+export const TREE_WALK_BLOCK = TREE_TRUNK_RADIUS * 2 + 0.24;
 /** Grass-click radius around a tree. Was 1.15 before the pines doubled. */
 export const TREE_CLICK_RADIUS = 1.15 * OUTDOOR_TREE_SCALE;
 /**
@@ -122,11 +125,40 @@ export const TREE_CLICK_RADIUS = 1.15 * OUTDOOR_TREE_SCALE;
  * variation and the outdoor scale.
  */
 export const TREE_CANOPY_UNIT = 0.66;
+/** Garden pines vary uniformly by this much around the 2× fit. */
+export const TREE_SCALE_SPREAD = 0.15;
 
-/** Widest crown for a garden pine of this side, including the random size roll. */
+/** Widest crown for a garden pine, including the ±15% size roll. */
 export function treeCanopyRadius(side = 'left') {
-  const variation = (side === 'edge' ? 1.15 : 0.85) + 0.45;
-  return TREE_CANOPY_UNIT * variation * OUTDOOR_TREE_SCALE;
+  void side;
+  return TREE_CANOPY_UNIT * (1 + TREE_SCALE_SPREAD) * OUTDOOR_TREE_SCALE;
+}
+
+/** Block width for a pine whose trunk column has this radius. */
+export function treeWalkBlock(radius = TREE_TRUNK_RADIUS) {
+  const r = Number.isFinite(radius) && radius > 0 ? radius : TREE_TRUNK_RADIUS;
+  const pad = TREE_WALK_BLOCK - TREE_TRUNK_RADIUS * 2;
+  return r * 2 + pad;
+}
+
+const plantedTrunkRadii = new Map();
+
+function trunkKey(x, z) {
+  return `${Number(x).toFixed(2)},${Number(z).toFixed(2)}`;
+}
+
+export function resetPlantedTrunks() {
+  plantedTrunkRadii.clear();
+}
+
+export function notePlantedTrunk(x, z, radius) {
+  const r = Number(radius);
+  if (!Number.isFinite(r) || r <= 0) return;
+  plantedTrunkRadii.set(trunkKey(x, z), r);
+}
+
+export function plantedTrunkRadius(x, z) {
+  return plantedTrunkRadii.get(trunkKey(x, z)) ?? TREE_TRUNK_RADIUS;
 }
 
 export const GRASS_PAD = 9;

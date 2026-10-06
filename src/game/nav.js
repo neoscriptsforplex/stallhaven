@@ -9,7 +9,8 @@ import {
   furnitureVisualYaw,
   gardenTreeSpots,
   gardenRockSpots,
-  TREE_WALK_BLOCK,
+  plantedTrunkRadius,
+  treeWalkBlock,
   keepFountain,
   neighborsOf,
   occupiedCells,
@@ -148,7 +149,8 @@ export function gardenObstacles(expansionIds = []) {
     blocks.push(rectFromCenter(FOUNTAIN.x, FOUNTAIN.z, size, size));
   }
   for (const tree of gardenTreeSpots(expansionIds)) {
-    blocks.push(rectFromCenter(tree.x, tree.z, TREE_WALK_BLOCK, TREE_WALK_BLOCK));
+    const block = treeWalkBlock(plantedTrunkRadius(tree.x, tree.z));
+    blocks.push(rectFromCenter(tree.x, tree.z, block, block));
   }
   for (const rock of gardenRockSpots(expansionIds)) {
     const s = 0.45 * (rock.scale ?? 1);

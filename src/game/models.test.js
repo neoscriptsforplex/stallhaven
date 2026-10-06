@@ -688,16 +688,16 @@ describe('bundled prop swaps', () => {
     setBundledLook('tree', dump);
     try {
       const tree = buildTree(1);
-      tree.position.set(-2.4, 0, 6.1);
-      tree.rotation.y = 0.7;
-      tree.updateMatrixWorld(true);
       const visual = tree.getObjectByName('pine-visual');
       assert.ok(Math.abs(visual.scale.x - visual.scale.y) < 1e-6, 'bundled pine should stay uniform');
       assert.ok(Math.abs(visual.scale.y - visual.scale.z) < 1e-6);
+      const big = measureVisibleBox(tree).getSize(new THREE.Vector3());
+      const half = measureVisibleBox(buildTree(0.5)).getSize(new THREE.Vector3());
+      tree.position.set(-2.4, 0, 6.1);
+      tree.rotation.y = 0.7;
+      tree.updateMatrixWorld(true);
       const box = measureVisibleBox(tree);
       assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `bundled base minY=${box.min.y}`);
-      const big = box.getSize(new THREE.Vector3());
-      const half = measureVisibleBox(buildTree(0.5)).getSize(new THREE.Vector3());
       assert.ok(half.y > 1.4 && half.y < 3.2, `half-scale pine should stay the old size, got ${half.y}`);
       for (const axis of ['x', 'y', 'z']) {
         assert.ok(
@@ -1118,17 +1118,17 @@ describe('bundled prop swaps', () => {
     assert.equal(OUTDOOR_TREE_SCALE, 2);
     assert.deepEqual(GATHER_CONTACT.tree, { x: 0.21, z: 0.62 });
     const tree = buildTree(1);
-    tree.position.set(4.2, 0, -3.4);
-    tree.rotation.y = 1.1;
-    tree.updateMatrixWorld(true);
     const visual = tree.getObjectByName('pine-visual');
     assert.ok(visual, 'the pine visual should live under the placement group');
     assert.ok(Math.abs(visual.scale.x - visual.scale.y) < 1e-6);
     assert.ok(Math.abs(visual.scale.y - visual.scale.z) < 1e-6);
+    const big = measureVisibleBox(tree).getSize(new THREE.Vector3());
+    const half = measureVisibleBox(buildTree(0.5)).getSize(new THREE.Vector3());
+    tree.position.set(4.2, 0, -3.4);
+    tree.rotation.y = 1.1;
+    tree.updateMatrixWorld(true);
     const box = measureVisibleBox(tree);
     assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `base should sit on the grass, minY=${box.min.y}`);
-    const big = box.getSize(new THREE.Vector3());
-    const half = measureVisibleBox(buildTree(0.5)).getSize(new THREE.Vector3());
     assert.ok(half.y > 1.5 && half.y < 2.4, `half scale should stay the old pine, got ${half.y}`);
     for (const axis of ['x', 'y', 'z']) {
       assert.ok(
@@ -1169,8 +1169,12 @@ describe('bundled prop swaps', () => {
       assert.ok(Math.abs(params.depth - 0.85 * OUTDOOR_TREE_SCALE) < 1e-6, `pick depth ${params.depth}`);
       assert.ok(params.height > 2.8, `pick should cover the taller crown, height=${params.height}`);
       const pine = child.parent;
+      const yaw = pine.rotation.y;
+      pine.rotation.y = 0;
       pine.updateMatrixWorld(true);
       const box = measureVisibleBox(pine);
+      pine.rotation.y = yaw;
+      pine.updateMatrixWorld(true);
       assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `placed tree should stay grounded, minY=${box.min.y}`);
       assert.ok(params.height + 0.05 >= box.max.y - box.min.y, 'pick should reach the crown');
       const wide = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);

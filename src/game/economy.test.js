@@ -69,6 +69,7 @@ import {
   chestDisplayList,
   grantChoppedLogs,
   grantMinedMaterial,
+  grantPickedFlax,
   FREE_FURNITURE_REPLACE,
   chestTotal,
   completeCrafts,
@@ -144,7 +145,7 @@ describe('stall economy', () => {
     assert.equal(state.materials.bronze, 12);
     assert.equal(state.materials.bronze_bar, 0);
     assert.equal(state.materials.bow_string, 0);
-    assert.equal(state.materials.flax, 8);
+    assert.equal(state.materials.flax, 5);
     assert.equal(state.materials.flour, 10);
     assert.equal(state.materials.logs, 0);
     assert.equal(state.materials.hide, 8);
@@ -986,7 +987,27 @@ describe('material regen', () => {
     assert.equal(canRestock(state, 'bow_string'), false);
     assert.equal(restock(state, 'bronze_bar'), false);
     assert.equal(restock(state, 'bow_string'), false);
-    assert.equal(canRestock(state, 'flax'), true);
+    assert.equal(canRestock(state, 'flour'), true);
+  });
+
+  it('does not regenerate or restock flax and grants one per pick', () => {
+    const state = createState();
+    assert.equal(MATERIALS.flax.start, 5);
+    assert.equal(MATERIALS.flax.restock, 0);
+    assert.equal(MATERIALS.flax.regenEvery, 0);
+    assert.equal(state.materials.flax, 5);
+    state.materials.flax = 0;
+    state.materialAcc.flax = 0;
+    tickMaterials(state, 240);
+    assert.equal(state.materials.flax, 0);
+    state.gold = 1000;
+    assert.equal(canRestock(state, 'flax'), false);
+    assert.equal(restock(state, 'flax'), false);
+    assert.equal(grantPickedFlax(state), 1);
+    assert.equal(state.materials.flax, 1);
+    state.materials.flax = 250;
+    assert.equal(grantPickedFlax(state), 0);
+    assert.equal(state.materials.flax, 250);
   });
 });
 
@@ -1385,8 +1406,10 @@ describe('cheat codes', () => {
     state.furniture.furnace = { x: 1, z: 2, rot: 0 };
     state.furniture.loom = { x: 0, z: 1, rot: 0 };
     state.shopXp = 500;
+    state.materials.flax = 40;
     assert.equal(isUnlocked(state, 'iron_sword'), true);
     assert.equal(applyCheat(state, 'nOoB'), 'noob');
+    assert.equal(state.materials.flax, 5);
     assert.equal(state.gold, START_GOLD);
     assert.equal(state.chest.bread, 3);
     assert.equal(isUnlocked(state, 'iron_sword'), false);

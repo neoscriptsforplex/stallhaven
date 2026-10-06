@@ -44,7 +44,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { cobblePathSpan, furnitureVisualYaw, pointHitsShop, ROOM_W, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -489,7 +489,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'rock', 'fountain', 'skeleton']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'flax-plant', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
     for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-runite', 'ore-dragon', 'ore-essence']) {
@@ -522,6 +522,21 @@ describe('bundled prop swaps', () => {
     const cGot = measureVisibleBox(counter).getSize(new THREE.Vector3());
     const cWant = measureVisibleBox(buildCounter()).getSize(new THREE.Vector3());
     assert.ok(Math.abs(Math.max(cGot.x, cGot.z) - Math.max(cWant.x, cWant.z)) < 0.12);
+
+    setBundledLook('flax-plant', null);
+    const fallbackFlax = buildFlaxPlant();
+    assert.equal(fallbackFlax.userData.flaxProcedural, true);
+    const flaxWant = measureVisibleBox(fallbackFlax).getSize(new THREE.Vector3()).y;
+    assert.ok(flaxWant >= 0.45 && flaxWant <= 0.7, `procedural flax height ${flaxWant}`);
+    setBundledLook('flax-plant', await loadFolder('flax'));
+    const flaxPlant = buildFlaxPlant();
+    assert.equal(flaxPlant.userData.flaxProcedural, false);
+    assertUniform(flaxPlant);
+    assertGrounded(flaxPlant);
+    const flaxSize = measureVisibleBox(flaxPlant).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(flaxSize.y - flaxWant) < 0.08, `flax height ${flaxSize.y} vs ${flaxWant}`);
+    assert.ok(Math.max(flaxSize.x, flaxSize.z) < 1.05, `flax footprint ${flaxSize.x}×${flaxSize.z}`);
+    setBundledLook('flax-plant', null);
 
     const flowers = wrapBundledProp(await loadFolder('flowers'), new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.22, 0.55)), { name: 'flowers', fit: 'max' });
     assertUniform(flowers);

@@ -274,7 +274,7 @@ export const MATERIALS = {
   runite: { id: 'runite', name: 'Runite Ore', restock: 0, start: 0, tier: 6, regenEvery: 0 },
   dragon: { id: 'dragon', name: 'Dragon Ore', restock: 0, start: 0, tier: 7, regenEvery: 0 },
   logs: { id: 'logs', name: 'Logs', restock: 0, start: 0, tier: 1, regenEvery: 0 },
-  flax: { id: 'flax', name: 'Flax', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  flax: { id: 'flax', name: 'Flax', restock: 0, start: 5, tier: 1, regenEvery: 0, gathered: true },
   bow_string: {
     id: 'bow_string',
     name: 'Bow String',
@@ -1389,6 +1389,11 @@ export const MINE_YIELD = 5;
 export const MINE_DURATION = 3.2;
 export const CHOP_YIELD = 5;
 export const CHOP_DURATION = 3.2;
+/** One flax per pick. The bar matches mining and chopping. */
+export const FLAX_YIELD = 1;
+export const FLAX_DURATION = 3.2;
+/** How close the player stands before the pick bar starts. */
+export const FLAX_ARRIVE = 0.85;
 
 export function isMinedMaterial(materialId) {
   return materialId === 'essence' || METALS.some((metal) => metal.id === materialId);

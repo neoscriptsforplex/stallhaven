@@ -353,6 +353,7 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'counter', folder: 'counter' },
   { id: 'tree', folder: 'tree' },
   { id: 'flowers', folder: 'flowers' },
+  { id: 'flax-plant', folder: 'flax' },
   { id: 'rock', folder: 'rock' },
   { id: 'fountain', folder: 'fountain', rev: FOUNTAIN_DUMP_REV },
   { id: 'skeleton', folder: 'skeleton' },

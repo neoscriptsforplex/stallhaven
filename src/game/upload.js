@@ -18,6 +18,8 @@ function decodeText(buffer) {
   return new TextDecoder().decode(buffer);
 }
 
+const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
+
 function basename(path) {
   return String(path ?? '').split(/[\\/]/).pop().split('?')[0].toLowerCase();
 }
@@ -26,7 +28,7 @@ function sidecarMap(sidecars = {}) {
   const urls = new Map();
   const revoke = [];
   for (const [name, data] of Object.entries(sidecars)) {
-    if (!data) continue;
+    if (!data || IMAGE_EXT.test(name)) continue;
     const blob = new Blob([data]);
     const url = URL.createObjectURL(blob);
     revoke.push(url);
@@ -53,7 +55,114 @@ function sanitizeObjText(objText) {
   return objText;
 }
 
-function parseObjBuffer(buffer, sidecars = {}, name = '') {
+const MTL_MAP_PROP = {
+  map_kd: 'map',
+  map_ks: 'specularMap',
+  map_ke: 'emissiveMap',
+  map_bump: 'bumpMap',
+  bump: 'bumpMap',
+  map_d: 'alphaMap',
+  map_kn: 'normalMap',
+  norm: 'normalMap',
+  disp: 'displacementMap',
+};
+
+/** Filename after optional `-flag value` pairs. Keeps spaces inside the name. */
+function mtlMapFilename(rest) {
+  const tokens = String(rest ?? '').trim().split(/\s+/);
+  let i = 0;
+  while (i < tokens.length && tokens[i].startsWith('-')) i += 2;
+  return tokens.slice(i).join(' ').replace(/\\/g, '/');
+}
+
+function mtlMapRefs(mtlText) {
+  const refs = [];
+  let material = '';
+  for (const line of String(mtlText).split(/\r?\n/)) {
+    const named = line.match(/^newmtl\s+(\S+)/i);
+    if (named) {
+      material = named[1];
+      continue;
+    }
+    const mapped = line.match(/^\s*(map_ka|map_kd|map_ks|map_ke|map_ns|map_d|map_bump|bump|map_kn|norm|disp|refl)\s+(.+)$/i);
+    if (!mapped || !material) continue;
+    const file = mtlMapFilename(mapped[2]);
+    if (!file) continue;
+    refs.push({ material, token: mapped[1].toLowerCase(), file });
+  }
+  return refs;
+}
+
+function mtlWithoutMaps(mtlText) {
+  return String(mtlText).replace(/^(?:map_ka|map_kd|map_ks|map_ke|map_ns|map_d|map_bump|bump|map_kn|norm|disp|refl)\s+.*$/gmi, '');
+}
+
+function imageMapFiles(mtlText) {
+  const files = [];
+  const seen = new Set();
+  for (const ref of mtlMapRefs(mtlText)) {
+    if (!IMAGE_EXT.test(ref.file)) continue;
+    const key = ref.file.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    files.push(ref.file);
+  }
+  return files;
+}
+
+function encodeAssetPath(file) {
+  return String(file).split('/').map((part) => encodeURIComponent(part)).join('/');
+}
+
+async function decodeSidecarImages(sidecars = {}) {
+  const images = new Map();
+  if (typeof createImageBitmap !== 'function') return images;
+  for (const [name, data] of Object.entries(sidecars)) {
+    if (!data || !IMAGE_EXT.test(name)) continue;
+    try {
+      const bitmap = await createImageBitmap(new Blob([data]), { imageOrientation: 'flipY', premultiplyAlpha: 'none' });
+      images.set(basename(name), bitmap);
+    } catch {
+      // A missing or undecodable map stays off the material.
+    }
+  }
+  return images;
+}
+
+function attachDecodedMaps(group, mtlText, images) {
+  if (!images?.size) return;
+  const textures = new Map();
+  const byMaterial = new Map();
+  for (const ref of mtlMapRefs(mtlText)) {
+    const prop = MTL_MAP_PROP[ref.token];
+    const image = images.get(basename(ref.file));
+    if (!prop || !image) continue;
+    const key = `${prop}:${basename(ref.file)}`;
+    let texture = textures.get(key);
+    if (!texture) {
+      texture = new THREE.Texture(image);
+      texture.needsUpdate = true;
+      texture.colorSpace = prop === 'map' || prop === 'emissiveMap'
+        ? THREE.SRGBColorSpace
+        : THREE.NoColorSpace;
+      textures.set(key, texture);
+    }
+    if (!byMaterial.has(ref.material)) byMaterial.set(ref.material, []);
+    byMaterial.get(ref.material).push({ prop, texture });
+  }
+  group.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      const assigns = byMaterial.get(mat.name);
+      if (!assigns) continue;
+      for (const { prop, texture } of assigns) mat[prop] = texture;
+      mat.needsUpdate = true;
+    }
+  });
+}
+
+async function parseObjBuffer(buffer, sidecars = {}, name = '') {
   const objText = sanitizeObjText(decodeText(buffer));
   if (!objText.trim()) throw new Error('That .obj file is empty.');
   const { urls, revoke } = sidecarMap(sidecars);
@@ -68,10 +177,15 @@ function parseObjBuffer(buffer, sidecars = {}, name = '') {
 
   const objLoader = new OBJLoader(manager);
   const mtlEntry = Object.entries(sidecars).find(([fileName]) => fileName.toLowerCase().endsWith('.mtl'));
+  let mtlText = '';
   if (mtlEntry) {
     try {
+      mtlText = decodeText(mtlEntry[1]);
+      // Map lines are applied from decoded sidecars below. Leaving them for
+      // MTLLoader would fetch page-relative URLs that 404 and never finish
+      // before dropUnusableMaps runs.
       const mtlLoader = new MTLLoader(manager);
-      const materials = mtlLoader.parse(decodeText(mtlEntry[1]), '');
+      const materials = mtlLoader.parse(mtlWithoutMaps(mtlText), '');
       materials.preload();
       objLoader.setMaterials(materials);
     } catch (err) {
@@ -80,6 +194,7 @@ function parseObjBuffer(buffer, sidecars = {}, name = '') {
   }
   const group = objLoader.parse(objText);
   if (!hasMesh(group)) throw new Error('That .obj has no mesh.');
+  attachDecodedMaps(group, mtlText, await decodeSidecarImages(sidecars));
   dropUnusableMaps(group);
   if (isDungeonRockDump(name) || isDungeonRockDump(mtlEntry?.[0])) {
     prepareDungeonRockMaterials(group);
@@ -194,11 +309,9 @@ export function parseModelBuffer(buffer, name, sidecars = {}) {
   return new Promise((resolve, reject) => {
     const ext = (name || '').toLowerCase();
     if (ext.endsWith('.obj')) {
-      try {
-        resolve(parseObjBuffer(buffer, sidecars, name));
-      } catch (err) {
-        reject(new Error(friendlyParseError(err, 'obj')));
-      }
+      parseObjBuffer(buffer, sidecars, name)
+        .then(resolve)
+        .catch((err) => reject(new Error(friendlyParseError(err, 'obj'))));
       return;
     }
     if (ext.endsWith('.mtl')) {
@@ -372,6 +485,19 @@ async function fetchObjMtl(folder, objFile, mtlFile, rev) {
             // Ignore an HTML fallback for a missing .mtl; the OBJ can still load.
           }
         }
+      }
+      const mtlBuffer = sidecars[mtlFile];
+      if (mtlBuffer) {
+        await Promise.all(imageMapFiles(decodeText(mtlBuffer)).map(async (file) => {
+          try {
+            const mapRes = await fetch(`${base}${encodeAssetPath(file)}${q}`);
+            if (!mapRes.ok) return;
+            const mapBuffer = await mapRes.arrayBuffer();
+            if (mapBuffer.byteLength > 0) sidecars[file] = mapBuffer;
+          } catch {
+            // A missing map leaves that material on its Kd color.
+          }
+        }));
       }
       const scene = await parseModelBuffer(objBuffer, objFile, sidecars);
       if (isDungeonRockFolder(folder)) prepareDungeonRockMaterials(scene);

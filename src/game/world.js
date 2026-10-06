@@ -431,6 +431,9 @@ export function createWorld(canvas, state, opts = {}) {
   let sceneMode = 'shop';
   let pendingUse = null;
   let mining = null;
+  // Face the waiting customer only after a counter click, until the next walk.
+  let servingAtCounter = false;
+  const COUNTER_TURN_SEC = 0.15;
   flaxGroup = new THREE.Group();
   flaxGroup.name = 'flax-field';
   scene.add(flaxGroup);
@@ -442,16 +445,17 @@ export function createWorld(canvas, state, opts = {}) {
 
   function planSceneWalk(from, to) {
     if (sceneMode === 'dungeon') {
-      return planWalk(from, to, DUNGEON_BLOCKS, PLAYER_RADIUS, [DUNGEON_FLOOR]);
+      return planWalk(from, to, DUNGEON_BLOCKS, PLAYER_RADIUS, [DUNGEON_FLOOR], to?.releaseTree ?? null);
     }
     return planPlayerWalk(from, to, state, PLAYER_RADIUS);
   }
 
   function playerCollide() {
+    const release = pendingUse?.releaseTree ?? null;
     if (sceneMode === 'dungeon') {
-      return { obstacles: DUNGEON_BLOCKS, floors: [DUNGEON_FLOOR] };
+      return { obstacles: DUNGEON_BLOCKS, floors: [DUNGEON_FLOOR], release };
     }
-    return { obstacles: collideObstacles, floors: playerFloors };
+    return { obstacles: collideObstacles, floors: playerFloors, release };
   }
   const shopReturnPos = { x: SHOP.keeper.x, z: SHOP.keeper.z };
   const playerPath = [];
@@ -1262,8 +1266,44 @@ export function createWorld(canvas, state, opts = {}) {
     mining.startedAt = now;
   }
 
+  function shortestYawDelta(current, target) {
+    let delta = target - current;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    return delta;
+  }
+
+  function turnYaw(current, target, dt) {
+    const delta = shortestYawDelta(current, target);
+    const maxStep = (Math.PI / COUNTER_TURN_SEC) * Math.max(0, dt);
+    if (Math.abs(delta) <= maxStep) return target;
+    return current + Math.sign(delta) * maxStep;
+  }
+
+  /** Across the counter, toward the queue and the shop door. */
+  function counterFloorYaw() {
+    const rot = counterPose()?.rot ?? 0;
+    return Math.atan2(Math.sin(rot), Math.cos(rot));
+  }
+
+  function counterLookYaw() {
+    const front = waitingLine()[0];
+    if (front) {
+      const dx = front.mesh.position.x - shopkeeper.position.x;
+      const dz = front.mesh.position.z - shopkeeper.position.z;
+      if (Math.hypot(dx, dz) > 0.05) return Math.atan2(dx, dz);
+    }
+    return counterFloorYaw();
+  }
+
+  function faceCounterCustomer(dt) {
+    if (!servingAtCounter || sceneMode !== 'shop') return;
+    shopkeeper.rotation.y = turnYaw(shopkeeper.rotation.y, counterLookYaw(), dt);
+  }
+
   function applyWalkPath(path) {
     if (!path?.length) return false;
+    servingAtCounter = false;
     stopMining();
     playerPath.length = 0;
     playerPath.push(...path);
@@ -1318,6 +1358,7 @@ export function createWorld(canvas, state, opts = {}) {
         actor.collide.obstacles,
         PLAYER_RADIUS,
         actor.collide.floors,
+        actor.collide.release ?? null,
       );
       nx = moved.x;
       nz = moved.z;
@@ -1352,6 +1393,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function queueUse(type, pose) {
     if (!pose) return;
+    if (type !== 'counter') servingAtCounter = false;
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
     const arrive = type === 'flax' ? FLAX_ARRIVE : type === 'trapdoor' || type === 'ladder' ? 1.35 : STATION_ARRIVE;
     const standFloors = sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors;
@@ -1382,6 +1424,7 @@ export function createWorld(canvas, state, opts = {}) {
         faceYaw,
         nodeX: pose.x,
         nodeZ: pose.z,
+        releaseTree: dest?.releaseTree ?? null,
       };
     };
     if (atStation) {
@@ -1390,6 +1433,8 @@ export function createWorld(canvas, state, opts = {}) {
       moveMarker.visible = false;
       if (faceYaw != null) shopkeeper.rotation.y = faceYaw;
       if (type === 'counter') {
+        servingAtCounter = true;
+        faceCounterCustomer(COUNTER_TURN_SEC);
         playClick('ui');
         return;
       }
@@ -1434,7 +1479,10 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pendingUse) return;
     const { type, materialId, x, z, plantId, faceYaw, nodeX, nodeZ } = pendingUse;
     pendingUse = null;
-    if (type === 'counter') return;
+    if (type === 'counter') {
+      servingAtCounter = true;
+      return;
+    }
     const pose = {
       x: nodeX ?? x,
       z: nodeZ ?? z,
@@ -1469,6 +1517,7 @@ export function createWorld(canvas, state, opts = {}) {
           if (pendingUse && (pendingUse.openOnArrive || isNearPose(pendingUse, pendingUse.arrive ?? STATION_ARRIVE))) {
             finishPendingUse();
           }
+          faceCounterCustomer(dt);
         }
       }
       return;
@@ -1486,6 +1535,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (pendingUse && isNearPose(pendingUse, pendingUse.arrive ?? 1.35)) {
       finishPendingUse();
     }
+    faceCounterCustomer(dt);
   }
 
   function updateFollowCamera(dt) {
@@ -2790,6 +2840,7 @@ export function createWorld(canvas, state, opts = {}) {
     sceneMode = 'dungeon';
     playerPath.length = 0;
     pendingUse = null;
+    servingAtCounter = false;
     stopMining();
     moveMarker.visible = false;
     setShopLayerVisible(false);
@@ -2807,6 +2858,7 @@ export function createWorld(canvas, state, opts = {}) {
     sceneMode = 'shop';
     playerPath.length = 0;
     pendingUse = null;
+    servingAtCounter = false;
     stopMining();
     if (dungeon) {
       dungeon.root.visible = false;

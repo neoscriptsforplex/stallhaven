@@ -1,6 +1,6 @@
 import { FLAX_ARRIVE } from './catalog.js';
 import { PLAYER_RADIUS, isWalkable, planPlayerWalk, playerObstacles } from './nav.js';
-import { furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, TREE_TRUNK_RADIUS, treeWalkBlock } from './layout.js';
+import { furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, TREE_TRUNK_RADIUS } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter'];
 export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder']);
@@ -125,43 +125,62 @@ function fletchStandCandidates(pose) {
 }
 
 /**
- * Gathering contacts in character-local units (the rig is 1.8 tall and then
- * scaled by about 0.863). The player stands so this point lands on the node.
- * Rock is the tip on the near face; the centre is farther along the same line.
- * Tree is the trunk centre for a radius-0.12 trunk. A wider pine steps back by
- * the extra bark of that tree's measured column. Flax is the plant base.
+ * Gathering contacts. Rock and tree are world metres at the 0.863 player
+ * scale, player-local, facing +Z. Flax is still character-local units and is
+ * multiplied by GATHER_MODEL_SCALE. The v2 rig hits these points: the pick
+ * tip on a rock crown, and the axe edge on a trunk.
  */
 export const GATHER_MODEL_SCALE = 0.863;
 export const GATHER_CONTACT = {
-  rock: { x: -0.02, z: 0.61 },
-  tree: { x: 0.21, z: 0.62 },
+  rock: { x: -0.017, z: 0.557 },
+  tree: { x: 0.078, z: 0.641 },
   flax: { x: -0.12, z: 0.31 },
 };
+/** Axe travel at the chop impact, player-local XZ. The edge moves toward +X. */
+const CHOP_SWING = { x: 0.995, z: -0.105 };
+/** How far a chop stand may sit inside its own tree block and still count. */
+const CHOP_RELEASE_REACH = 0.22;
 
 /** Near-face radius of a dungeon boulder, in world metres. Essence is the large one. */
 export function boulderFaceRadius(materialId) {
   return materialId === 'essence' ? 1.04 : 0.52;
 }
 
+/** Trunk centre in player-local metres for a trunk of world radius R. */
+export function treeTrunkOffset(radius = TREE_TRUNK_RADIUS) {
+  const r = Number.isFinite(radius) && radius > 0 ? radius : TREE_TRUNK_RADIUS;
+  return {
+    x: GATHER_CONTACT.tree.x + CHOP_SWING.x * r,
+    z: GATHER_CONTACT.tree.z + CHOP_SWING.z * r,
+  };
+}
+
+/** Distance from the player's feet to the trunk centre at the chop impact. */
+export function chopStandDistance(radius = TREE_TRUNK_RADIUS) {
+  const offset = treeTrunkOffset(radius);
+  return Math.hypot(offset.x, offset.z);
+}
+
+/**
+ * Boulder centre so the front face (the side toward the player) passes through
+ * the pick tip. Ore and clay share one radius; essence is the large crown.
+ */
+export function mineStandOffset(materialId) {
+  return {
+    x: GATHER_CONTACT.rock.x,
+    z: GATHER_CONTACT.rock.z + boulderFaceRadius(materialId),
+  };
+}
+
+/** Distance from the player's feet to the boulder centre at the mine impact. */
+export function mineStandDistance(materialId) {
+  const offset = mineStandOffset(materialId);
+  return Math.hypot(offset.x, offset.z);
+}
+
 function gatherCentreOffset(kind, pose, scale) {
-  if (kind === 'boulder') {
-    const contact = GATHER_CONTACT.rock;
-    const lx = contact.x * scale;
-    const lz = contact.z * scale;
-    const len = Math.hypot(lx, lz) || 1;
-    const grow = (len + boulderFaceRadius(pose?.materialId)) / len;
-    return { x: lx * grow, z: lz * grow };
-  }
-  if (kind === 'tree') {
-    const local = GATHER_CONTACT.tree;
-    const lx = local.x * scale;
-    const lz = local.z * scale;
-    const len = Math.hypot(lx, lz) || 1;
-    const radius = Number.isFinite(pose?.trunkRadius) ? pose.trunkRadius : TREE_TRUNK_RADIUS;
-    const extraBark = Math.max(0, radius - 0.12);
-    const grow = (len + extraBark) / len;
-    return { x: lx * grow, z: lz * grow };
-  }
+  if (kind === 'boulder') return mineStandOffset(pose?.materialId);
+  if (kind === 'tree') return treeTrunkOffset(pose?.trunkRadius);
   const local = GATHER_CONTACT.flax;
   return { x: local.x * scale, z: local.z * scale };
 }
@@ -185,24 +204,50 @@ export function gatherStandAt(node, offset, yaw) {
   };
 }
 
-/** Step back far enough that the body clears this tree's trunk block. */
-function treeStandExtras(baseLen, radius) {
-  const clear = treeWalkBlock(radius) / 2 + PLAYER_RADIUS + 0.06;
-  const first = Math.max(0.04, clear - baseLen);
-  return [first, first + 0.12, first + 0.26, first + 0.46];
+/** Exact chop ring first. Later rings are only for a stand that has left the grass. */
+function treeStandExtras() {
+  return [0, 0.12, 0.26, 0.46];
 }
 
-/** Closest alignments first. Trees start just outside their own trunk block. */
+/**
+ * The eight formula stands around this pine. Pathing and collision may overlap
+ * the tree block inside this bubble so the swing is not pushed off the bark.
+ */
+function chopRelease(pose) {
+  const offset = treeTrunkOffset(pose?.trunkRadius);
+  const points = [];
+  for (let i = 0; i < 8; i += 1) {
+    const yaw = (i / 8) * Math.PI * 2;
+    const spot = gatherStandAt(pose, offset, yaw);
+    points.push({ x: spot.x, z: spot.z });
+  }
+  return {
+    x: pose?.x ?? 0,
+    z: pose?.z ?? 0,
+    reach: CHOP_RELEASE_REACH,
+    points,
+  };
+}
+
+/** Closest alignments first. A chop stand is the trunk-centre formula, not the collider edge. */
 export function gatherStandCandidates(kind, pose, scale = GATHER_MODEL_SCALE) {
   const base = gatherCentreOffset(kind, pose, scale);
-  const radius = Number.isFinite(pose?.trunkRadius) ? pose.trunkRadius : TREE_TRUNK_RADIUS;
-  const extras = kind === 'tree' ? treeStandExtras(Math.hypot(base.x, base.z), radius) : [0, 0.08, 0.18, 0.36];
+  const extras = kind === 'tree' ? treeStandExtras() : [0, 0.08, 0.18, 0.36];
+  const release = kind === 'tree' ? chopRelease(pose) : null;
   const spots = [];
   for (const extra of extras) {
     for (let i = 0; i < 8; i += 1) {
       const yaw = (i / 8) * Math.PI * 2;
       const spot = gatherStandAt(pose, growOffset(base, extra), yaw);
       spot.extra = extra;
+      if (release && extra === 0) {
+        spot.releaseTree = {
+          x: release.x,
+          z: release.z,
+          reach: release.reach,
+          points: [{ x: spot.x, z: spot.z }],
+        };
+      }
       spots.push(spot);
     }
   }
@@ -213,18 +258,25 @@ function gatherArrive(kind) {
   return kind === 'flax' ? 0.22 : 0.32;
 }
 
-function defaultCanStand(x, z, state) {
+function defaultCanStand(x, z, state, release = null) {
   return isWalkable(
     x,
     z,
     playerObstacles(state),
     PLAYER_RADIUS,
     playerWalkFloors(state?.expansions ?? []),
+    release,
   );
 }
 
 function resolveGatherStand(from, pose, state, planFn, kind, canStand) {
-  const standable = canStand ?? ((x, z) => defaultCanStand(x, z, state));
+  const release = kind === 'tree' ? chopRelease(pose) : null;
+  const standable = (x, z) => {
+    if (canStand?.(x, z)) return true;
+    if (release && defaultCanStand(x, z, state, release)) return true;
+    if (!canStand) return defaultCanStand(x, z, state, release);
+    return false;
+  };
   const spots = gatherStandCandidates(kind, pose).filter((dest) => standable(dest.x, dest.z));
   const arrive = gatherArrive(kind);
   for (const dest of spots) {

@@ -105,6 +105,48 @@ describe('station walk-then-open', () => {
     assert.equal(yard.z, 8);
   });
 
+  it('keeps the invisible dungeon floor and rock picks, and still prefers shop boards', () => {
+    const dungeonFloor = {
+      visible: true,
+      name: 'dungeon-grounds',
+      userData: { kind: 'ground' },
+      material: { transparent: true, opacity: 0 },
+      parent: { name: 'dungeon-grounds', visible: true, userData: {}, parent: null },
+    };
+    const rock = {
+      visible: true,
+      name: 'boulder-bronze',
+      userData: { kind: 'boulder', materialId: 'bronze' },
+      material: { transparent: true, opacity: 0 },
+      parent: null,
+    };
+    const yardPick = {
+      visible: true,
+      name: 'grounds',
+      userData: { kind: 'ground' },
+      material: { transparent: true, opacity: 0 },
+      parent: { name: 'grounds', visible: true, userData: {}, parent: null },
+    };
+    assert.equal(ignoredClickObject(dungeonFloor), false);
+    assert.equal(ignoredClickObject(rock), false);
+    const boards = {
+      visible: true,
+      userData: { kind: 'ground', shopFloor: 'plank' },
+      material: { transparent: false, opacity: 1 },
+      parent: null,
+    };
+    const point = floorClickPoint([
+      { distance: 4.0, point: { x: 0.2, y: 0.02, z: 0.4 }, object: yardPick },
+      { distance: 4.35, point: { x: 0.18, y: 0.1, z: 0.36 }, object: boards },
+    ]);
+    assert.equal(point.y, 0.1);
+    const picked = pickUseHit([
+      { distance: 5, point: { x: 1.5, y: 0.04, z: -2 }, object: dungeonFloor },
+      { distance: 4.2, point: { x: -3.3, y: 0.5, z: -3.1 }, object: rock },
+    ]);
+    assert.equal(picked.object.userData.kind, 'boulder');
+  });
+
   it('does not let a closer floor ray steal an anvil pick', () => {
     const picked = pickUseHit([
       hit('ground', 4.1, SHOP.anvil.x, SHOP.anvil.z + 0.2),

@@ -272,6 +272,10 @@ export function ignoredClickObject(object) {
     if (name === 'roof-gable' || name === 'roofs') return true;
     node = node.parent;
   }
+  // Dungeon floor, rock, and ladder picks are opacity-0 volumes on purpose.
+  // A faded roof is untagged or marked isRoof; do not treat every clear material as one.
+  const kind = object?.userData?.kind;
+  if (kind && kind !== 'roof' && kind !== 'wall') return false;
   const mats = Array.isArray(object?.material) ? object.material : [object?.material];
   return mats.some((mat) => {
     if (!mat) return false;

@@ -14,12 +14,14 @@ import {
   shopRugRect,
   walkFloors,
 } from './layout.js';
-import { gatherStandCandidates } from './interact.js';
+import { boulderFaceRadius, gatherStandCandidates } from './interact.js';
 import {
   CELL,
   FLOOR,
   PLAYER_RADIUS,
   buildShopWallRects,
+  dungeonBoulderObstacles,
+  dungeonMoveObstacles,
   dungeonWallObstacles,
   isWalkable,
   liveObstacles,
@@ -464,5 +466,57 @@ describe('shop navigation', () => {
     const moved = moveWithCollision(4.6, 0, 6.4, 0, walls, PLAYER_RADIUS, [wide]);
     assert.ok(moved.x < 5.2, 'the east dungeon wall should stop the player');
     assert.ok(moved.x > 4.6, 'the player should walk up to the wall');
+  });
+
+  it('paths around dungeon rocks and stops inside the walls', () => {
+    const floor = { minX: -5.2, maxX: 5.2, minZ: -4.2, maxZ: 4.2 };
+    const spots = [
+      { x: 0, z: 0, materialId: 'essence', face: boulderFaceRadius('essence') },
+      { x: -3.3, z: -3.15, materialId: 'bronze', face: boulderFaceRadius('bronze') },
+      { x: 1.4, z: -3.15, materialId: 'iron', face: boulderFaceRadius('iron') },
+      { x: 4.05, z: -1.5, materialId: 'steel', face: boulderFaceRadius('steel') },
+      { x: 4.05, z: 2.15, materialId: 'mithril', face: boulderFaceRadius('mithril') },
+      { x: -1.5, z: 3.15, materialId: 'adamant', face: boulderFaceRadius('adamant') },
+      { x: -4.05, z: 1.7, materialId: 'runite', face: boulderFaceRadius('runite') },
+      { x: -4.05, z: -1.35, materialId: 'dragon', face: boulderFaceRadius('dragon') },
+      { x: 1.9, z: 3.15, materialId: 'hard_clay', face: boulderFaceRadius('hard_clay') },
+    ];
+    const blocks = dungeonMoveObstacles(spots);
+    assert.equal(isWalkable(0, 0, blocks, PLAYER_RADIUS, [floor]), false);
+    assert.equal(isWalkable(-4.15, 0.4, blocks, PLAYER_RADIUS, [floor]), true);
+    const across = planWalk({ x: -2.2, z: 0.15 }, { x: 2.2, z: -0.1 }, blocks, PLAYER_RADIUS, [floor]);
+    assert.ok(across.length >= 1, 'should path past the essence rock');
+    let prev = { x: -2.2, z: 0.15 };
+    for (const point of across) {
+      const steps = Math.max(1, Math.ceil(Math.hypot(point.x - prev.x, point.z - prev.z) / 0.05));
+      for (let i = 1; i <= steps; i += 1) {
+        const t = i / steps;
+        const x = prev.x + (point.x - prev.x) * t;
+        const z = prev.z + (point.z - prev.z) * t;
+        assert.equal(
+          isWalkable(x, z, blocks, PLAYER_RADIUS, [floor]),
+          true,
+          `path clips a dungeon blocker at ${x},${z}`,
+        );
+      }
+      prev = point;
+    }
+    const end = across[across.length - 1];
+    assert.ok(Math.hypot(end.x - 2.2, end.z + 0.1) < 0.45, 'should arrive beside the far side of essence');
+    assert.ok(Math.hypot(end.x, end.z) > boulderFaceRadius('essence'), 'should not finish inside essence');
+    const outside = planWalk({ x: -4.15, z: 0.4 }, { x: 8, z: 0.2 }, blocks, PLAYER_RADIUS, [floor]);
+    const stopped = outside[outside.length - 1];
+    assert.ok(stopped, 'a click outside the dungeon still walks');
+    assert.ok(stopped.x < 5.05, 'the east wall should stop the walk');
+    assert.equal(isWalkable(stopped.x, stopped.z, blocks, PLAYER_RADIUS, [floor]), true);
+    for (const spot of spots) {
+      const stands = gatherStandCandidates('boulder', spot).filter((dest) => (
+        isWalkable(dest.x, dest.z, blocks, PLAYER_RADIUS, [floor])
+      ));
+      assert.ok(stands.length >= 1, `${spot.materialId} should have a walkable mining stand`);
+      const path = planWalk({ x: -4.15, z: 0.4 }, stands[0], blocks, PLAYER_RADIUS, [floor]);
+      assert.ok(path.length >= 1, `${spot.materialId} stand should be reachable from the ladder`);
+    }
+    assert.equal(dungeonBoulderObstacles(spots).length, spots.length);
   });
 });

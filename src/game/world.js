@@ -64,7 +64,7 @@ import {
 } from './layout.js';
 import {
   PLAYER_RADIUS,
-  dungeonWallObstacles,
+  dungeonMoveObstacles,
   floorsForState,
   isWalkable,
   liveObstacles,
@@ -434,18 +434,18 @@ export function createWorld(canvas, state, opts = {}) {
   refillFlaxField();
   let lastPlaceClickAt = 0;
   const DUNGEON_FLOOR = { minX: -5.2, maxX: 5.2, minZ: -4.2, maxZ: 4.2 };
-  const DUNGEON_WALLS = dungeonWallObstacles();
+  const DUNGEON_BLOCKS = dungeonMoveObstacles(DUNGEON_BOULDERS);
 
   function planSceneWalk(from, to) {
     if (sceneMode === 'dungeon') {
-      return planWalk(from, to, DUNGEON_WALLS, PLAYER_RADIUS, [DUNGEON_FLOOR]);
+      return planWalk(from, to, DUNGEON_BLOCKS, PLAYER_RADIUS, [DUNGEON_FLOOR]);
     }
     return planPlayerWalk(from, to, state, PLAYER_RADIUS);
   }
 
   function playerCollide() {
     if (sceneMode === 'dungeon') {
-      return { obstacles: DUNGEON_WALLS, floors: [DUNGEON_FLOOR] };
+      return { obstacles: DUNGEON_BLOCKS, floors: [DUNGEON_FLOOR] };
     }
     return { obstacles: collideObstacles, floors: playerFloors };
   }
@@ -1347,7 +1347,7 @@ export function createWorld(canvas, state, opts = {}) {
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
     const arrive = type === 'flax' ? FLAX_ARRIVE : type === 'trapdoor' || type === 'ladder' ? 1.35 : STATION_ARRIVE;
     const standFloors = sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors;
-    const standBlocks = sceneMode === 'dungeon' ? DUNGEON_WALLS : playerObstacles(state);
+    const standBlocks = sceneMode === 'dungeon' ? DUNGEON_BLOCKS : playerObstacles(state);
     const canStand = (x, z) => isWalkable(x, z, standBlocks, PLAYER_RADIUS, standFloors);
     const plan = resolveStationUse(from, pose, state, planSceneWalk, type, canStand);
     const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax';

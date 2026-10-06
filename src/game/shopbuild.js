@@ -171,7 +171,6 @@ function configureShopWallTexture(tex) {
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  tex.needsUpdate = true;
   return tex;
 }
 

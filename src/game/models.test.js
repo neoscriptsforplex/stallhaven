@@ -55,7 +55,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, TREE_HEIGHT_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_WALL_H, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, TREE_HEIGHT_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT } from './interact.js';
 
@@ -969,6 +969,18 @@ describe('bundled prop swaps', () => {
       built.ladder.updateMatrixWorld(true);
       const box = measureVisibleBox(built.ladder);
       assert.ok(box.min.x > -5.5 && box.min.x < -5.2, `ladder should sit inside the west wall, minX=${box.min.x}`);
+      const fitTarget = new THREE.Mesh(new THREE.BoxGeometry(0.41, 2.6, 0.1));
+      fitTarget.position.y = 1.3;
+      const before = wrapBundledProp(bundled, fitTarget, { name: 'ladder-mesh', fit: 'max' });
+      const beforeSize = measureVisibleBox(before).getSize(new THREE.Vector3());
+      const visual = built.ladder.getObjectByName('ladder-mesh');
+      visual.updateMatrixWorld(true);
+      const after = measureVisibleBox(visual);
+      const afterSize = after.getSize(new THREE.Vector3());
+      assert.ok(Math.abs(afterSize.z - beforeSize.x * 0.5) < 0.06, `bundled width should be half, z=${afterSize.z} from ${beforeSize.x}`);
+      assert.ok(Math.abs(afterSize.x - beforeSize.z) < 0.08, `bundled depth should stay, x=${afterSize.x} from ${beforeSize.z}`);
+      assert.ok(Math.abs(after.max.y - DUNGEON_WALL_H) < 0.08, `bundled top should meet the wall, maxY=${after.max.y}`);
+      assert.ok(after.min.y > -0.05 && after.min.y < 0.08, `bundled bottom should stay on the floor, minY=${after.min.y}`);
     } finally {
       setBundledLook('ladder', null);
     }
@@ -2130,6 +2142,44 @@ describe('shop props', () => {
     assert.equal(built.ladder?.name, 'ladder');
     assert.ok(Math.abs(built.ladder.position.z - 0.4) < 1e-6);
     assert.ok(Math.abs(built.ladder.rotation.y - Math.PI / 2) < 1e-6);
+  });
+
+  it('halves the wall ladder width and stretches it to the wall top', () => {
+    const ladder = buildDungeonLadder();
+    const visual = ladder.getObjectByName('ladder-mesh');
+    assert.ok(visual);
+    visual.updateMatrixWorld(true);
+    const box = measureVisibleBox(visual);
+    const size = box.getSize(new THREE.Vector3());
+    assert.ok(Math.abs(size.z - 0.205) < 0.02, `along-wall width should be half of 0.41, z=${size.z}`);
+    assert.ok(Math.abs(size.y - DUNGEON_WALL_H) < 0.04, `height should meet the wall, y=${size.y}`);
+    assert.ok(Math.abs(box.min.y) < 0.04, `bottom stays on the floor, minY=${box.min.y}`);
+    assert.ok(Math.abs(box.max.y - DUNGEON_WALL_H) < 0.04, `top meets the wall, maxY=${box.max.y}`);
+    assert.ok(size.x < 0.12, `depth stays the rail thickness, x=${size.x}`);
+
+    const pick = ladder.getObjectByName('ladder-pick');
+    assert.ok(pick);
+    pick.updateMatrixWorld(true);
+    const pickSize = measureVisibleBox(pick).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(pickSize.z - size.z) < 0.03, `click box width matches the ladder, z=${pickSize.z}`);
+    assert.ok(Math.abs(pickSize.y - DUNGEON_WALL_H) < 0.04, `click box reaches the wall top, y=${pickSize.y}`);
+    assert.ok(pickSize.x > 0.6, `click depth stays easy to hit, x=${pickSize.x}`);
+
+    const built = buildDungeon();
+    const placed = built.ladder.getObjectByName('ladder-mesh');
+    placed.updateMatrixWorld(true);
+    const placedBox = measureVisibleBox(placed);
+    let wallTop = null;
+    built.root.traverse((child) => {
+      if (!child.isMesh || child.position.x > -5) return;
+      const height = child.geometry?.parameters?.height;
+      if (height !== DUNGEON_WALL_H) return;
+      wallTop = child.position.y + height / 2;
+    });
+    assert.ok(wallTop != null);
+    assert.ok(Math.abs(placedBox.max.y - wallTop) < 0.05, `placed top ${placedBox.max.y} vs wall ${wallTop}`);
+    assert.ok(placedBox.min.y > -0.04 && placedBox.min.y < 0.06, `placed bottom, minY=${placedBox.min.y}`);
+    assert.ok(Math.abs(built.ladder.position.z - 0.4) < 1e-6);
   });
 
   it('keeps the shop door hinged open so the front doorway stays walkable', () => {

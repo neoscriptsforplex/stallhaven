@@ -15,6 +15,12 @@ import {
   gardenRockSpots,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  notePlantedTrunk,
+  OUTDOOR_GROUND_Y,
+  OUTDOOR_TREE_SCALE,
+  resetPlantedTrunks,
+  TREE_SCALE_SPREAD,
+  TREE_TRUNK_RADIUS,
   keepFountain,
   keepGardenSpot,
   pointHitsTrapdoor,
@@ -1298,35 +1304,76 @@ function makeNameSprite(text) {
   return sprite;
 }
 
-/**
- * Outdoor pines are twice as tall as the fit target.
- * XZ stays put so trunk width, the walk block, and chop stand points still meet.
- */
-export const TREE_HEIGHT_SCALE = 2;
-
 export function buildTree(scale = 1) {
-  const target = buildProceduralTree(scale);
+  const target = buildProceduralTree(scale * OUTDOOR_TREE_SCALE);
   const bundled = getBundledLook('tree');
   const fitted = bundled
     ? wrapBundledProp(bundled, target, { name: 'pine', fit: 'height' })
-    : null;
-  return raiseOutdoorTree(fitted || target);
+    : target;
+  return mountOutdoorTree(fitted);
 }
 
 /**
- * Stretch the fitted pine on Y only, then sit its base on y = 0.
+ * Sit the uniformly scaled pine on the grass.
  * The visual lives under a placement group so the garden can pin the group
- * to the grass without lifting the trunk. Materials stay opaque: the roof
- * fade adopts transparent meshes, and this must not join that pass.
+ * without lifting the trunk. Materials stay opaque: the roof fade adopts
+ * transparent meshes, and this must not join that pass.
  */
-function raiseOutdoorTree(visual) {
-  visual.scale.y *= TREE_HEIGHT_SCALE;
+function mountOutdoorTree(visual) {
   sitVisibleOnY(visual, 0);
   visual.name = 'pine-visual';
   const root = new THREE.Group();
   root.name = 'pine';
   root.add(visual);
   return root;
+}
+
+/** How far under the lawn plane the lowest root vertex should sit, in metres. */
+const TREE_ROOT_SINK = 0.015;
+const GRASS_PLANE_Y = -0.02;
+
+/**
+ * After every scale, drop the pine so its lowest world vertex meets the grass.
+ * Scaling around a pivot above the roots lifts the fins; this measures the
+ * finished box and corrects it.
+ */
+export function seatTreeOnGround(tree, surfaceY = GRASS_PLANE_Y) {
+  if (!tree) return tree;
+  tree.updateMatrixWorld(true);
+  const box = measureVisibleBox(tree);
+  if (!Number.isFinite(box.min.y)) return tree;
+  const target = surfaceY - TREE_ROOT_SINK;
+  tree.position.y += target - box.min.y;
+  tree.updateMatrixWorld(true);
+  return tree;
+}
+
+/** Bark radius above the root fins, in world metres. Falls back to the 2× column. */
+export function measureTrunkRadius(tree) {
+  if (!tree) return TREE_TRUNK_RADIUS;
+  tree.updateMatrixWorld(true);
+  const origin = new THREE.Vector3();
+  tree.getWorldPosition(origin);
+  const box = measureVisibleBox(tree);
+  const height = Math.max(0.01, box.max.y - box.min.y);
+  const y0 = box.min.y + height * 0.14;
+  const y1 = box.min.y + height * 0.24;
+  const v = new THREE.Vector3();
+  let maxR = 0;
+  let n = 0;
+  tree.traverse((child) => {
+    if (!child.isMesh || !child.geometry || child.userData?.kind === 'tree') return;
+    const pos = child.geometry.getAttribute('position');
+    if (!pos) return;
+    for (let i = 0; i < pos.count; i += 1) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
+      if (v.y < y0 || v.y > y1) continue;
+      const r = Math.hypot(v.x - origin.x, v.z - origin.z);
+      if (r > maxR) maxR = r;
+      n += 1;
+    }
+  });
+  return n ? maxR : TREE_TRUNK_RADIUS;
 }
 
 /** Knee-high next to the shopkeeper. The uploaded dump is a wide flat spray. */
@@ -1687,11 +1734,18 @@ function addGarden(root, cells, expansionIds = []) {
   });
 
   const rand = randAt(1337 + cells.length * 17);
+  resetPlantedTrunks();
   for (const spot of gardenTreeSpots(expansionIds)) {
-    const tree = buildTree((spot.side === 'edge' ? 1.15 : 0.85) + rand() * 0.45);
-    tree.position.set(spot.x, 0, spot.z);
+    const vary = 1 + (rand() * 2 - 1) * TREE_SCALE_SPREAD;
+    const tree = buildTree(vary);
+    tree.position.set(spot.x, OUTDOOR_GROUND_Y, spot.z);
     tree.rotation.y = rand() * Math.PI * 2;
+    seatTreeOnGround(tree);
+    const trunkRadius = measureTrunkRadius(tree);
     tree.userData.gardenSide = spot.side;
+    tree.userData.uniformScale = vary;
+    tree.userData.trunkRadius = trunkRadius;
+    notePlantedTrunk(spot.x, spot.z, trunkRadius);
     attachTreePick(tree, spot);
     root.add(tree);
   }
@@ -2063,20 +2117,24 @@ function shadeHex(hex, factor) {
   return color.getHex();
 }
 
-const TREE_PICK_XZ = 0.85;
+const TREE_PICK_XZ = 0.85 * OUTDOOR_TREE_SCALE;
 
 function attachTreePick(tree, spot) {
+  tree.updateMatrixWorld(true);
   const box = measureVisibleBox(tree);
-  const base = Number.isFinite(box.min.y) ? box.min.y : 0;
+  const base = Number.isFinite(box.min.y) ? box.min.y : tree.position.y;
   const top = Number.isFinite(box.max.y) ? box.max.y : base + 1.7;
-  const height = Math.max(1.7, top - base);
+  const scaleY = Math.abs(tree.scale.y) || 1;
+  const localBase = (base - tree.position.y) / scaleY;
+  const height = Math.max(1.7, (top - base) / scaleY);
   const pick = new THREE.Mesh(new THREE.BoxGeometry(TREE_PICK_XZ, height, TREE_PICK_XZ), pickMat());
-  pick.position.y = base + height / 2;
+  pick.position.y = localBase + height / 2;
   pick.userData.kind = 'tree';
   pick.userData.materialId = 'logs';
   pick.userData.name = 'Tree';
   pick.userData.x = spot.x;
   pick.userData.z = spot.z;
+  pick.userData.trunkRadius = tree.userData.trunkRadius;
   tree.add(pick);
 }
 

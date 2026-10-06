@@ -21,7 +21,7 @@ import {
   FLAX_ARRIVE,
   FLAX_DURATION,
   FLAX_YIELD,
-  MINE_YIELD,
+  mineYield,
   mineTiming,
   emptySlots,
   emptyShelfSlots,
@@ -1090,6 +1090,13 @@ export function createWorld(canvas, state, opts = {}) {
     setGatherClip(shopkeeper, null);
   }
 
+  function barYield(session) {
+    if (session?.yield != null) return session.yield;
+    if (session?.mode === 'chop') return CHOP_YIELD;
+    if (session?.mode === 'pick') return FLAX_YIELD;
+    return mineYield(session?.materialId);
+  }
+
   function startMining(materialId, pose) {
     const mat = MATERIALS[materialId];
     if (!mat) return;
@@ -1150,7 +1157,7 @@ export function createWorld(canvas, state, opts = {}) {
   function tickMining(now) {
     if (!mining) return;
     if (now - mining.startedAt < mining.duration) return;
-    const amount = mining.yield ?? MINE_YIELD;
+    const amount = barYield(mining);
     if (mining.mode === 'pick') {
       releaseHeldFlax(false);
       const got = grantPickedFlax(state, amount);
@@ -2991,7 +2998,7 @@ export function createWorld(canvas, state, opts = {}) {
     getMining(now = performance.now() / 1000) {
       if (!mining) return null;
       const t = Math.min(1, Math.max(0, (now - mining.startedAt) / mining.duration));
-      const want = mining.yield ?? MINE_YIELD;
+      const want = barYield(mining);
       const have = state.materials[mining.materialId] ?? 0;
       const grant = Math.min(want, Math.max(0, MATERIAL_CAP - have));
       return {

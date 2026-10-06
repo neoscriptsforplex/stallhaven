@@ -1135,6 +1135,7 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function syncStance(mesh) {
+    // Live expansion list: a bought room raises feet, a reset drops that floor away.
     mesh.userData.groundY = sceneMode === 'shop'
       ? characterGroundY(mesh.position.x, mesh.position.z, state.expansions ?? [])
       : OUTDOOR_GROUND_Y;

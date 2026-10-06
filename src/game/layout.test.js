@@ -511,6 +511,48 @@ describe('layout numbers', () => {
     assert.equal(prev, OUTDOOR_GROUND_Y);
   });
 
+  it('stands on every expansion floor, including doorway joins, and clears them on reset', () => {
+    const top = shopFloorTopY();
+    const all = EXPANSION_PADS.map((pad) => pad.id);
+    let owned = [];
+    for (const pad of EXPANSION_PADS) {
+      const spot = roomCenter(pad.gx, pad.gz);
+      assert.equal(characterGroundY(spot.x, spot.z, owned), OUTDOOR_GROUND_Y, `${pad.id} before it is bought`);
+      owned = [...owned, pad.id];
+      assert.equal(characterGroundY(spot.x, spot.z, owned), top, `${pad.id} after it is bought`);
+      assert.equal(characterGroundY(spot.x, spot.z, all), top, `${pad.id} with every room unlocked`);
+    }
+    assert.equal(characterGroundY(0, 0, all), top);
+    assert.equal(characterGroundY(SHOP.keeper.x, SHOP.keeper.z, all), top);
+    assert.equal(characterGroundY(0, 8, all), OUTDOOR_GROUND_Y, 'the yard stays outdoor when the shop is fully expanded');
+    const cells = [{ id: 'origin', gx: 0, gz: 0 }, ...EXPANSION_PADS];
+    for (let i = 0; i < cells.length; i += 1) {
+      for (let j = i + 1; j < cells.length; j += 1) {
+        const a = cells[i];
+        const b = cells[j];
+        const beside = (a.gx === b.gx && Math.abs(a.gz - b.gz) === 1)
+          || (a.gz === b.gz && Math.abs(a.gx - b.gx) === 1);
+        if (!beside) continue;
+        const ca = roomCenter(a.gx, a.gz);
+        const cb = roomCenter(b.gx, b.gz);
+        const midX = (ca.x + cb.x) / 2;
+        const midZ = (ca.z + cb.z) / 2;
+        const ids = [a.id, b.id].filter((id) => id !== 'origin');
+        assert.equal(characterGroundY(midX, midZ, ids), top, `doorway ${a.id} to ${b.id}`);
+        if (ids.length === 2) {
+          assert.equal(characterGroundY(midX, midZ, [ids[0]]), top, `seam still held by ${ids[0]}`);
+        }
+      }
+    }
+    for (const pad of EXPANSION_PADS) {
+      const spot = roomCenter(pad.gx, pad.gz);
+      assert.equal(characterGroundY(spot.x, spot.z, []), OUTDOOR_GROUND_Y, `${pad.id} after reset`);
+    }
+    const foot = shopFloorFootprint(0, 0);
+    const mid = characterGroundY(SHOP.door.x, foot.maxZ + SHOP_DOOR_STEP * 0.5, all);
+    assert.ok(mid > OUTDOOR_GROUND_Y && mid < top, 'front door still eases up with every room built');
+  });
+
   it('lists furnace and range as free upgrade stations and shelves in the furniture shop', () => {
     assert.equal(FURNACE_COST, 0);
     assert.equal(RANGE_COST, 0);

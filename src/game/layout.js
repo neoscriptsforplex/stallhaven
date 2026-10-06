@@ -253,6 +253,58 @@ export function shopFloorFootprints(expansionIds = []) {
   return occupiedCells(expansionIds).map((cell) => shopFloorFootprint(cell.gx, cell.gz));
 }
 
+const SHOP_FLOOR_SEAM = 0.45;
+
+/** Overlap across a shared wall so the join between two rooms stays on the boards. */
+function shopFloorSeam(a, b, top) {
+  const besideX = a.gz === b.gz && Math.abs(a.gx - b.gx) === 1;
+  const besideZ = a.gx === b.gx && Math.abs(a.gz - b.gz) === 1;
+  if (!besideX && !besideZ) return null;
+  const fa = shopFloorFootprint(a.gx, a.gz);
+  const fb = shopFloorFootprint(b.gx, b.gz);
+  if (besideZ) {
+    const north = a.gz > b.gz ? fa : fb;
+    const south = a.gz > b.gz ? fb : fa;
+    const seam = (south.maxZ + north.minZ) / 2;
+    return {
+      minX: Math.max(fa.minX, fb.minX),
+      maxX: Math.min(fa.maxX, fb.maxX),
+      minZ: seam - SHOP_FLOOR_SEAM,
+      maxZ: seam + SHOP_FLOOR_SEAM,
+      top,
+      id: `seam-${a.id}-${b.id}`,
+    };
+  }
+  const east = a.gx > b.gx ? fa : fb;
+  const west = a.gx > b.gx ? fb : fa;
+  const seam = (west.maxX + east.minX) / 2;
+  return {
+    minX: seam - SHOP_FLOOR_SEAM,
+    maxX: seam + SHOP_FLOOR_SEAM,
+    minZ: Math.max(fa.minZ, fb.minZ),
+    maxZ: Math.min(fa.maxZ, fb.maxZ),
+    top,
+    id: `seam-${a.id}-${b.id}`,
+  };
+}
+
+/** One walkable board rect per owned room, plus the doorway pieces between them. */
+export function shopFloorPieces(expansionIds = [], floorTop = shopFloorTopY()) {
+  const cells = occupiedCells(expansionIds);
+  const pieces = cells.map((cell) => ({
+    ...shopFloorFootprint(cell.gx, cell.gz),
+    top: floorTop,
+    id: cell.id,
+  }));
+  for (let i = 0; i < cells.length; i += 1) {
+    for (let j = i + 1; j < cells.length; j += 1) {
+      const seam = shopFloorSeam(cells[i], cells[j], floorTop);
+      if (seam) pieces.push(seam);
+    }
+  }
+  return pieces;
+}
+
 /** True interior wall faces of a room (stone inner plane, before snap expansion). */
 export function roomInteriorFloor(gx = 0, gz = 0) {
   const c = roomCenter(gx, gz);
@@ -360,25 +412,15 @@ function smooth01(t) {
   return x * x * (3 - 2 * x);
 }
 
-/** Positive when (x, z) is inside the shop floor union, negative outside. */
-export function shopFloorInset(x, z, floors) {
-  let best = -Infinity;
-  for (const rect of floors) {
-    const ox = x < rect.minX ? rect.minX - x : x > rect.maxX ? x - rect.maxX : 0;
-    const oz = z < rect.minZ ? rect.minZ - z : z > rect.maxZ ? z - rect.maxZ : 0;
-    if (ox === 0 && oz === 0) {
-      const inset = Math.min(x - rect.minX, rect.maxX - x, z - rect.minZ, rect.maxZ - z);
-      best = Math.max(best, inset);
-    } else {
-      best = Math.max(best, -Math.hypot(ox, oz));
-    }
-  }
-  return best;
+function pointOnFloorPiece(x, z, piece) {
+  return x >= piece.minX - 1e-4 && x <= piece.maxX + 1e-4
+    && z >= piece.minZ - 1e-4 && z <= piece.maxZ + 1e-4;
 }
 
 /**
- * Feet height: shop board top over the floor, outdoor ground outside, and a
- * smooth step across the front doorway instead of a pop.
+ * Feet height for the shop floor piece under (x, z). Owned rooms and the
+ * doorway pieces between them each contribute their board top. Anywhere else
+ * is outdoor ground, with a smooth step at the front door.
  */
 export function characterGroundY(
   x,
@@ -388,12 +430,16 @@ export function characterGroundY(
   outdoorY = OUTDOOR_GROUND_Y,
   step = SHOP_DOOR_STEP,
 ) {
-  const floors = shopFloorFootprints(expansionIds);
-  if (shopFloorInset(x, z, floors) >= -1e-6) return floorTop;
+  let stand = null;
+  for (const piece of shopFloorPieces(expansionIds, floorTop)) {
+    if (!pointOnFloorPiece(x, z, piece)) continue;
+    stand = stand == null ? piece.top : Math.max(stand, piece.top);
+  }
+  if (stand != null) return stand;
   const front = shopFloorFootprint(0, 0).maxZ;
   const beyond = z - front;
   const inDoor = Math.abs(x - SHOP.door.x) <= DOOR_HALF;
-  if (!inDoor || !(step > 0) || beyond <= 0 || beyond >= step) return outdoorY;
+  if (!inDoor || !(step > 0) || beyond <= 0 || beyond >= step - 1e-6) return outdoorY;
   const t = smooth01(1 - beyond / step);
   return outdoorY + (floorTop - outdoorY) * t;
 }

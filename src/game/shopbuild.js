@@ -434,7 +434,14 @@ function markGround(mesh) {
   return mesh;
 }
 
-function addFloor(root, center) {
+function tagShopFloor(mesh, kind, cell) {
+  mesh.userData.shopFloor = kind;
+  mesh.userData.floorGx = cell?.gx ?? 0;
+  mesh.userData.floorGz = cell?.gz ?? 0;
+  return mesh;
+}
+
+function addFloor(root, center, cell = { gx: 0, gz: 0 }) {
   const slab = SHOP_FLOOR_SLAB;
   const board = SHOP_FLOOR_PLANK;
   const base = addShadow(new THREE.Mesh(
@@ -443,7 +450,7 @@ function addFloor(root, center) {
   ));
   base.position.set(center.x, slab.centerY, center.z);
   markGround(base);
-  base.userData.shopFloor = 'slab';
+  tagShopFloor(base, 'slab', cell);
   root.add(base);
   const count = Math.ceil(ROOM_D / board.pitch);
   for (let i = 0; i < count; i += 1) {
@@ -462,21 +469,48 @@ function addFloor(root, center) {
     const z = center.z - ROOM_D / 2 + board.pitch * 0.5 + i * board.pitch;
     plank.position.set(center.x, board.centerY, z);
     markGround(plank);
-    plank.userData.shopFloor = 'plank';
+    tagShopFloor(plank, 'plank', cell);
     root.add(plank);
   }
 }
 
 /** Top face of the shop floorboards, from the built meshes. */
 export function measureShopFloorTop(root) {
-  let top = -Infinity;
+  const pieces = measureShopFloorPieces(root);
+  if (!pieces.length) return -Infinity;
+  return Math.max(...pieces.map((piece) => piece.top));
+}
+
+/** Board top and XZ bounds for each built room, including expansion floors. */
+export function measureShopFloorPieces(root) {
+  const groups = new Map();
   root?.updateMatrixWorld?.(true);
   root?.traverse((child) => {
     if (!child.isMesh || child.userData?.shopFloor !== 'plank') return;
+    const gx = child.userData.floorGx ?? 0;
+    const gz = child.userData.floorGz ?? 0;
+    const key = `${gx},${gz}`;
     const box = new THREE.Box3().setFromObject(child);
-    if (Number.isFinite(box.max.y)) top = Math.max(top, box.max.y);
+    let piece = groups.get(key);
+    if (!piece) {
+      piece = {
+        gx,
+        gz,
+        minX: Infinity,
+        maxX: -Infinity,
+        minZ: Infinity,
+        maxZ: -Infinity,
+        top: -Infinity,
+      };
+      groups.set(key, piece);
+    }
+    piece.minX = Math.min(piece.minX, box.min.x);
+    piece.maxX = Math.max(piece.maxX, box.max.x);
+    piece.minZ = Math.min(piece.minZ, box.min.z);
+    piece.maxZ = Math.max(piece.maxZ, box.max.z);
+    if (Number.isFinite(box.max.y)) piece.top = Math.max(piece.top, box.max.y);
   });
-  return top;
+  return [...groups.values()];
 }
 
 function addBeams(root, center) {
@@ -1842,7 +1876,7 @@ export function buildShop(expansionIds = []) {
     const c = roomCenter(cell.gx, cell.gz);
     const isOrigin = cell.gx === 0 && cell.gz === 0;
     const neigh = neighborsOf(cell.gx, cell.gz, expansionIds);
-    addFloor(root, c);
+    addFloor(root, c, cell);
     addBeams(root, c);
     addRoomWalls(root, cell, neigh, isOrigin);
     addRoofForRoom(roofs, root, c, neigh, isOrigin);

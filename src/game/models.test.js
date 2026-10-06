@@ -45,9 +45,9 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { cobblePathSpan, furnitureVisualYaw, pointHitsShop, ROOM_W, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
+import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, OUTDOOR_GROUND_Y, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -339,6 +339,25 @@ describe('outdoor and dungeon extras', () => {
     });
     assert.ok(boards > 10);
     assert.ok(Math.abs(maxZ - shopFloorFootprint(0, 0).maxZ) < 1e-3, `lip ${maxZ}`);
+  });
+
+  it('builds a floor piece for every expansion room', () => {
+    const ids = EXPANSION_PADS.map((pad) => pad.id);
+    const pieces = measureShopFloorPieces(buildShop(ids).root);
+    const rooms = [{ id: 'origin', gx: 0, gz: 0 }, ...EXPANSION_PADS];
+    assert.equal(pieces.length, rooms.length);
+    for (const room of rooms) {
+      const piece = pieces.find((item) => item.gx === room.gx && item.gz === room.gz);
+      assert.ok(piece, room.id);
+      assert.ok(Math.abs(piece.top - shopFloorTopY()) < 1e-4, `${room.id} top ${piece.top}`);
+      const spot = roomCenter(room.gx, room.gz);
+      assert.ok(spot.x > piece.minX && spot.x < piece.maxX && spot.z > piece.minZ && spot.z < piece.maxZ);
+      assert.ok(Math.abs(characterGroundY(spot.x, spot.z, ids) - piece.top) < 1e-4, room.id);
+      if (room.id !== 'origin') {
+        assert.equal(characterGroundY(spot.x, spot.z, []), OUTDOOR_GROUND_Y, `${room.id} after reset`);
+      }
+    }
+    assert.ok(Math.abs(measureShopFloorTop(buildShop([]).root) - shopFloorTopY()) < 1e-4);
   });
 
   it('pours water from the fountain spout', () => {

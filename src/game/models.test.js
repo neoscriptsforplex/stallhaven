@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {
   CUSTOMER_LOOKS,
   PLAYER_WORLD_SCALE,
@@ -18,6 +19,7 @@ import {
   setDoorOpen,
   buildGoblin,
   buildPickaxe,
+  buildHeldTool,
   buildShopkeeper,
   measureVisibleBox,
   measureVisibleMeshHeight,
@@ -30,6 +32,7 @@ import {
   wareDisplayYaw,
   wrapBundledProp,
   wrapImportedCharacter,
+  wrapRiggedShopkeeper,
   wrapShopPlayer,
   wrapBuyerDump,
   sitVisibleOnY,
@@ -39,7 +42,7 @@ import {
   BUYER_FIT_HEIGHT,
   ANVIL_WORLD_SCALE,
 } from './models.js';
-import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, craftOreFolder, craftOreLookId } from './catalog.js';
+import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { cobblePathSpan, furnitureVisualYaw, pointHitsShop, ROOM_W, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
@@ -1621,6 +1624,152 @@ describe('bundled prop swaps', () => {
 });
 
 describe('shop props', () => {
+  it('holds a rune pickaxe and hatchet on the same grip as the procedural tools', async () => {
+    const runeTint = (hex) => new THREE.MeshStandardMaterial({ color: hex }).color.getHexString();
+    const wantPick = runeTint(RECIPES.runite_pickaxe.tint);
+    const wantHatchet = runeTint(RECIPES.runite_hatchet.tint);
+    const bronze = runeTint(0x8a5a32);
+    const ironGrey = runeTint(0x6a7078);
+
+    const plainPick = buildHeldTool('pickaxe');
+    const plainHat = buildHeldTool('hatchet');
+    assert.equal(plainPick.getObjectByName('dump'), undefined);
+    assert.equal(plainPick.getObjectByName('pickaxe-head').material.color.getHexString(), wantPick);
+    assert.notEqual(wantPick, ironGrey);
+    let hatchetMetal = 0;
+    plainHat.traverse((child) => {
+      if (child.isMesh && child.material?.color?.getHexString() === wantHatchet) hatchetMetal += 1;
+    });
+    assert.ok(hatchetMetal >= 3);
+    assert.notEqual(wantHatchet, bronze);
+
+    function pointsOf(root) {
+      root.updateMatrixWorld(true);
+      const pts = [];
+      root.traverse((child) => {
+        if (!child.isMesh) return;
+        const pos = child.geometry.getAttribute('position');
+        for (let i = 0; i < pos.count; i += 1) {
+          pts.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld));
+        }
+      });
+      return pts;
+    }
+
+    function gripFrame(root) {
+      const pts = pointsOf(root);
+      const center = new THREE.Vector3();
+      for (const p of pts) center.add(p);
+      center.multiplyScalar(1 / pts.length);
+      let xx = 0; let yy = 0; let zz = 0; let xy = 0; let xz = 0; let yz = 0;
+      for (const p of pts) {
+        const x = p.x - center.x; const y = p.y - center.y; const z = p.z - center.z;
+        xx += x * x; yy += y * y; zz += z * z; xy += x * y; xz += x * z; yz += y * z;
+      }
+      const axis = new THREE.Vector3(0, 1, 0);
+      for (let k = 0; k < 40; k += 1) {
+        axis.set(xx * axis.x + xy * axis.y + xz * axis.z, xy * axis.x + yy * axis.y + yz * axis.z, xz * axis.x + yz * axis.y + zz * axis.z).normalize();
+      }
+      let minT = Infinity; let maxT = -Infinity;
+      for (const p of pts) {
+        const t = p.clone().sub(center).dot(axis);
+        if (t < minT) minT = t;
+        if (t > maxT) maxT = t;
+      }
+      const endMin = center.clone().addScaledVector(axis, minT);
+      const endMax = center.clone().addScaledVector(axis, maxT);
+      const butt = endMin.lengthSq() <= endMax.lengthSq() ? endMin : endMax;
+      if (butt === endMax) axis.negate();
+      const perps = pts.map((p) => {
+        const rel = p.clone().sub(center);
+        return rel.addScaledVector(axis, -rel.dot(axis));
+      }).filter((perp) => perp.lengthSq() > 1e-8);
+      perps.sort((a, b) => b.lengthSq() - a.lengthSq());
+      const seed = perps[0].clone().normalize();
+      const side = new THREE.Vector3();
+      const cutoff = perps[0].length() * 0.55;
+      for (const perp of perps) {
+        if (perp.length() < cutoff) break;
+        if (perp.clone().normalize().dot(seed) <= 0) continue;
+        side.add(perp);
+      }
+      return { butt, axis, length: maxT - minT, side: side.normalize() };
+    }
+
+    const modelsRoot = join(dirname(fileURLToPath(import.meta.url)), '../../public/models');
+    async function loadGear(folder) {
+      const base = folder.split('/').pop();
+      const obj = readFileSync(join(modelsRoot, folder, `${base}.obj`));
+      const mtl = readFileSync(join(modelsRoot, folder, `${base}.mtl`));
+      return parseModelBuffer(
+        obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength),
+        `${folder}/${base}.obj`,
+        { [`${base}.mtl`]: mtl.buffer.slice(mtl.byteOffset, mtl.byteOffset + mtl.byteLength) },
+      );
+    }
+    const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
+    setBundledLook('runite_pickaxe', await loadGear(byId.runite_pickaxe));
+    setBundledLook('runite_hatchet', await loadGear(byId.runite_hatchet));
+    try {
+      for (const [kind, stock] of [['pickaxe', plainPick], ['hatchet', plainHat]]) {
+        const held = buildHeldTool(kind);
+        const dump = held.getObjectByName('dump');
+        assert.ok(dump, kind);
+        assert.ok(Math.abs(dump.scale.x - dump.scale.y) < 1e-6, kind);
+        assert.ok(Math.abs(dump.scale.y - dump.scale.z) < 1e-6, kind);
+        const got = gripFrame(held);
+        const want = gripFrame(stock);
+        assert.ok(got.butt.distanceTo(want.butt) < 0.02, `${kind} butt ${got.butt.toArray()} vs ${want.butt.toArray()}`);
+        assert.ok(Math.abs(got.axis.dot(want.axis)) > 0.98, `${kind} axis ${got.axis.toArray()}`);
+        assert.ok(got.side.dot(want.side) > 0.85, `${kind} side ${got.side.toArray()} vs ${want.side.toArray()}`);
+        assert.ok(Math.abs(got.length - want.length) / want.length < 0.08, `${kind} length ${got.length} vs ${want.length}`);
+        let cyan = 0;
+        dump.traverse((child) => {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          for (const mat of mats) {
+            const color = mat?.color;
+            if (color && color.b > color.r && color.g > color.r) cyan += 1;
+          }
+        });
+        assert.ok(cyan >= 1, `${kind} should keep the baked rune colour`);
+      }
+
+      const keeper = buildShopkeeper();
+      assert.equal(keeper.userData.pickaxe.parent, keeper.userData.hand);
+      assert.equal(keeper.userData.hatchet.parent, keeper.userData.hand);
+      assert.ok(keeper.userData.pickaxe.getObjectByName('dump'));
+      assert.ok(keeper.userData.hatchet.getObjectByName('dump'));
+      assert.ok(Math.abs(keeper.userData.pickaxe.position.x - 0.012) < 1e-6);
+      assert.ok(Math.abs(keeper.userData.pickaxe.rotation.x - -0.62) < 1e-6);
+      setHeldTool(keeper, 'pickaxe');
+      assert.equal(keeper.userData.pickaxe.visible, true);
+      assert.equal(keeper.userData.hatchet.visible, false);
+      setHeldTool(keeper, 'hatchet');
+      assert.equal(keeper.userData.pickaxe.visible, false);
+      assert.equal(keeper.userData.hatchet.visible, true);
+
+      const glb = readFileSync(join(modelsRoot, 'player/character_rigged.glb'));
+      const gltf = await new Promise((resolve, reject) => {
+        new GLTFLoader().parse(
+          glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength),
+          '',
+          resolve,
+          reject,
+        );
+      });
+      const rigged = wrapRiggedShopkeeper(gltf, { height: 1.7 });
+      assert.equal(rigged.userData.hand.parent?.name, 'Hand_R');
+      assert.ok(rigged.userData.pickaxe.getObjectByName('dump'));
+      assert.ok(rigged.userData.hatchet.getObjectByName('dump'));
+      assert.equal(rigged.userData.pickaxe.parent, rigged.userData.hand);
+      assert.ok(Math.abs(rigged.userData.pickaxe.position.x - 0.012) < 1e-6);
+      assert.ok(Math.abs(rigged.userData.hatchet.rotation.x - -0.62) < 1e-6);
+    } finally {
+      setBundledLook('runite_pickaxe', null);
+      setBundledLook('runite_hatchet', null);
+    }
+  });
+
   it('seats the pickaxe head on the wooden haft and holds it in the right hand', () => {
     const pick = buildPickaxe();
     const haft = pick.getObjectByName('pickaxe-haft');

@@ -21,8 +21,8 @@ import {
   FLAX_ARRIVE,
   FLAX_DURATION,
   FLAX_YIELD,
-  MINE_DURATION,
   MINE_YIELD,
+  mineTiming,
   emptySlots,
   emptyShelfSlots,
   mostExpensiveChestId,
@@ -1019,13 +1019,14 @@ export function createWorld(canvas, state, opts = {}) {
   function startMining(materialId, pose) {
     const mat = MATERIALS[materialId];
     if (!mat) return;
+    const timing = mineTiming(materialId);
     mining = {
       materialId,
       name: mat.name,
       mode: 'mine',
       startedAt: performance.now() / 1000,
-      duration: MINE_DURATION,
-      yield: MINE_YIELD,
+      duration: timing.duration,
+      yield: timing.yield,
       x: pose?.x ?? shopkeeper.position.x,
       z: pose?.z ?? shopkeeper.position.z,
     };

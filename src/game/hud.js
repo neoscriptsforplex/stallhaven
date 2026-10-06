@@ -372,6 +372,7 @@ export function bindHud(root, state, world) {
     if (!container || container.dataset.ready) return;
     container.innerHTML = materialList().map((mat) => `
       <div class="mat${isCraftedMaterial(mat.id) ? ' is-crafted' : ''}" data-mat="${mat.id}">
+        ${mat.tint && !mat.bar ? `<span class="mat-swatch" style="background:#${mat.tint.toString(16).padStart(6, '0')}" aria-hidden="true"></span>` : ''}
         <span class="mat-name">${mat.name}</span>
         <span class="mat-count" data-count="${mat.id}">0</span>
         ${isCraftedMaterial(mat.id)

@@ -36,6 +36,9 @@ import {
   isMinedMaterial,
   CHOP_YIELD,
   MINE_YIELD,
+  CLAY_MINE_DURATION,
+  CLAY_MINE_YIELD,
+  mineTiming,
   nearestShelfSlot,
   SHELF_SLOT_COUNT,
   SHELF_SLOT_LABELS,
@@ -965,6 +968,21 @@ describe('material regen', () => {
     assert.equal(grantMinedMaterial(state, 'runite'), 2);
     assert.equal(state.materials.runite, 250);
     assert.equal(grantMinedMaterial(state, 'flour'), 0);
+    assert.equal(CLAY_MINE_YIELD, 1);
+    assert.equal(CLAY_MINE_DURATION, 1);
+    assert.equal(isMinedMaterial('hard_clay'), true);
+    assert.deepEqual(mineTiming('hard_clay'), { duration: 1, yield: 1 });
+    assert.equal(mineTiming('bronze').yield, MINE_YIELD);
+    assert.equal(mineTiming('bronze').duration, 3.2);
+    assert.equal(MATERIALS.hard_clay.name, 'Hard clay');
+    assert.equal(MATERIALS.hard_clay.tint, 0xb56a3a);
+    const clayBefore = state.materials.hard_clay;
+    assert.equal(grantMinedMaterial(state, 'hard_clay', mineTiming('hard_clay').yield), 1);
+    assert.equal(state.materials.hard_clay, clayBefore + 1);
+    const saved = serializeState(state);
+    const restored = createState();
+    assert.equal(applyState(restored, saved), true);
+    assert.equal(restored.materials.hard_clay, state.materials.hard_clay);
     assert.equal(CHOP_YIELD, 5);
     assert.equal(MATERIALS.logs.start, 0);
     assert.equal(MATERIALS.logs.restock, 0);
@@ -1943,9 +1961,9 @@ describe('dungeon sky and remains', () => {
     assert.ok(DUNGEON_REMAINS.length >= 3);
     assert.ok(DUNGEON_REMAINS.every((spot) => spot.kind === 'slump'));
     assert.equal(DUNGEON_REMAINS.some((spot) => spot.kind === 'pile' || spot.kind === 'scatter'), false);
-    assert.equal(DUNGEON_BOULDERS.length, 8);
+    assert.equal(DUNGEON_BOULDERS.length, 9);
     assert.deepEqual(DUNGEON_BOULDERS.map((spot) => spot.materialId), [
-      'essence', 'bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon',
+      'essence', 'bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon', 'hard_clay',
     ]);
     const byId = Object.fromEntries(DUNGEON_BOULDERS.map((spot) => [spot.id, spot]));
     const ores = ['bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon'];
@@ -1967,6 +1985,16 @@ describe('dungeon sky and remains', () => {
     assert.match(boulderInspect('adamant').blurb, /adamantite/i);
     assert.equal(boulderInspect('dragon').name, 'Dragon Ore');
     assert.match(boulderInspect('runite').blurb, /runite/i);
+    assert.equal(boulderInspect('hard_clay').name, 'Clay');
+    assert.match(boulderInspect('hard_clay').blurb, /clay/i);
+    const clay = byId.clay;
+    assert.equal(clay.materialId, 'hard_clay');
+    assert.notEqual(clay.rock, byId.bronze.rock);
+    assert.ok(clay.x > -5.2 && clay.x < 5.2 && clay.z > -4.2 && clay.z < 4.2);
+    for (const other of DUNGEON_BOULDERS.filter((item) => item.id !== 'clay')) {
+      const dist = Math.hypot(clay.x - other.x, clay.z - other.z);
+      assert.ok(dist > 2.2, `${other.id} too close to clay (${dist})`);
+    }
   });
 });
 

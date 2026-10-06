@@ -296,12 +296,13 @@ export const MATERIALS = {
   soft_clay: { id: 'soft_clay', name: 'Soft Clay', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
   hard_clay: {
     id: 'hard_clay',
-    name: 'Clay',
+    name: 'Hard clay',
     restock: 0,
     start: 0,
     tier: 1,
     regenEvery: 0,
     crafted: true,
+    tint: 0xb56a3a,
   },
   orb: { id: 'orb', name: 'Unpowered Orb', restock: 6, start: 4, tier: 2, regenEvery: regenEvery(2) },
   hide: { id: 'hide', name: 'Hide', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
@@ -1387,6 +1388,8 @@ export function nearestShelfSlot(localX, localY, localZ = 0) {
 
 export const MINE_YIELD = 5;
 export const MINE_DURATION = 3.2;
+export const CLAY_MINE_YIELD = 1;
+export const CLAY_MINE_DURATION = 1;
 export const CHOP_YIELD = 5;
 export const CHOP_DURATION = 3.2;
 /** One flax per pick. The bar matches mining and chopping. */
@@ -1395,8 +1398,15 @@ export const FLAX_DURATION = 3.2;
 /** How close the player stands before the pick bar starts. */
 export const FLAX_ARRIVE = 0.85;
 
+export function mineTiming(materialId) {
+  if (materialId === 'hard_clay') return { duration: CLAY_MINE_DURATION, yield: CLAY_MINE_YIELD };
+  return { duration: MINE_DURATION, yield: MINE_YIELD };
+}
+
 export function isMinedMaterial(materialId) {
-  return materialId === 'essence' || METALS.some((metal) => metal.id === materialId);
+  return materialId === 'essence'
+    || materialId === 'hard_clay'
+    || METALS.some((metal) => metal.id === materialId);
 }
 
 /** Craft/inventory/smelt preview dumps for ore items — not dungeon rock props. */

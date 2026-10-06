@@ -117,6 +117,7 @@ describe('bundled model paths', () => {
       'dungeon-rocks/rune-rocks',
       'dungeon-rocks/dragon-rocks',
       'dungeon-rocks/essence',
+      'dungeon-rocks/clay-rocks',
     ]) {
       assert.equal(isDungeonRockDump(folder), true);
       const scene = await loadDump(folder);

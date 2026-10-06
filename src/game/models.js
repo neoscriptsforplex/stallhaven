@@ -1160,6 +1160,80 @@ export function slotPose(slot) {
 }
 
 /**
+ * Mannequin sections these shapes are fitted to. Width is the shoulder bar
+ * (0.50) or the hip block (0.34), with a little overhang so the piece reads
+ * as worn over the wood. Torso runs from the waist (hip center, y=0.50) up
+ * to the shoulder line (y=1.16). Legs run from just above the base (y=0.09)
+ * back up to that waist. Depth is only a clamp: the piece keeps its own
+ * thickness unless that would sink inside the form or balloon into a block.
+ */
+export const MANNEQUIN_WEAR_FIT = {
+  torso: { width: 0.52, height: 0.66, y: 0.50, depthMin: 0.18, depthMax: 0.26 },
+  legs: { width: 0.36, height: 0.41, y: 0.09, depthMin: 0.16, depthMax: 0.22 },
+};
+
+const MANNEQUIN_WEAR_KIND = {
+  platebody: 'torso',
+  chainbody: 'torso',
+  robe_top: 'torso',
+  dhide_body: 'torso',
+  platelegs: 'legs',
+  plateskirt: 'legs',
+  robe_bottom: 'legs',
+  dhide_chaps: 'legs',
+};
+
+const _fitSize = new THREE.Vector3();
+const _fitPoint = new THREE.Vector3();
+const _fitInv = new THREE.Matrix4();
+
+/** Axis-aligned bounds of real vertices, in root local space. */
+function meshTightBox(root) {
+  const box = new THREE.Box3();
+  root.updateMatrixWorld(true);
+  _fitInv.copy(root.matrixWorld).invert();
+  root.traverse((child) => {
+    const pos = child.isMesh && child.geometry?.attributes?.position;
+    if (!pos) return;
+    for (let i = 0; i < pos.count; i += 1) {
+      _fitPoint.fromBufferAttribute(pos, i);
+      child.localToWorld(_fitPoint);
+      _fitPoint.applyMatrix4(_fitInv);
+      box.expandByPoint(_fitPoint);
+    }
+  });
+  return box;
+}
+
+/**
+ * Scale one body or leg mesh so its bounds cover that mannequin section.
+ * Each mesh is measured on its own. X matches the section width and Y the
+ * section height; Z keeps the mesh's proportion, clamped to the depth band.
+ * Position sits the hem on the section and centers it across the stand.
+ * Does not touch rotation — display poses stay whatever the caller set.
+ * Returns false for helms, shields, weapons, and anything else.
+ */
+export function fitMannequinWear(mesh, recipeId) {
+  const section = MANNEQUIN_WEAR_FIT[MANNEQUIN_WEAR_KIND[RECIPES[recipeId]?.shape]];
+  if (!mesh || !section) return false;
+  const box = meshTightBox(mesh);
+  if (box.isEmpty()) return false;
+  const size = box.getSize(_fitSize);
+  if (size.x < 1e-4 || size.y < 1e-4 || size.z < 1e-4) return false;
+  const sx = section.width / size.x;
+  const sy = section.height / size.y;
+  const depth = Math.min(section.depthMax, Math.max(section.depthMin, size.z * Math.min(sx, sy)));
+  const sz = depth / size.z;
+  mesh.scale.set(sx, sy, sz);
+  mesh.position.set(
+    -((box.min.x + box.max.x) * 0.5) * sx,
+    section.y - box.min.y * sy,
+    -((box.min.z + box.max.z) * 0.5) * sz,
+  );
+  return true;
+}
+
+/**
  * Extra yaw after the dump is stood up. Mannequins face +Z.
  * Platebodies already read correctly and are left alone.
  * Wizard and mystic robe tops stand edge-on to that front; a quarter turn

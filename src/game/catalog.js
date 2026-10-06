@@ -536,7 +536,7 @@ DRAGON_MASKS.forEach((color, index) => {
     combatClass: 'range',
     slot: 'helm',
     shape: 'dhide_coif',
-    setKey: `${color.id}-mask`,
+    setKey: `${color.id}-dhide`,
     lineId: 'range-dragon-mask',
     lineName: 'Dragon Mask',
     lineIndex: index,

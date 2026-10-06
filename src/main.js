@@ -2,7 +2,7 @@ import { RECIPES } from './game/catalog.js';
 import { completeCrafts, createState, pushLog, tickMaterials } from './game/economy.js';
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
-import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledLooks } from './game/upload.js';
+import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledLooks } from './game/upload.js';
 import { loadBundledMusic } from './game/audio.js';
 import { createWorld } from './game/world.js';
 import { normalizeImported, setBundledLooks } from './game/models.js';
@@ -54,11 +54,12 @@ async function bootGame() {
   setBootProgress(0, 1, 'Loading models…');
 
   let bundledPlayer = null;
+  let riggedPlayer = null;
   let bundledLooks = {};
   try {
-    const [player, looks] = await Promise.all([
-      loadBundledPlayerScene().catch((err) => {
-        console.warn('Bundled player skipped:', err?.message || err);
+    const [rigged, looks] = await Promise.all([
+      loadBundledRiggedPlayer().catch((err) => {
+        console.warn('Rigged player skipped:', err?.message || err);
         return null;
       }),
       loadBundledLooks((done, total) => {
@@ -69,7 +70,13 @@ async function bootGame() {
         return [];
       }),
     ]);
-    bundledPlayer = player;
+    riggedPlayer = rigged;
+    if (!riggedPlayer) {
+      bundledPlayer = await loadBundledPlayerScene().catch((err) => {
+        console.warn('Bundled player skipped:', err?.message || err);
+        return null;
+      });
+    }
     bundledLooks = looks ?? {};
     setBundledLooks(bundledLooks);
     setBootProgress(1, 1, 'Building shop…');
@@ -77,12 +84,12 @@ async function bootGame() {
     console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
   }
 
-  const world = createWorld(canvas, state, { bundledPlayer });
+  const world = createWorld(canvas, state, { bundledPlayer, riggedPlayer });
   window.stallhaven = {
     world,
     state,
     bundled: {
-      player: Boolean(bundledPlayer),
+      player: Boolean(riggedPlayer || bundledPlayer),
       looks: Object.keys(bundledLooks ?? {}),
     },
   };

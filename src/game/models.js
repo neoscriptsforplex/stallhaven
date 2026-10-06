@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import {
   BUYER_PACKS,
   CUSTOMERS,
@@ -711,7 +712,38 @@ function restScaleY(mesh, body) {
   return body?.scale?.y ?? 1;
 }
 
+/** In-place Walk clip speed of character_rigged.glb at scale 1. */
+export const RIGGED_WALK_SPEED = 0.834;
+/** Crossfade between Walk and Idle. */
+export const RIGGED_CLIP_FADE = 0.2;
+/** Both the old shopkeeper and the rig face +Z, so atan2(dx, dz) needs no extra yaw. */
+export const RIGGED_FACING_YAW = 0;
+
+function updateClipLocomotion(mesh, moving, dt) {
+  const loco = mesh?.userData?.clipLocomotion;
+  if (!loco) return;
+  const want = moving ? 'walk' : 'idle';
+  if (loco.mode !== want) {
+    const next = want === 'walk' ? loco.walk : loco.idle;
+    const prev = loco.mode === 'walk' ? loco.walk : loco.mode === 'idle' ? loco.idle : null;
+    next.enabled = true;
+    next.setEffectiveWeight(1);
+    next.reset().play();
+    if (prev && prev !== next) prev.crossFadeTo(next, RIGGED_CLIP_FADE, false);
+    loco.mode = want;
+  }
+  if (moving) {
+    const scale = loco.modelScale || 1;
+    loco.walk.timeScale = (loco.speed ?? 0) / (RIGGED_WALK_SPEED * scale);
+  }
+  loco.mixer.update(dt);
+}
+
 export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
+  if (mesh?.userData?.clipLocomotion) {
+    updateClipLocomotion(mesh, moving, dt);
+    return;
+  }
   const rig = mesh?.userData?.rig;
   const body = mesh?.userData?.walkBody;
   const settle = (obj, rest = 0) => {
@@ -849,6 +881,10 @@ export function setHeldTool(mesh, tool) {
 }
 
 export function updateMinePose(mesh, dt = 0.016, now = 0) {
+  if (mesh?.userData?.clipLocomotion) {
+    updateClipLocomotion(mesh, false, dt);
+    return;
+  }
   const rig = mesh?.userData?.rig;
   const body = mesh?.userData?.walkBody;
   const swing = Math.sin(now * 8.2) * 0.72 - 0.32;
@@ -3386,6 +3422,115 @@ export function proceduralPlayerFitHeight() {
   if (keeper.userData.chefHat) keeper.userData.chefHat.visible = false;
   cachedProceduralHeight = Math.max(0.9, measureVisibleMeshHeight(keeper));
   return cachedProceduralHeight;
+}
+
+function prepareRiggedSurface(root) {
+  root.traverse((child) => {
+    if (!child.isMesh) return;
+    child.frustumCulled = false;
+    child.castShadow = true;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      mat.vertexColors = true;
+      if (mat.color) mat.color.setHex(0xffffff);
+      if ('metalness' in mat) mat.metalness = 0;
+      if ('roughness' in mat) mat.roughness = 1;
+      mat.needsUpdate = true;
+    }
+  });
+}
+
+/**
+ * Shop player from character_rigged.glb. Scale matches the current keeper height.
+ * Walk/Idle play on an AnimationMixer; tools hang off Hand_R.
+ */
+export function wrapRiggedShopkeeper(gltf, opts = {}) {
+  if (!gltf?.scene) throw new Error('Rigged player has no scene.');
+  const walkClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Walk');
+  const idleClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Idle');
+  if (!walkClip || !idleClip) throw new Error('Rigged player is missing Walk or Idle.');
+
+  const visual = cloneSkinned(gltf.scene);
+  visual.name = 'rigged-player';
+  visual.rotation.y = RIGGED_FACING_YAW;
+  hideWalkDebug(visual);
+  prepareRiggedSurface(visual);
+  visual.updateMatrixWorld(true);
+  const rawBox = new THREE.Box3().setFromObject(visual);
+  const rawHeight = Math.max(0.01, rawBox.max.y - rawBox.min.y);
+  if (Number.isFinite(rawBox.min.y) && Math.abs(rawBox.min.y) > 1e-4) {
+    visual.position.y -= rawBox.min.y;
+  }
+
+  const targetHeight = opts.height ?? (proceduralPlayerFitHeight() * PLAYER_WORLD_SCALE);
+  const modelScale = targetHeight / rawHeight;
+  const group = new THREE.Group();
+  group.name = opts.name ?? 'shopkeeper';
+  group.add(visual);
+  group.scale.setScalar(modelScale);
+
+  const mixer = new THREE.AnimationMixer(visual);
+  const walk = mixer.clipAction(walkClip);
+  const idle = mixer.clipAction(idleClip);
+  for (const action of [walk, idle]) {
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.enabled = true;
+  }
+  idle.play();
+  mixer.update(0);
+
+  const hand = visual.getObjectByName('Hand_R');
+  const grip = new THREE.Group();
+  grip.name = 'importedGrip';
+  // Tools are built for the procedural keeper, then that keeper is scaled by
+  // PLAYER_WORLD_SCALE. Cancel the rig scale so they stay the same world size.
+  grip.scale.setScalar(PLAYER_WORLD_SCALE / modelScale);
+  const pickaxe = buildPickaxe();
+  pickaxe.visible = false;
+  grip.add(pickaxe);
+  poseHeldPickaxe(pickaxe);
+  const hatchet = buildHatchet();
+  hatchet.visible = false;
+  grip.add(hatchet);
+  poseHeldPickaxe(hatchet);
+  if (hand) hand.add(grip);
+  else visual.add(grip);
+
+  const head = visual.getObjectByName('Head');
+  const chefHat = buildChefHat();
+  chefHat.visible = Boolean(opts.chefHatOn);
+  chefHat.scale.setScalar(PLAYER_WORLD_SCALE / modelScale);
+  if (head) {
+    head.add(chefHat);
+    chefHat.position.set(0, 0.22, 0.02);
+  } else {
+    chefHat.position.y = rawHeight;
+    visual.add(chefHat);
+  }
+
+  const label = makeNameSprite(opts.label ?? 'You');
+  label.position.y = rawHeight + 0.2;
+  visual.add(label);
+
+  group.userData.clipLocomotion = {
+    mixer,
+    walk,
+    idle,
+    modelScale,
+    mode: 'idle',
+    speed: 0,
+  };
+  group.userData.modelScale = modelScale;
+  group.userData.hand = grip;
+  group.userData.pickaxe = pickaxe;
+  group.userData.hatchet = hatchet;
+  group.userData.hammers = [];
+  group.userData.chefHat = chefHat;
+  group.userData.customMesh = true;
+  group.userData.walkPhase = 0;
+  return group;
 }
 
 /** Wrap an imported mesh as the shop player: height-fit, feet on floor, shared walk. */

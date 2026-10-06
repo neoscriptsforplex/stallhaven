@@ -1322,9 +1322,13 @@ export function createWorld(canvas, state, opts = {}) {
       nz = moved.z;
       blocked = moved.blocked && Math.hypot(nx - pos.x, nz - pos.z) < 1e-4;
     }
+    const stepX = nx - pos.x;
+    const stepZ = nz - pos.z;
     pos.x = nx;
     pos.z = nz;
-    actor.mesh.rotation.y = Math.atan2(dx, dz);
+    if (Math.hypot(stepX, stepZ) > 1e-4) {
+      actor.mesh.rotation.y = Math.atan2(stepX, stepZ);
+    }
     if (actor.mesh.userData.clipLocomotion) {
       actor.mesh.userData.clipLocomotion.speed = blocked ? 0 : actualSpeed;
     }
@@ -1480,13 +1484,6 @@ export function createWorld(canvas, state, opts = {}) {
     updateWalkPose(shopkeeper, false, dt, now);
     if (pendingUse && isNearPose(pendingUse, pendingUse.arrive ?? 1.35)) {
       finishPendingUse();
-      return;
-    }
-    const front = customers.find((actor) => actor.state === 'request');
-    if (front && sceneMode === 'shop') {
-      const dx = front.mesh.position.x - shopkeeper.position.x;
-      const dz = front.mesh.position.z - shopkeeper.position.z;
-      if (Math.hypot(dx, dz) > 0.05) shopkeeper.rotation.y = Math.atan2(dx, dz);
     }
   }
 

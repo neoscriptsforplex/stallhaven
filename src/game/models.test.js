@@ -55,7 +55,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_WALL_H, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles, PLAYER_RADIUS } from './nav.js';
 import { GATHER_CONTACT, GATHER_MODEL_SCALE, gatherStandCandidates } from './interact.js';
 
@@ -1717,6 +1717,51 @@ describe('bundled prop swaps', () => {
     assert.ok(clayColored >= 1);
   });
 
+  it('seats every full and depleted dungeon rock on the cobble, not on y=0', async () => {
+    const folders = {
+      bronze: 'dungeon-rocks/bronze-rocks',
+      iron: 'dungeon-rocks/iron-rocks',
+      steel: 'dungeon-rocks/steel-rocks',
+      mithril: 'dungeon-rocks/mithril-rocks',
+      adamant: 'dungeon-rocks/adamant-rocks',
+      runite: 'dungeon-rocks/rune-rocks',
+      dragon: 'dungeon-rocks/dragon-rocks',
+      essence: 'dungeon-rocks/essence',
+      clay: 'dungeon-rocks/clay-rocks',
+    };
+    for (const [id, folder] of Object.entries(folders)) {
+      setBundledLook(`ore-${id}`, await loadFolder(folder));
+    }
+    try {
+      const built = buildDungeon();
+      const floorY = dungeonFloorSurfaceY(built.root);
+      assert.ok(floorY > 0.01, `floor surface should be the raised cobble, got ${floorY}`);
+      assert.ok(Math.abs(floorY - DUNGEON_FLOOR_Y) < 1e-4);
+      const target = floorY - DUNGEON_ROCK_SINK;
+      for (const spot of DUNGEON_BOULDERS) {
+        const boulder = built.boulders.find((item) => item.name === `boulder-${spot.id}`);
+        assert.equal(boulder.position.x, spot.x);
+        assert.equal(boulder.position.y, 0);
+        assert.equal(boulder.position.z, spot.z);
+        const visual = boulder.children.find((child) => child.name?.startsWith('ore-'));
+        const contacts = dungeonRockContactMins(visual);
+        assert.ok(contacts.length >= 2, `${spot.id} should seat full and depleted rocks separately, got ${contacts.length}`);
+        for (const minY of contacts) {
+          assert.ok(Math.abs(minY - target) < 0.004, `${spot.id} base ${minY} vs ${target}`);
+        }
+        const box = measureVisibleBox(visual);
+        assert.ok(box.max.y - box.min.y > 0.35, `${spot.id} should stay a rock, height ${box.max.y - box.min.y}`);
+        const pick = boulder.children.find((child) => child.userData?.kind === 'boulder');
+        assert.equal(pick.userData.x, spot.x);
+        assert.equal(pick.userData.z, spot.z);
+        assert.equal(pick.position.x, 0);
+        assert.equal(pick.position.z, 0);
+      }
+    } finally {
+      for (const id of Object.keys(folders)) setBundledLook(`ore-${id}`, null);
+    }
+  });
+
   it('sits every dungeon ore rock on the floor plane', async () => {
     const folders = {
       bronze: 'dungeon-rocks/bronze-rocks',
@@ -1745,8 +1790,12 @@ describe('bundled prop swaps', () => {
         visual.updateMatrixWorld(true);
         const box = measureVisibleBox(visual);
         assert.ok(
-          Math.abs(box.min.y - DUNGEON_FLOOR_Y) < 0.02,
-          `${boulder.name} should sit on the floor, minY=${box.min.y}`,
+          box.min.y <= DUNGEON_FLOOR_Y + 0.005,
+          `${boulder.name} should meet the cobble, minY=${box.min.y}`,
+        );
+        assert.ok(
+          box.max.y > DUNGEON_FLOOR_Y + 0.2,
+          `${boulder.name} should still stand above the floor, maxY=${box.max.y}`,
         );
       }
       const spanOf = (name) => {
@@ -1801,7 +1850,8 @@ describe('bundled prop swaps', () => {
       const essenceMax = Math.max(essenceSize.x, essenceSize.y, essenceSize.z);
       const bronzeMax = Math.max(bronzeSize.x, bronzeSize.y, bronzeSize.z);
       assert.ok(essenceMax > bronzeMax * 1.6, `essence ${essenceMax} should be ~2× bronze ${bronzeMax}`);
-      assert.ok(Math.abs(essenceBox.min.y - DUNGEON_FLOOR_Y) < 0.02, `essence minY=${essenceBox.min.y}`);
+      assert.ok(essenceBox.min.y <= DUNGEON_FLOOR_Y + 0.005, `essence minY=${essenceBox.min.y}`);
+      assert.ok(essenceBox.max.y > DUNGEON_FLOOR_Y + 0.4, `essence maxY=${essenceBox.max.y}`);
       let slumps = 0;
       let oldSpotSlump = 0;
       built.root.traverse((child) => {

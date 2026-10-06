@@ -2079,6 +2079,13 @@ const ORE_VEIN_COLOR = {
 
 /** Visible top of the dungeon cobble slab. Ore rocks sit on this plane. */
 export const DUNGEON_FLOOR_Y = 0.02;
+/** Tuck bases into the cobble so a lit edge does not read as a gap. */
+export const DUNGEON_ROCK_SINK = 0.015;
+/**
+ * Seat this far up the rock, not on a single dangling vertex. The dumps rest
+ * on one low point while the underside the player sees is higher.
+ */
+const DUNGEON_ROCK_BASE_QUANTILE = 0.2;
 
 /** Previous essence xz — a second skeleton slump sits here after essence moved to the cave middle. */
 export const ESSENCE_OLD_XZ = { x: 0.2, z: 3.15 };
@@ -2202,7 +2209,7 @@ function darkenMithrilRock(root) {
   });
 }
 
-function buildMineBoulder(spot) {
+function buildMineBoulder(spot, floorY = DUNGEON_FLOOR_Y) {
   const group = new THREE.Group();
   group.name = `boulder-${spot.id}`;
   group.position.set(spot.x, 0, spot.z);
@@ -2215,10 +2222,180 @@ function buildMineBoulder(spot) {
   if (bundled) prepareDungeonRockMaterials(visual);
   if (bundled && spot.materialId === 'mithril') darkenMithrilRock(visual);
   group.add(visual);
-  sitVisibleOnY(visual, DUNGEON_FLOOR_Y);
+  group.updateMatrixWorld(true);
+  if (bundled) seatDungeonRockBases(visual, floorY);
+  else sitVisibleOnY(visual, floorY - DUNGEON_ROCK_SINK);
   attachBoulderPick(group, spot);
   if (spot.essence) stripEmissive(group);
   return group;
+}
+
+/**
+ * Top of the dungeon cobble slab in world Y. Measured from the floor mesh so a
+ * raised tile is not mistaken for y = 0.
+ */
+export function dungeonFloorSurfaceY(root) {
+  let top = null;
+  root?.updateMatrixWorld(true);
+  root?.traverse((child) => {
+    const height = child.geometry?.parameters?.height;
+    const width = child.geometry?.parameters?.width;
+    if (!child.isMesh || !(width > 8) || !(height > 0) || height > 0.25) return;
+    child.updateWorldMatrix(true, false);
+    const y = new THREE.Box3().setFromObject(child).max.y;
+    if (top == null || y > top) top = y;
+  });
+  return top ?? DUNGEON_FLOOR_Y;
+}
+
+function findParent(parent, index) {
+  let cursor = index;
+  while (parent[cursor] !== cursor) {
+    parent[cursor] = parent[parent[cursor]];
+    cursor = parent[cursor];
+  }
+  return cursor;
+}
+
+function uniteParent(parent, a, b) {
+  const ra = findParent(parent, a);
+  const rb = findParent(parent, b);
+  if (ra !== rb) parent[rb] = ra;
+}
+
+/**
+ * RuneLite dumps pack every rock at a site — full ore, clay, essence, and the
+ * depleted stubs — into one mesh, and those pieces do not share a floor height.
+ * After the fit scale, drop each piece so its underside meets the cobble. A
+ * single low vertex is allowed to tuck into the floor; seating only that point
+ * leaves the face the player sees hovering.
+ */
+export function seatDungeonRockBases(visual, floorY = DUNGEON_FLOOR_Y) {
+  const parts = collectDungeonRockParts(visual);
+  if (!parts.length || !Number.isFinite(floorY)) return visual;
+  const target = floorY - DUNGEON_ROCK_SINK;
+  const inverse = new Map();
+  const moved = new Set();
+  const world = new THREE.Vector3();
+  for (const part of parts) {
+    const dy = target - part.contactY;
+    if (Math.abs(dy) < 1e-5) continue;
+    for (const sample of part.samples) {
+      const mesh = sample.mesh;
+      if (!inverse.has(mesh.uuid)) inverse.set(mesh.uuid, mesh.matrixWorld.clone().invert());
+      world.set(sample.x, sample.y + dy, sample.z).applyMatrix4(inverse.get(mesh.uuid));
+      mesh.geometry.getAttribute('position').setXYZ(sample.index, world.x, world.y, world.z);
+      moved.add(mesh);
+    }
+  }
+  for (const mesh of moved) {
+    const attr = mesh.geometry.getAttribute('position');
+    attr.needsUpdate = true;
+    mesh.geometry.computeBoundingBox();
+    mesh.geometry.computeBoundingSphere();
+  }
+  return visual;
+}
+
+/** World Y of each separate rock's underside after the fit scale. */
+export function dungeonRockContactMins(visual) {
+  return collectDungeonRockParts(visual).map((part) => part.contactY);
+}
+
+function collectDungeonRockParts(visual) {
+  if (!visual) return [];
+  let top = visual;
+  while (top.parent) top = top.parent;
+  top.updateMatrixWorld(true);
+  const meshes = [];
+  visual.traverse((child) => {
+    if (!child.isMesh || !child.geometry?.getAttribute?.('position')) return;
+    if (child.userData?.kind === 'boulder') return;
+    if (child.material?.visible === false) return;
+    if (!child.userData.rockGeometryOwned) {
+      child.geometry = child.geometry.clone();
+      child.userData.rockGeometryOwned = true;
+    }
+    meshes.push(child);
+  });
+  const samples = [];
+  const ids = new Map();
+  const weld = new Map();
+  const world = new THREE.Vector3();
+  for (const mesh of meshes) {
+    const attr = mesh.geometry.getAttribute('position');
+    for (let index = 0; index < attr.count; index += 1) {
+      world.fromBufferAttribute(attr, index).applyMatrix4(mesh.matrixWorld);
+      const sample = { mesh, index, x: world.x, y: world.y, z: world.z };
+      const id = samples.length;
+      samples.push(sample);
+      ids.set(`${mesh.uuid}:${index}`, id);
+      const key = `${Math.round(world.x * 1000)}:${Math.round(world.y * 1000)}:${Math.round(world.z * 1000)}`;
+      if (!weld.has(key)) weld.set(key, []);
+      weld.get(key).push(id);
+    }
+  }
+  if (!samples.length) return [];
+  const parent = samples.map((_, index) => index);
+  for (const group of weld.values()) {
+    for (let i = 1; i < group.length; i += 1) uniteParent(parent, group[0], group[i]);
+  }
+  for (const mesh of meshes) {
+    const index = mesh.geometry.index;
+    const count = index ? index.count : mesh.geometry.getAttribute('position').count;
+    const vert = (n) => (index ? index.getX(n) : n);
+    for (let tri = 0; tri + 2 < count; tri += 3) {
+      const a = ids.get(`${mesh.uuid}:${vert(tri)}`);
+      const b = ids.get(`${mesh.uuid}:${vert(tri + 1)}`);
+      const c = ids.get(`${mesh.uuid}:${vert(tri + 2)}`);
+      if (a == null || b == null || c == null) continue;
+      uniteParent(parent, a, b);
+      uniteParent(parent, b, c);
+    }
+  }
+  const groups = new Map();
+  samples.forEach((sample, index) => {
+    const root = findParent(parent, index);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(sample);
+  });
+  return [...groups.values()]
+    .map((group) => partBounds(group))
+    .filter((part) => part.samples.length >= 3);
+}
+
+function partBounds(samples) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  const heights = [];
+  for (const sample of samples) {
+    minX = Math.min(minX, sample.x);
+    maxX = Math.max(maxX, sample.x);
+    minY = Math.min(minY, sample.y);
+    maxY = Math.max(maxY, sample.y);
+    minZ = Math.min(minZ, sample.z);
+    maxZ = Math.max(maxZ, sample.z);
+    heights.push(sample.y);
+  }
+  heights.sort((a, b) => a - b);
+  const index = Math.min(
+    heights.length - 1,
+    Math.max(0, Math.round((heights.length - 1) * DUNGEON_ROCK_BASE_QUANTILE)),
+  );
+  return {
+    samples,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    minZ,
+    maxZ,
+    contactY: heights[index],
+  };
 }
 
 function buildProceduralOreRock(spot) {
@@ -2399,8 +2576,10 @@ export function buildDungeon(opts = {}) {
 
   addDungeonRemains(root);
 
+  root.updateMatrixWorld(true);
+  const floorY = dungeonFloorSurfaceY(root);
   const boulders = DUNGEON_BOULDERS.map((spot) => {
-    const boulder = buildMineBoulder(spot);
+    const boulder = buildMineBoulder(spot, floorY);
     root.add(boulder);
     return boulder;
   });

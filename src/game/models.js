@@ -1498,7 +1498,7 @@ const MANNEQUIN_ID_TUNE = {
   wizard_robe: { margin: 0.08, raise: 0.06 },
   splitbark_robe_top: { margin: 0.06, raise: 0.02, shoulders: true },
   splitbark_robe_bottom: { margin: 0.06, raise: 0 },
-  mystic_robe_top: { margin: 0.08, raise: 0.12 },
+  mystic_robe_top: { margin: 0.08, raise: 0.18 },
   mystic_robe_bottom: { margin: 0.08, raise: 0 },
 };
 

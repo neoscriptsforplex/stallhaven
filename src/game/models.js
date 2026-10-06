@@ -1359,15 +1359,11 @@ export function buildArmourStand() {
   const base = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.08, 12), baseWood));
   base.position.y = 0.04;
   group.add(base);
-  const hips = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.14), oak));
-  hips.position.y = 0.5;
+  const hips = standBlock(MANNEQUIN_BLOCKS.hips, oak);
   group.add(hips);
-  const torso = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 0.14), oak));
-  torso.position.y = 0.92;
+  const torso = standBlock(MANNEQUIN_BLOCKS.torso, oak);
   group.add(torso);
-  const shoulders = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.12), oak));
-  shoulders.position.y = 1.16;
-  group.add(shoulders);
+  group.add(standBlock(MANNEQUIN_BLOCKS.shoulders, oak));
   const armL = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.38, 8), post));
   armL.position.set(-0.24, 0.92, 0);
   group.add(armL);
@@ -1408,12 +1404,42 @@ export function slotPose(slot) {
 }
 
 /**
+ * The wooden boxes on the stand. BoxGeometry is centered on its position,
+ * so a block's bottom face is `at` plus the geometry's min Y.
+ * Leg waistbands sit on the torso block's bottom face.
+ */
+const MANNEQUIN_BLOCKS = {
+  hips: { x: 0.34, y: 0.06, z: 0.14, at: 0.5 },
+  torso: { x: 0.3, y: 0.42, z: 0.14, at: 0.92 },
+  shoulders: { x: 0.5, y: 0.06, z: 0.12, at: 1.16 },
+};
+
+function standBlock(block, material) {
+  const mesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(block.x, block.y, block.z), material));
+  mesh.position.y = block.at;
+  return mesh;
+}
+
+/** Face heights of a stand box, read from its geometry. */
+function blockFaces(block) {
+  const geometry = new THREE.BoxGeometry(block.x, block.y, block.z);
+  geometry.computeBoundingBox();
+  const bottom = block.at + geometry.boundingBox.min.y;
+  const top = block.at + geometry.boundingBox.max.y;
+  geometry.dispose();
+  return { bottom, top };
+}
+
+const TORSO_FACES = blockFaces(MANNEQUIN_BLOCKS.torso);
+const HIP_FACES = blockFaces(MANNEQUIN_BLOCKS.hips);
+
+/**
  * Wood the gear has to hide, in the stand's local space.
  * Shoulder bar: y 1.13–1.19, half-width 0.25, half-depth 0.06.
- * Torso block plus the arm posts: y 0.71–1.13, arms out to x ≈ ±0.27.
- * Hip block: y 0.47–0.53, half-width 0.17, half-depth 0.07.
+ * Torso block plus the arm posts. The torso bottom is where leg waistbands sit.
+ * Hip block is the wide wood the legs have to wrap.
  * The hem stays at `bottom` so the pole under the piece stays covered.
- * `top` is where a body shoulder line or a leg waist sits before any raise.
+ * `top` is the body shoulder line, or the torso bottom for legs.
  */
 const MANNEQUIN_WOOD = {
   torso: {
@@ -1426,16 +1452,17 @@ const MANNEQUIN_WOOD = {
   },
   legs: {
     bottom: 0.10,
-    top: 0.54,
+    top: TORSO_FACES.bottom,
     checks: [
-      { y0: 0.47, y1: 0.53, halfW: 0.17, halfD: 0.07 },
+      { y0: HIP_FACES.bottom, y1: HIP_FACES.top, halfW: MANNEQUIN_BLOCKS.hips.x / 2, halfD: MANNEQUIN_BLOCKS.hips.z / 2 },
     ],
   },
 };
 
 /**
  * Every worn shape fits its section box plus `margin` on each side.
- * `raise` lifts the shoulder line or the waist and keeps the hem put.
+ * `raise` lifts a body shoulder line and keeps the hem put.
+ * Leg pieces do not use it: their top edge is the torso bottom.
  * `shoulders` parks the wide shoulder band on that line (platebodies and
  * splitbark tops) instead of the narrow collar. A robe that is only wide
  * at the hem grows until the shoulder slice still clears the bar.
@@ -1446,17 +1473,17 @@ const MANNEQUIN_TUNE = {
   robe_top: { section: 'torso', margin: 0.06, raise: 0.04, shoulders: false },
   dhide_body: { section: 'torso', margin: 0.08, raise: 0.06, shoulders: false },
   platelegs: { section: 'legs', margin: 0.06, raise: 0, shoulders: false },
-  plateskirt: { section: 'legs', margin: 0.06, raise: 0.08, shoulders: false },
-  robe_bottom: { section: 'legs', margin: 0.06, raise: 0.04, shoulders: false },
-  dhide_chaps: { section: 'legs', margin: 0.08, raise: 0.06, shoulders: false },
+  plateskirt: { section: 'legs', margin: 0.06, raise: 0, shoulders: false },
+  robe_bottom: { section: 'legs', margin: 0.06, raise: 0, shoulders: false },
+  dhide_chaps: { section: 'legs', margin: 0.08, raise: 0, shoulders: false },
 };
 
 const MANNEQUIN_ID_TUNE = {
   wizard_robe: { margin: 0.08, raise: 0.06 },
   splitbark_robe_top: { margin: 0.06, raise: 0.02, shoulders: true },
-  splitbark_robe_bottom: { margin: 0.06, raise: 0.08 },
-  mystic_robe_top: { margin: 0.08, raise: 0.06 },
-  mystic_robe_bottom: { margin: 0.08, raise: 0.06 },
+  splitbark_robe_bottom: { margin: 0.06, raise: 0 },
+  mystic_robe_top: { margin: 0.08, raise: 0.12 },
+  mystic_robe_bottom: { margin: 0.08, raise: 0 },
 };
 
 export const MANNEQUIN_WEAR_FIT = MANNEQUIN_WOOD;
@@ -1677,8 +1704,11 @@ export function fitMannequinWear(mesh, recipeId) {
     sz = 0.45 / zHalf;
     pz = -zMid * sz;
   }
-  mesh.scale.set(coveredX.s, sy, sz);
-  mesh.position.set(coveredX.p, hem - box.min.y * sy, pz);
+  // A slightly narrower fit. Width and depth only; height stays on the section,
+  // and the centering shift scales with them.
+  const lateral = 0.9;
+  mesh.scale.set(coveredX.s * lateral, sy, sz * lateral);
+  mesh.position.set(coveredX.p * lateral, hem - box.min.y * sy, pz * lateral);
   return true;
 }
 

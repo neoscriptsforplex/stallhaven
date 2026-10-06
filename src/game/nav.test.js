@@ -19,6 +19,7 @@ import {
   CELL,
   FLOOR,
   PLAYER_RADIUS,
+  buildShopWallRects,
   dungeonWallObstacles,
   isWalkable,
   liveObstacles,
@@ -286,6 +287,46 @@ describe('shop navigation', () => {
           `stopped far from ${target.x},${target.z}`,
         );
       }
+    }
+  });
+
+  it('walks from outside onto an inside floor click, including a blocked cell', () => {
+    const state = createState();
+    const outside = { x: 0, z: 6.2 };
+    const obstacles = playerObstacles(state);
+    const floors = playerWalkFloors([]);
+    const walls = buildShopWallRects([]);
+    const targets = [
+      { x: 0, z: 0.2 },
+      { x: -2.2, z: -1.2 },
+      { x: 1.6, z: 1.1 },
+      { x: -2.7, z: 2.75 },
+    ];
+    for (const target of targets) {
+      const path = planPlayerWalk(outside, target, state);
+      assert.ok(path.length >= 1, `no path onto ${target.x},${target.z}`);
+      sampleClear(outside, path, obstacles, floors);
+      let prev = outside;
+      for (const point of path) {
+        const dx = point.x - prev.x;
+        const dz = point.z - prev.z;
+        const dist = Math.hypot(dx, dz);
+        const steps = Math.max(1, Math.ceil(dist / 0.05));
+        for (let i = 0; i <= steps; i += 1) {
+          const t = i / steps;
+          const x = prev.x + dx * t;
+          const z = prev.z + dz * t;
+          assert.equal(
+            walls.some((wall) => x >= wall.minX && x <= wall.maxX && z >= wall.minZ && z <= wall.maxZ),
+            false,
+            `floor click path crosses a wall near ${x},${z}`,
+          );
+        }
+        prev = point;
+      }
+      const end = path[path.length - 1];
+      assert.ok(Math.hypot(end.x - target.x, end.z - target.z) < 1.6, `stopped far from ${target.x},${target.z}`);
+      assert.equal(isWalkable(end.x, end.z, obstacles, PLAYER_RADIUS, floors), true);
     }
   });
 

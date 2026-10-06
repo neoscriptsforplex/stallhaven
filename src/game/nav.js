@@ -431,6 +431,27 @@ function toWalkableCell(x, z, obstacles, radius, floors) {
   return [ix0, iz0];
 }
 
+function routeFrom(came, key, goal, obstacles, radius, floors, start, allowGoal) {
+  const cells = [];
+  let walk = key;
+  const guard = new Set();
+  while (walk && !guard.has(walk)) {
+    guard.add(walk);
+    const [ix, iz] = walk.split(',').map(Number);
+    cells.push({ ix, iz });
+    const prev = came.get(walk);
+    walk = prev ? `${prev.ix},${prev.iz}` : null;
+  }
+  cells.reverse();
+  const points = cells.map((cell) => cellWorld(cell.ix, cell.iz));
+  const tail = points[points.length - 1];
+  if (allowGoal && tail && goal && Math.hypot(tail.x - goal.x, tail.z - goal.z) > 0.001
+    && hasLineOfSight(tail, goal, obstacles, radius, floors)) {
+    points.push(goal);
+  }
+  return smoothPath(start, points, obstacles, radius, floors);
+}
+
 function smoothPath(start, points, obstacles, radius, floors) {
   if (!points.length) return [];
   const out = [];
@@ -454,11 +475,11 @@ function smoothPath(start, points, obstacles, radius, floors) {
 export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR], wallBlocked = null) {
   const start = nearestWalkable(from.x, from.z, obstacles, radius, floors) ?? from;
   const goal = nearestWalkable(to.x, to.z, obstacles, radius, floors);
-  if (!goal) return [];
-  if (hasLineOfSight(start, goal, obstacles, radius, floors)) return [goal];
+  const aim = goal ?? { x: to.x, z: to.z };
+  if (goal && hasLineOfSight(start, goal, obstacles, radius, floors)) return [goal];
 
   const [sx, sz] = toWalkableCell(start.x, start.z, obstacles, radius, floors);
-  const [gx, gz] = toWalkableCell(goal.x, goal.z, obstacles, radius, floors);
+  const [gx, gz] = toWalkableCell(aim.x, aim.z, obstacles, radius, floors);
   const startKey = `${sx},${sz}`;
   const goalKey = `${gx},${gz}`;
   const open = [{ ix: sx, iz: sz, g: 0, f: Math.hypot(gx - sx, gz - sz) }];
@@ -466,6 +487,8 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
   const gScore = new Map([[startKey, 0]]);
   const seen = new Set();
   let steps = 0;
+  let bestKey = null;
+  let bestDist = Infinity;
 
   while (open.length && steps < 40000) {
     steps += 1;
@@ -473,22 +496,14 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
     const key = `${cur.ix},${cur.iz}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    const here = cellWorld(cur.ix, cur.iz);
+    const dist = Math.hypot(here.x - aim.x, here.z - aim.z);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestKey = key;
+    }
     if (key === goalKey) {
-      const cells = [{ ix: cur.ix, iz: cur.iz }];
-      let walk = key;
-      while (came.has(walk)) {
-        const prev = came.get(walk);
-        cells.push(prev);
-        walk = `${prev.ix},${prev.iz}`;
-      }
-      cells.reverse();
-      const points = cells.map((cell) => cellWorld(cell.ix, cell.iz));
-      const tail = points[points.length - 1];
-      if (tail && Math.hypot(tail.x - goal.x, tail.z - goal.z) > 0.001
-        && hasLineOfSight(tail, goal, obstacles, radius, floors)) {
-        points.push(goal);
-      }
-      return smoothPath(start, points, obstacles, radius, floors);
+      return routeFrom(came, key, goal, obstacles, radius, floors, start, true);
     }
     for (const [dx, dz, cost] of NEIGHBORS) {
       const nix = cur.ix + dx;
@@ -516,7 +531,8 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
       });
     }
   }
-  return [];
+  if (!bestKey) return [];
+  return routeFrom(came, bestKey, goal, obstacles, radius, floors, start, false);
 }
 
 export function planWalk(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR]) {

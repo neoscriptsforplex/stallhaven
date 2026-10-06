@@ -196,7 +196,7 @@ describe('shop navigation', () => {
     assert.ok(endBack.z < -4, 'should finish inside the rear room');
   });
 
-  function sampleClear(from, path, obstacles, floors) {
+  function sampleClear(from, path, obstacles, floors, release = null) {
     let prev = from;
     for (const point of path) {
       const dx = point.x - prev.x;
@@ -208,7 +208,7 @@ describe('shop navigation', () => {
         const x = prev.x + dx * t;
         const z = prev.z + dz * t;
         assert.equal(
-          isWalkable(x, z, obstacles, PLAYER_RADIUS, floors),
+          isWalkable(x, z, obstacles, PLAYER_RADIUS, floors, release),
           true,
           `path clips a wall at ${x.toFixed(2)},${z.toFixed(2)}`,
         );
@@ -446,7 +446,7 @@ describe('shop navigation', () => {
             Math.hypot(standEnd.x - dest.x, standEnd.z - dest.z) < 0.45,
             `gather stand missed for ${label}`,
           );
-          sampleClear(keeper, standPath, obstacles, floors);
+          sampleClear(keeper, standPath, obstacles, floors, dest.releaseTree ?? null);
           assert.equal(
             crossesFrontDoor(keeper, standPath),
             true,

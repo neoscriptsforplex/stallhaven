@@ -441,16 +441,17 @@ export function createWorld(canvas, state, opts = {}) {
 
   function planSceneWalk(from, to) {
     if (sceneMode === 'dungeon') {
-      return planWalk(from, to, DUNGEON_BLOCKS, PLAYER_RADIUS, [DUNGEON_FLOOR]);
+      return planWalk(from, to, DUNGEON_BLOCKS, PLAYER_RADIUS, [DUNGEON_FLOOR], to?.releaseTree ?? null);
     }
     return planPlayerWalk(from, to, state, PLAYER_RADIUS);
   }
 
   function playerCollide() {
+    const release = pendingUse?.releaseTree ?? null;
     if (sceneMode === 'dungeon') {
-      return { obstacles: DUNGEON_BLOCKS, floors: [DUNGEON_FLOOR] };
+      return { obstacles: DUNGEON_BLOCKS, floors: [DUNGEON_FLOOR], release };
     }
-    return { obstacles: collideObstacles, floors: playerFloors };
+    return { obstacles: collideObstacles, floors: playerFloors, release };
   }
   const shopReturnPos = { x: SHOP.keeper.x, z: SHOP.keeper.z };
   const playerPath = [];
@@ -1317,6 +1318,7 @@ export function createWorld(canvas, state, opts = {}) {
         actor.collide.obstacles,
         PLAYER_RADIUS,
         actor.collide.floors,
+        actor.collide.release ?? null,
       );
       nx = moved.x;
       nz = moved.z;
@@ -1381,6 +1383,7 @@ export function createWorld(canvas, state, opts = {}) {
         faceYaw,
         nodeX: pose.x,
         nodeZ: pose.z,
+        releaseTree: dest?.releaseTree ?? null,
       };
     };
     if (atStation) {

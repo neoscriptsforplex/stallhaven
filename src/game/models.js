@@ -1165,6 +1165,8 @@ export function slotPose(slot) {
  * Wizard and mystic robe tops stand edge-on to that front; a quarter turn
  * puts the chest toward +Z. Splitbark tops and dragon masks already face
  * along Z, but the outer surface points -Z (away from the customer).
+ * Baked into the ware mesh. Displays apply previewBasePose on a parent and
+ * must not apply this yaw again.
  */
 export function wareDisplayYaw(id) {
   if (id === 'wizard_robe') return -Math.PI / 2;

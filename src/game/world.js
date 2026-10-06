@@ -1091,9 +1091,9 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function barYield(session) {
-    if (session?.yield != null) return session.yield;
     if (session?.mode === 'chop') return CHOP_YIELD;
     if (session?.mode === 'pick') return FLAX_YIELD;
+    if (session?.yield != null) return session.yield;
     return mineYield(session?.materialId);
   }
 
@@ -1157,10 +1157,9 @@ export function createWorld(canvas, state, opts = {}) {
   function tickMining(now) {
     if (!mining) return;
     if (now - mining.startedAt < mining.duration) return;
-    const amount = barYield(mining);
     if (mining.mode === 'pick') {
       releaseHeldFlax(false);
-      const got = grantPickedFlax(state, amount);
+      const got = grantPickedFlax(state, FLAX_YIELD);
       if (got > 0) {
         pushLog(state, `Picked ${got} Flax.`);
         pickHandler?.({
@@ -1177,8 +1176,8 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     const got = mining.mode === 'chop'
-      ? grantChoppedLogs(state, amount)
-      : grantMinedMaterial(state, mining.materialId, amount);
+      ? grantChoppedLogs(state, CHOP_YIELD)
+      : grantMinedMaterial(state, mining.materialId, barYield(mining));
     if (got > 0) {
       pushLog(state, mining.mode === 'chop' ? `Chopped ${got} Logs.` : `Mined ${got} ${mining.name}.`);
       pickHandler?.({

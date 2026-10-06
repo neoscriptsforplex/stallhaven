@@ -1407,18 +1407,19 @@ export function mineYield(materialId) {
 export const MINE_YIELD = MINE_YIELDS.bronze;
 export const MINE_DURATION = 3.2;
 export const CLAY_MINE_YIELD = MINE_YIELDS.hard_clay;
-export const CLAY_MINE_DURATION = 1;
+/** Clay uses the same bar length as every other dungeon rock. */
+export const CLAY_MINE_DURATION = MINE_DURATION;
+/** Logs (wood) from one completed chop bar. */
 export const CHOP_YIELD = 5;
 export const CHOP_DURATION = 3.2;
-/** One flax per pick. The bar matches mining and chopping. */
+/** Exactly one flax from one completed pick bar. */
 export const FLAX_YIELD = 1;
 export const FLAX_DURATION = 3.2;
 /** How close the player stands before the pick bar starts. */
 export const FLAX_ARRIVE = 0.85;
 
 export function mineTiming(materialId) {
-  const duration = materialId === 'hard_clay' ? CLAY_MINE_DURATION : MINE_DURATION;
-  return { duration, yield: mineYield(materialId) };
+  return { duration: MINE_DURATION, yield: mineYield(materialId) };
 }
 
 export function isMinedMaterial(materialId) {

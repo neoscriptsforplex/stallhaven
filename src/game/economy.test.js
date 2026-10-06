@@ -34,7 +34,10 @@ import {
   costLabel,
   isAmmoRecipe,
   isMinedMaterial,
+  CHOP_DURATION,
   CHOP_YIELD,
+  FLAX_DURATION,
+  FLAX_YIELD,
   MINE_YIELD,
   MINE_YIELDS,
   CLAY_MINE_DURATION,
@@ -115,7 +118,7 @@ import {
 } from './economy.js';
 import { defaultFurniture, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
-import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS } from './shopbuild.js';
+import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS, flaxInspect, treeInspect } from './shopbuild.js';
 
 function placeStation(state, id) {
   const pose = SHOP[id];
@@ -998,9 +1001,10 @@ describe('material regen', () => {
     assert.equal(grantMinedMaterial(state, 'bronze'), 0);
     assert.equal(grantMinedMaterial(state, 'flour'), 0);
     assert.equal(CLAY_MINE_YIELD, 1);
-    assert.equal(CLAY_MINE_DURATION, 1);
+    assert.equal(CLAY_MINE_DURATION, 3.2);
     assert.equal(isMinedMaterial('hard_clay'), true);
-    assert.deepEqual(mineTiming('hard_clay'), { duration: 1, yield: 1 });
+    assert.deepEqual(mineTiming('hard_clay'), { duration: 3.2, yield: 1 });
+    assert.equal(mineTiming('hard_clay').duration, mineTiming('bronze').duration);
     assert.equal(mineTiming('bronze').yield, MINE_YIELD);
     assert.equal(mineTiming('bronze').duration, 3.2);
     assert.equal(MATERIALS.hard_clay.name, 'Hard clay');
@@ -1013,13 +1017,19 @@ describe('material regen', () => {
     assert.equal(applyState(restored, saved), true);
     assert.equal(restored.materials.hard_clay, state.materials.hard_clay);
     assert.equal(CHOP_YIELD, 5);
+    assert.equal(CHOP_DURATION, 3.2);
+    assert.equal(MATERIALS.logs.name, 'Logs');
     assert.equal(MATERIALS.logs.start, 0);
     assert.equal(MATERIALS.logs.restock, 0);
     assert.equal(MATERIALS.logs.regenEvery, 0);
+    assert.equal(mineYield('logs'), 0);
+    assert.match(treeInspect().blurb, /5 Logs/);
     const logsBefore = state.materials.logs;
     assert.equal(logsBefore, 0);
     assert.equal(grantChoppedLogs(state), 5);
     assert.equal(state.materials.logs, 5);
+    assert.equal(grantChoppedLogs(state, CHOP_YIELD), 5);
+    assert.equal(state.materials.logs, 10);
   });
 
   it('does not regenerate or restock metal bars or bow string', () => {
@@ -1050,8 +1060,14 @@ describe('material regen', () => {
     state.gold = 1000;
     assert.equal(canRestock(state, 'flax'), false);
     assert.equal(restock(state, 'flax'), false);
+    assert.equal(FLAX_YIELD, 1);
+    assert.equal(FLAX_DURATION, 3.2);
+    assert.equal(mineYield('flax'), 0);
+    assert.match(flaxInspect().blurb, /1 flax/);
     assert.equal(grantPickedFlax(state), 1);
     assert.equal(state.materials.flax, 1);
+    assert.equal(grantPickedFlax(state, FLAX_YIELD), 1);
+    assert.equal(state.materials.flax, 2);
     state.materials.flax = 250;
     assert.equal(grantPickedFlax(state), 0);
     assert.equal(state.materials.flax, 250);

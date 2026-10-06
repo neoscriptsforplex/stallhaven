@@ -39,6 +39,7 @@ import {
   furnitureRotateDelta,
   snapGridLines,
   cloneFurniture,
+  furnitureHalfSize,
   furnitureStartYaw,
   furnitureVisualYaw,
   FLAX_CLICK_RADIUS,
@@ -80,6 +81,8 @@ import {
   STATION_ARRIVE,
   STATION_HIT,
   fletchFaceYaw,
+  floorClickPoint,
+  ignoredClickObject,
   pickUseHit,
   rangeFaceYaw,
   resolveStationUse,
@@ -485,7 +488,8 @@ export function createWorld(canvas, state, opts = {}) {
 
   const counterMesh = buildCounter();
   scene.add(counterMesh);
-  const counterPick = makePick(2.7, 1.2, 0.95, 'counter');
+  const counterSpan = furnitureHalfSize('counter');
+  const counterPick = makePick(counterSpan.hw * 2 + 0.16, 1.15, counterSpan.hd * 2 + 0.12, 'counter');
   counterPick.position.y = 0.55;
   const counterGlow = makeGlow(0.9, 1.12);
 
@@ -575,11 +579,12 @@ export function createWorld(canvas, state, opts = {}) {
     const wareAnchor = new THREE.Group();
     wareAnchor.position.y = furniture.userData.stand ? 0 : furniture.userData.wareY;
     anchor.add(wareAnchor);
+    const span = furnitureHalfSize(spot.kind);
     const pickSize = spot.kind === 'stand'
-      ? [1.15, 2.05, 1.05]
+      ? [span.hw * 2 + 0.12, 1.7, span.hd * 2 + 0.12]
       : spot.kind === 'shelf'
-        ? [1.42, 1.15, 0.46]
-        : [2.9, 1.55, 1.9];
+        ? [span.hw * 2 + 0.1, 1.05, span.hd * 2 + 0.08]
+        : [span.hw * 2 + 0.16, 1.15, span.hd * 2 + 0.16];
     const pick = new THREE.Mesh(
       new THREE.BoxGeometry(...pickSize),
       new THREE.MeshBasicMaterial({ visible: false }),
@@ -762,8 +767,7 @@ export function createWorld(canvas, state, opts = {}) {
   function floorPointFromEvent(event) {
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(groundMeshes(), false);
-    return hits[0]?.point ?? null;
+    return floorClickPoint(clickHits());
   }
 
   function applyAllPoses() {
@@ -1048,6 +1052,30 @@ export function createWorld(canvas, state, opts = {}) {
     architecture?.traverse((child) => add(child));
     fixtureMeshes.rug?.mesh?.traverse((child) => add(child));
     return list;
+  }
+
+  function shellMeshes() {
+    const list = [];
+    const add = (obj) => {
+      if (!obj?.isMesh) return;
+      const parent = obj.parent;
+      if (
+        obj.userData?.shopWall
+        || obj.userData?.isRoof
+        || obj.name === 'roof-gable'
+        || parent?.userData?.isRoof
+        || parent?.name === 'roofs'
+      ) list.push(obj);
+    };
+    architecture?.traverse(add);
+    roofGroup?.traverse(add);
+    return list;
+  }
+
+  function clickHits() {
+    const targets = [...allPicks(), ...groundMeshes(), ...shellMeshes()];
+    return raycaster.intersectObjects(targets, false)
+      .filter((hit) => !ignoredClickObject(hit.object));
   }
 
   function counterPose() {
@@ -1712,7 +1740,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (moved > 8) return;
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects([...allPicks(), ...groundMeshes()], false);
+    const hits = clickHits();
     if (!hits.length) return;
 
     if (expandMode) {
@@ -1798,9 +1826,8 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
     }
-    const groundHit = hits.find((h) => h.object.userData.kind === 'ground' || h.object.userData.kind === 'rug');
-    if (groundHit) {
-      const point = groundHit.point;
+    const point = floorClickPoint(hits);
+    if (point) {
       const station = stationAtFloor(point.x, point.z, state.furniture);
       if (station) {
         queueUse(station.type, station.pose);
@@ -1940,7 +1967,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (modalBlocksWorld() && !moveTarget) return;
     setPointer(event);
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects([...allPicks(), ...groundMeshes()], false);
+    const hits = clickHits();
     if (moveTarget) {
       cancelPlaceOrMove();
       pickHandler?.({ type: 'furniture-cancel' });

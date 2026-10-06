@@ -1,21 +1,33 @@
 import { FLAX_ARRIVE } from './catalog.js';
 import { PLAYER_RADIUS, isWalkable, planPlayerWalk, playerObstacles } from './nav.js';
-import { furnitureVisualYaw, playerWalkFloors } from './layout.js';
+import { furnitureHalfSize, furnitureVisualYaw, playerWalkFloors } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter'];
 export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder']);
 
-/** Invisible click boxes and floor-steal radii for walk-then-open stations. */
+function stationHit(kind, height, pickY) {
+  const { hw, hd } = furnitureHalfSize(kind);
+  const round = (n) => Math.round(n * 100) / 100;
+  return {
+    w: round(hw * 2 + 0.14),
+    h: height,
+    d: round(hd * 2 + 0.14),
+    pickY,
+    floorR: round(Math.hypot(hw, hd) + 0.12),
+  };
+}
+
+/** Click boxes sit on the furniture footprint, not the old oversized volumes. */
 export const STATION_HIT = {
-  anvil: { w: 1.62, h: 1.9, d: 1.42, pickY: 0.9, floorR: 1.2 },
-  chest: { w: 1.55, h: 1.7, d: 1.28, pickY: 0.82, floorR: 1.1 },
-  range: { w: 2.4, h: 3.3, d: 2.2, pickY: 1.6, floorR: 1.55 },
-  furnace: { w: 1.28, h: 1.7, d: 1.2, pickY: 0.8, floorR: 1.05 },
-  cauldron: { w: 1.15, h: 1.55, d: 1.15, pickY: 0.74, floorR: 1.0 },
-  wheel: { w: 1.85, h: 2.4, d: 1.8, pickY: 1.1, floorR: 1.35 },
-  loom: { w: 1.25, h: 1.45, d: 0.95, pickY: 0.72, floorR: 0.95 },
-  fletch: { w: 1.4, h: 1.25, d: 1.05, pickY: 0.64, floorR: 1.0 },
-  potter: { w: 1.15, h: 1.3, d: 1.15, pickY: 0.64, floorR: 0.9 },
+  anvil: stationHit('anvil', 1.5, 0.75),
+  chest: stationHit('chest', 1.35, 0.68),
+  range: stationHit('range', 2.4, 1.2),
+  furnace: stationHit('furnace', 1.4, 0.7),
+  cauldron: stationHit('cauldron', 1.25, 0.62),
+  wheel: stationHit('wheel', 2.0, 1.0),
+  loom: stationHit('loom', 1.2, 0.6),
+  fletch: stationHit('fletch', 1.05, 0.52),
+  potter: stationHit('potter', 1.1, 0.55),
   boulder: { w: 1.4, h: 1.2, d: 1.4, pickY: 0.52, floorR: 1.15 },
 };
 
@@ -249,14 +261,57 @@ function isWalkFloorKind(kind) {
   return kind === 'ground' || kind === 'rug';
 }
 
+/** Roofs, gables, and walls must not swallow a floor click, even while faded. */
+export function ignoredClickObject(object) {
+  let node = object;
+  while (node) {
+    if (node.visible === false) return true;
+    const data = node.userData ?? {};
+    const name = node.name || '';
+    if (data.isRoof || data.shopWall || data.kind === 'roof' || data.kind === 'wall') return true;
+    if (name === 'roof-gable' || name === 'roofs') return true;
+    node = node.parent;
+  }
+  const mats = Array.isArray(object?.material) ? object.material : [object?.material];
+  return mats.some((mat) => {
+    if (!mat) return false;
+    if (mat.userData?.isRoof) return true;
+    return mat.transparent === true && typeof mat.opacity === 'number' && mat.opacity < 0.2;
+  });
+}
+
+/**
+ * Ground point for a walk click. A raised shop floor wins over the lawn sheet
+ * that runs underneath it when both lie on the same ray.
+ */
+export function floorClickPoint(hits) {
+  const open = (hits ?? []).filter((hit) => hit?.object && !ignoredClickObject(hit.object));
+  const grounds = open.filter((hit) => {
+    const kind = hit.object.userData?.kind;
+    return kind === 'ground' || kind === 'rug';
+  });
+  if (!grounds.length) return null;
+  const floor = grounds.find((hit) => hit.object.userData?.shopFloor);
+  const first = grounds[0];
+  if (floor && first !== floor && first.point && floor.point) {
+    const sameSpot = Math.hypot(first.point.x - floor.point.x, first.point.z - floor.point.z) < 1.25;
+    const underBoards = first.point.y < floor.point.y - 0.015
+      && sameSpot
+      && floor.distance - first.distance < 1.6;
+    if (underBoards) return floor.point;
+  }
+  return first.point ?? null;
+}
+
 export function pickUseHit(hits) {
-  if (!hits?.length) return null;
-  const useHit = hits.find((hit) => USE_KINDS.has(hit.object?.userData?.kind));
-  const closestKind = hits[0].object?.userData?.kind;
+  const list = (hits ?? []).filter((hit) => !ignoredClickObject(hit.object));
+  if (!list.length) return null;
+  const useHit = list.find((hit) => USE_KINDS.has(hit.object?.userData?.kind));
+  const closestKind = list[0].object?.userData?.kind;
   if (useHit && (!closestKind || isWalkFloorKind(closestKind) || closestKind === 'expand-pad' || USE_KINDS.has(closestKind))) {
     return useHit;
   }
-  return hits.find((hit) => {
+  return list.find((hit) => {
     const kind = hit.object?.userData?.kind;
     return kind && !isWalkFloorKind(kind) && kind !== 'customer' && kind !== 'expand-pad';
   }) ?? null;

@@ -49,9 +49,11 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, OUTDOOR_GROUND_Y, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
+import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, TREE_HEIGHT_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { gardenObstacles } from './nav.js';
+import { GATHER_CONTACT } from './interact.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -628,6 +630,35 @@ describe('bundled prop swaps', () => {
     assert.ok(ids.includes('goblin'));
   });
 
+  it('doubles a bundled outdoor tree on Y only and keeps it grounded', async () => {
+    const dump = await loadFolder('tree');
+    setBundledLook('tree', dump);
+    try {
+      const tree = buildTree(1);
+      tree.position.set(-2.4, 0, 6.1);
+      tree.rotation.y = 0.7;
+      tree.updateMatrixWorld(true);
+      const visual = tree.getObjectByName('pine-visual');
+      assert.ok(Math.abs(visual.scale.y - visual.scale.x * TREE_HEIGHT_SCALE) < 1e-6);
+      assert.ok(Math.abs(visual.scale.x - visual.scale.z) < 1e-6);
+      const box = measureVisibleBox(tree);
+      assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `bundled base minY=${box.min.y}`);
+      const tall = box.getSize(new THREE.Vector3());
+      const savedY = visual.scale.y;
+      visual.scale.y = visual.scale.x;
+      visual.updateMatrixWorld(true);
+      const short = measureVisibleBox(tree).getSize(new THREE.Vector3());
+      visual.scale.y = savedY;
+      assert.ok(short.y > 1.4 && short.y < 3.2, `fit height before the stretch should stay the old pine, got ${short.y}`);
+      assert.ok(Math.abs(tall.y - short.y * TREE_HEIGHT_SCALE) < 0.08, `bundled height ${tall.y} vs ${short.y}`);
+      assert.ok(Math.abs(tall.x - short.x) < 0.05 && Math.abs(tall.z - short.z) < 0.05);
+      assert.ok(tall.x < short.x * 1.15 && tall.z < short.z * 1.15, `crown widened to ${tall.x} x ${tall.z}`);
+      assert.ok(tall.x < 2.2 && tall.z < 2.2, `crown should stay under the old width, got ${tall.x} x ${tall.z}`);
+    } finally {
+      setBundledLook('tree', null);
+    }
+  });
+
   it('fits bundled trees, counters, flowers, rocks, and skeletons without stretch', async () => {
     const tree = wrapBundledProp(await loadFolder('tree'), buildTree(1), { name: 'pine', fit: 'height' });
     assert.equal(tree.name, 'pine');
@@ -997,6 +1028,81 @@ describe('bundled prop swaps', () => {
       if (child.userData?.kind === 'tree' && child.userData?.materialId === 'logs') trees += 1;
     });
     assert.ok(trees > 0, `garden trees should be choppable, trees=${trees}`);
+  });
+
+  it('doubles outdoor tree height, keeps the trunk footprint, and stays on the grass', () => {
+    assert.equal(TREE_HEIGHT_SCALE, 2);
+    assert.deepEqual(GATHER_CONTACT.tree, { x: 0.21, z: 0.62 });
+    const tree = buildTree(1);
+    tree.position.set(4.2, 0, -3.4);
+    tree.rotation.y = 1.1;
+    tree.updateMatrixWorld(true);
+    const visual = tree.getObjectByName('pine-visual');
+    assert.ok(visual, 'height stretch should live on the visual, not the placement group');
+    assert.ok(Math.abs(visual.scale.y - visual.scale.x * TREE_HEIGHT_SCALE) < 1e-6);
+    assert.ok(Math.abs(visual.scale.x - visual.scale.z) < 1e-6);
+    const box = measureVisibleBox(tree);
+    assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `base should sit on the grass, minY=${box.min.y}`);
+    const tall = box.getSize(new THREE.Vector3());
+    const savedY = visual.scale.y;
+    visual.scale.y = visual.scale.x;
+    visual.updateMatrixWorld(true);
+    const short = measureVisibleBox(tree).getSize(new THREE.Vector3());
+    visual.scale.y = savedY;
+    visual.updateMatrixWorld(true);
+    assert.ok(Math.abs(tall.y - short.y * TREE_HEIGHT_SCALE) < 0.08, `height ${tall.y} vs ${short.y}`);
+    assert.ok(Math.abs(tall.x - short.x) < 0.05, `width changed ${tall.x} vs ${short.x}`);
+    assert.ok(Math.abs(tall.z - short.z) < 0.05, `depth changed ${tall.z} vs ${short.z}`);
+    assert.ok(short.y > 1.5 && short.y < 2.3, `unstretched pine should stay knee-to-head height, got ${short.y}`);
+    let roofMarked = 0;
+    let transparentMats = 0;
+    tree.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of mats) {
+        if (mat.userData?.isRoof) roofMarked += 1;
+        if (mat.transparent) transparentMats += 1;
+      }
+    });
+    assert.equal(roofMarked, 0, 'taller trees must not join the roof fade');
+    assert.equal(transparentMats, 0, 'tree materials stay opaque so the camera roof fade cannot claim them');
+  });
+
+  it('keeps garden tree colliders and chop blocks at the old footprint', () => {
+    const shop = buildShop([]).root;
+    let picks = 0;
+    shop.updateMatrixWorld(true);
+    shop.traverse((child) => {
+      if (child.userData?.kind !== 'tree') return;
+      picks += 1;
+      const params = child.geometry?.parameters;
+      assert.ok(params, 'chop pick should stay a box');
+      assert.ok(Math.abs(params.width - 0.85) < 1e-6, `pick width ${params.width}`);
+      assert.ok(Math.abs(params.depth - 0.85) < 1e-6, `pick depth ${params.depth}`);
+      assert.ok(params.height > 2.8, `pick should cover the taller crown, height=${params.height}`);
+      const pine = child.parent;
+      pine.updateMatrixWorld(true);
+      const box = measureVisibleBox(pine);
+      assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `placed tree should stay grounded, minY=${box.min.y}`);
+      assert.ok(params.height + 0.05 >= box.max.y - box.min.y, 'pick should reach the crown');
+      const ray = new THREE.Raycaster(
+        new THREE.Vector3(child.userData.x, box.max.y - 0.2, child.userData.z + 3),
+        new THREE.Vector3(0, 0, -1),
+      );
+      assert.ok(ray.intersectObject(child, false).length > 0, 'upper crown should still be clickable');
+    });
+    assert.ok(picks > 0, 'garden should still plant choppable trees');
+    const blocks = gardenObstacles([]);
+    for (const spot of gardenTreeSpots([])) {
+      const block = blocks.find((item) => (
+        Math.abs((item.minX + item.maxX) / 2 - spot.x) < 0.01
+        && Math.abs((item.minZ + item.maxZ) / 2 - spot.z) < 0.01
+      ));
+      assert.ok(block, `missing walk block for tree at ${spot.x},${spot.z}`);
+      const w = block.maxX - block.minX;
+      const d = block.maxZ - block.minZ;
+      assert.ok(Math.abs(w - 0.62) < 1e-6 && Math.abs(d - 0.62) < 1e-6, `tree block grew to ${w}x${d}`);
+    }
   });
 
   it('fits a bundled pottery-oven furnace dump on the shop floor', async () => {

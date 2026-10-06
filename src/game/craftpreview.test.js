@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import './canvas-mock.js';
 import * as THREE from 'three';
-import { craftPreviewEuler, frameCraftPreview, isRunePreview, poseRuneForFrontView } from './craftpreview.js';
+import { craftPreviewEuler, frameCraftPreview, isRunePreview, poseRuneForFrontView, wrapCraftPreviewSpin } from './craftpreview.js';
 import { buildWare } from './models.js';
 
 describe('craft preview framing', () => {
@@ -67,24 +67,25 @@ describe('craft preview framing', () => {
     assert.equal(craftPreviewEuler('dragon_platelegs').x, Math.PI);
     assert.equal(craftPreviewEuler('blue_dhide_chaps').x, Math.PI);
     assert.equal(craftPreviewEuler('black_dhide_chaps').x, Math.PI);
-    assert.equal(craftPreviewEuler('bronze_platebody').y, Math.PI / 2);
-    assert.equal(craftPreviewEuler('runite_platebody').y, Math.PI / 2);
-    assert.equal(craftPreviewEuler('bronze_platebody').x, 0);
+    assert.equal(craftPreviewEuler('bronze_platebody').y, 0);
+    assert.equal(craftPreviewEuler('runite_platebody').y, 0);
+    assert.equal(craftPreviewEuler('bronze_platebody').x, Math.PI / 2);
     assert.equal(craftPreviewEuler('bronze_platebody').z, -Math.PI / 2);
+    assert.equal(craftPreviewEuler('adamant_platebody').x, Math.PI / 2);
     assert.equal(craftPreviewEuler('adamant_platebody').z, -Math.PI / 2);
-    assert.equal(craftPreviewEuler('wizard_robe').z, -Math.PI / 2);
+    assert.equal(craftPreviewEuler('wizard_robe').z, Math.PI / 2);
     assert.equal(craftPreviewEuler('mystic_robe_top').z, -Math.PI / 2);
-    assert.equal(craftPreviewEuler('splitbark_robe_top').z, -Math.PI / 2);
+    assert.equal(craftPreviewEuler('splitbark_robe_top').z, -Math.PI / 4);
     assert.equal(craftPreviewEuler('wizard_robe').x, 0);
     assert.equal(craftPreviewEuler('wizard_robe').y, 0);
     assert.equal(craftPreviewEuler('bronze_plateskirt').x, Math.PI / 2);
     assert.equal(craftPreviewEuler('dragon_plateskirt').x, Math.PI / 2);
-    assert.equal(craftPreviewEuler('green_dragon_mask').x, Math.PI / 2);
-    assert.equal(craftPreviewEuler('black_dragon_mask').x, Math.PI / 2);
-    assert.equal(craftPreviewEuler('blue_dragon_mask').x, Math.PI / 2);
-    assert.equal(craftPreviewEuler('red_dragon_mask').x, Math.PI / 2);
+    assert.equal(craftPreviewEuler('green_dragon_mask').x, 0);
+    assert.equal(craftPreviewEuler('black_dragon_mask').x, 0);
+    assert.equal(craftPreviewEuler('blue_dragon_mask').x, 0);
+    assert.equal(craftPreviewEuler('red_dragon_mask').x, 0);
     assert.equal(craftPreviewEuler('green_dragon_mask').y, 0);
-    assert.equal(craftPreviewEuler('green_dragon_mask').z, 0);
+    assert.equal(craftPreviewEuler('green_dragon_mask').z, Math.PI);
     assert.equal(craftPreviewEuler('bronze_sword'), null);
     const ware = buildWare('bronze_platelegs');
     assert.equal(ware.rotation.x, 0);
@@ -96,5 +97,21 @@ describe('craft preview framing', () => {
       assert.equal(mesh.rotation.y, 0, id);
       assert.equal(mesh.rotation.z, 0, id);
     }
+  });
+
+  it('yaws the outer preview group without twisting the base pose', () => {
+    const spin = wrapCraftPreviewSpin(new THREE.Group(), 'bronze_platebody');
+    const pose = spin.children[0];
+    assert.equal(pose.rotation.x, Math.PI / 2);
+    assert.equal(pose.rotation.y, 0);
+    assert.equal(pose.rotation.z, -Math.PI / 2);
+    const top = new THREE.Vector3(0, 1, 0).applyQuaternion(pose.quaternion);
+    spin.rotation.y = 1.1;
+    spin.updateMatrixWorld(true);
+    const spun = top.clone().applyQuaternion(spin.quaternion);
+    assert.ok(Math.abs(spun.y - top.y) < 1e-6, 'yaw keeps the base up-direction level');
+    assert.equal(pose.rotation.x, Math.PI / 2);
+    assert.equal(pose.rotation.y, 0);
+    assert.equal(pose.rotation.z, -Math.PI / 2);
   });
 });

@@ -21,6 +21,10 @@ import {
   wrapRiggedGoblin,
   GOBLIN_MODEL_SCALE,
   GOBLIN_WALK_SPEED,
+  wrapRiggedRat,
+  RAT_MODEL_SCALE,
+  RAT_WALK_SPEED,
+  RAT_WALK_UNIT_SPEED,
   buildPickaxe,
   buildHeldTool,
   buildShopkeeper,
@@ -51,7 +55,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, TREE_HEIGHT_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_WALL_H, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, TREE_HEIGHT_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT } from './interact.js';
 
@@ -201,6 +205,55 @@ describe('outdoor and dungeon extras', () => {
     const box = new THREE.Box3().setFromObject(goblin);
     const height = box.max.y - box.min.y;
     assert.ok(Math.abs(height - 1.319 * GOBLIN_MODEL_SCALE) < 0.02, `height ${height}`);
+  });
+
+  it('plays Walk and Idle on the rigged dungeon rat at the current rat length', async () => {
+    const glb = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/models/npc/rat_rigged.glb'));
+    const gltf = await new Promise((resolve, reject) => {
+      new GLTFLoader().parse(
+        glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength),
+        '',
+        resolve,
+        reject,
+      );
+    });
+    const rat = wrapRiggedRat(gltf);
+    assert.equal(rat.name, 'rat');
+    assert.equal(rat.userData.pick, undefined);
+    assert.ok(Math.abs(rat.userData.modelScale - RAT_MODEL_SCALE) < 1e-9);
+    assert.ok(Math.abs(RAT_MODEL_SCALE - 0.863) > 0.1, 'rat scale is not the goblin convention');
+    const loco = rat.userData.clipLocomotion;
+    assert.ok(Math.abs(loco.walk.getClip().duration - 0.4) < 1e-3);
+    assert.ok(Math.abs(loco.idle.getClip().duration - 4) < 1e-3);
+    assert.equal(loco.walkStride, RAT_WALK_SPEED);
+    assert.ok(Math.abs(RAT_WALK_SPEED - (RAT_WALK_UNIT_SPEED * RAT_MODEL_SCALE)) < 1e-12);
+    let skinned = 0;
+    let bones = 0;
+    rat.traverse((child) => {
+      if (child.isBone) bones += 1;
+      if (!child.isSkinnedMesh) return;
+      skinned += 1;
+      assert.equal(child.frustumCulled, false);
+    });
+    assert.equal(skinned, 1);
+    assert.equal(bones, 24);
+    loco.speed = 0.52;
+    updateWalkPose(rat, true, 0.05, 1);
+    assert.equal(loco.mode, 'walk');
+    assert.ok(Math.abs(loco.walk.timeScale - (0.52 / RAT_WALK_SPEED)) < 1e-6);
+    updateWalkPose(rat, false, 0.2, 1.2);
+    assert.equal(loco.mode, 'idle');
+    const box = new THREE.Box3().setFromObject(rat);
+    const size = box.getSize(new THREE.Vector3());
+    assert.ok(Math.abs(size.z - 0.3764958443895918) < 0.01, `length ${size.z}`);
+    assert.ok(Math.abs(size.y - 0.11584158338694467 * RAT_MODEL_SCALE) < 0.01, `height ${size.y}`);
+    const built = buildDungeon({ riggedRat: gltf });
+    assert.equal(built.rats.length, 4);
+    for (const live of built.rats) {
+      assert.equal(live.userData.clipLocomotion.walkStride, RAT_WALK_SPEED);
+      assert.equal(live.userData.groundY, 0.06);
+      assert.equal(live.userData.pick, undefined);
+    }
   });
 
   it('builds dark grey dungeon rats with red triangle eyes and a tan tail', () => {
@@ -916,6 +969,38 @@ describe('bundled prop swaps', () => {
       built.ladder.updateMatrixWorld(true);
       const box = measureVisibleBox(built.ladder);
       assert.ok(box.min.x > -5.5 && box.min.x < -5.2, `ladder should sit inside the west wall, minX=${box.min.x}`);
+      const fitTarget = new THREE.Mesh(new THREE.BoxGeometry(0.41, 2.6, 0.1));
+      fitTarget.position.y = 1.3;
+      const before = wrapBundledProp(bundled, fitTarget, { name: 'ladder-mesh', fit: 'max' });
+      const beforeSize = measureVisibleBox(before).getSize(new THREE.Vector3());
+      const copies = [];
+      built.ladder.traverse((child) => {
+        if (child.name === 'ladder-mesh') copies.push(child);
+      });
+      assert.equal(copies.length, 2);
+      const stack = built.ladder.getObjectByName('ladder-stack');
+      assert.ok(Math.abs(stack.scale.x - stack.scale.y) < 1e-6);
+      assert.ok(Math.abs(stack.scale.y - stack.scale.z) < 1e-6);
+      stack.updateMatrixWorld(true);
+      const after = measureVisibleBox(stack);
+      const afterSize = after.getSize(new THREE.Vector3());
+      const span = DUNGEON_WALL_H / (beforeSize.y * 2);
+      assert.ok(Math.abs(afterSize.z - beforeSize.x * span) < 0.06, `stacked width should stay proportional, z=${afterSize.z}`);
+      assert.ok(Math.abs(afterSize.x - beforeSize.z * span) < 0.08, `stacked depth should stay proportional, x=${afterSize.x}`);
+      assert.ok(Math.abs(after.max.y - DUNGEON_WALL_H) < 0.08, `bundled top should meet the wall, maxY=${after.max.y}`);
+      assert.ok(after.min.y > -0.05 && after.min.y < 0.08, `bundled bottom should stay on the floor, minY=${after.min.y}`);
+      const boxes = copies.map((copy) => {
+        copy.updateMatrixWorld(true);
+        return measureVisibleBox(copy);
+      }).sort((a, b) => a.min.y - b.min.y);
+      const wantAspect = beforeSize.y / beforeSize.x;
+      for (const box of boxes) {
+        const size = box.getSize(new THREE.Vector3());
+        assert.ok(Math.abs(size.y / size.z - wantAspect) / wantAspect < 0.08, `copy aspect ${size.y / size.z} vs ${wantAspect}`);
+      }
+      assert.ok(Math.abs(boxes[0].max.y - boxes[1].min.y) < 0.04, `rails should meet, gap=${boxes[1].min.y - boxes[0].max.y}`);
+      assert.ok(Math.abs(boxes[0].min.z - boxes[1].min.z) < 0.03);
+      assert.ok(Math.abs(boxes[0].max.z - boxes[1].max.z) < 0.03);
     } finally {
       setBundledLook('ladder', null);
     }
@@ -2077,6 +2162,64 @@ describe('shop props', () => {
     assert.equal(built.ladder?.name, 'ladder');
     assert.ok(Math.abs(built.ladder.position.z - 0.4) < 1e-6);
     assert.ok(Math.abs(built.ladder.rotation.y - Math.PI / 2) < 1e-6);
+  });
+
+  it('stacks two proportional ladder copies to the wall top', () => {
+    const ladder = buildDungeonLadder();
+    const copies = [];
+    ladder.traverse((child) => {
+      if (child.name === 'ladder-mesh') copies.push(child);
+    });
+    assert.equal(copies.length, 2);
+    const stack = ladder.getObjectByName('ladder-stack');
+    assert.ok(stack);
+    assert.ok(Math.abs(stack.scale.x - stack.scale.y) < 1e-6);
+    assert.ok(Math.abs(stack.scale.y - stack.scale.z) < 1e-6);
+    stack.updateMatrixWorld(true);
+    const box = measureVisibleBox(stack);
+    const size = box.getSize(new THREE.Vector3());
+    const width = 0.41 * (DUNGEON_WALL_H / 5.2);
+    assert.ok(Math.abs(size.z - width) < 0.02, `along-wall width should keep the half-size proportions, z=${size.z}`);
+    assert.ok(Math.abs(size.y - DUNGEON_WALL_H) < 0.04, `height should meet the wall, y=${size.y}`);
+    assert.ok(Math.abs(box.min.y) < 0.04, `bottom stays on the floor, minY=${box.min.y}`);
+    assert.ok(Math.abs(box.max.y - DUNGEON_WALL_H) < 0.04, `top meets the wall, maxY=${box.max.y}`);
+    const boxes = copies.map((copy) => {
+      copy.updateMatrixWorld(true);
+      return measureVisibleBox(copy);
+    }).sort((a, b) => a.min.y - b.min.y);
+    for (const copyBox of boxes) {
+      const copySize = copyBox.getSize(new THREE.Vector3());
+      assert.ok(Math.abs(copySize.y / copySize.z - 2.6 / 0.41) < 0.15, `copy should keep the rail aspect, y/z=${copySize.y / copySize.z}`);
+      assert.ok(Math.abs(copySize.y - DUNGEON_WALL_H / 2) < 0.04, `each copy is half the wall, y=${copySize.y}`);
+    }
+    assert.ok(Math.abs(boxes[0].max.y - boxes[1].min.y) < 0.03, `rails should meet, gap=${boxes[1].min.y - boxes[0].max.y}`);
+    assert.ok(Math.abs(boxes[0].min.z - boxes[1].min.z) < 0.02);
+    assert.ok(Math.abs(boxes[0].max.z - boxes[1].max.z) < 0.02);
+
+    const pick = ladder.getObjectByName('ladder-pick');
+    assert.ok(pick);
+    assert.equal(ladder.children.filter((child) => child.name === 'ladder-pick').length, 1);
+    pick.updateMatrixWorld(true);
+    const pickSize = measureVisibleBox(pick).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(pickSize.z - size.z) < 0.03, `click box width matches the ladder, z=${pickSize.z}`);
+    assert.ok(Math.abs(pickSize.y - DUNGEON_WALL_H) < 0.04, `click box reaches the wall top, y=${pickSize.y}`);
+    assert.ok(pickSize.x > 0.6, `click depth stays easy to hit, x=${pickSize.x}`);
+
+    const built = buildDungeon();
+    const placed = built.ladder.getObjectByName('ladder-stack');
+    placed.updateMatrixWorld(true);
+    const placedBox = measureVisibleBox(placed);
+    let wallTop = null;
+    built.root.traverse((child) => {
+      if (!child.isMesh || child.position.x > -5) return;
+      const height = child.geometry?.parameters?.height;
+      if (height !== DUNGEON_WALL_H) return;
+      wallTop = child.position.y + height / 2;
+    });
+    assert.ok(wallTop != null);
+    assert.ok(Math.abs(placedBox.max.y - wallTop) < 0.05, `placed top ${placedBox.max.y} vs wall ${wallTop}`);
+    assert.ok(placedBox.min.y > -0.04 && placedBox.min.y < 0.06, `placed bottom, minY=${placedBox.min.y}`);
+    assert.ok(Math.abs(built.ladder.position.z - 0.4) < 1e-6);
   });
 
   it('keeps the shop door hinged open so the front doorway stays walkable', () => {

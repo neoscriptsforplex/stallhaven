@@ -31,7 +31,7 @@ import { METALS } from './catalog.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
-import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp, dumpStandEuler } from './models.js';
+import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
 import { prepareDungeonRockMaterials } from './upload.js';
 
 export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
@@ -2263,14 +2263,17 @@ function addDungeonWallTorches(root, W = 11, D = 9) {
   }
 }
 
-export function buildDungeon() {
+/** Cobble wall height. The exit ladder is stretched to this top. */
+export const DUNGEON_WALL_H = 3.4;
+
+export function buildDungeon(opts = {}) {
   const root = new THREE.Group();
   root.name = 'dungeon';
   const grounds = new THREE.Group();
   grounds.name = 'dungeon-grounds';
   const W = 11;
   const D = 9;
-  const H = 3.4;
+  const H = DUNGEON_WALL_H;
   /** Top face of the cobble slab (0.12 thick, centered at y=-0.04). */
   const floor = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(W, 0.12, D),
@@ -2348,8 +2351,9 @@ export function buildDungeon() {
     [2.8, -1.8],
   ];
   for (let i = 0; i < ratStarts.length; i += 1) {
-    const rat = buildRat();
+    const rat = buildRat(opts.riggedRat ?? null);
     rat.position.set(ratStarts[i][0], 0.06, ratStarts[i][1]);
+    if (rat.userData.clipLocomotion) rat.userData.groundY = 0.06;
     initRatWander(rat, i);
     root.add(rat);
     rats.push(rat);
@@ -2368,7 +2372,14 @@ export function buildDungeon() {
   return { root, grounds, rats, ladder, boulders, size: { w: W, d: D } };
 }
 
-export function buildRat() {
+export function buildRat(riggedGltf = null) {
+  if (riggedGltf) {
+    try {
+      return wrapRiggedRat(riggedGltf);
+    } catch (err) {
+      console.warn('Rigged rat skipped:', err?.message || err);
+    }
+  }
   const bundled = getBundledLook('rat');
   const visual = bundled
     ? wrapBundledProp(bundled, buildProceduralRat(), { name: 'rat-mesh', fit: 'max', rotateY: RAT_DUMP_YAW })
@@ -2433,36 +2444,68 @@ function ladderFitTarget() {
   return mesh;
 }
 
-export function buildDungeonLadder() {
+/** One copy at half the fitted size, so width, height, and depth stay in proportion. */
+function makeProportionalLadderCopy() {
   const bundled = getBundledLook('ladder');
-  let ladder;
-  if (bundled) {
-    const fitted = wrapBundledProp(bundled, ladderFitTarget(), { name: 'ladder', fit: 'max' });
-    fitted.name = 'ladder';
-    markLadder(fitted);
-    fitted.traverse((child) => markLadder(child));
-    fitted.add(makeLadderPick());
-    ladder = fitted;
-  } else {
-    ladder = buildProceduralDungeonLadder();
-  }
+  const visual = bundled
+    ? wrapBundledProp(bundled, ladderFitTarget(), { name: 'ladder-mesh', fit: 'max' })
+    : buildProceduralDungeonLadder();
+  visual.name = 'ladder-mesh';
+  markLadder(visual);
+  visual.traverse((child) => markLadder(child));
+  visual.scale.multiplyScalar(0.5);
+  sitVisibleOnY(visual, 0);
+  return visual;
+}
+
+/**
+ * Two half-size copies, one above the other, then one uniform scale so the
+ * stack meets the wall. Rails share the same X so the joint reads as one ladder.
+ */
+function stackLadderToWall() {
+  const lower = makeProportionalLadderCopy();
+  const upper = makeProportionalLadderCopy();
+  lower.updateMatrixWorld(true);
+  const copyHeight = measureVisibleBox(lower).getSize(new THREE.Vector3()).y;
+  upper.position.y += copyHeight;
+  const stack = new THREE.Group();
+  stack.name = 'ladder-stack';
+  stack.add(lower);
+  stack.add(upper);
+  stack.updateMatrixWorld(true);
+  const stacked = measureVisibleBox(stack).getSize(new THREE.Vector3()).y;
+  if (stacked > 1e-4) stack.scale.multiplyScalar(DUNGEON_WALL_H / stacked);
+  sitVisibleOnY(stack, 0);
+  return stack;
+}
+
+export function buildDungeonLadder() {
+  const stack = stackLadderToWall();
+  stack.updateMatrixWorld(true);
+  const width = measureVisibleBox(stack).getSize(new THREE.Vector3()).x;
+  const ladder = new THREE.Group();
+  ladder.name = 'ladder';
+  ladder.add(stack);
+  ladder.add(makeLadderPick(width));
+  markLadder(ladder);
   // Dump and rails are wide in X; yaw so the face sits flat on the west wall.
   ladder.rotation.y = Math.PI / 2;
   return ladder;
 }
 
-function makeLadderPick() {
+function makeLadderPick(width) {
   const pick = markLadder(new THREE.Mesh(
-    new THREE.BoxGeometry(1.1, 2.8, 0.7),
+    new THREE.BoxGeometry(Math.max(0.12, width), DUNGEON_WALL_H, 0.7),
     pickMat(),
   ));
-  pick.position.set(0, 1.3, 0.12);
+  pick.name = 'ladder-pick';
+  pick.position.set(0, DUNGEON_WALL_H / 2, 0.12);
   return pick;
 }
 
 function buildProceduralDungeonLadder() {
   const group = new THREE.Group();
-  group.name = 'ladder';
+  group.name = 'ladder-mesh';
   const rail = wood(0x5a3a22);
   for (const x of [-0.18, 0.18]) {
     const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.05), rail));
@@ -2474,7 +2517,6 @@ function buildProceduralDungeonLadder() {
     rung.position.set(0, 0.28 + i * 0.3, 0.02);
     group.add(markLadder(rung));
   }
-  group.add(makeLadderPick());
   return group;
 }
 

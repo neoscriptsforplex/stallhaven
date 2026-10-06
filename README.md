@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/runecraft_banner.jpg" alt="RuneCraft - Legends of Gielenor" width="100%"></p>
+
 # Rune Craft - Legends of Gielenor - A Runescape Tycoon Fan Game
 
 A free browser game.

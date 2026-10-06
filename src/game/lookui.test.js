@@ -110,18 +110,26 @@ describe('player look UI', () => {
     assert.match(help, /This will allow you to load it back again\./);
   });
 
-  it('keeps Settings to a Player Avatar Customize button, not look grids', () => {
-    const settings = slice(html, 'id="settings-dock"', 'id="look-dock"');
-    assert.match(settings, /<h3>Player Avatar<\/h3>/);
+  it('keeps Settings to an upload button, not avatar look grids', () => {
+    const settings = slice(html, 'id="settings-dock"', 'id="music-dock"');
+    assert.match(settings, /<h3>Player model<\/h3>/);
+    assert.match(settings, /data-player-model-upload>Upload player model</);
+    assert.match(settings, /data-player-model-reset>Reset to default</);
+    assert.match(settings, /data-player-model-yaw[^>]*>Rotate 180°/);
+    assert.match(settings, /data-player-model-file/);
+    assert.match(settings, /\.glb/);
     assert.match(settings, /data-dungeon-brightness/);
     assert.match(settings, /Dungeon brightness/);
     assert.match(settings, /data-photo-mode/);
     assert.match(settings, /Photo mode/);
-    assert.equal(settings.includes('data-look="hair"'), false);
-    assert.equal(settings.includes('data-look="shirt"'), false);
-    assert.equal(settings.includes('data-look="legs"'), false);
-    assert.equal(settings.includes('data-look="boots"'), false);
-    assert.equal(settings.includes('data-look="faceHair"'), false);
+    assert.equal(settings.includes('data-look='), false);
+    assert.equal(settings.includes('Player Avatar'), false);
+    assert.equal(html.includes('id="look-dock"'), false);
+    assert.equal(hud.includes('openLookDock'), false);
+    assert.equal(hud.includes('setAppearance'), false);
+    assert.match(hud, /validatePlayerModelFile/);
+    assert.match(hud, /saveModel/);
+    assert.match(hud, /deleteModel/);
   });
 
   it('puts Mine above Close on dungeon rock inspect', () => {
@@ -153,13 +161,4 @@ describe('player look UI', () => {
     assert.match(catalog, /ANVIL_TAB_IDS\.has\(prev\.tab\) \? prev\.tab : 'melee'/);
   });
 
-  it('opens a dedicated customize dock with every look slot and a back path', () => {
-    const look = slice(html, 'id="look-dock"', 'id="music-dock"');
-    assert.match(look, /id="look-dock"/);
-    for (const slot of ['hair', 'shirt', 'legs', 'boots', 'faceHair']) {
-      assert.match(look, new RegExp(`data-look="${slot}"`));
-    }
-    assert.match(look, /data-look-back>Back to Settings</);
-    assert.match(look, /data-look-close>Close</);
-  });
 });

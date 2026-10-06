@@ -9,6 +9,8 @@ import {
   STATION_HIT,
   USE_KINDS,
   pickUseHit,
+  fletchFaceYaw,
+  fletchStandWorld,
   rangeFaceYaw,
   rangeStandWorld,
   resolveStationUse,
@@ -149,6 +151,51 @@ describe('station walk-then-open', () => {
     assert.ok(Math.hypot(turned.dest.x - turnedStand.x, turned.dest.z - turnedStand.z) < 1e-6);
     assert.ok(turned.dest.x < state.furniture.range.x - 0.9, 'front stays local −X after a quarter turn');
     assert.ok(turned.dest.z < state.furniture.range.z - 0.2, 'pan stays local −Z after a quarter turn');
+    assert.equal(
+      isWalkable(turnedStand.x, turnedStand.z, playerObstacles(state), PLAYER_RADIUS, playerWalkFloors([])),
+      true,
+    );
+  });
+
+  it('stands one step in front of the fletching bench vice, not at the left end', () => {
+    const state = createState();
+    const from = { x: SHOP.keeper.x, z: SHOP.keeper.z };
+    state.furniture.fletch = { x: 0.2, z: 0.2, rot: 0 };
+    const plan = resolveStationUse(from, state.furniture.fletch, state, undefined, 'fletch');
+    const stand = fletchStandWorld(state.furniture.fletch);
+    assert.equal(plan.action, 'walk');
+    assert.ok(Math.hypot(plan.dest.x - stand.x, plan.dest.z - stand.z) < 1e-6);
+    assert.ok(plan.dest.z > state.furniture.fletch.z + 0.9, 'one step out from the front face');
+    assert.ok(plan.dest.x < state.furniture.fletch.x - 0.1, 'centre-left, under the vice');
+    assert.ok(plan.dest.x > state.furniture.fletch.x - 0.5, 'not off the left end');
+    const end = plan.path[plan.path.length - 1];
+    assert.ok(Math.hypot(end.x - stand.x, end.z - stand.z) < 0.05, 'path ends on the stand');
+    assert.equal(
+      isWalkable(stand.x, stand.z, playerObstacles(state), PLAYER_RADIUS, playerWalkFloors([])),
+      true,
+    );
+    assert.ok(Math.abs(Math.abs(fletchFaceYaw(state.furniture.fletch)) - Math.PI) < 1e-9);
+
+    const atEnd = resolveStationUse(
+      { x: state.furniture.fletch.x - 0.85, z: state.furniture.fletch.z },
+      state.furniture.fletch,
+      state,
+      undefined,
+      'fletch',
+    );
+    assert.equal(atEnd.action, 'walk');
+    assert.ok(atEnd.dest.z > state.furniture.fletch.z + 0.9);
+
+    const already = resolveStationUse(stand, state.furniture.fletch, state, undefined, 'fletch');
+    assert.equal(already.action, 'open');
+
+    state.furniture.fletch = { x: 0.2, z: 0.2, rot: -Math.PI / 2 };
+    const turned = resolveStationUse(from, state.furniture.fletch, state, undefined, 'fletch');
+    const turnedStand = fletchStandWorld(state.furniture.fletch);
+    assert.equal(turned.action, 'walk');
+    assert.ok(Math.hypot(turned.dest.x - turnedStand.x, turned.dest.z - turnedStand.z) < 1e-6);
+    assert.ok(turned.dest.x < state.furniture.fletch.x - 0.9, 'front stays local +Z after a quarter turn');
+    assert.ok(turned.dest.z < state.furniture.fletch.z - 0.1, 'vice stays local −X after a quarter turn');
     assert.equal(
       isWalkable(turnedStand.x, turnedStand.z, playerObstacles(state), PLAYER_RADIUS, playerWalkFloors([])),
       true,

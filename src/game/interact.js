@@ -76,6 +76,42 @@ function rangeStandCandidates(pose) {
 }
 
 /**
+ * Fletching bench stand in the mesh's own XZ, in metres, so it yaws with the bench.
+ * Local −X is the vice end (where a world-axis approach leaves the player).
+ * The front face is local +Z; the vice sits centre-left at about x = −0.22.
+ * z = 1.22 is about one step out from that face (the face is near z = 0.39).
+ * Closer spots stay on the same line when the full step is blocked.
+ */
+export const FLETCH_STAND_LOCAL = { x: -0.22, z: 1.22 };
+
+const FLETCH_STAND_TRIES = [
+  FLETCH_STAND_LOCAL,
+  { x: -0.22, z: 1.05 },
+  { x: -0.22, z: 0.92 },
+  { x: -0.22, z: 0.8 },
+];
+
+export function fletchFaceYaw(pose) {
+  const yaw = furnitureVisualYaw('fletch', pose?.rot ?? 0);
+  return Math.atan2(-Math.sin(yaw), -Math.cos(yaw));
+}
+
+export function fletchStandWorld(pose, local = FLETCH_STAND_LOCAL) {
+  const yaw = furnitureVisualYaw('fletch', pose?.rot ?? 0);
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  const { x, z } = local;
+  return {
+    x: (pose?.x ?? 0) + x * c + z * s,
+    z: (pose?.z ?? 0) - x * s + z * c,
+  };
+}
+
+function fletchStandCandidates(pose) {
+  return FLETCH_STAND_TRIES.map((local) => fletchStandWorld(pose, local));
+}
+
+/**
  * Local +Z is the shopkeeper side of the counter. The chest latch is dump
  * local −X (into the room at visual yaw 0).
  */
@@ -157,6 +193,21 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
       if (path.length) return { action: 'walk', path, dest, face };
     }
     return { action: 'blocked', dest: stand, face };
+  }
+  if (kind === 'fletch') {
+    const face = fletchFaceYaw(pose);
+    const spots = fletchStandCandidates(pose);
+    for (const dest of spots) {
+      if (isNearPoint(from, dest, 0.45)) return { action: 'open', dest, face };
+    }
+    for (const dest of spots) {
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      const end = path[path.length - 1];
+      if (end && Math.hypot(end.x - dest.x, end.z - dest.z) < 0.22) {
+        return { action: 'walk', path, dest, face };
+      }
+    }
+    return { action: 'blocked', dest: spots[0], face };
   }
   if (isNearPoint(from, pose, STATION_ARRIVE)) return { action: 'open' };
   const offsets = APPROACH_OFFSETS;

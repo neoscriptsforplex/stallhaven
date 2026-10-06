@@ -63,6 +63,7 @@ import { playClick } from './audio.js';
 import {
   STATION_ARRIVE,
   STATION_HIT,
+  fletchFaceYaw,
   pickUseHit,
   rangeFaceYaw,
   resolveStationUse,
@@ -1007,7 +1008,8 @@ export function createWorld(canvas, state, opts = {}) {
         planWalk(start, dest, [], PLAYER_RADIUS, sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors)
       ), type)
       : resolveStationUse(from, pose, state, planPlayerWalk, type);
-    const standFront = type === 'counter' || type === 'chest' || type === 'range';
+    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch';
+    const faceYaw = type === 'range' ? rangeFaceYaw(pose) : type === 'fletch' ? fletchFaceYaw(pose) : null;
     const atStation = standFront
       ? plan.action === 'open'
       : (plan.action === 'open' || isNearPose(pose, arrive));
@@ -1015,7 +1017,7 @@ export function createWorld(canvas, state, opts = {}) {
       pendingUse = null;
       playerPath.length = 0;
       moveMarker.visible = false;
-      if (type === 'range') shopkeeper.rotation.y = rangeFaceYaw(pose);
+      if (faceYaw != null) shopkeeper.rotation.y = faceYaw;
       if (type === 'counter') {
         playClick('ui');
         return;
@@ -1044,7 +1046,7 @@ export function createWorld(canvas, state, opts = {}) {
         arrive: standFront ? 0.55 : arrive,
         openOnArrive: type !== 'counter',
         materialId: pose.materialId,
-        faceYaw: type === 'range' ? rangeFaceYaw(pose) : null,
+        faceYaw,
       };
       playClick('move');
       return;
@@ -1061,7 +1063,7 @@ export function createWorld(canvas, state, opts = {}) {
         arrive: standFront ? 0.55 : arrive,
         openOnArrive: type !== 'counter',
         materialId: pose.materialId,
-        faceYaw: type === 'range' ? rangeFaceYaw(pose) : null,
+        faceYaw,
       };
       playClick('move');
       return;
@@ -1073,7 +1075,7 @@ export function createWorld(canvas, state, opts = {}) {
       arrive: standFront ? 0.55 : arrive,
       openOnArrive: false,
       materialId: pose.materialId,
-      faceYaw: type === 'range' ? rangeFaceYaw(pose) : null,
+      faceYaw,
     };
     playClick('ui');
   }

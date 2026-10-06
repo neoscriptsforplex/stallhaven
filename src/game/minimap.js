@@ -24,6 +24,53 @@ export function shopMapBounds(expansionIds = []) {
   return gardenBox(expansionIds);
 }
 
+/** Same shell as buildDungeon / dungeonWallObstacles: 11×9, walls 0.22 thick. */
+const DUNGEON_W = 11;
+const DUNGEON_D = 9;
+const DUNGEON_WALL_T = 0.22;
+
+export function dungeonShellRect() {
+  const hx = DUNGEON_W / 2 + DUNGEON_WALL_T / 2;
+  const hz = DUNGEON_D / 2 + DUNGEON_WALL_T / 2;
+  return { minX: -hx, maxX: hx, minZ: -hz, maxZ: hz };
+}
+
+export function dungeonFloorRect() {
+  const hx = DUNGEON_W / 2 - DUNGEON_WALL_T / 2;
+  const hz = DUNGEON_D / 2 - DUNGEON_WALL_T / 2;
+  return { minX: -hx, maxX: hx, minZ: -hz, maxZ: hz };
+}
+
+/** Square bounds big enough that the whole room stays on the canvas when the map yaws. */
+export function dungeonMapBounds() {
+  const shell = dungeonShellRect();
+  const halfW = (shell.maxX - shell.minX) / 2;
+  const halfH = (shell.maxZ - shell.minZ) / 2;
+  const half = Math.hypot(halfW, halfH) + 0.4;
+  return { minX: -half, maxX: half, minZ: -half, maxZ: half };
+}
+
+export function dungeonMapFocus() {
+  return { x: 0, z: 0 };
+}
+
+/** Bounds and focus shared by drawing and click-to-walk. */
+export function minimapFrame(snap) {
+  const dungeon = snap?.sceneMode === 'dungeon';
+  if (dungeon) {
+    return {
+      bounds: snap.bounds ?? dungeonMapBounds(),
+      focus: snap.focus ?? dungeonMapFocus(),
+      yaw: snap.yaw ?? 0,
+    };
+  }
+  return {
+    bounds: snap?.bounds ?? shopMapBounds(snap?.expansions ?? []),
+    focus: snap?.focus ?? snap?.player ?? null,
+    yaw: snap?.yaw ?? 0,
+  };
+}
+
 export function clampMapZoom(zoom) {
   const value = Number(zoom);
   if (!Number.isFinite(value)) return MAP_ZOOM_DEFAULT;
@@ -244,12 +291,107 @@ function drawTrapdoorMarker(ctx, pt) {
   drawTrapdoorFallback(ctx, pt);
 }
 
-export function drawMinimap(ctx, snap) {
+function cssHex(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return `#${(n >>> 0).toString(16).padStart(6, '0').slice(-6)}`;
+}
+
+function drawPlayerMarker(ctx, snap, toMap, yaw) {
+  if (!snap.player) return;
+  const you = toMap(snap.player.x, snap.player.z);
+  ctx.save();
+  ctx.translate(you.x, you.y);
+  ctx.rotate(-(snap.player.facing ?? 0) + mapYaw(yaw));
+  ctx.fillStyle = '#f4f0e4';
+  ctx.beginPath();
+  ctx.moveTo(0, -5);
+  ctx.lineTo(3.5, 4);
+  ctx.lineTo(-3.5, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMovePing(ctx, snap, toMap) {
+  const ping = snap.ping;
+  if (!ping || ping.age >= 1) return;
+  const pt = toMap(ping.x, ping.z);
+  const t = Math.min(1, Math.max(0, ping.age));
+  const alpha = 1 - t;
+  const radius = 4 + t * 16;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(244, 226, 164, ${0.92 * alpha})`;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(pt.x, pt.y, 2.4, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(244, 226, 164, ${0.85 * alpha})`;
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Exit ladder, same weight as the outdoor trapdoor mark. */
+function drawLadderMarker(ctx, pt) {
+  const h = 12;
+  const w = 7;
+  ctx.save();
+  ctx.strokeStyle = '#e6d3b0';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  ctx.moveTo(pt.x - w / 2, pt.y - h / 2);
+  ctx.lineTo(pt.x - w / 2, pt.y + h / 2);
+  ctx.moveTo(pt.x + w / 2, pt.y - h / 2);
+  ctx.lineTo(pt.x + w / 2, pt.y + h / 2);
+  for (let i = 0; i < 4; i += 1) {
+    const y = pt.y - h / 2 + ((i + 0.5) * h) / 4;
+    ctx.moveTo(pt.x - w / 2, y);
+    ctx.lineTo(pt.x + w / 2, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawDungeonMinimap(ctx, snap, frame, zoom) {
   const size = ctx.canvas.width;
-  const bounds = snap.bounds ?? shopMapBounds(snap.expansions ?? []);
-  const yaw = snap.yaw ?? 0;
+  const { bounds, yaw, focus } = frame;
+  const toMap = (x, z) => worldToMap(x, z, bounds, size, yaw, zoom, focus);
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = '#241c16';
+  ctx.fillRect(0, 0, size, size);
+
+  const shell = dungeonShellRect();
+  ctx.fillStyle = '#4e4338';
+  fillPoly(ctx, rectPoints(shell.minX, shell.maxX, shell.minZ, shell.maxZ, bounds, size, yaw, zoom, focus));
+
+  const floor = dungeonFloorRect();
+  ctx.fillStyle = '#8d7356';
+  fillPoly(ctx, rectPoints(floor.minX, floor.maxX, floor.minZ, floor.maxZ, bounds, size, yaw, zoom, focus));
+
+  for (const rock of snap.rocks ?? []) {
+    const large = rock.essence || (rock.scale ?? 1) >= 1.5;
+    drawDot(ctx, toMap(rock.x, rock.z), large ? 5.4 : 3.4, cssHex(rock.vein, '#6e5a32'), '#1c140e');
+  }
+  if (snap.ladder) drawLadderMarker(ctx, toMap(snap.ladder.x, snap.ladder.z));
+  for (const rat of snap.rats ?? []) {
+    drawDot(ctx, toMap(rat.x, rat.z), 2.4, '#d7cfc4', '#2a2016');
+  }
+  drawPlayerMarker(ctx, snap, toMap, yaw);
+  drawMovePing(ctx, snap, toMap);
+}
+
+export function drawMinimap(ctx, snap) {
+  const frame = minimapFrame(snap);
   const zoom = clampMapZoom(snap.zoom ?? MAP_ZOOM_DEFAULT);
-  const focus = snap.focus ?? snap.player ?? null;
+  if (snap.sceneMode === 'dungeon') {
+    drawDungeonMinimap(ctx, snap, frame, zoom);
+    return;
+  }
+  const size = ctx.canvas.width;
+  const { bounds, yaw, focus } = frame;
   const toMap = (x, z) => worldToMap(x, z, bounds, size, yaw, zoom, focus);
   ctx.clearRect(0, 0, size, size);
   ctx.fillStyle = '#2f5a30';
@@ -292,37 +434,6 @@ export function drawMinimap(ctx, snap) {
   for (const actor of snap.customers ?? []) {
     drawDot(ctx, toMap(actor.x, actor.z), 2.4, '#e8b45a', '#3a240e');
   }
-  if (snap.player) {
-    const you = toMap(snap.player.x, snap.player.z);
-    ctx.save();
-    ctx.translate(you.x, you.y);
-    ctx.rotate(-(snap.player.facing ?? 0) + mapYaw(yaw));
-    ctx.fillStyle = '#f4f0e4';
-    ctx.beginPath();
-    ctx.moveTo(0, -5);
-    ctx.lineTo(3.5, 4);
-    ctx.lineTo(-3.5, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-
-  const ping = snap.ping;
-  if (ping && ping.age < 1) {
-    const pt = toMap(ping.x, ping.z);
-    const t = Math.min(1, Math.max(0, ping.age));
-    const alpha = 1 - t;
-    const radius = 4 + t * 16;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(244, 226, 164, ${0.92 * alpha})`;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(pt.x, pt.y, 2.4, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(244, 226, 164, ${0.85 * alpha})`;
-    ctx.fill();
-    ctx.restore();
-  }
+  drawPlayerMarker(ctx, snap, toMap, yaw);
+  drawMovePing(ctx, snap, toMap);
 }

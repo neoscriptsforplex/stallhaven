@@ -116,7 +116,7 @@ import {
   stationLabel,
   STATION_UNLOCKS,
 } from './layout.js';
-import { clampMapZoom, drawMinimap, mapToWorld, shopMapBounds } from './minimap.js';
+import { clampMapZoom, drawMinimap, mapToWorld, minimapFrame } from './minimap.js';
 import { boulderInspect, flaxInspect, treeInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
@@ -2377,10 +2377,6 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   });
 
-  function mapFocus(snap) {
-    return snap?.player ?? null;
-  }
-
   function bumpMapZoom(factor) {
     mapZoom = clampMapZoom(mapZoom * factor);
   }
@@ -2394,8 +2390,8 @@ export function bindHud(root, state, world) {
     const size = minimap.width;
     const px = (event.clientX - rect.left) * (size / rect.width);
     const py = (event.clientY - rect.top) * (size / rect.height);
-    const bounds = shopMapBounds(snap.expansions ?? []);
-    const dest = mapToWorld(px, py, bounds, size, snap.yaw ?? 0, mapZoom, mapFocus(snap));
+    const frame = minimapFrame(snap);
+    const dest = mapToWorld(px, py, frame.bounds, size, frame.yaw, mapZoom, frame.focus);
     mapPing = { x: dest.x, z: dest.z, at: performance.now() / 1000 };
     world.walkTo?.(dest.x, dest.z);
   });
@@ -2563,9 +2559,19 @@ export function bindHud(root, state, world) {
       if (mapSnap && !mapSnap.hidden) {
         const ctx = minimap.getContext('2d');
         if (ctx) {
-          mapSnap.bounds = shopMapBounds(mapSnap.expansions);
+          const frame = minimapFrame(mapSnap);
+          mapSnap.bounds = frame.bounds;
+          mapSnap.focus = frame.focus;
           mapSnap.zoom = mapZoom;
-          mapSnap.focus = mapFocus(mapSnap);
+          if (minimap.dataset.scene !== mapSnap.sceneMode) {
+            minimap.dataset.scene = mapSnap.sceneMode;
+            minimap.setAttribute(
+              'aria-label',
+              mapSnap.sceneMode === 'dungeon'
+                ? 'Dungeon map. Click to walk. Scroll to zoom.'
+                : 'Shop map. Click to walk. Scroll to zoom.',
+            );
+          }
           if (mapPing) {
             const age = (performance.now() / 1000) - mapPing.at;
             if (age < 1) mapSnap.ping = { x: mapPing.x, z: mapPing.z, age };

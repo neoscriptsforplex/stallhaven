@@ -122,6 +122,7 @@ import {
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRug, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
+import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 import { mountDisplayBasePose } from './craftpreview.js';
 
@@ -3102,17 +3103,45 @@ export function createWorld(canvas, state, opts = {}) {
       };
     },
     getMinimapSnapshot() {
+      const player = {
+        x: shopkeeper.position.x,
+        z: shopkeeper.position.z,
+        facing: shopkeeper.rotation.y,
+      };
+      if (sceneMode === 'dungeon') {
+        return {
+          hidden: false,
+          sceneMode,
+          yaw: cam.yaw,
+          bounds: dungeonMapBounds(),
+          focus: dungeonMapFocus(),
+          player,
+          rocks: DUNGEON_BOULDERS.map((spot) => ({
+            id: spot.id,
+            materialId: spot.materialId,
+            x: spot.x,
+            z: spot.z,
+            scale: spot.scale ?? 1,
+            vein: spot.vein,
+            essence: Boolean(spot.essence),
+          })),
+          ladder: {
+            x: dungeon?.ladder?.position.x ?? -5.2,
+            z: dungeon?.ladder?.position.z ?? 0.4,
+          },
+          rats: (dungeon?.rats ?? []).map((rat) => ({
+            x: rat.position.x,
+            z: rat.position.z,
+          })),
+        };
+      }
       if (sceneMode !== 'shop') return { hidden: true, sceneMode };
       return {
         hidden: false,
         sceneMode,
         yaw: cam.yaw,
         expansions: state.expansions ?? [],
-        player: {
-          x: shopkeeper.position.x,
-          z: shopkeeper.position.z,
-          facing: shopkeeper.rotation.y,
-        },
+        player,
         customers: customers
           .filter((actor) => actor.mesh.visible)
           .map((actor) => ({ x: actor.mesh.position.x, z: actor.mesh.position.z })),

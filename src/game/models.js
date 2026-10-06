@@ -730,6 +730,10 @@ function settleStanceY(mesh, dt) {
 
 /** In-place Walk clip speed of character_rigged.glb at scale 1. */
 export const RIGGED_WALK_SPEED = 0.834;
+/** Same scale as the rigged player. 1.319m rest height becomes about 1.14m. */
+export const GOBLIN_MODEL_SCALE = 0.863;
+/** No-slide Walk speed of goblin_rigged.glb at GOBLIN_MODEL_SCALE, metres/second. */
+export const GOBLIN_WALK_SPEED = 0.549;
 /** Crossfade between Walk, Idle, and the gathering clips. */
 export const RIGGED_CLIP_FADE = 0.2;
 /** Both the old shopkeeper and the rig face +Z, so atan2(dx, dz) needs no extra yaw. */
@@ -776,7 +780,8 @@ function updateClipLocomotion(mesh, moving, dt) {
   }
   if (want === 'walk') {
     const scale = loco.modelScale || 1;
-    loco.walk.timeScale = (loco.speed ?? 0) / (RIGGED_WALK_SPEED * scale);
+    const stride = loco.walkStride ?? (RIGGED_WALK_SPEED * scale);
+    loco.walk.timeScale = (loco.speed ?? 0) / stride;
   }
   const prevTime = loco.eventPrev;
   loco.mixer.update(dt);
@@ -3626,6 +3631,72 @@ export function buildAdventurer(typeId, opts = {}) {
   return group;
 }
 
+function goblinPick() {
+  const pick = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 1.05, 0.42),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  pick.position.y = 0.52;
+  pick.userData.kind = 'goblin';
+  return pick;
+}
+
+/**
+ * Yard goblin from goblin_rigged.glb. Scale matches the rigged player.
+ * Walk and Idle crossfade on the same mixer path. Hands stay empty.
+ */
+export function wrapRiggedGoblin(gltf) {
+  if (!gltf?.scene) throw new Error('Rigged goblin has no scene.');
+  const walkClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Walk');
+  const idleClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Idle');
+  if (!walkClip || !idleClip) throw new Error('Rigged goblin is missing Walk or Idle.');
+
+  const visual = cloneSkinned(gltf.scene);
+  visual.name = 'rigged-goblin';
+  visual.rotation.y = RIGGED_FACING_YAW;
+  hideWalkDebug(visual);
+  prepareRiggedSurface(visual);
+  visual.updateMatrixWorld(true);
+  const rawBox = new THREE.Box3().setFromObject(visual);
+  if (Number.isFinite(rawBox.min.y) && Math.abs(rawBox.min.y) > 1e-4) {
+    visual.position.y -= rawBox.min.y;
+  }
+  visual.scale.setScalar(GOBLIN_MODEL_SCALE);
+
+  const mixer = new THREE.AnimationMixer(visual);
+  const walk = mixer.clipAction(walkClip);
+  const idle = mixer.clipAction(idleClip);
+  for (const action of [walk, idle]) {
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.enabled = true;
+  }
+  idle.play();
+  mixer.update(0);
+
+  const group = new THREE.Group();
+  group.name = 'goblin';
+  group.add(visual);
+  const pick = goblinPick();
+  group.add(pick);
+
+  group.userData.clipLocomotion = {
+    mixer,
+    walk,
+    idle,
+    modelScale: GOBLIN_MODEL_SCALE,
+    walkStride: GOBLIN_WALK_SPEED,
+    mode: 'idle',
+    speed: 0,
+    gather: null,
+    eventPrev: null,
+  };
+  group.userData.modelScale = GOBLIN_MODEL_SCALE;
+  group.userData.pick = pick;
+  group.userData.walkPhase = 0;
+  return group;
+}
+
 export function buildGoblin() {
   const bundled = getBundledLook('goblin');
   if (bundled) {
@@ -3709,13 +3780,9 @@ function buildProceduralGoblin() {
   group.userData.walkPhase = 0;
   group.userData.walkRest = body.userData.walkRest;
 
-  const pick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 1.05, 0.42),
-    new THREE.MeshBasicMaterial({ visible: false }),
-  );
-  pick.position.y = 0.52;
-  pick.userData.kind = 'goblin';
+  const pick = goblinPick();
   group.add(pick);
+  group.userData.pick = pick;
   return group;
 }
 

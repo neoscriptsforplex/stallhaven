@@ -18,6 +18,9 @@ import {
   buildShopDoor,
   setDoorOpen,
   buildGoblin,
+  wrapRiggedGoblin,
+  GOBLIN_MODEL_SCALE,
+  GOBLIN_WALK_SPEED,
   buildPickaxe,
   buildHeldTool,
   buildShopkeeper,
@@ -162,6 +165,40 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(goblin.has('cue-ear'));
     assert.ok(goblin.has('cue-nose'));
     assert.ok(goblin.has('cue-topknot'));
+  });
+
+  it('plays Walk and Idle on the rigged yard goblin at the player scale', async () => {
+    const glb = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/models/npc/goblin_rigged.glb'));
+    const gltf = await new Promise((resolve, reject) => {
+      new GLTFLoader().parse(
+        glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength),
+        '',
+        resolve,
+        reject,
+      );
+    });
+    const goblin = wrapRiggedGoblin(gltf);
+    assert.equal(goblin.name, 'goblin');
+    assert.equal(goblin.userData.pick?.userData.kind, 'goblin');
+    assert.ok(Math.abs(goblin.userData.modelScale - GOBLIN_MODEL_SCALE) < 1e-9);
+    const loco = goblin.userData.clipLocomotion;
+    assert.ok(Math.abs(loco.walk.getClip().duration - 0.84) < 1e-3);
+    assert.ok(Math.abs(loco.idle.getClip().duration - 3) < 1e-3);
+    assert.equal(loco.walkStride, GOBLIN_WALK_SPEED);
+    let skinned = 0;
+    goblin.traverse((child) => {
+      if (!child.isSkinnedMesh) return;
+      skinned += 1;
+      assert.equal(child.frustumCulled, false);
+    });
+    assert.equal(skinned, 1);
+    loco.speed = 0.72;
+    updateWalkPose(goblin, true, 0.05, 1);
+    assert.equal(loco.mode, 'walk');
+    assert.ok(Math.abs(loco.walk.timeScale - (0.72 / GOBLIN_WALK_SPEED)) < 1e-6);
+    const box = new THREE.Box3().setFromObject(goblin);
+    const height = box.max.y - box.min.y;
+    assert.ok(Math.abs(height - 1.319 * GOBLIN_MODEL_SCALE) < 0.02, `height ${height}`);
   });
 
   it('builds dark grey dungeon rats with red triangle eyes and a tan tail', () => {

@@ -2802,10 +2802,12 @@ describe('rigged buyer looks', () => {
   it('plays Walk and Idle on each rigged adventurer at the player scale', async () => {
     assert.equal(BUYER_MODEL_SCALE, 0.863);
     assert.equal(RIGGED_CLIP_FADE, 0.2);
-    assert.equal(RIGGED_BUYER_MODELS.length, 7);
+    assert.equal(RIGGED_BUYER_MODELS.length, 9);
     try {
       for (const spec of RIGGED_BUYER_MODELS) {
-        const typeId = spec.lookId.startsWith('buyer-guard-') ? 'mercenary' : 'pilgrim';
+        const typeId = spec.lookId.startsWith('buyer-guard-') ? 'mercenary'
+          : spec.lookId.startsWith('buyer-ranger-') ? 'ranger'
+            : 'pilgrim';
         const gltf = await loadBuyer(spec.file);
         const buyer = wrapRiggedBuyer(gltf, typeId, { lookId: spec.lookId });
         assert.equal(buyer.name, typeId);
@@ -2843,6 +2845,7 @@ describe('rigged buyer looks', () => {
           assert.equal(handR.children.length, 0, `${spec.lookId} leaves the baked weapon on Hand_R`);
           assert.equal(handL.children.length, 0, `${spec.lookId} leaves the baked weapon on Hand_L`);
           assert.equal(buyer.userData.hand.parent, buyer);
+          assert.equal(buyer.userData.hand.children.length, 0, `${spec.lookId} purchase grip stays empty`);
         } else if (spec.carryHand === 'Hand_L') {
           assert.equal(handR.children.length, 0, 'Donie staff stays on Hand_R with no attached tool');
           assert.equal(buyer.userData.hand.parent?.name, 'Hand_L');
@@ -2877,6 +2880,7 @@ describe('rigged buyer looks', () => {
   it('keeps the old adventurer dump when a rigged buyer fails to wrap', () => {
     setRiggedBuyer('buyer-adventurer-bob', { scene: new THREE.Group(), animations: [] });
     setRiggedBuyer('buyer-guard-barbarian-level-17', { scene: new THREE.Group(), animations: [] });
+    setRiggedBuyer('buyer-ranger-armour-salesman', { scene: new THREE.Group(), animations: [] });
     try {
       const fallback = buildAdventurer('pilgrim', { lookId: 'buyer-adventurer-bob', seed: 0.2 });
       assert.equal(fallback.userData.clipLocomotion, undefined);
@@ -2887,6 +2891,11 @@ describe('rigged buyer looks', () => {
       assert.equal(guard.userData.clipLocomotion, undefined);
       assert.equal(guard.userData.pick?.userData.kind, 'customer');
       assert.equal(getRiggedBuyer('buyer-guard-barbarian-level-17'), null);
+      const salesman = buildAdventurer('ranger', { lookId: 'buyer-ranger-armour-salesman', seed: 0.2 });
+      assert.equal(salesman.name, 'ranger');
+      assert.equal(salesman.userData.clipLocomotion, undefined);
+      assert.equal(salesman.userData.pick?.userData.kind, 'customer');
+      assert.equal(getRiggedBuyer('buyer-ranger-armour-salesman'), null);
     } finally {
       clearRiggedBuyers();
     }

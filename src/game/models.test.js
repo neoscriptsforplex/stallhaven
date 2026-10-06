@@ -973,14 +973,34 @@ describe('bundled prop swaps', () => {
       fitTarget.position.y = 1.3;
       const before = wrapBundledProp(bundled, fitTarget, { name: 'ladder-mesh', fit: 'max' });
       const beforeSize = measureVisibleBox(before).getSize(new THREE.Vector3());
-      const visual = built.ladder.getObjectByName('ladder-mesh');
-      visual.updateMatrixWorld(true);
-      const after = measureVisibleBox(visual);
+      const copies = [];
+      built.ladder.traverse((child) => {
+        if (child.name === 'ladder-mesh') copies.push(child);
+      });
+      assert.equal(copies.length, 2);
+      const stack = built.ladder.getObjectByName('ladder-stack');
+      assert.ok(Math.abs(stack.scale.x - stack.scale.y) < 1e-6);
+      assert.ok(Math.abs(stack.scale.y - stack.scale.z) < 1e-6);
+      stack.updateMatrixWorld(true);
+      const after = measureVisibleBox(stack);
       const afterSize = after.getSize(new THREE.Vector3());
-      assert.ok(Math.abs(afterSize.z - beforeSize.x * 0.5) < 0.06, `bundled width should be half, z=${afterSize.z} from ${beforeSize.x}`);
-      assert.ok(Math.abs(afterSize.x - beforeSize.z) < 0.08, `bundled depth should stay, x=${afterSize.x} from ${beforeSize.z}`);
+      const span = DUNGEON_WALL_H / (beforeSize.y * 2);
+      assert.ok(Math.abs(afterSize.z - beforeSize.x * span) < 0.06, `stacked width should stay proportional, z=${afterSize.z}`);
+      assert.ok(Math.abs(afterSize.x - beforeSize.z * span) < 0.08, `stacked depth should stay proportional, x=${afterSize.x}`);
       assert.ok(Math.abs(after.max.y - DUNGEON_WALL_H) < 0.08, `bundled top should meet the wall, maxY=${after.max.y}`);
       assert.ok(after.min.y > -0.05 && after.min.y < 0.08, `bundled bottom should stay on the floor, minY=${after.min.y}`);
+      const boxes = copies.map((copy) => {
+        copy.updateMatrixWorld(true);
+        return measureVisibleBox(copy);
+      }).sort((a, b) => a.min.y - b.min.y);
+      const wantAspect = beforeSize.y / beforeSize.x;
+      for (const box of boxes) {
+        const size = box.getSize(new THREE.Vector3());
+        assert.ok(Math.abs(size.y / size.z - wantAspect) / wantAspect < 0.08, `copy aspect ${size.y / size.z} vs ${wantAspect}`);
+      }
+      assert.ok(Math.abs(boxes[0].max.y - boxes[1].min.y) < 0.04, `rails should meet, gap=${boxes[1].min.y - boxes[0].max.y}`);
+      assert.ok(Math.abs(boxes[0].min.z - boxes[1].min.z) < 0.03);
+      assert.ok(Math.abs(boxes[0].max.z - boxes[1].max.z) < 0.03);
     } finally {
       setBundledLook('ladder', null);
     }
@@ -2144,21 +2164,41 @@ describe('shop props', () => {
     assert.ok(Math.abs(built.ladder.rotation.y - Math.PI / 2) < 1e-6);
   });
 
-  it('halves the wall ladder width and stretches it to the wall top', () => {
+  it('stacks two proportional ladder copies to the wall top', () => {
     const ladder = buildDungeonLadder();
-    const visual = ladder.getObjectByName('ladder-mesh');
-    assert.ok(visual);
-    visual.updateMatrixWorld(true);
-    const box = measureVisibleBox(visual);
+    const copies = [];
+    ladder.traverse((child) => {
+      if (child.name === 'ladder-mesh') copies.push(child);
+    });
+    assert.equal(copies.length, 2);
+    const stack = ladder.getObjectByName('ladder-stack');
+    assert.ok(stack);
+    assert.ok(Math.abs(stack.scale.x - stack.scale.y) < 1e-6);
+    assert.ok(Math.abs(stack.scale.y - stack.scale.z) < 1e-6);
+    stack.updateMatrixWorld(true);
+    const box = measureVisibleBox(stack);
     const size = box.getSize(new THREE.Vector3());
-    assert.ok(Math.abs(size.z - 0.205) < 0.02, `along-wall width should be half of 0.41, z=${size.z}`);
+    const width = 0.41 * (DUNGEON_WALL_H / 5.2);
+    assert.ok(Math.abs(size.z - width) < 0.02, `along-wall width should keep the half-size proportions, z=${size.z}`);
     assert.ok(Math.abs(size.y - DUNGEON_WALL_H) < 0.04, `height should meet the wall, y=${size.y}`);
     assert.ok(Math.abs(box.min.y) < 0.04, `bottom stays on the floor, minY=${box.min.y}`);
     assert.ok(Math.abs(box.max.y - DUNGEON_WALL_H) < 0.04, `top meets the wall, maxY=${box.max.y}`);
-    assert.ok(size.x < 0.12, `depth stays the rail thickness, x=${size.x}`);
+    const boxes = copies.map((copy) => {
+      copy.updateMatrixWorld(true);
+      return measureVisibleBox(copy);
+    }).sort((a, b) => a.min.y - b.min.y);
+    for (const copyBox of boxes) {
+      const copySize = copyBox.getSize(new THREE.Vector3());
+      assert.ok(Math.abs(copySize.y / copySize.z - 2.6 / 0.41) < 0.15, `copy should keep the rail aspect, y/z=${copySize.y / copySize.z}`);
+      assert.ok(Math.abs(copySize.y - DUNGEON_WALL_H / 2) < 0.04, `each copy is half the wall, y=${copySize.y}`);
+    }
+    assert.ok(Math.abs(boxes[0].max.y - boxes[1].min.y) < 0.03, `rails should meet, gap=${boxes[1].min.y - boxes[0].max.y}`);
+    assert.ok(Math.abs(boxes[0].min.z - boxes[1].min.z) < 0.02);
+    assert.ok(Math.abs(boxes[0].max.z - boxes[1].max.z) < 0.02);
 
     const pick = ladder.getObjectByName('ladder-pick');
     assert.ok(pick);
+    assert.equal(ladder.children.filter((child) => child.name === 'ladder-pick').length, 1);
     pick.updateMatrixWorld(true);
     const pickSize = measureVisibleBox(pick).getSize(new THREE.Vector3());
     assert.ok(Math.abs(pickSize.z - size.z) < 0.03, `click box width matches the ladder, z=${pickSize.z}`);
@@ -2166,7 +2206,7 @@ describe('shop props', () => {
     assert.ok(pickSize.x > 0.6, `click depth stays easy to hit, x=${pickSize.x}`);
 
     const built = buildDungeon();
-    const placed = built.ladder.getObjectByName('ladder-mesh');
+    const placed = built.ladder.getObjectByName('ladder-stack');
     placed.updateMatrixWorld(true);
     const placedBox = measureVisibleBox(placed);
     let wallTop = null;

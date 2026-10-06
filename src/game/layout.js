@@ -195,6 +195,16 @@ export function shopFloorTopY() {
   return Math.max(plankTop, slabTop);
 }
 
+/** Timber beam over the origin storefront. The door leaf meets its underside. */
+export const SHOP_DOOR_LINTEL = { centerY: 2.52, height: 0.38 };
+
+/** Opening the front door leaf fills: board top up to the lintel underside. */
+export function shopDoorOpening() {
+  const floorY = shopFloorTopY();
+  const topY = SHOP_DOOR_LINTEL.centerY - SHOP_DOOR_LINTEL.height / 2;
+  return { floorY, topY, height: topY - floorY };
+}
+
 export function furnitureBuyCost(boughtCount = 0) {
   const n = Math.max(0, Math.round(Number(boughtCount) || 0));
   return FURNITURE_BUY_BASE * (FURNITURE_BUY_MULT ** n);

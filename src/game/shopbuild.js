@@ -4,6 +4,7 @@ import {
   FOUNTAIN,
   ROOM_D,
   ROOM_W,
+  SHOP_DOOR_LINTEL,
   SHOP_FLOOR_PLANK,
   SHOP_FLOOR_SLAB,
   SHOP_FURNITURE_FLOOR_Y,
@@ -624,8 +625,11 @@ function addRoofGables(group, center, neigh, ridgeY) {
 function addOriginFront(root, center) {
   const beam = wood(0x3c2616, 0.78);
   const doorHalf = 0.58;
-  const lintel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(doorHalf * 2 + 0.36, 0.38, 0.22), beam));
-  lintel.position.set(center.x, 2.52, center.z + ROOM_D / 2);
+  const lintel = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(doorHalf * 2 + 0.36, SHOP_DOOR_LINTEL.height, 0.22),
+    beam,
+  ));
+  lintel.position.set(center.x, SHOP_DOOR_LINTEL.centerY, center.z + ROOM_D / 2);
   root.add(lintel);
   const postL = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.18, 0.2), beam));
   postL.position.set(center.x - doorHalf - 0.02, 1.14, center.z + ROOM_D / 2);

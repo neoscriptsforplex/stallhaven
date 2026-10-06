@@ -849,19 +849,22 @@ function updateClipLocomotion(mesh, moving, dt) {
   if (loco.mode !== want) {
     const next = gatherAction || (want === 'walk' ? loco.walk : loco.idle);
     const prev = clipByMode(loco, loco.mode);
-    next.enabled = true;
-    next.setEffectiveWeight(1);
-    if (gatherAction) next.timeScale = 1;
-    next.reset().play();
-    if (prev && prev !== next) prev.crossFadeTo(next, RIGGED_CLIP_FADE, false);
+    if (next) {
+      next.enabled = true;
+      next.setEffectiveWeight(1);
+      if (gatherAction) next.timeScale = 1;
+      next.reset().play();
+      if (prev && prev !== next) prev.crossFadeTo(next, RIGGED_CLIP_FADE, false);
+    }
     loco.mode = want;
     loco.eventPrev = gatherAction ? 0 : null;
   }
-  if (want === 'walk') {
+  if (want === 'walk' && loco.walk) {
     const scale = loco.modelScale || 1;
     const stride = loco.walkStride ?? (RIGGED_WALK_SPEED * scale);
     loco.walk.timeScale = (loco.speed ?? 0) / stride;
   }
+  if (!loco.mixer) return;
   const prevTime = loco.eventPrev;
   loco.mixer.update(dt);
   if (gatherAction && want === loco.gather && prevTime != null) {
@@ -4232,6 +4235,11 @@ export function proceduralPlayerFitHeight() {
   return cachedProceduralHeight;
 }
 
+/** In-game height of the default rigged adventurer, in metres. */
+export function defaultPlayerWorldHeight() {
+  return proceduralPlayerFitHeight() * PLAYER_WORLD_SCALE;
+}
+
 function prepareRiggedSurface(root) {
   root.traverse((child) => {
     if (!child.isMesh) return;
@@ -4365,6 +4373,223 @@ export function wrapShopPlayer(source, opts = {}) {
   });
   wrapped.scale.setScalar(PLAYER_WORLD_SCALE);
   return wrapped;
+}
+
+/** Case-insensitive clip lookup. Exact names win, then partial matches such as Walking. */
+export function findNamedClip(animations, hints, skip = []) {
+  const clips = [];
+  for (const clip of animations ?? []) {
+    if (!clip || skip.includes(clip)) continue;
+    clips.push({ clip, name: String(clip.name || '').toLowerCase() });
+  }
+  const wanted = (hints ?? []).map((hint) => String(hint).toLowerCase()).filter(Boolean);
+  for (const hint of wanted) {
+    const exact = clips.find((item) => item.name === hint);
+    if (exact) return exact.clip;
+  }
+  for (const hint of wanted) {
+    const partial = clips.find((item) => item.name.includes(hint));
+    if (partial) return partial.clip;
+  }
+  return null;
+}
+
+/**
+ * Bounding-box hint only. Does not rotate the model.
+ * zUp: the long axis is Z. facesNegZ: most of the mesh sits behind the box centre.
+ */
+export function playerOrientationHint(root) {
+  const empty = { zUp: false, facesNegZ: false, suggestRotate: false };
+  if (!root?.updateMatrixWorld) return empty;
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  if (box.isEmpty()) return empty;
+  const size = box.getSize(new THREE.Vector3());
+  const zUp = size.z > size.y * 1.25 && size.z >= size.x * 0.8;
+  let count = 0;
+  let sumZ = 0;
+  const sample = new THREE.Vector3();
+  root.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    const pos = child.geometry.getAttribute?.('position');
+    if (!pos?.count) return;
+    const step = Math.max(1, Math.floor(pos.count / 120));
+    for (let i = 0; i < pos.count; i += step) {
+      sample.fromBufferAttribute(pos, i);
+      child.localToWorld(sample);
+      sumZ += sample.z;
+      count += 1;
+    }
+  });
+  const centerZ = (box.min.z + box.max.z) * 0.5;
+  const meanZ = count ? sumZ / count : centerZ;
+  const facesNegZ = size.z > 0.05 && meanZ < centerZ - size.z * 0.08;
+  return { zUp, facesNegZ, suggestRotate: Boolean(zUp || facesNegZ) };
+}
+
+const BONE_HEAD = /(^|[:_|-])head$/i;
+
+function prepareUploadedSurface(root) {
+  root.traverse((child) => {
+    if (!child.isMesh) return;
+    child.frustumCulled = false;
+    child.castShadow = true;
+    if (!child.geometry?.getAttribute?.('color')) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      mat.vertexColors = true;
+      if (mat.color) mat.color.setHex(0xffffff);
+      mat.needsUpdate = true;
+    }
+  });
+}
+
+function playClip(mixer, clip) {
+  if (!mixer || !clip) return null;
+  const action = mixer.clipAction(clip);
+  action.setLoop(THREE.LoopRepeat, Infinity);
+  action.clampWhenFinished = false;
+  action.enabled = true;
+  return action;
+}
+
+function attachUploadedGear(visual, rawHeight, modelScale, opts) {
+  const bones = collectBones(visual);
+  const hand = matchBone(bones, BONE_HAND_R);
+  const grip = new THREE.Group();
+  grip.name = 'importedGrip';
+  const pickaxe = buildHeldTool('pickaxe');
+  pickaxe.visible = false;
+  const hatchet = buildHeldTool('hatchet');
+  hatchet.visible = false;
+  grip.add(pickaxe);
+  grip.add(hatchet);
+  const riggedHand = Boolean(hand && /^hand_r$/i.test(hand.name || ''));
+  if (riggedHand) {
+    grip.position.set(RIGGED_FIST.x, RIGGED_FIST.y, RIGGED_FIST.z);
+    poseRiggedHeldTool(pickaxe, 'pickaxe');
+    poseRiggedHeldTool(hatchet, 'hatchet');
+    hand.add(grip);
+  } else if (hand) {
+    grip.position.set(0.02, 0.04, 0.06);
+    poseHeldPickaxe(pickaxe);
+    poseHeldPickaxe(hatchet);
+    hand.add(grip);
+  } else {
+    grip.position.set(rawHeight * 0.18, rawHeight * 0.55, rawHeight * 0.05);
+    poseHeldPickaxe(pickaxe);
+    poseHeldPickaxe(hatchet);
+    visual.add(grip);
+  }
+
+  const head = matchBone(bones, BONE_HEAD);
+  const chefHat = buildChefHat();
+  chefHat.visible = Boolean(opts.chefHatOn);
+  chefHat.scale.setScalar(PLAYER_WORLD_SCALE / Math.max(modelScale, 1e-4));
+  if (head) {
+    head.add(chefHat);
+    if (/^head$/i.test(head.name || '')) chefHat.position.set(0, 0.22, 0.02);
+    else chefHat.position.set(0, Math.max(0.05, rawHeight * 0.06), 0);
+  } else {
+    chefHat.position.set(0, rawHeight, 0);
+    visual.add(chefHat);
+  }
+  return { grip, pickaxe, hatchet, chefHat };
+}
+
+/**
+ * User-uploaded player. Uniform height of the default adventurer, feet at y=0,
+ * centred on the origin, facing +Z unless yaw180 is set. Walk/Idle clips use the
+ * rigged crossfade; otherwise the body bobs while moving.
+ */
+export function wrapUploadedPlayer(source, opts = {}) {
+  if (!source) throw new Error('That file has no visible mesh. The current model is unchanged.');
+  const visual = cloneSkinned(source);
+  visual.name = 'uploaded-player';
+  hideWalkDebug(visual);
+  prepareUploadedSurface(visual);
+  const orientationHint = playerOrientationHint(visual);
+
+  const turn = new THREE.Group();
+  turn.name = 'uploaded-turn';
+  turn.rotation.y = opts.yaw180 ? Math.PI : 0;
+  turn.add(visual);
+  turn.updateMatrixWorld(true);
+  const rawBox = new THREE.Box3().setFromObject(turn);
+  const rawHeight = rawBox.max.y - rawBox.min.y;
+  if (!Number.isFinite(rawHeight) || rawHeight < 0.02 || rawBox.isEmpty()) {
+    throw new Error('That file has no visible mesh. The current model is unchanged.');
+  }
+  const center = rawBox.getCenter(new THREE.Vector3());
+  turn.position.x -= center.x;
+  turn.position.z -= center.z;
+  turn.position.y -= rawBox.min.y;
+
+  const targetHeight = opts.height ?? defaultPlayerWorldHeight();
+  const modelScale = targetHeight / rawHeight;
+  if (!Number.isFinite(modelScale) || modelScale <= 0) {
+    throw new Error('Could not fit that model. The current model is unchanged.');
+  }
+  const group = new THREE.Group();
+  group.name = opts.name ?? 'shopkeeper';
+  group.add(turn);
+  group.scale.setScalar(modelScale);
+
+  const animations = opts.animations ?? source.animations ?? [];
+  const walkClip = findNamedClip(animations, ['walk']);
+  const idleClip = findNamedClip(animations, ['idle'], walkClip ? [walkClip] : []);
+  const used = [walkClip, idleClip].filter(Boolean);
+  let gear = { grip: null, pickaxe: null, hatchet: null, chefHat: null };
+  try {
+    gear = attachUploadedGear(visual, rawHeight, modelScale, opts);
+  } catch (err) {
+    console.warn('Uploaded player gear skipped:', err?.message || err);
+  }
+  const label = makeNameSprite(opts.label ?? 'You');
+  label.position.y = rawHeight + 0.2;
+  visual.add(label);
+
+  if (walkClip || idleClip) {
+    const mixer = new THREE.AnimationMixer(visual);
+    const walk = playClip(mixer, walkClip);
+    const idle = playClip(mixer, idleClip);
+    const actions = {};
+    for (const name of ['mine', 'chop', 'pick']) {
+      const clip = findNamedClip(animations, [name], used);
+      const action = playClip(mixer, clip);
+      if (!action) continue;
+      action.enabled = false;
+      actions[name] = action;
+    }
+    if (idle) idle.play();
+    mixer.update(0);
+    group.userData.clipLocomotion = {
+      mixer,
+      walk,
+      idle,
+      actions,
+      modelScale,
+      mode: idle ? 'idle' : 'walk',
+      speed: 0,
+      gather: null,
+      eventPrev: null,
+      onEvent: null,
+    };
+  }
+
+  group.userData.modelScale = modelScale;
+  group.userData.hand = gear.grip;
+  group.userData.pickaxe = gear.pickaxe;
+  group.userData.hatchet = gear.hatchet;
+  group.userData.hammers = [];
+  group.userData.chefHat = gear.chefHat;
+  group.userData.customMesh = true;
+  group.userData.uploadedPlayer = true;
+  group.userData.yaw180 = Boolean(opts.yaw180);
+  group.userData.orientationHint = orientationHint;
+  group.userData.walkPhase = 0;
+  return group;
 }
 
 const bundledLooks = Object.create(null);

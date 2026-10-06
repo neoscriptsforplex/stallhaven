@@ -770,6 +770,51 @@ export const RAT_WALK_UNIT_SPEED = 0.3119;
 export const RAT_WALK_SPEED = RAT_WALK_UNIT_SPEED * RAT_MODEL_SCALE;
 /** Crossfade between Walk, Idle, and the gathering clips. */
 export const RIGGED_CLIP_FADE = 0.2;
+/**
+ * World scale for the five rigged adventurer buyers.
+ * Same 0.863 used for the player rig and the yard goblin.
+ */
+export const BUYER_MODEL_SCALE = 0.863;
+/**
+ * Rigged looks that replace the adventurer OBJ dumps.
+ * speed is the no-slide Walk rate at scale 1 (m/s). Playback is
+ * timeScale = moveSpeed / (speed * BUYER_MODEL_SCALE).
+ * height is the mesh top at scale 1 (Donie includes the staff tip).
+ * Donie's staff is rigid on Hand_R, so the carry grip uses Hand_L.
+ */
+export const RIGGED_BUYER_MODELS = [
+  {
+    lookId: 'buyer-adventurer-bob',
+    file: 'npc/bob_rigged.glb',
+    speed: 0.849001881856245,
+    height: 1.797281847145991,
+  },
+  {
+    lookId: 'buyer-adventurer-cooking-tutor',
+    file: 'npc/cooking_tutor_rigged.glb',
+    speed: 0.8476863071714783,
+    height: 1.9566676305083985,
+  },
+  {
+    lookId: 'buyer-adventurer-donie',
+    file: 'npc/donie_rigged.glb',
+    speed: 0.854416854482484,
+    height: 2.1030169593929724,
+    carryHand: 'Hand_L',
+  },
+  {
+    lookId: 'buyer-adventurer-man-level-2',
+    file: 'npc/man_level_2_rigged.glb',
+    speed: 0.8475701490516011,
+    height: 1.7964131297480046,
+  },
+  {
+    lookId: 'buyer-adventurer-woman-level-2',
+    file: 'npc/woman_level_2_rigged.glb',
+    speed: 0.8394186217945104,
+    height: 1.765324631383086,
+  },
+];
 /** Both the old shopkeeper and the rig face +Z, so atan2(dx, dz) needs no extra yaw. */
 export const RIGGED_FACING_YAW = 0;
 /** Fist centre in Hand_R local units. The bone origin is the wrist. */
@@ -3545,6 +3590,15 @@ export function wrapBuyerDump(source, typeId, opts = {}) {
 
 export function buildAdventurer(typeId, opts = {}) {
   const buyerLookId = opts.lookId ?? nextBuyerLookId(typeId);
+  const rigged = buyerLookId ? getRiggedBuyer(buyerLookId) : null;
+  if (rigged) {
+    try {
+      return wrapRiggedBuyer(rigged, typeId, { lookId: buyerLookId });
+    } catch (err) {
+      console.warn(`Rigged buyer ${buyerLookId} skipped:`, err?.message || err);
+      setRiggedBuyer(buyerLookId, null);
+    }
+  }
   const bundled = buyerLookId ? getBundledLook(buyerLookId) : null;
   if (bundled) {
     try {
@@ -3780,6 +3834,119 @@ export function wrapRiggedRat(gltf) {
   };
   group.userData.modelScale = RAT_MODEL_SCALE;
   group.userData.walkPhase = 0;
+  return group;
+}
+
+function riggedBuyerSpec(lookId) {
+  return RIGGED_BUYER_MODELS.find((spec) => spec.lookId === lookId) ?? null;
+}
+
+/**
+ * One adventurer buyer from a rigged GLB. The group keeps the customer
+ * nameplate, speech bubble, click box, and ring. Walk and Idle crossfade
+ * on the same mixer path as the goblin. Facing stays +Z; walkToward yaws the group.
+ * Donie's staff is already on Hand_R, so no grip or tool is parented there.
+ */
+export function wrapRiggedBuyer(gltf, typeId, opts = {}) {
+  const spec = riggedBuyerSpec(opts.lookId);
+  if (!spec) throw new Error(`No rigged buyer for ${opts.lookId ?? typeId}.`);
+  if (!gltf?.scene) throw new Error(`Rigged buyer ${spec.lookId} has no scene.`);
+  const walkClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Walk');
+  const idleClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Idle');
+  if (!walkClip || !idleClip) throw new Error(`Rigged buyer ${spec.lookId} is missing Walk or Idle.`);
+
+  const visual = cloneSkinned(gltf.scene);
+  visual.name = 'rigged-buyer';
+  visual.rotation.y = RIGGED_FACING_YAW;
+  hideWalkDebug(visual);
+  prepareRiggedSurface(visual);
+  visual.scale.setScalar(BUYER_MODEL_SCALE);
+
+  const mixer = new THREE.AnimationMixer(visual);
+  const walk = mixer.clipAction(walkClip);
+  const idle = mixer.clipAction(idleClip);
+  for (const action of [walk, idle]) {
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.enabled = true;
+  }
+  idle.play();
+  mixer.update(0);
+
+  visual.updateMatrixWorld(true);
+  const posed = new THREE.Box3().setFromObject(visual);
+  if (Number.isFinite(posed.min.y) && Math.abs(posed.min.y) > 1e-4) {
+    visual.position.y -= posed.min.y;
+    visual.updateMatrixWorld(true);
+  }
+  const box = new THREE.Box3().setFromObject(visual);
+  const meshHeight = Math.max(0.9, box.max.y - Math.min(0, box.min.y));
+  const labelTop = Math.max(meshHeight, spec.height * BUYER_MODEL_SCALE);
+
+  const group = new THREE.Group();
+  group.name = typeId;
+  group.add(visual);
+
+  const label = makeNameSprite(customerName(typeId));
+  label.position.y = labelTop + 0.18;
+  group.add(label);
+
+  const speech = makeSpeechSprite('…');
+  speech.position.y = labelTop + 0.52;
+  speech.visible = false;
+  group.add(speech);
+
+  const pick = new THREE.Mesh(
+    new THREE.BoxGeometry(
+      Math.max(0.55, (box.max.x - box.min.x) * 0.95),
+      meshHeight,
+      Math.max(0.42, (box.max.z - box.min.z) * 0.95),
+    ),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  pick.position.y = meshHeight * 0.5;
+  pick.userData.kind = 'customer';
+  group.add(pick);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.28, 0.4, 24),
+    new THREE.MeshBasicMaterial({ color: 0xe8b45a, transparent: true, opacity: 0.0, side: THREE.DoubleSide }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.04;
+  ring.visible = false;
+  group.add(ring);
+
+  const grip = new THREE.Group();
+  grip.name = 'importedGrip';
+  const carryHand = visual.getObjectByName(spec.carryHand ?? 'Hand_R');
+  if (carryHand) {
+    grip.position.set(RIGGED_FIST.x, RIGGED_FIST.y, RIGGED_FIST.z);
+    carryHand.add(grip);
+  } else {
+    grip.position.set(0.22, meshHeight * 0.52, 0.1);
+    group.add(grip);
+  }
+
+  const walkStride = spec.speed * BUYER_MODEL_SCALE;
+  group.userData.clipLocomotion = {
+    mixer,
+    walk,
+    idle,
+    modelScale: BUYER_MODEL_SCALE,
+    walkStride,
+    mode: 'idle',
+    speed: 0,
+    gather: null,
+    eventPrev: null,
+  };
+  group.userData.modelScale = BUYER_MODEL_SCALE;
+  group.userData.walkPhase = 0;
+  group.userData.speech = speech;
+  group.userData.pick = pick;
+  group.userData.ring = ring;
+  group.userData.hand = grip;
+  group.userData.buyerLookId = spec.lookId;
   return group;
 }
 
@@ -4213,6 +4380,29 @@ export function getBundledLook(id) {
 
 export function setBundledLooks(map = {}) {
   for (const [id, scene] of Object.entries(map)) setBundledLook(id, scene);
+}
+
+const riggedBuyerGltfs = Object.create(null);
+
+export function setRiggedBuyer(lookId, gltf) {
+  if (!lookId) return;
+  if (gltf) riggedBuyerGltfs[lookId] = gltf;
+  else delete riggedBuyerGltfs[lookId];
+}
+
+export function getRiggedBuyer(lookId) {
+  return riggedBuyerGltfs[lookId] ?? null;
+}
+
+export function setRiggedBuyers(map = {}) {
+  for (const key of Object.keys(riggedBuyerGltfs)) delete riggedBuyerGltfs[key];
+  for (const [id, gltf] of Object.entries(map)) {
+    if (gltf) riggedBuyerGltfs[id] = gltf;
+  }
+}
+
+export function clearRiggedBuyers() {
+  for (const key of Object.keys(riggedBuyerGltfs)) delete riggedBuyerGltfs[key];
 }
 
 export function measureVisibleBox(root) {

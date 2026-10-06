@@ -25,6 +25,13 @@ import {
   RAT_MODEL_SCALE,
   RAT_WALK_SPEED,
   RAT_WALK_UNIT_SPEED,
+  wrapRiggedBuyer,
+  BUYER_MODEL_SCALE,
+  RIGGED_BUYER_MODELS,
+  RIGGED_CLIP_FADE,
+  setRiggedBuyer,
+  getRiggedBuyer,
+  clearRiggedBuyers,
   buildPickaxe,
   buildHeldTool,
   buildShopkeeper,
@@ -2476,5 +2483,98 @@ describe('shop props', () => {
       }
     });
     assert.equal(brick, 0x8a9098);
+  });
+});
+
+describe('rigged adventurer buyers', () => {
+  async function loadBuyer(file) {
+    const glb = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/models', file));
+    return new Promise((resolve, reject) => {
+      new GLTFLoader().parse(
+        glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength),
+        '',
+        resolve,
+        reject,
+      );
+    });
+  }
+
+  it('plays Walk and Idle on each rigged adventurer at the player scale', async () => {
+    assert.equal(BUYER_MODEL_SCALE, 0.863);
+    assert.equal(RIGGED_CLIP_FADE, 0.2);
+    assert.equal(RIGGED_BUYER_MODELS.length, 5);
+    try {
+      for (const spec of RIGGED_BUYER_MODELS) {
+        const gltf = await loadBuyer(spec.file);
+        const buyer = wrapRiggedBuyer(gltf, 'pilgrim', { lookId: spec.lookId });
+        assert.equal(buyer.name, 'pilgrim');
+        assert.equal(buyer.userData.buyerLookId, spec.lookId);
+        assert.equal(buyer.userData.pick?.userData.kind, 'customer');
+        assert.ok(buyer.userData.speech);
+        assert.ok(buyer.userData.ring);
+        assert.ok(buyer.userData.hand);
+        assert.equal(buyer.userData.pickaxe, undefined);
+        assert.equal(buyer.userData.hatchet, undefined);
+        assert.ok(Math.abs(buyer.userData.modelScale - BUYER_MODEL_SCALE) < 1e-9);
+        const visual = buyer.getObjectByName('rigged-buyer');
+        assert.ok(visual);
+        assert.ok(Math.abs(visual.scale.x - BUYER_MODEL_SCALE) < 1e-9);
+        assert.ok(Math.abs(visual.rotation.y) < 1e-9, 'buyer meshes face +Z like the dumps');
+        const loco = buyer.userData.clipLocomotion;
+        assert.ok(Math.abs(loco.walk.getClip().duration - 1) < 1e-3);
+        assert.ok(Math.abs(loco.idle.getClip().duration - 3) < 1e-3);
+        assert.ok(Math.abs(loco.walkStride - spec.speed * BUYER_MODEL_SCALE) < 1e-9);
+        let skinned = 0;
+        let bones = 0;
+        buyer.traverse((child) => {
+          if (child.isBone) bones += 1;
+          if (!child.isSkinnedMesh) return;
+          skinned += 1;
+          assert.equal(child.frustumCulled, false);
+        });
+        assert.equal(skinned, 1, spec.lookId);
+        assert.equal(bones, 18, spec.lookId);
+        const handR = buyer.getObjectByName('Hand_R');
+        assert.ok(handR);
+        if (spec.carryHand === 'Hand_L') {
+          assert.equal(handR.children.length, 0, 'Donie staff stays on Hand_R with no attached tool');
+          assert.equal(buyer.userData.hand.parent?.name, 'Hand_L');
+        } else {
+          assert.equal(buyer.userData.hand.parent?.name, 'Hand_R');
+          assert.equal(handR.children.some((child) => child.isMesh), false);
+        }
+        const moveSpeed = 1.35;
+        loco.speed = moveSpeed;
+        updateWalkPose(buyer, true, 0.05, 1);
+        assert.equal(loco.mode, 'walk');
+        assert.ok(Math.abs(loco.walk.timeScale - (moveSpeed / (spec.speed * BUYER_MODEL_SCALE))) < 1e-6);
+        updateWalkPose(buyer, false, 0.25, 1.3);
+        assert.equal(loco.mode, 'idle');
+        visual.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(visual);
+        const height = box.max.y - box.min.y;
+        const expected = spec.height * BUYER_MODEL_SCALE;
+        assert.ok(Math.abs(box.min.y) < 0.03, `${spec.lookId} feet ${box.min.y}`);
+        assert.ok(Math.abs(height - expected) < 0.08, `${spec.lookId} height ${height} expected ${expected}`);
+        setRiggedBuyer(spec.lookId, gltf);
+        const built = buildAdventurer('pilgrim', { lookId: spec.lookId, seed: 0.2 });
+        assert.equal(built.userData.buyerLookId, spec.lookId);
+        assert.equal(built.userData.clipLocomotion.walkStride, loco.walkStride);
+      }
+    } finally {
+      clearRiggedBuyers();
+    }
+  });
+
+  it('keeps the old adventurer dump when a rigged buyer fails to wrap', () => {
+    setRiggedBuyer('buyer-adventurer-bob', { scene: new THREE.Group(), animations: [] });
+    try {
+      const fallback = buildAdventurer('pilgrim', { lookId: 'buyer-adventurer-bob', seed: 0.2 });
+      assert.equal(fallback.userData.clipLocomotion, undefined);
+      assert.equal(fallback.userData.pick?.userData.kind, 'customer');
+      assert.equal(getRiggedBuyer('buyer-adventurer-bob'), null);
+    } finally {
+      clearRiggedBuyers();
+    }
   });
 });

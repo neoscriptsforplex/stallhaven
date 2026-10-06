@@ -387,6 +387,7 @@ export function createWorld(canvas, state, opts = {}) {
   const dust = buildDust();
   scene.add(dust);
 
+  let drawScene = true;
   let riggedPlayerGltf = opts.riggedPlayer ?? null;
   let riggedGoblinGltf = opts.riggedGoblin ?? null;
   let riggedRatGltf = opts.riggedRat ?? null;
@@ -2638,6 +2639,16 @@ export function createWorld(canvas, state, opts = {}) {
     advanceQueue(lastNow || performance.now() / 1000);
   }
 
+  function holdCustomer(actor, dt, now, bobHz) {
+    if (actor.mesh.userData.clipLocomotion) {
+      actor.mesh.userData.clipLocomotion.speed = 0;
+      syncStance(actor.mesh);
+      updateWalkPose(actor.mesh, false, dt, now);
+      return;
+    }
+    actor.mesh.position.y = syncStance(actor.mesh) + Math.abs(Math.sin(now * bobHz + actor.id)) * 0.012;
+  }
+
   function updateCustomers(dt, now) {
     if (now >= nextSpawnAt) spawnCustomer(now);
     for (let i = customers.length - 1; i >= 0; i -= 1) {
@@ -2651,14 +2662,14 @@ export function createWorld(canvas, state, opts = {}) {
         }
       } else if (actor.state === 'browse') {
         actor.mesh.rotation.y += dt * 0.35;
-        actor.mesh.position.y = syncStance(actor.mesh) + Math.abs(Math.sin(now * 1.4 + actor.id)) * 0.012;
+        holdCustomer(actor, dt, now, 1.4);
         if (now >= actor.waitUntil) joinQueue(actor, now);
       } else if (actor.state === 'queue') {
         actor.mesh.rotation.y = Math.PI + Math.sin(now * 1.1 + actor.id) * 0.06;
-        actor.mesh.position.y = syncStance(actor.mesh) + Math.abs(Math.sin(now * 1.6 + actor.id)) * 0.012;
+        holdCustomer(actor, dt, now, 1.6);
       } else if (actor.state === 'request') {
         actor.mesh.rotation.y = Math.PI + Math.sin(now * 1.4 + actor.id) * 0.12;
-        actor.mesh.position.y = syncStance(actor.mesh) + Math.abs(Math.sin(now * 1.5 + actor.id)) * 0.012;
+        holdCustomer(actor, dt, now, 1.5);
         const have = hasStock(state, actor.requestRecipeId);
         actor.mesh.userData.ring.material.opacity = actor.id === tradingId ? 0.95 : have ? 0.8 : 0.4;
         actor.mesh.userData.ring.material.color.setHex(
@@ -2736,7 +2747,7 @@ export function createWorld(canvas, state, opts = {}) {
       const spinning = Object.keys(state.crafts ?? {}).some((id) => RECIPES[id]?.category === 'spin');
       if (spinning) wheel.rotation.z += dt * 9.5;
     }
-    renderer.render(scene, camera);
+    if (drawScene) renderer.render(scene, camera);
   }
 
   function replaceShopkeeperMesh(next) {
@@ -2929,6 +2940,62 @@ export function createWorld(canvas, state, opts = {}) {
     },
     getFrontCustomer() {
       return customers.find((actor) => actor.state === 'request') ?? null;
+    },
+    setDraw(on = true) {
+      drawScene = Boolean(on);
+    },
+    inspectCustomers() {
+      return customers.map((actor) => {
+        const mesh = actor.mesh;
+        const loco = mesh?.userData?.clipLocomotion ?? null;
+        mesh?.updateMatrixWorld(true);
+        const foot = (name) => {
+          const bone = mesh?.getObjectByName(name);
+          if (!bone) return null;
+          const v = new THREE.Vector3();
+          bone.getWorldPosition(v);
+          return { x: v.x, y: v.y, z: v.z };
+        };
+        let skinned = 0;
+        let culled = 0;
+        mesh?.traverse((child) => {
+          if (!child.isSkinnedMesh) return;
+          skinned += 1;
+          if (child.frustumCulled) culled += 1;
+        });
+        const handR = mesh?.getObjectByName('Hand_R');
+        const visual = mesh?.getObjectByName('rigged-buyer');
+        let height = null;
+        let footY = null;
+        if (visual) {
+          const box = new THREE.Box3().setFromObject(visual);
+          height = box.max.y - box.min.y;
+          footY = box.min.y - (mesh?.position.y ?? 0);
+        }
+        return {
+          id: actor.id,
+          typeId: actor.typeId,
+          lookId: actor.lookId,
+          state: actor.state,
+          x: mesh?.position.x ?? 0,
+          y: mesh?.position.y ?? 0,
+          z: mesh?.position.z ?? 0,
+          rotY: mesh?.rotation.y ?? 0,
+          mode: loco?.mode ?? null,
+          timeScale: loco?.walk?.timeScale ?? null,
+          speed: loco?.speed ?? null,
+          scale: mesh?.userData?.modelScale ?? null,
+          rigged: Boolean(loco && visual),
+          skinned,
+          frustumCulled: culled,
+          handRChildren: (handR?.children ?? []).map((child) => child.name),
+          height,
+          footY,
+          footL: foot('Foot_L'),
+          footR: foot('Foot_R'),
+          buyerLookId: mesh?.userData?.buyerLookId ?? null,
+        };
+      });
     },
     projectToClient(x, y, z) {
       const point = new THREE.Vector3(x, y, z);

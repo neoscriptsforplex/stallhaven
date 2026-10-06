@@ -2,10 +2,10 @@ import { RECIPES } from './game/catalog.js';
 import { completeCrafts, createState, pushLog, tickMaterials } from './game/economy.js';
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
-import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledRiggedGoblin, loadBundledRiggedRat, loadBundledLooks } from './game/upload.js';
+import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledRiggedGoblin, loadBundledRiggedRat, loadBundledRiggedBuyers, loadBundledLooks } from './game/upload.js';
 import { loadBundledMusic } from './game/audio.js';
 import { createWorld } from './game/world.js';
-import { normalizeImported, setBundledLooks } from './game/models.js';
+import { normalizeImported, setBundledLooks, setRiggedBuyers } from './game/models.js';
 
 const canvas = document.querySelector('#view');
 const hudRoot = document.querySelector('#hud');
@@ -57,9 +57,10 @@ async function bootGame() {
   let riggedPlayer = null;
   let riggedGoblin = null;
   let riggedRat = null;
+  let riggedBuyers = {};
   let bundledLooks = {};
   try {
-    const [rigged, looks, , goblin, rat] = await Promise.all([
+    const [rigged, looks, , goblin, rat, buyers] = await Promise.all([
       loadBundledRiggedPlayer().catch((err) => {
         console.warn('Rigged player skipped:', err?.message || err);
         return null;
@@ -79,10 +80,12 @@ async function bootGame() {
         console.warn('Rigged rat skipped:', err?.message || err);
         return null;
       }),
+      loadBundledRiggedBuyers(),
     ]);
     riggedPlayer = rigged;
     riggedGoblin = goblin;
     riggedRat = rat;
+    riggedBuyers = buyers ?? {};
     if (!riggedPlayer) {
       bundledPlayer = await loadBundledPlayerScene().catch((err) => {
         console.warn('Bundled player skipped:', err?.message || err);
@@ -91,6 +94,7 @@ async function bootGame() {
     }
     bundledLooks = looks ?? {};
     setBundledLooks(bundledLooks);
+    setRiggedBuyers(riggedBuyers);
     setBootProgress(1, 1, 'Building shop…');
   } catch (err) {
     console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
@@ -103,6 +107,7 @@ async function bootGame() {
     bundled: {
       player: Boolean(riggedPlayer || bundledPlayer),
       looks: Object.keys(bundledLooks ?? {}),
+      buyers: Object.keys(riggedBuyers ?? {}),
     },
   };
   const hud = bindHud(hudRoot, state, world);

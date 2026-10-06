@@ -89,7 +89,7 @@ Cook these on the **range**, not the anvil. Food displays on wall shelves.
 
 ### Potions
 
-Brew on a placed **cauldron** from **Herbs** and **Water**: Strength (yellow), Prayer (aqua), Attack (turquoise), Anti Poison (lime), Ranging (light blue), Antifire (purple), Energy (pink), Magic (peach). Sell prices start at **1,000g** for Strength and climb with rarity (Prayer 1,500g … Magic 16,000g). Vials sit on wall shelves.
+Brew on a placed **cauldron** from **Herbs** and **Water**: Attack (turquoise), Strength (yellow), Antipoison (lime), Energy (pink), Prayer (aqua), Antifire (purple), Ranging (light blue), Magic (peach). Sell prices start at **1,000g** for Attack and climb with rarity (Strength 1,500g … Magic 16,000g). Vials sit on wall shelves.
 
 ## Shop upgrades
 

@@ -905,7 +905,7 @@ export const FLAX_CLICK_RADIUS = 0.72;
 const FLAX_EDGE = 0.7;
 /** Stay outside the doubled crown and the widened grass-click radius. */
 const FLAX_TREE_CLEAR = Math.max(treeCanopyRadius('edge'), TREE_CLICK_RADIUS) + 0.25;
-const FLAX_BED_CLEAR = 1.05;
+const FLAX_FLOWER_CLEAR = 0.34;
 const FLAX_STATION_CLEAR = 1.45;
 const FLAX_DISPLAY_CLEAR = 1.2;
 const FLAX_TRAP_CLEAR = 1.25;
@@ -924,8 +924,9 @@ export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furnit
   for (const rock of gardenRockSpots(expansionIds)) {
     if (Math.hypot(x - rock.x, z - rock.z) < gardenRockRadius(rock.scale ?? 1) + 0.3) return true;
   }
-  for (const bed of gardenBedSpots(expansionIds)) {
-    if (Math.hypot(x - bed.x, z - bed.z) < FLAX_BED_CLEAR) return true;
+  for (const flower of gardenFlowerSpots(expansionIds)) {
+    const reach = FLAX_FLOWER_CLEAR + (flower.scale ?? 1) * 0.16;
+    if (Math.hypot(x - flower.x, z - flower.z) < reach) return true;
   }
   const furn = furniture ?? defaultFurniture();
   for (const id of FLAX_STATION_IDS) {
@@ -1019,6 +1020,75 @@ export const GARDEN_BED_SPOTS = [
 
 export function gardenBedSpots(expansionIds = []) {
   return GARDEN_BED_SPOTS.filter((spot) => keepGardenSpot(spot, expansionIds));
+}
+
+const FLOWER_TINT_COUNT = 6;
+const flowerSpotCache = new Map();
+
+function flowerBlocked(x, z, expansionIds, trees, rocks) {
+  const grass = gardenBox(expansionIds);
+  const edge = 0.4;
+  if (x < grass.minX + edge || x > grass.maxX - edge) return true;
+  if (z < grass.minZ + edge || z > grass.maxZ - edge) return true;
+  if (pointHitsShop(x, z, expansionIds, 0.55)) return true;
+  if (pointOnFloors(x, z, walkFloors(expansionIds), 0)) return true;
+  if (pointOnPath(x, z, expansionIds, 0.48)) return true;
+  if (Math.hypot(x - FOUNTAIN.x, z - FOUNTAIN.z) < (FOUNTAIN.apron ?? 1.42) + 0.3) return true;
+  if (pointHitsTrapdoor(x, z, TRAPDOOR_HOLE_CLEAR + 0.28)) return true;
+  const front = shopFloorFootprint(0, 0).maxZ;
+  if (Math.abs(x - SHOP.door.x) <= DOOR_HALF + 0.45 && z > front - 0.05 && z < PATH_START_Z + 0.05) {
+    return true;
+  }
+  const trunk = TREE_TRUNK_RADIUS * (1 + TREE_SCALE_SPREAD) + 0.16;
+  for (const tree of trees) {
+    if (Math.hypot(x - tree.x, z - tree.z) < trunk) return true;
+  }
+  for (const rock of rocks) {
+    if (Math.hypot(x - rock.x, z - rock.z) < gardenRockRadius(rock.scale ?? 1) + 0.22) return true;
+  }
+  return false;
+}
+
+/**
+ * Deterministic blossoms on every lawn. Centres stay off the shop, path,
+ * fountain, hatch, door, trunks, and rocks. Callers instance the flower mesh.
+ */
+export function gardenFlowerSpots(expansionIds = []) {
+  const key = expansionIds.length ? [...expansionIds].sort().join('|') : '-';
+  const cached = flowerSpotCache.get(key);
+  if (cached) return cached;
+  const grass = gardenBox(expansionIds);
+  const rand = gardenSeedRand(510510 + key.length * 97);
+  const trees = gardenTreeSpots(expansionIds);
+  const rocks = gardenRockSpots(expansionIds);
+  const spots = [];
+  const cell = 2.05;
+  const cols = Math.max(1, Math.ceil((grass.maxX - grass.minX) / cell));
+  const rows = Math.max(1, Math.ceil((grass.maxZ - grass.minZ) / cell));
+  const dx = (grass.maxX - grass.minX) / cols;
+  const dz = (grass.maxZ - grass.minZ) / rows;
+  const tooClose = (x, z, gap) => spots.some((spot) => Math.hypot(spot.x - x, spot.z - z) < gap);
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      if (rand() < 0.38) continue;
+      const extras = rand() < 0.28 ? 2 : 1;
+      for (let k = 0; k < extras; k += 1) {
+        const x = grass.minX + (c + 0.12 + rand() * 0.76) * dx;
+        const z = grass.minZ + (r + 0.12 + rand() * 0.76) * dz;
+        if (flowerBlocked(x, z, expansionIds, trees, rocks)) continue;
+        if (tooClose(x, z, 0.62)) continue;
+        spots.push({
+          x,
+          z,
+          yaw: rand() * Math.PI * 2,
+          scale: 0.58 + rand() * 0.62,
+          tint: Math.floor(rand() * FLOWER_TINT_COUNT),
+        });
+      }
+    }
+  }
+  flowerSpotCache.set(key, spots);
+  return spots;
 }
 
 function gardenSeedRand(seed) {

@@ -40,6 +40,9 @@ import {
   gardenRockRadius,
   gardenTrapdoorSpot,
   gardenBedSpots,
+  gardenFlowerSpots,
+  pointOnFloors,
+  TREE_TRUNK_RADIUS,
   pointHitsTrapdoor,
   segmentHitsTrapdoor,
   TRAPDOOR,
@@ -393,6 +396,37 @@ describe('layout numbers', () => {
     assert.equal(isWalkable(SHOP.keeper.x, SHOP.keeper.z, shopObstacles(SHOP), 0.28, player), true);
     assert.equal(isWalkable(0, SHOP.door.z, [], 0.28, player), true);
     assert.equal(isWalkable(0, 4.6, [], 0.28, player), true);
+  });
+
+  it('scatters flowers across the grass and off paths, buildings, trunks, and rocks', () => {
+    const spots = gardenFlowerSpots([]);
+    const grass = gardenBox([]);
+    assert.ok(spots.length >= 40, `expected a lawn of flowers, got ${spots.length}`);
+    assert.ok(spots.some((spot) => spot.x < grass.cx - 8));
+    assert.ok(spots.some((spot) => spot.x > grass.cx + 8));
+    assert.ok(spots.some((spot) => spot.z < grass.cz - 8));
+    assert.ok(spots.some((spot) => spot.z > grass.cz + 8));
+    const scales = spots.map((spot) => spot.scale);
+    assert.ok(Math.max(...scales) - Math.min(...scales) > 0.35);
+    assert.ok(new Set(spots.map((spot) => spot.tint)).size >= 4);
+    assert.ok(new Set(spots.map((spot) => spot.yaw.toFixed(2))).size > 12);
+    const trees = gardenTreeSpots([]);
+    const rocks = gardenRockSpots([]);
+    for (const spot of spots) {
+      assert.equal(pointHitsShop(spot.x, spot.z, [], 0.2), false, `${spot.x},${spot.z} hits the shop`);
+      assert.equal(pointOnFloors(spot.x, spot.z, walkFloors([]), 0), false);
+      assert.equal(pointOnPath(spot.x, spot.z, [], 0.05), false);
+      assert.equal(pointHitsTrapdoor(spot.x, spot.z, TRAPDOOR_HOLE_CLEAR), false);
+      for (const tree of trees) {
+        assert.ok(Math.hypot(spot.x - tree.x, spot.z - tree.z) >= TREE_TRUNK_RADIUS);
+      }
+      for (const rock of rocks) {
+        assert.ok(Math.hypot(spot.x - rock.x, spot.z - rock.z) >= gardenRockRadius(rock.scale ?? 1));
+      }
+    }
+    const left = gardenFlowerSpots(['left']);
+    assert.equal(left.some((spot) => pointHitsShop(spot.x, spot.z, ['left'], 0)), false);
+    assert.ok(left.some((spot) => spot.x < -8));
   });
 
   it('keeps garden trees and large rocks off flower beds', () => {

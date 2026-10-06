@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   EXPANSION_PADS,
   FOUNTAIN,
@@ -10,8 +11,8 @@ import {
   SHOP_FURNITURE_FLOOR_Y,
   cobblePathSpan,
   cobbleRingTuck,
-  gardenBedSpots,
   gardenBox,
+  gardenFlowerSpots,
   gardenGrassClusters,
   gardenRockSpots,
   gardenTrapdoorSpot,
@@ -1798,27 +1799,93 @@ function addFountain(root, x, z) {
   return group;
 }
 
-function addGardenBed(root, x, z, rand) {
-  const soil = addShadow(new THREE.Mesh(
-    new THREE.CylinderGeometry(0.55, 0.62, 0.12, 10),
-    new THREE.MeshStandardMaterial({ color: 0x4a331c, roughness: 1 }),
-  ));
-  soil.position.set(x, 0.04, z);
-  root.add(soil);
-  const flowers = buildFlowerCluster(rand);
-  flowers.position.set(x, 0.08, z);
-  root.add(flowers);
-}
+const FLOWER_TINTS = [0xffffff, 0xffb7c8, 0xffd56a, 0xf3efe6, 0xd98ad4, 0xff8a5b];
 
 function buildFlowerCluster(rand) {
   const target = buildProceduralFlowerCluster(rand);
   const bundled = getBundledLook('flowers');
   if (bundled) {
-    const mesh = wrapBundledProp(bundled, target, { name: 'flowers', fit: 'max' });
-    mesh.rotation.y = rand() * Math.PI * 2;
-    return mesh;
+    return wrapBundledProp(bundled, target, { name: 'flowers', fit: 'max' });
   }
   return target;
+}
+
+function meshTint(material) {
+  const mat = Array.isArray(material) ? material[0] : material;
+  return mat?.color ?? new THREE.Color(1, 1, 1);
+}
+
+/** One grounded flower, vertex colours baked, ready to instance. */
+function flowerGeometry(rand) {
+  const visual = buildFlowerCluster(rand);
+  // Keep the fitted wrapper scale. Zeroing it restores the raw dump, which is metres wide.
+  visual.updateMatrixWorld(true);
+  const pieces = [];
+  visual.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    if (child.material && child.material.visible === false) return;
+    const source = child.geometry.index ? child.geometry.toNonIndexed() : child.geometry.clone();
+    source.applyMatrix4(child.matrixWorld);
+    const position = source.getAttribute('position');
+    if (!position) return;
+    if (!source.getAttribute('normal')) source.computeVertexNormals();
+    const tint = meshTint(child.material);
+    const colors = new Float32Array(position.count * 3);
+    for (let i = 0; i < position.count; i += 1) {
+      colors[i * 3] = tint.r;
+      colors[i * 3 + 1] = tint.g;
+      colors[i * 3 + 2] = tint.b;
+    }
+    const next = new THREE.BufferGeometry();
+    next.setAttribute('position', position.clone());
+    next.setAttribute('normal', source.getAttribute('normal').clone());
+    next.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    pieces.push(next);
+    source.dispose();
+  });
+  if (!pieces.length) return null;
+  const merged = mergeGeometries(pieces, false);
+  pieces.forEach((geo) => geo.dispose());
+  if (!merged) return null;
+  merged.computeBoundingBox();
+  const box = merged.boundingBox;
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  merged.translate(-center.x, -box.min.y, -center.z);
+  return merged;
+}
+
+function addGrassFlowers(root, expansionIds) {
+  const spots = gardenFlowerSpots(expansionIds);
+  const geometry = flowerGeometry(randAt(8801));
+  if (!spots.length || !geometry) return;
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.72,
+    metalness: 0,
+  });
+  const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
+  mesh.name = 'flowers';
+  mesh.userData.kind = 'decor';
+  mesh.castShadow = false;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  mesh.raycast = () => {};
+  const dummy = new THREE.Object3D();
+  const color = new THREE.Color();
+  for (let i = 0; i < spots.length; i += 1) {
+    const spot = spots[i];
+    dummy.position.set(spot.x, GRASS_PLANE_Y, spot.z);
+    dummy.rotation.set(0, spot.yaw, 0);
+    dummy.scale.setScalar(spot.scale);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+    color.setHex(FLOWER_TINTS[spot.tint % FLOWER_TINTS.length]);
+    mesh.setColorAt(i, color);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  root.add(mesh);
 }
 
 function buildProceduralFlowerCluster(rand) {
@@ -1846,19 +1913,6 @@ function buildProceduralFlowerCluster(rand) {
 }
 
 function addGarden(root, cells, expansionIds = []) {
-  const box = {
-    minX: Infinity,
-    maxX: -Infinity,
-    minZ: Infinity,
-    maxZ: -Infinity,
-  };
-  for (const cell of cells) {
-    const c = roomCenter(cell.gx, cell.gz);
-    box.minX = Math.min(box.minX, c.x - ROOM_W / 2);
-    box.maxX = Math.max(box.maxX, c.x + ROOM_W / 2);
-    box.minZ = Math.min(box.minZ, c.z - ROOM_D / 2);
-    box.maxZ = Math.max(box.maxZ, c.z + ROOM_D / 2);
-  }
   const grass = gardenBox(expansionIds);
   const grassW = grass.maxX - grass.minX;
   const grassD = grass.maxZ - grass.minZ;
@@ -1874,10 +1928,6 @@ function addGarden(root, cells, expansionIds = []) {
 
   addCobblePath(root, expansionIds);
   if (keepFountain(expansionIds)) addFountain(root, FOUNTAIN.x, FOUNTAIN.z);
-
-  gardenBedSpots(expansionIds).forEach((spot, i) => {
-    addGardenBed(root, spot.x, spot.z, randAt(2201 + i * 1110));
-  });
 
   const rand = randAt(1337 + cells.length * 17);
   resetPlantedTrunks();
@@ -1909,24 +1959,7 @@ function addGarden(root, cells, expansionIds = []) {
     root.add(door);
   }
   addLushGrass(root, grass, expansionIds, rand);
-  for (let i = 0; i < 14; i += 1) {
-    const leftSide = i % 2 === 0;
-    const side = leftSide ? box.minX - 1.1 : box.maxX + 1.1;
-    const z = box.minZ - 1.2 + rand() * ((box.maxZ - box.minZ) + 3);
-    const x = side + (rand() - 0.5);
-    if (!keepGardenSpot({ x, z, side: leftSide ? 'left' : 'right' }, expansionIds)) continue;
-    const flowers = buildFlowerCluster(rand);
-    flowers.position.set(x, 0, z);
-    root.add(flowers);
-  }
-  for (let i = 0; i < 6; i += 1) {
-    const x = box.minX + rand() * (box.maxX - box.minX);
-    const z = box.minZ - 1.4 - rand() * 1.6;
-    if (!keepGardenSpot({ x, z, side: 'rear' }, expansionIds)) continue;
-    const flowers = buildFlowerCluster(rand);
-    flowers.position.set(x, 0, z);
-    root.add(flowers);
-  }
+  addGrassFlowers(root, expansionIds);
 }
 
 function addPathRect(root, minX, maxX, minZ, maxZ) {

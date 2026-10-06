@@ -495,24 +495,49 @@ describe('outdoor and dungeon extras', () => {
     assert.equal(leftInRoom, 0);
   });
 
-  it('keeps round dark-green bushes off garden soil patches', () => {
+  it('scatters instanced flowers on the grass without beds or click meshes', () => {
     const { root } = buildShop([]);
     let bushes = 0;
     let soils = 0;
-    let flowerBeds = 0;
+    let flowers = null;
     root.traverse((child) => {
-      if (child.name === 'flowers') flowerBeds += 1;
       if (child.isMesh && child.geometry?.type === 'CylinderGeometry' && child.material?.color?.getHex?.() === 0x4a331c) {
         soils += 1;
       }
+      if (child.name === 'flowers' && child.isInstancedMesh) flowers = child;
       if (child.isMesh && child.geometry?.type === 'SphereGeometry' && child.geometry.parameters?.radius === 0.28) {
         const hex = child.material?.color?.getHex?.();
         if (hex === 0x2f6a32) bushes += 1;
       }
     });
     assert.equal(bushes, 0);
-    assert.ok(soils >= 1, 'dirt patches should remain');
-    assert.ok(flowerBeds >= 1, 'flower beds should remain');
+    assert.equal(soils, 0, 'flower-bed soil should be gone');
+    assert.ok(flowers, 'lawn flowers should be one instanced mesh');
+    assert.equal(flowers.userData.kind, 'decor');
+    assert.equal(flowers.raycast.length, 0);
+    assert.ok(flowers.count >= 40, `expected a spread of flowers, got ${flowers.count}`);
+    flowers.geometry.computeBoundingBox();
+    assert.ok(Math.abs(flowers.geometry.boundingBox.min.y) < 1e-3, 'flower base is the local origin');
+    const matrix = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    const ray = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (let i = 0; i < flowers.count; i += 1) {
+      flowers.getMatrixAt(i, matrix);
+      pos.setFromMatrixPosition(matrix);
+      assert.ok(Math.abs(pos.y - (-0.02)) < 1e-4, `flower should sit on the grass plane, y=${pos.y}`);
+      minX = Math.min(minX, pos.x);
+      maxX = Math.max(maxX, pos.x);
+      minZ = Math.min(minZ, pos.z);
+      maxZ = Math.max(maxZ, pos.z);
+    }
+    assert.ok(maxX - minX > 16, 'flowers should cross the lawn');
+    assert.ok(maxZ - minZ > 16, 'flowers should run the length of the lawn');
+    ray.ray.origin.set(pos.x, 4, pos.z);
+    assert.equal(ray.intersectObject(flowers, false).length, 0, 'flowers must not steal ground clicks');
   });
 
   it('lights expansion rooms with extra wall torches', () => {
@@ -1064,6 +1089,17 @@ describe('bundled prop swaps', () => {
     const flowers = wrapBundledProp(await loadFolder('flowers'), new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.22, 0.55)), { name: 'flowers', fit: 'max' });
     assertUniform(flowers);
     assertGrounded(flowers);
+    setBundledLook('flowers', await loadFolder('flowers'));
+    try {
+      const planted = buildShop([]).root.getObjectByName('flowers');
+      assert.equal(planted?.isInstancedMesh, true);
+      planted.geometry.computeBoundingBox();
+      const size = planted.geometry.boundingBox.getSize(new THREE.Vector3());
+      assert.ok(size.x < 1.2 && size.y < 0.7 && size.z < 1.2, `bundled blossom should stay flower-sized, got ${size.x}×${size.y}×${size.z}`);
+      assert.ok(Math.abs(planted.geometry.boundingBox.min.y) < 1e-3);
+    } finally {
+      setBundledLook('flowers', null);
+    }
 
     const rock = wrapBundledProp(await loadFolder('rock'), new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.28, 0.45)), { name: 'rock', fit: 'max' });
     assertUniform(rock);

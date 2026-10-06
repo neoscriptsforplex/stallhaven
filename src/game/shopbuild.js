@@ -2263,6 +2263,9 @@ function addDungeonWallTorches(root, W = 11, D = 9) {
   }
 }
 
+/** Cobble wall height. The exit ladder is stretched to this top. */
+export const DUNGEON_WALL_H = 3.4;
+
 export function buildDungeon(opts = {}) {
   const root = new THREE.Group();
   root.name = 'dungeon';
@@ -2270,7 +2273,7 @@ export function buildDungeon(opts = {}) {
   grounds.name = 'dungeon-grounds';
   const W = 11;
   const D = 9;
-  const H = 3.4;
+  const H = DUNGEON_WALL_H;
   /** Top face of the cobble slab (0.12 thick, centered at y=-0.04). */
   const floor = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(W, 0.12, D),
@@ -2441,36 +2444,53 @@ function ladderFitTarget() {
   return mesh;
 }
 
+/** Half the rail width, then stretch Y so the top meets the wall. Depth stays put. */
+function stretchLadderToWall(mesh) {
+  mesh.updateMatrixWorld(true);
+  const size = measureVisibleBox(mesh).getSize(new THREE.Vector3());
+  if (size.x > 1e-4) mesh.scale.x *= 0.5;
+  if (size.y > 1e-4) mesh.scale.y *= DUNGEON_WALL_H / size.y;
+  sitVisibleOnY(mesh, 0);
+  return mesh;
+}
+
 export function buildDungeonLadder() {
   const bundled = getBundledLook('ladder');
-  let ladder;
+  let visual;
   if (bundled) {
-    const fitted = wrapBundledProp(bundled, ladderFitTarget(), { name: 'ladder', fit: 'max' });
-    fitted.name = 'ladder';
-    markLadder(fitted);
-    fitted.traverse((child) => markLadder(child));
-    fitted.add(makeLadderPick());
-    ladder = fitted;
+    visual = wrapBundledProp(bundled, ladderFitTarget(), { name: 'ladder-mesh', fit: 'max' });
+    visual.name = 'ladder-mesh';
+    markLadder(visual);
+    visual.traverse((child) => markLadder(child));
   } else {
-    ladder = buildProceduralDungeonLadder();
+    visual = buildProceduralDungeonLadder();
   }
+  stretchLadderToWall(visual);
+  visual.updateMatrixWorld(true);
+  const width = measureVisibleBox(visual).getSize(new THREE.Vector3()).x;
+  const ladder = new THREE.Group();
+  ladder.name = 'ladder';
+  ladder.add(visual);
+  ladder.add(makeLadderPick(width));
+  markLadder(ladder);
   // Dump and rails are wide in X; yaw so the face sits flat on the west wall.
   ladder.rotation.y = Math.PI / 2;
   return ladder;
 }
 
-function makeLadderPick() {
+function makeLadderPick(width) {
   const pick = markLadder(new THREE.Mesh(
-    new THREE.BoxGeometry(1.1, 2.8, 0.7),
+    new THREE.BoxGeometry(Math.max(0.12, width), DUNGEON_WALL_H, 0.7),
     pickMat(),
   ));
-  pick.position.set(0, 1.3, 0.12);
+  pick.name = 'ladder-pick';
+  pick.position.set(0, DUNGEON_WALL_H / 2, 0.12);
   return pick;
 }
 
 function buildProceduralDungeonLadder() {
   const group = new THREE.Group();
-  group.name = 'ladder';
+  group.name = 'ladder-mesh';
   const rail = wood(0x5a3a22);
   for (const x of [-0.18, 0.18]) {
     const post = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.05), rail));
@@ -2482,7 +2502,6 @@ function buildProceduralDungeonLadder() {
     rung.position.set(0, 0.28 + i * 0.3, 0.02);
     group.add(markLadder(rung));
   }
-  group.add(makeLadderPick());
   return group;
 }
 

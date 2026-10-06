@@ -14,6 +14,7 @@ import {
   customerName,
   defaultAppearance,
   displayKind,
+  isHandOrFootWare,
   formatGold,
   isAmmoRecipe,
   isCraftedMaterial,
@@ -746,7 +747,7 @@ export function bindHud(root, state, world) {
           <span class="meta">×${count} · ${classLabel(recipe.combatClass, recipe.category)} · sells ${formatGold(recipe.price)}g</span>
         </div>
         <div class="chest-actions">
-          ${standSelected ? `<button type="button" data-place="${recipe.id}">Place on Stand</button>` : ''}
+          ${standSelected && !isHandOrFootWare(recipe) ? `<button type="button" data-place="${recipe.id}">Place on Stand</button>` : ''}
           <button type="button" class="chest-bin" data-discard="${recipe.id}" title="Discard">🗑</button>
         </div>
       </div>
@@ -1795,7 +1796,9 @@ export function bindHud(root, state, world) {
     }
     const combat = fillClass === 'ranged' ? 'range' : fillClass;
     const items = chestList(state).filter((item) => (
-      item.recipe?.category === 'armour' && item.recipe.combatClass === combat
+      item.recipe?.category === 'armour'
+      && item.recipe.combatClass === combat
+      && !isHandOrFootWare(item.recipe)
     ));
     if (!items.length) {
       selectedFillId = null;

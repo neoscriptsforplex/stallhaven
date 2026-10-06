@@ -1429,10 +1429,19 @@ export function isShelfItem(recipe) {
   );
 }
 
+/** Gloves, gauntlets, vambraces, boots, and any other hand or foot slot. */
+export function isHandOrFootWare(recipeOrId) {
+  const recipe = typeof recipeOrId === 'string' ? RECIPES[recipeOrId] : recipeOrId;
+  return recipe?.slot === 'gloves' || recipe?.slot === 'boots';
+}
+
 /** Wares that can sit on a table or 4-slot wall shelf (not armour stands). */
 export function canDisplayOn(kind, recipe) {
   if (!recipe || recipe.outputMaterial) return false;
-  if (kind === 'stand') return recipe.category === 'armour' || recipe.category === 'weapon';
+  if (kind === 'stand') {
+    if (isHandOrFootWare(recipe)) return false;
+    return recipe.category === 'armour' || recipe.category === 'weapon';
+  }
   const gear = recipe.category === 'weapon' || recipe.category === 'armour' || isToolRecipe(recipe);
   const ammoOrRune = recipe.category === 'rune' || recipe.category === 'ammo';
   const platter = recipe.category === 'food' || recipe.category === 'potion';
@@ -1662,6 +1671,7 @@ export function matchingArmourIds(recipeId, ownedIds) {
       && other.combatClass === recipe.combatClass
       && other.setKey === recipe.setKey
       && ARMOUR_SLOTS.includes(other.slot)
+      && !isHandOrFootWare(other)
     ));
   const rank = (other) => {
     if (other.id === recipeId) return 0;
@@ -1672,7 +1682,7 @@ export function matchingArmourIds(recipeId, ownedIds) {
   for (const other of owned) {
     if (!slots[other.slot]) slots[other.slot] = other.id;
   }
-  if (ARMOUR_SLOTS.includes(recipe.slot)) slots[recipe.slot] = recipeId;
+  if (ARMOUR_SLOTS.includes(recipe.slot) && !isHandOrFootWare(recipe)) slots[recipe.slot] = recipeId;
   return slots;
 }
 

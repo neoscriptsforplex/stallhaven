@@ -22,6 +22,7 @@ import {
   emptyShelfSlots,
   emptySlots,
   formatGold,
+  isHandOrFootWare,
   matchingArmourIds,
   masteryNeed,
   MASTERY_SPEED,
@@ -1025,12 +1026,13 @@ export function refreshShowcases(state) {
     migrateShelfSlots(display, index, state);
     const kind = displayKind(index, state);
     if (kind === 'stand') {
+      clearMannequinHandsAndFeet(state, display);
       for (const slot of ARMOUR_SLOTS) {
         const id = display.slots[slot];
         if (id && chestCount(state, id) < 1) display.slots[slot] = null;
       }
       const focus = display.ware?.recipeId;
-      if (focus && chestCount(state, focus) > 0 && RECIPES[focus]?.category === 'armour') {
+      if (focus && !isHandOrFootWare(focus) && chestCount(state, focus) > 0 && RECIPES[focus]?.category === 'armour') {
         fillStandSet(display, focus, Object.keys(state.chest).filter((id) => chestCount(state, id) > 0));
       } else {
         const filled = ARMOUR_SLOTS.map((slot) => display.slots[slot]).filter(Boolean);
@@ -1048,7 +1050,9 @@ export function refreshShowcases(state) {
   for (const [index, display] of state.displays.entries()) {
     if (displayKind(index, state) !== 'stand') continue;
     if (ARMOUR_SLOTS.some((slot) => display.slots[slot])) continue;
-    const next = chestIds.find((id) => !shown.has(id) && RECIPES[id]?.category === 'armour');
+    const next = chestIds.find((id) => (
+      !shown.has(id) && RECIPES[id]?.category === 'armour' && !isHandOrFootWare(id)
+    ));
     if (!next) continue;
     fillStandSet(display, next, chestIds);
     for (const slot of ARMOUR_SLOTS) {
@@ -1416,11 +1420,26 @@ export function autoStock(state) {
   refreshShowcases(state);
 }
 
+function clearMannequinHandsAndFeet(state, display) {
+  if (!display.slots) display.slots = emptySlots();
+  for (const slot of ['boots', 'gloves']) {
+    const id = display.slots[slot];
+    if (!id) continue;
+    display.slots[slot] = null;
+    if (RECIPES[id] && chestCount(state, id) < 1) addToChest(state, id);
+  }
+  if (isHandOrFootWare(display.ware?.recipeId)) {
+    const filled = ARMOUR_SLOTS.map((slot) => display.slots[slot]).filter(Boolean);
+    display.ware = filled.length ? { recipeId: filled[0] } : null;
+  }
+}
+
 export function assignStandPiece(state, displayIndex, recipeId) {
   if (chestCount(state, recipeId) < 1) return false;
   const display = state.displays[displayIndex];
   if (!display || displayKind(displayIndex, state) !== 'stand') return false;
   const recipe = RECIPES[recipeId];
+  if (isHandOrFootWare(recipe)) return false;
   if (recipe?.category !== 'armour' || !ARMOUR_SLOTS.includes(recipe.slot)) return false;
   if (!display.slots) display.slots = emptySlots();
   display.slots[recipe.slot] = recipeId;
@@ -1433,7 +1452,7 @@ export function fillStandFromRecipe(state, displayIndex, recipeId) {
   const display = state.displays[displayIndex];
   if (!display || displayKind(displayIndex, state) !== 'stand') return false;
   const recipe = RECIPES[recipeId];
-  if (recipe?.category !== 'armour') return false;
+  if (recipe?.category !== 'armour' || isHandOrFootWare(recipe)) return false;
   if (!display.slots) display.slots = emptySlots();
   const owned = Object.keys(state.chest).filter((id) => chestCount(state, id) > 0);
   fillStandSet(display, recipeId, owned);

@@ -871,6 +871,218 @@ export function buildHatchet(tint = 0x8a5a32) {
   return group;
 }
 
+const heldToolFrames = new Map();
+
+function meshVertexSamples(root) {
+  const samples = [];
+  root.updateMatrixWorld(true);
+  root.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    const pos = child.geometry.getAttribute('position');
+    if (!pos) return;
+    const index = child.geometry.index;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    const groups = child.geometry.groups?.length
+      ? child.geometry.groups
+      : [{ start: 0, count: index ? index.count : pos.count, materialIndex: 0 }];
+    for (const group of groups) {
+      const mat = materials[group.materialIndex] ?? materials[0];
+      const color = mat?.color;
+      const r = color?.r ?? 0;
+      const g = color?.g ?? 0;
+      const b = color?.b ?? 0;
+      const end = group.start + group.count;
+      if (index) {
+        const limit = Math.min(end, index.count);
+        for (let i = group.start; i < limit; i += 1) {
+          samples.push({
+            p: new THREE.Vector3().fromBufferAttribute(pos, index.getX(i)).applyMatrix4(child.matrixWorld),
+            r, g, b,
+          });
+        }
+      } else {
+        const limit = Math.min(end, pos.count);
+        for (let i = group.start; i < limit; i += 1) {
+          samples.push({
+            p: new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld),
+            r, g, b,
+          });
+        }
+      }
+    }
+  });
+  return samples;
+}
+
+function isWoodSample(sample) {
+  return sample.r > sample.b * 1.35 && sample.r + 1e-6 >= sample.g * 0.85;
+}
+
+function sampleCentroid(list) {
+  const center = new THREE.Vector3();
+  if (!list.length) return center;
+  for (const sample of list) center.add(sample.p ?? sample);
+  return center.multiplyScalar(1 / list.length);
+}
+
+function principalAxis(points) {
+  const center = sampleCentroid(points);
+  let xx = 0; let yy = 0; let zz = 0; let xy = 0; let xz = 0; let yz = 0;
+  for (const p of points) {
+    const x = p.x - center.x;
+    const y = p.y - center.y;
+    const z = p.z - center.z;
+    xx += x * x; yy += y * y; zz += z * z;
+    xy += x * y; xz += x * z; yz += y * z;
+  }
+  const axis = new THREE.Vector3(0, 1, 0);
+  for (let k = 0; k < 48; k += 1) {
+    const x = xx * axis.x + xy * axis.y + xz * axis.z;
+    const y = xy * axis.x + yy * axis.y + yz * axis.z;
+    const z = xz * axis.x + yz * axis.y + zz * axis.z;
+    const len = Math.hypot(x, y, z) || 1;
+    axis.set(x / len, y / len, z / len);
+  }
+  return { center, axis };
+}
+
+function extentAlong(points, center, axis) {
+  let minT = Infinity;
+  let maxT = -Infinity;
+  for (const p of points) {
+    const t = p.clone().sub(center).dot(axis);
+    if (t < minT) minT = t;
+    if (t > maxT) maxT = t;
+  }
+  return {
+    length: maxT - minT,
+    endMin: center.clone().addScaledVector(axis, minT),
+    endMax: center.clone().addScaledVector(axis, maxT),
+  };
+}
+
+function headSide(points, center, axis) {
+  const perps = [];
+  for (const p of points) {
+    const rel = p.clone().sub(center);
+    const perp = rel.addScaledVector(axis, -rel.dot(axis));
+    const len = perp.length();
+    if (len > 1e-5) perps.push({ perp, len });
+  }
+  if (!perps.length) return new THREE.Vector3(1, 0, 0);
+  perps.sort((a, b) => b.len - a.len);
+  const seed = perps[0].perp.clone().normalize();
+  const acc = new THREE.Vector3();
+  const cutoff = perps[0].len * 0.55;
+  for (const item of perps) {
+    if (item.len < cutoff) break;
+    if (item.perp.clone().normalize().dot(seed) <= 0) continue;
+    acc.add(item.perp);
+  }
+  if (acc.lengthSq() < 1e-8) return seed;
+  return acc.normalize();
+}
+
+function proceduralHeldFrame(tool) {
+  const mesh = tool === 'hatchet' ? buildHatchet() : buildPickaxe();
+  const points = meshVertexSamples(mesh).map((sample) => sample.p);
+  const { center, axis } = principalAxis(points);
+  const extent = extentAlong(points, center, axis);
+  const buttIsMin = extent.endMin.lengthSq() <= extent.endMax.lengthSq();
+  const dir = buttIsMin ? axis.clone() : axis.clone().negate();
+  return {
+    butt: buttIsMin ? extent.endMin : extent.endMax,
+    axis: dir,
+    length: extent.length,
+    side: headSide(points, center, dir),
+  };
+}
+
+function bundledHeldFrame(samples) {
+  const points = samples.map((sample) => sample.p);
+  const { center, axis } = principalAxis(points);
+  const extent = extentAlong(points, center, axis);
+  const wood = samples.filter(isWoodSample);
+  const metal = samples.filter((sample) => !isWoodSample(sample));
+  let buttIsMin = extent.endMin.lengthSq() <= extent.endMax.lengthSq();
+  if (wood.length && metal.length) {
+    const woodC = sampleCentroid(wood);
+    const metalC = sampleCentroid(metal);
+    const score = (end) => end.distanceTo(metalC) - end.distanceTo(woodC);
+    buttIsMin = score(extent.endMin) >= score(extent.endMax);
+  }
+  const dir = buttIsMin ? axis.clone() : axis.clone().negate();
+  return {
+    butt: buttIsMin ? extent.endMin : extent.endMax,
+    axis: dir,
+    length: extent.length,
+    side: headSide(points, center, dir),
+  };
+}
+
+function heldFrame(tool) {
+  if (!heldToolFrames.has(tool)) heldToolFrames.set(tool, proceduralHeldFrame(tool));
+  return heldToolFrames.get(tool);
+}
+
+function alignHeldQuaternion(src, dst) {
+  const q = new THREE.Quaternion().setFromUnitVectors(
+    src.axis.clone().normalize(),
+    dst.axis.clone().normalize(),
+  );
+  const side = src.side.clone().applyQuaternion(q);
+  side.addScaledVector(dst.axis, -side.dot(dst.axis));
+  const want = dst.side.clone();
+  want.addScaledVector(dst.axis, -want.dot(dst.axis));
+  if (side.lengthSq() > 1e-8 && want.lengthSq() > 1e-8) {
+    const roll = new THREE.Quaternion().setFromUnitVectors(side.normalize(), want.normalize());
+    q.premultiply(roll);
+  }
+  return q;
+}
+
+function fitBundledHeldTool(source, frame) {
+  const mesh = source.clone(true);
+  const src = bundledHeldFrame(meshVertexSamples(mesh));
+  const holder = new THREE.Group();
+  holder.name = 'dump';
+  holder.add(mesh);
+  const q = alignHeldQuaternion(src, frame);
+  const scale = frame.length / Math.max(src.length, 1e-4);
+  holder.quaternion.copy(q);
+  holder.scale.setScalar(scale);
+  const butt = src.butt.clone().applyQuaternion(q).multiplyScalar(scale);
+  holder.position.copy(frame.butt).sub(butt);
+  holder.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+  });
+  return holder;
+}
+
+/**
+ * Pickaxe or hatchet held while mining or chopping.
+ * Uses the baked rune gear dump when that look is loaded, and otherwise the
+ * same procedural tool recoloured with the rune metal tint. The handle butt
+ * and head stay on the procedural grip so poseHeldPickaxe still seats it.
+ */
+export function buildHeldTool(kind) {
+  const tool = kind === 'hatchet' ? 'hatchet' : 'pickaxe';
+  const group = new THREE.Group();
+  group.name = tool;
+  const lookId = tool === 'hatchet' ? 'runite_hatchet' : 'runite_pickaxe';
+  const bundled = getBundledLook(lookId);
+  if (bundled) {
+    group.add(fitBundledHeldTool(bundled, heldFrame(tool)));
+    return group;
+  }
+  const tint = RECIPES[lookId]?.tint ?? 0x3ec8c4;
+  if (tool === 'hatchet') addHatchet(group, tint);
+  else assemblePickaxe(group, { tint, spikeTint: tint });
+  return group;
+}
+
 export function setHeldTool(mesh, tool) {
   const hammers = mesh?.userData?.hammers ?? [];
   for (const part of hammers) {
@@ -985,9 +1197,9 @@ export function buildShopkeeper(opts = {}) {
   hammerHaft.rotation.z = 0.55;
   const hammerHead = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.07), metal(0x6a7078)));
   hammerHead.position.set(0.12, 0.3, 0.04);
-  const pickaxe = buildPickaxe();
+  const pickaxe = buildHeldTool('pickaxe');
   pickaxe.visible = false;
-  const hatchet = buildHatchet();
+  const hatchet = buildHeldTool('hatchet');
   hatchet.visible = false;
   const hand = group.userData.hand;
   if (hand) {
@@ -3487,11 +3699,11 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
   // Tools are built for the procedural keeper, then that keeper is scaled by
   // PLAYER_WORLD_SCALE. Cancel the rig scale so they stay the same world size.
   grip.scale.setScalar(PLAYER_WORLD_SCALE / modelScale);
-  const pickaxe = buildPickaxe();
+  const pickaxe = buildHeldTool('pickaxe');
   pickaxe.visible = false;
   grip.add(pickaxe);
   poseHeldPickaxe(pickaxe);
-  const hatchet = buildHatchet();
+  const hatchet = buildHeldTool('hatchet');
   hatchet.visible = false;
   grip.add(hatchet);
   poseHeldPickaxe(hatchet);
@@ -3986,11 +4198,11 @@ function attachImportedGrip(group, mesh, height) {
   const arm = group.userData.rig?.armR;
   const grip = new THREE.Group();
   grip.name = 'importedGrip';
-  const pickaxe = buildPickaxe();
+  const pickaxe = buildHeldTool('pickaxe');
   pickaxe.visible = false;
   grip.add(pickaxe);
   poseHeldPickaxe(pickaxe);
-  const hatchet = buildHatchet();
+  const hatchet = buildHeldTool('hatchet');
   hatchet.visible = false;
   grip.add(hatchet);
   poseHeldPickaxe(hatchet);

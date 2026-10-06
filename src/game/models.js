@@ -730,29 +730,81 @@ function settleStanceY(mesh, dt) {
 
 /** In-place Walk clip speed of character_rigged.glb at scale 1. */
 export const RIGGED_WALK_SPEED = 0.834;
-/** Crossfade between Walk and Idle. */
+/** Crossfade between Walk, Idle, and the gathering clips. */
 export const RIGGED_CLIP_FADE = 0.2;
 /** Both the old shopkeeper and the rig face +Z, so atan2(dx, dz) needs no extra yaw. */
 export const RIGGED_FACING_YAW = 0;
+/** Fist centre in Hand_R local units. The bone origin is the wrist. */
+export const RIGGED_FIST = { x: -0.0089, y: -0.0579, z: 0.0045 };
+/** Clip-local seconds at timeScale 1. */
+const GATHER_EVENTS = {
+  mine: [['hit', 0.933]],
+  chop: [['hit', 0.867]],
+  pick: [['close', 0.54], ['lift', 0.705], ['vanish', 1.4]],
+};
+
+function clipByMode(loco, mode) {
+  if (mode === 'walk') return loco.walk ?? null;
+  if (mode === 'idle') return loco.idle ?? null;
+  return loco.actions?.[mode] ?? null;
+}
+
+function emitGatherEvents(loco, prev, t) {
+  const wrapped = t < prev - 1e-4;
+  for (const [name, at] of GATHER_EVENTS[loco.gather] ?? []) {
+    const crossed = wrapped ? (at > prev || at <= t) : (at > prev && at <= t);
+    if (crossed) loco.onEvent?.(name, loco.gather);
+  }
+  if (wrapped && loco.gather === 'pick') loco.onEvent?.('wrap', 'pick');
+}
 
 function updateClipLocomotion(mesh, moving, dt) {
   const loco = mesh?.userData?.clipLocomotion;
   if (!loco) return;
-  const want = moving ? 'walk' : 'idle';
+  const gatherAction = loco.gather ? loco.actions?.[loco.gather] : null;
+  const want = gatherAction ? loco.gather : (moving ? 'walk' : 'idle');
   if (loco.mode !== want) {
-    const next = want === 'walk' ? loco.walk : loco.idle;
-    const prev = loco.mode === 'walk' ? loco.walk : loco.mode === 'idle' ? loco.idle : null;
+    const next = gatherAction || (want === 'walk' ? loco.walk : loco.idle);
+    const prev = clipByMode(loco, loco.mode);
     next.enabled = true;
     next.setEffectiveWeight(1);
+    if (gatherAction) next.timeScale = 1;
     next.reset().play();
     if (prev && prev !== next) prev.crossFadeTo(next, RIGGED_CLIP_FADE, false);
     loco.mode = want;
+    loco.eventPrev = gatherAction ? 0 : null;
   }
-  if (moving) {
+  if (want === 'walk') {
     const scale = loco.modelScale || 1;
     loco.walk.timeScale = (loco.speed ?? 0) / (RIGGED_WALK_SPEED * scale);
   }
+  const prevTime = loco.eventPrev;
   loco.mixer.update(dt);
+  if (gatherAction && want === loco.gather && prevTime != null) {
+    const t = gatherAction.time;
+    emitGatherEvents(loco, prevTime, t);
+    loco.eventPrev = t;
+  }
+}
+
+/** Play Mine, Chop, or Pick on the rig. Null returns to Idle/Walk. No-op without those clips. */
+export function setGatherClip(mesh, mode) {
+  const loco = mesh?.userData?.clipLocomotion;
+  if (!loco) return false;
+  if (mode && !loco.actions?.[mode]) {
+    loco.gather = null;
+    return false;
+  }
+  loco.gather = mode || null;
+  if (!mode) loco.eventPrev = null;
+  return true;
+}
+
+/** Current gathering clip time, or null when the rig is not in a gather clip. */
+export function riggedClipTime(mesh) {
+  const loco = mesh?.userData?.clipLocomotion;
+  if (!loco?.gather) return null;
+  return loco.actions?.[loco.gather]?.time ?? null;
 }
 
 export function updateWalkPose(mesh, moving, dt = 0.016, now = 0) {
@@ -870,6 +922,26 @@ export function poseHeldPickaxe(pickaxe) {
   if (!pickaxe) return;
   pickaxe.position.set(0.012, 0.0, 0.02);
   pickaxe.rotation.set(-0.62, 0.2, 0.1);
+}
+
+/** Handle along Hand_R +Z, head at +Z, striking side toward −Y. Butt sits behind the fist. */
+const RIGGED_TOOL_HEAD_Z = { pickaxe: 0.51, hatchet: 0.395 };
+const RIGGED_TOOL_BUTT_Z = -0.15;
+
+function poseRiggedHeldTool(tool, kind) {
+  if (!tool) return;
+  const key = kind === 'hatchet' ? 'hatchet' : 'pickaxe';
+  const frame = heldFrame(key);
+  const headZ = RIGGED_TOOL_HEAD_Z[key];
+  const scale = (headZ - RIGGED_TOOL_BUTT_Z) / Math.max(frame.length, 1e-4);
+  const q = alignHeldQuaternion(frame, {
+    axis: new THREE.Vector3(0, 0, 1),
+    side: new THREE.Vector3(0, -1, 0),
+  });
+  tool.scale.setScalar(scale);
+  tool.quaternion.copy(q);
+  const butt = frame.butt.clone().applyQuaternion(q).multiplyScalar(scale);
+  tool.position.set(0, 0, RIGGED_TOOL_BUTT_Z).sub(butt);
 }
 
 export function buildPickaxe() {
@@ -3889,6 +3961,16 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
   const mixer = new THREE.AnimationMixer(visual);
   const walk = mixer.clipAction(walkClip);
   const idle = mixer.clipAction(idleClip);
+  const actions = {};
+  for (const name of ['Mine', 'Chop', 'Pick']) {
+    const clip = THREE.AnimationClip.findByName(gltf.animations ?? [], name);
+    if (!clip) continue;
+    const action = mixer.clipAction(clip);
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.enabled = false;
+    actions[name.toLowerCase()] = action;
+  }
   for (const action of [walk, idle]) {
     action.setLoop(THREE.LoopRepeat, Infinity);
     action.clampWhenFinished = false;
@@ -3900,17 +3982,16 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
   const hand = visual.getObjectByName('Hand_R');
   const grip = new THREE.Group();
   grip.name = 'importedGrip';
-  // Tools are built for the procedural keeper, then that keeper is scaled by
-  // PLAYER_WORLD_SCALE. Cancel the rig scale so they stay the same world size.
-  grip.scale.setScalar(PLAYER_WORLD_SCALE / modelScale);
+  // Skill swings are authored in character units: handle along Hand_R +Z.
+  if (hand) grip.position.set(RIGGED_FIST.x, RIGGED_FIST.y, RIGGED_FIST.z);
   const pickaxe = buildHeldTool('pickaxe');
   pickaxe.visible = false;
   grip.add(pickaxe);
-  poseHeldPickaxe(pickaxe);
+  poseRiggedHeldTool(pickaxe, 'pickaxe');
   const hatchet = buildHeldTool('hatchet');
   hatchet.visible = false;
   grip.add(hatchet);
-  poseHeldPickaxe(hatchet);
+  poseRiggedHeldTool(hatchet, 'hatchet');
   if (hand) hand.add(grip);
   else visual.add(grip);
 
@@ -3934,9 +4015,13 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
     mixer,
     walk,
     idle,
+    actions,
     modelScale,
     mode: 'idle',
     speed: 0,
+    gather: null,
+    eventPrev: null,
+    onEvent: null,
   };
   group.userData.modelScale = modelScale;
   group.userData.hand = grip;

@@ -25,6 +25,7 @@ import {
   measureVisibleMeshHeight,
   proceduralPlayerFitHeight,
   setHeldTool,
+  setGatherClip,
   updateMinePose,
   updateWalkPose,
   setBundledLook,
@@ -1870,8 +1871,38 @@ describe('shop props', () => {
       assert.ok(rigged.userData.pickaxe.getObjectByName('dump'));
       assert.ok(rigged.userData.hatchet.getObjectByName('dump'));
       assert.equal(rigged.userData.pickaxe.parent, rigged.userData.hand);
-      assert.ok(Math.abs(rigged.userData.pickaxe.position.x - 0.012) < 1e-6);
-      assert.ok(Math.abs(rigged.userData.hatchet.rotation.x - -0.62) < 1e-6);
+      assert.ok(Math.abs(rigged.userData.hand.position.x - -0.0089) < 1e-4);
+      assert.ok(Math.abs(rigged.userData.hand.position.y - -0.0579) < 1e-4);
+      assert.ok(Math.abs(rigged.userData.hand.position.z - 0.0045) < 1e-4);
+      for (const [kind, headZ] of [['pickaxe', 0.51], ['hatchet', 0.395]]) {
+        const tool = rigged.userData[kind];
+        const parent = tool.parent;
+        const parked = new THREE.Group();
+        parked.add(tool);
+        const frame = gripFrame(tool);
+        parent.add(tool);
+        assert.ok(frame.axis.z > 0.95, `${kind} handle should run along grip +Z`);
+        assert.ok(frame.side.y < -0.7, `${kind} striking side should face grip −Y, side=${frame.side.toArray()}`);
+        const head = frame.butt.clone().addScaledVector(frame.axis, frame.length);
+        assert.ok(Math.abs(head.z - headZ) < 0.08, `${kind} head z ${head.z} vs ${headZ}`);
+        assert.ok(frame.butt.z < -0.1, `${kind} butt should sit behind the fist, z=${frame.butt.z}`);
+      }
+      const loco = rigged.userData.clipLocomotion;
+      assert.ok(Math.abs(loco.actions.mine.getClip().duration - 1.6) < 1e-3);
+      assert.ok(Math.abs(loco.actions.chop.getClip().duration - 1.5) < 1e-3);
+      assert.ok(Math.abs(loco.actions.pick.getClip().duration - 1.5) < 1e-3);
+      let hits = 0;
+      loco.onEvent = (name) => { if (name === 'hit') hits += 1; };
+      setGatherClip(rigged, 'mine');
+      for (let i = 0; i < 12; i += 1) updateMinePose(rigged, 0.1, i);
+      assert.equal(loco.mode, 'mine');
+      assert.equal(loco.actions.mine.timeScale, 1);
+      assert.equal(hits, 1);
+      setGatherClip(rigged, null);
+      loco.speed = 1.85;
+      updateWalkPose(rigged, true, 0.05, 1);
+      const walkScale = 1.85 / (0.834 * loco.modelScale);
+      assert.ok(Math.abs(loco.walk.timeScale - walkScale) < 1e-6);
     } finally {
       setBundledLook('runite_pickaxe', null);
       setBundledLook('runite_hatchet', null);

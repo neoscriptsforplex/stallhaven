@@ -1,6 +1,6 @@
 import { FLAX_ARRIVE } from './catalog.js';
-import { PLAYER_RADIUS, planPlayerWalk } from './nav.js';
-import { furnitureVisualYaw } from './layout.js';
+import { PLAYER_RADIUS, isWalkable, planPlayerWalk, playerObstacles } from './nav.js';
+import { furnitureVisualYaw, playerWalkFloors } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter'];
 export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder']);
@@ -113,6 +113,111 @@ function fletchStandCandidates(pose) {
 }
 
 /**
+ * Gathering contacts in character-local units (the rig is 1.8 tall and then
+ * scaled by about 0.863). The player stands so this point lands on the node.
+ * Rock is the tip on the near face; the centre is farther along the same line.
+ * Tree is the trunk centre for a radius-0.12 trunk. Flax is the plant base.
+ */
+export const GATHER_MODEL_SCALE = 0.863;
+export const GATHER_CONTACT = {
+  rock: { x: -0.02, z: 0.61 },
+  tree: { x: 0.21, z: 0.62 },
+  flax: { x: -0.12, z: 0.31 },
+};
+
+/** Near-face radius of a dungeon boulder, in world metres. Essence is the large one. */
+export function boulderFaceRadius(materialId) {
+  return materialId === 'essence' ? 1.04 : 0.52;
+}
+
+function gatherCentreOffset(kind, pose, scale) {
+  if (kind === 'boulder') {
+    const contact = GATHER_CONTACT.rock;
+    const lx = contact.x * scale;
+    const lz = contact.z * scale;
+    const len = Math.hypot(lx, lz) || 1;
+    const grow = (len + boulderFaceRadius(pose?.materialId)) / len;
+    return { x: lx * grow, z: lz * grow };
+  }
+  const local = kind === 'tree' ? GATHER_CONTACT.tree : GATHER_CONTACT.flax;
+  return { x: local.x * scale, z: local.z * scale };
+}
+
+function growOffset(offset, extra) {
+  const len = Math.hypot(offset.x, offset.z) || 1;
+  const grow = (len + extra) / len;
+  return { x: offset.x * grow, z: offset.z * grow };
+}
+
+/** Stand and facing yaw that put `offset` (world metres, character-local XZ) on the node. */
+export function gatherStandAt(node, offset, yaw) {
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  const wx = offset.x * c + offset.z * s;
+  const wz = -offset.x * s + offset.z * c;
+  return {
+    x: (node?.x ?? 0) - wx,
+    z: (node?.z ?? 0) - wz,
+    yaw,
+  };
+}
+
+/** Closest alignments first. Trees start a step back: the trunk block sits just outside the ideal. */
+export function gatherStandCandidates(kind, pose, scale = GATHER_MODEL_SCALE) {
+  const base = gatherCentreOffset(kind, pose, scale);
+  const extras = kind === 'tree' ? [0.08, 0.14, 0.24, 0.4] : [0, 0.08, 0.18, 0.36];
+  const spots = [];
+  for (const extra of extras) {
+    for (let i = 0; i < 8; i += 1) {
+      const yaw = (i / 8) * Math.PI * 2;
+      const spot = gatherStandAt(pose, growOffset(base, extra), yaw);
+      spot.extra = extra;
+      spots.push(spot);
+    }
+  }
+  return spots;
+}
+
+function gatherArrive(kind) {
+  return kind === 'flax' ? 0.22 : 0.32;
+}
+
+function defaultCanStand(x, z, state) {
+  return isWalkable(
+    x,
+    z,
+    playerObstacles(state),
+    PLAYER_RADIUS,
+    playerWalkFloors(state?.expansions ?? []),
+  );
+}
+
+function resolveGatherStand(from, pose, state, planFn, kind, canStand) {
+  const standable = canStand ?? ((x, z) => defaultCanStand(x, z, state));
+  const spots = gatherStandCandidates(kind, pose).filter((dest) => standable(dest.x, dest.z));
+  const arrive = gatherArrive(kind);
+  for (const dest of spots) {
+    if (isNearPoint(from, dest, arrive)) return { action: 'open', dest, face: dest.yaw };
+  }
+  let tried = 0;
+  let empty = 0;
+  for (const dest of spots) {
+    if (tried >= 4 || empty >= 2) break;
+    tried += 1;
+    const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+    const end = path[path.length - 1];
+    if (!end) {
+      empty += 1;
+      continue;
+    }
+    if (Math.hypot(end.x - dest.x, end.z - dest.z) < 0.2) {
+      return { action: 'walk', path, dest, face: dest.yaw };
+    }
+  }
+  return null;
+}
+
+/**
  * Local +Z is the shopkeeper side of the counter. The chest latch is dump
  * local −X (into the room at visual yaw 0).
  */
@@ -171,7 +276,7 @@ export function stationAtFloor(x, z, furniture = {}) {
   return best;
 }
 
-export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, kind = null) {
+export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, kind = null, canStand = null) {
   if (!pose) return { action: 'none' };
   if (STAND_FRONT.has(kind)) {
     const offsets = facingApproachOffsets(kind, pose);
@@ -209,6 +314,10 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
       }
     }
     return { action: 'blocked', dest: spots[0], face };
+  }
+  if (kind === 'tree' || kind === 'boulder' || kind === 'flax') {
+    const aligned = resolveGatherStand(from, pose, state, planFn, kind, canStand);
+    if (aligned) return aligned;
   }
   if (kind === 'flax') {
     if (isNearPoint(from, pose, FLAX_ARRIVE)) return { action: 'open' };

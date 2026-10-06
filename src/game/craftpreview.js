@@ -16,10 +16,13 @@ export function isRunePreview(id) {
 }
 
 /**
- * Craft-preview only. The shop mannequin keeps the ware mesh as built
- * (including wareDisplayYaw). These turns are a fixed base pose on an inner
- * group. The spin is a separate yaw on the outer parent around world Y, so
- * turning does not twist this Euler.
+ * Fixed base pose shared by the craft preview and by these items on a shop
+ * mannequin or table. previewBasePose is the only copy of these turns.
+ * In the preview they sit on an inner group. The spin is a separate yaw on
+ * the outer parent around world Y, so turning does not twist this Euler.
+ * Robe tops and dragon masks already have wareDisplayYaw baked into the ware
+ * mesh (PR #33). This pose is the parent turn on top of that bake — applying
+ * the yaw again would double-rotate.
  *
  * Mystic robe tops are the reference: collar up, sleeves to the left and
  * right, chest toward the +Z camera. Wizard tops need the opposite roll.
@@ -27,7 +30,7 @@ export function isRunePreview(id) {
  * the same camera-facing roll the platebody uses.
  * Platebodies lie flat until they are pitched onto the chest and rolled
  * collar-up. Dragon masks need a half-turn so the horns are up and the face
- * points at the camera.
+ * points at the camera. On a display, that +Z is the furniture front.
  */
 const PREVIEW_EULER = {
   robe_bottom: { x: 0, y: 0, z: -Math.PI / 4 },
@@ -43,7 +46,7 @@ const WIZARD_UPRIGHT = { x: 0, y: 0, z: Math.PI / 2 };
 const SPLITBARK_UPRIGHT = { x: 0, y: 0, z: -Math.PI / 4 - Math.PI / 2 };
 const MASK_FACE_CAMERA = { x: 0, y: 0, z: Math.PI };
 
-/** Preview-only pose for dumps whose mannequin yaw is already baked in. */
+/** Pose for dumps whose mannequin yaw is already baked into the ware mesh. */
 function previewOnlyEuler(id) {
   if (id === 'mystic_robe_top') return MYSTIC_UPRIGHT;
   if (id === 'wizard_robe') return WIZARD_UPRIGHT;
@@ -52,11 +55,26 @@ function previewOnlyEuler(id) {
   return null;
 }
 
-export function craftPreviewEuler(id) {
+/** Platebodies, the three robe tops, and dragon masks share this pose on displays. */
+export function displayUsesPreviewBasePose(id) {
+  if (id === 'wizard_robe' || id === 'mystic_robe_top' || id === 'splitbark_robe_top') return true;
+  if (String(id).endsWith('_dragon_mask')) return true;
+  return RECIPES[id]?.shape === 'platebody';
+}
+
+/**
+ * Fixed base pose: upright, front toward +Z (the preview camera, or a
+ * display's local front). Null when this item has no preview turn.
+ */
+export function previewBasePose(id) {
   const keyed = previewOnlyEuler(id);
   if (keyed) return keyed;
   const shape = RECIPES[id]?.shape;
   return shape ? (PREVIEW_EULER[shape] ?? null) : null;
+}
+
+export function craftPreviewEuler(id) {
+  return previewBasePose(id);
 }
 
 export function applyCraftPreviewEuler(object, id) {
@@ -77,6 +95,33 @@ export function wrapCraftPreviewSpin(ware, id) {
   const spin = new THREE.Group();
   spin.add(pose);
   return spin;
+}
+
+/**
+ * Mannequin and table mount. Same base pose as the craft preview, in the
+ * caller's local space, so it follows the display when the furniture yaws.
+ * Does not apply wareDisplayYaw; that yaw is already baked into the mesh.
+ * Reseats the posed item so its bottom center stays on the slot origin.
+ */
+export function mountDisplayBasePose(ware, id) {
+  if (!ware || !displayUsesPreviewBasePose(id)) return ware;
+  const euler = previewBasePose(id);
+  if (!euler) return ware;
+  const pose = new THREE.Group();
+  pose.name = 'preview-base-pose';
+  applyCraftPreviewEuler(pose, id);
+  pose.add(ware);
+  const mount = new THREE.Group();
+  mount.name = 'display-base-pose';
+  mount.userData.recipeId = ware.userData?.recipeId ?? id;
+  mount.add(pose);
+  mount.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(mount);
+  if (!box.isEmpty()) {
+    const center = box.getCenter(_center);
+    pose.position.set(-center.x, -box.min.y, -center.z);
+  }
+  return mount;
 }
 
 /**

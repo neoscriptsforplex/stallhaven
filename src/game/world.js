@@ -99,6 +99,7 @@ import {
 import { buildCauldron, buildDungeon, buildFletchingBench, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRug, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
+import { mountDisplayBasePose } from './craftpreview.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
@@ -1827,7 +1828,7 @@ export function createWorld(canvas, state, opts = {}) {
     const slot = displays[index];
     clearSlotMeshes(slot);
     if (!recipeId) return;
-    const mesh = makeWareMesh(recipeId);
+    const mesh = mountDisplayBasePose(makeWareMesh(recipeId), recipeId);
     mesh.position.set(0, 0, 0);
     slot.wareAnchor.add(mesh);
     slot.wareMesh = mesh;
@@ -1881,7 +1882,7 @@ export function createWorld(canvas, state, opts = {}) {
     for (const name of ARMOUR_SLOTS) {
       const recipeId = want[name];
       if (!recipeId) continue;
-      const mesh = makeWareMesh(recipeId);
+      const mesh = mountDisplayBasePose(makeWareMesh(recipeId), recipeId);
       const pose = slotPose(name);
       mesh.position.set(pose.x, pose.y, pose.z);
       slot.wareAnchor.add(mesh);

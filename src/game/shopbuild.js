@@ -1968,6 +1968,92 @@ function addGarden(root, cells, expansionIds = []) {
   addGrassFlowers(root, expansionIds);
 }
 
+/** Metres of ground covered by one seamless fountain_cobble tile. */
+export const FOUNTAIN_COBBLE_TILE_M = 3;
+const FOUNTAIN_COBBLE_FILE = 'fountain_cobble_512.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function fountainCobbleTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${FOUNTAIN_COBBLE_FILE}`,
+    `${envBase}public/textures/${FOUNTAIN_COBBLE_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${FOUNTAIN_COBBLE_FILE}`, `./public/textures/${FOUNTAIN_COBBLE_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let fountainCobbleSource = null;
+const fountainCobbleClones = [];
+
+function configureFountainCobbleTexture(tex) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.userData.kind = 'fountain-cobble';
+  return tex;
+}
+
+function applyFountainCobbleImage(loaded) {
+  if (!fountainCobbleSource || !loaded?.image) return;
+  fountainCobbleSource.image = loaded.image;
+  fountainCobbleSource.needsUpdate = true;
+  for (const tex of fountainCobbleClones) {
+    tex.image = loaded.image;
+    tex.needsUpdate = true;
+  }
+  fountainCobbleClones.length = 0;
+}
+
+function beginFountainCobbleLoad() {
+  const urls = fountainCobbleTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyFountainCobbleImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function fountainCobbleMap() {
+  if (!fountainCobbleSource) {
+    fountainCobbleSource = configureFountainCobbleTexture(new THREE.Texture());
+    beginFountainCobbleLoad();
+  }
+  const tex = configureFountainCobbleTexture(fountainCobbleSource.clone());
+  if (fountainCobbleSource.image) {
+    tex.image = fountainCobbleSource.image;
+    tex.needsUpdate = true;
+  } else {
+    fountainCobbleClones.push(tex);
+  }
+  return tex;
+}
+
+function fountainCobbleMat(repeatX, repeatY) {
+  const map = fountainCobbleMap();
+  map.repeat.set(repeatX, repeatY);
+  const mat = new THREE.MeshStandardMaterial({
+    map,
+    roughness: 0.94,
+    metalness: 0.03,
+    color: 0xffffff,
+  });
+  mat.userData.fountainCobble = true;
+  return mat;
+}
+
 function addPathRect(root, minX, maxX, minZ, maxZ) {
   const w = maxX - minX;
   const d = maxZ - minZ;
@@ -1994,14 +2080,15 @@ function addCobblePath(root, expansionIds = []) {
     const tuck = cobbleRingTuck(apron, (span.maxX - span.minX) / 2);
     addPathRect(root, span.minX, span.maxX, span.minZ, FOUNTAIN.z - apron + tuck);
     addPathRect(root, span.minX, span.maxX, FOUNTAIN.z + apron - tuck, span.maxZ);
+    const apronRepeat = (apron * 2) / FOUNTAIN_COBBLE_TILE_M;
     const ring = addShadow(new THREE.Mesh(
       new THREE.RingGeometry(FOUNTAIN.radius + 0.04, apron, 28),
-      cobbleMat(apron * 2 * PATH_COBBLE_U, apron * 2 * PATH_COBBLE_U),
+      fountainCobbleMat(apronRepeat, apronRepeat),
     ));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(FOUNTAIN.x, -0.006, FOUNTAIN.z);
     ring.userData.kind = 'ground';
-    ring.userData.pathCobble = true;
+    ring.userData.fountainApron = true;
     root.add(ring);
   } else {
     addPathRect(root, span.minX, span.maxX, span.minZ, span.maxZ);

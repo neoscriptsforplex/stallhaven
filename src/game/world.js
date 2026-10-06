@@ -64,10 +64,12 @@ import {
 import {
   PLAYER_RADIUS,
   floorsForState,
+  isWalkable,
   liveObstacles,
   placementBlocked,
   planPlayerWalk,
   planWalk,
+  playerObstacles,
   queueSlot,
 } from './nav.js';
 import { playClick } from './audio.js';
@@ -100,6 +102,8 @@ import {
   fitMannequinWear,
   slotPose,
   setHeldTool,
+  setGatherClip,
+  riggedClipTime,
   updateMinePose,
   updateWalkPose,
   wareTopY,
@@ -399,6 +403,7 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   let shopkeeper = makeDefaultKeeper();
+  bindGatherEvents(shopkeeper);
   const keeperGround = characterGroundY(SHOP.keeper.x, SHOP.keeper.z, state.expansions ?? []);
   shopkeeper.position.set(SHOP.keeper.x, keeperGround, SHOP.keeper.z);
   shopkeeper.userData.groundY = keeperGround;
@@ -1014,10 +1019,75 @@ export function createWorld(canvas, state, opts = {}) {
     cam.distance = Math.min(CAM_MAX_DISTANCE, Math.max(CAM_MIN_DISTANCE, cam.distance));
   }
 
+  function releaseHeldFlax(restoreGround) {
+    const visual = mining?.heldFlax;
+    if (visual) {
+      visual.removeFromParent();
+      mining.heldFlax = null;
+    }
+    if (!restoreGround || mining?.plantId == null) return;
+    const node = flaxNodes.find((item) => item.id === mining.plantId && item.alive);
+    const mesh = flaxMeshes.get(mining.plantId);
+    if (node && mesh) mesh.visible = true;
+  }
+
+  function holdFlaxVisual() {
+    if (!mining || mining.mode !== 'pick' || mining.heldFlax) return;
+    const node = flaxNodes.find((item) => item.id === mining.plantId && item.alive);
+    const mesh = flaxMeshes.get(mining.plantId);
+    const hand = shopkeeper.getObjectByName('Hand_R') || shopkeeper.userData.hand;
+    if (!node || !mesh || !hand) return;
+    mesh.visible = false;
+    const visual = mesh.clone(true);
+    visual.visible = true;
+    visual.traverse((child) => {
+      if (child.userData?.kind === 'flax') child.visible = false;
+    });
+    flaxGroup.add(visual);
+    visual.position.copy(mesh.position);
+    visual.quaternion.copy(mesh.quaternion);
+    visual.scale.copy(mesh.scale);
+    visual.updateMatrixWorld(true);
+    hand.attach(visual);
+    visual.userData.restScale = visual.scale.clone();
+    mining.heldFlax = visual;
+  }
+
+  function updateHeldFlax(t) {
+    const visual = mining?.heldFlax;
+    const rest = visual?.userData?.restScale;
+    if (!visual || !rest || t == null) return;
+    if (t >= 1.4) {
+      const u = Math.min(1, (t - 1.4) / 0.1);
+      visual.scale.copy(rest).multiplyScalar(1 - u);
+      visual.visible = u < 0.999;
+      return;
+    }
+    visual.visible = true;
+    visual.scale.copy(rest);
+  }
+
+  function onGatherEvent(name) {
+    if (!mining) return;
+    if (mining.mode === 'pick' && name === 'lift') holdFlaxVisual();
+    if (mining.mode === 'pick' && name === 'wrap') releaseHeldFlax(true);
+  }
+
+  function faceGather(pose) {
+    if (!pose) return;
+    if (Number.isFinite(pose.faceYaw)) {
+      shopkeeper.rotation.y = pose.faceYaw;
+      return;
+    }
+    shopkeeper.rotation.y = Math.atan2(pose.x - shopkeeper.position.x, pose.z - shopkeeper.position.z);
+  }
+
   function stopMining() {
     if (!mining) return;
+    releaseHeldFlax(true);
     mining = null;
     setHeldTool(shopkeeper, null);
+    setGatherClip(shopkeeper, null);
   }
 
   function startMining(materialId, pose) {
@@ -1033,11 +1103,11 @@ export function createWorld(canvas, state, opts = {}) {
       yield: timing.yield,
       x: pose?.x ?? shopkeeper.position.x,
       z: pose?.z ?? shopkeeper.position.z,
+      faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : null,
     };
     setHeldTool(shopkeeper, 'pickaxe');
-    if (pose) {
-      shopkeeper.rotation.y = Math.atan2(pose.x - shopkeeper.position.x, pose.z - shopkeeper.position.z);
-    }
+    faceGather(pose);
+    setGatherClip(shopkeeper, 'mine');
   }
 
   function startChopping(pose) {
@@ -1050,11 +1120,11 @@ export function createWorld(canvas, state, opts = {}) {
       yield: CHOP_YIELD,
       x: pose?.x ?? shopkeeper.position.x,
       z: pose?.z ?? shopkeeper.position.z,
+      faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : null,
     };
     setHeldTool(shopkeeper, 'hatchet');
-    if (pose) {
-      shopkeeper.rotation.y = Math.atan2(pose.x - shopkeeper.position.x, pose.z - shopkeeper.position.z);
-    }
+    faceGather(pose);
+    setGatherClip(shopkeeper, 'chop');
   }
 
   function startPicking(pose) {
@@ -1070,9 +1140,11 @@ export function createWorld(canvas, state, opts = {}) {
       yield: FLAX_YIELD,
       x: node.x,
       z: node.z,
+      faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : null,
     };
     setHeldTool(shopkeeper, null);
-    shopkeeper.rotation.y = Math.atan2(node.x - shopkeeper.position.x, node.z - shopkeeper.position.z);
+    faceGather({ x: node.x, z: node.z, faceYaw: pose?.faceYaw });
+    setGatherClip(shopkeeper, 'pick');
   }
 
   function tickMining(now) {
@@ -1080,6 +1152,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (now - mining.startedAt < mining.duration) return;
     const amount = mining.yield ?? MINE_YIELD;
     if (mining.mode === 'pick') {
+      releaseHeldFlax(false);
       const got = grantPickedFlax(state, amount);
       if (got > 0) {
         pushLog(state, `Picked ${got} Flax.`);
@@ -1183,16 +1256,46 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pose) return;
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
     const arrive = type === 'flax' ? FLAX_ARRIVE : type === 'trapdoor' || type === 'ladder' ? 1.35 : STATION_ARRIVE;
-    const plan = sceneMode === 'dungeon' || type === 'trapdoor' || type === 'ladder'
+    const dungeonUse = sceneMode === 'dungeon' || type === 'trapdoor' || type === 'ladder';
+    const standFloors = sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors;
+    const canStand = (x, z) => isWalkable(
+      x,
+      z,
+      dungeonUse ? [] : playerObstacles(state),
+      PLAYER_RADIUS,
+      standFloors,
+    );
+    const plan = dungeonUse
       ? resolveStationUse(from, pose, state, (start, dest) => (
-        planWalk(start, dest, [], PLAYER_RADIUS, sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors)
-      ), type)
-      : resolveStationUse(from, pose, state, planPlayerWalk, type);
-    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch';
-    const faceYaw = type === 'range' ? rangeFaceYaw(pose) : type === 'fletch' ? fletchFaceYaw(pose) : null;
+        planWalk(start, dest, [], PLAYER_RADIUS, standFloors)
+      ), type, canStand)
+      : resolveStationUse(from, pose, state, planPlayerWalk, type, canStand);
+    const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax';
+    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch' || gatherKind;
+    const faceYaw = plan.face != null
+      ? plan.face
+      : type === 'range' ? rangeFaceYaw(pose)
+        : type === 'fletch' ? fletchFaceYaw(pose)
+          : null;
+    const standArrive = gatherKind ? (type === 'flax' ? 0.22 : 0.32) : 0.55;
     const atStation = standFront
       ? plan.action === 'open'
       : (plan.action === 'open' || isNearPose(pose, arrive));
+    const aimed = faceYaw == null ? pose : { ...pose, faceYaw };
+    const remember = (dest, arriveDist, openOnArrive) => {
+      pendingUse = {
+        type,
+        x: dest.x,
+        z: dest.z,
+        arrive: arriveDist,
+        openOnArrive,
+        materialId: pose.materialId,
+        plantId: pose.plantId,
+        faceYaw,
+        nodeX: pose.x,
+        nodeZ: pose.z,
+      };
+    };
     if (atStation) {
       pendingUse = null;
       playerPath.length = 0;
@@ -1203,17 +1306,17 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (type === 'boulder') {
-        startMining(pose.materialId, pose);
+        startMining(pose.materialId, aimed);
         playClick('ui');
         return;
       }
       if (type === 'tree') {
-        startChopping(pose);
+        startChopping(aimed);
         playClick('ui');
         return;
       }
       if (type === 'flax') {
-        startPicking(pose);
+        startPicking(aimed);
         playClick('ui');
         return;
       }
@@ -1224,16 +1327,7 @@ export function createWorld(canvas, state, opts = {}) {
     }
     if (plan.action === 'walk' && applyWalkPath(plan.path)) {
       const dest = standFront && plan.dest ? plan.dest : pose;
-      pendingUse = {
-        type,
-        x: dest.x,
-        z: dest.z,
-        arrive: standFront ? 0.55 : arrive,
-        openOnArrive: type !== 'counter',
-        materialId: pose.materialId,
-        plantId: pose.plantId,
-        faceYaw,
-      };
+      remember(dest, standFront ? standArrive : arrive, type !== 'counter');
       playClick('move');
       return;
     }
@@ -1242,40 +1336,29 @@ export function createWorld(canvas, state, opts = {}) {
       ? planWalk(from, fallbackDest, [], PLAYER_RADIUS, [DUNGEON_FLOOR])
       : planPlayerWalk(from, fallbackDest, state, PLAYER_RADIUS);
     if (applyWalkPath(fallback)) {
-      pendingUse = {
-        type,
-        x: fallbackDest.x,
-        z: fallbackDest.z,
-        arrive: standFront ? 0.55 : arrive,
-        openOnArrive: type !== 'counter',
-        materialId: pose.materialId,
-        plantId: pose.plantId,
-        faceYaw,
-      };
+      remember(fallbackDest, standFront ? standArrive : arrive, type !== 'counter');
       playClick('move');
       return;
     }
-    pendingUse = {
-      type,
-      x: fallbackDest.x,
-      z: fallbackDest.z,
-      arrive: standFront ? 0.55 : arrive,
-      openOnArrive: false,
-      materialId: pose.materialId,
-      plantId: pose.plantId,
-      faceYaw,
-    };
+    remember(fallbackDest, standFront ? standArrive : arrive, false);
     playClick('ui');
   }
 
   function finishPendingUse() {
     if (!pendingUse) return;
-    const { type, materialId, x, z, plantId } = pendingUse;
+    const { type, materialId, x, z, plantId, faceYaw, nodeX, nodeZ } = pendingUse;
     pendingUse = null;
     if (type === 'counter') return;
-    if (type === 'boulder') startMining(materialId, { x, z, materialId });
-    else if (type === 'tree') startChopping({ x, z, materialId: 'logs' });
-    else if (type === 'flax') startPicking({ x, z, materialId: 'flax', plantId });
+    const pose = {
+      x: nodeX ?? x,
+      z: nodeZ ?? z,
+      materialId,
+      plantId,
+      faceYaw,
+    };
+    if (type === 'boulder') startMining(materialId, pose);
+    else if (type === 'tree') startChopping(pose);
+    else if (type === 'flax') startPicking(pose);
     else pickHandler?.({ type });
   }
 
@@ -1295,8 +1378,10 @@ export function createWorld(canvas, state, opts = {}) {
     }
     syncStance(shopkeeper);
     if (mining) {
-      shopkeeper.rotation.y = Math.atan2(mining.x - shopkeeper.position.x, mining.z - shopkeeper.position.z);
+      if (Number.isFinite(mining.faceYaw)) shopkeeper.rotation.y = mining.faceYaw;
+      else shopkeeper.rotation.y = Math.atan2(mining.x - shopkeeper.position.x, mining.z - shopkeeper.position.z);
       updateMinePose(shopkeeper, dt, now);
+      if (mining?.mode === 'pick') updateHeldFlax(riggedClipTime(shopkeeper));
       tickMining(now);
       return;
     }
@@ -2504,6 +2589,12 @@ export function createWorld(canvas, state, opts = {}) {
     scene.add(next);
     scene.remove(shopkeeper);
     shopkeeper = next;
+    bindGatherEvents(shopkeeper);
+  }
+
+  function bindGatherEvents(mesh) {
+    const loco = mesh?.userData?.clipLocomotion;
+    if (loco) loco.onEvent = onGatherEvent;
   }
 
   function rebuildCustomerMeshes() {

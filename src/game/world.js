@@ -387,6 +387,7 @@ export function createWorld(canvas, state, opts = {}) {
   const dust = buildDust();
   scene.add(dust);
 
+  let drawScene = true;
   let riggedPlayerGltf = opts.riggedPlayer ?? null;
   let riggedGoblinGltf = opts.riggedGoblin ?? null;
   let riggedRatGltf = opts.riggedRat ?? null;
@@ -2696,7 +2697,7 @@ export function createWorld(canvas, state, opts = {}) {
       const spinning = Object.keys(state.crafts ?? {}).some((id) => RECIPES[id]?.category === 'spin');
       if (spinning) wheel.rotation.z += dt * 9.5;
     }
-    renderer.render(scene, camera);
+    if (drawScene) renderer.render(scene, camera);
   }
 
   function replaceShopkeeperMesh(next) {
@@ -2887,6 +2888,9 @@ export function createWorld(canvas, state, opts = {}) {
     },
     getFrontCustomer() {
       return customers.find((actor) => actor.state === 'request') ?? null;
+    },
+    setDraw(on = true) {
+      drawScene = Boolean(on);
     },
     inspectCustomers() {
       return customers.map((actor) => {

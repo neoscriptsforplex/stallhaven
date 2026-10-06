@@ -1934,6 +1934,8 @@ export const DUNGEON_BOULDERS = [
   { id: 'adamant', materialId: 'adamant', name: 'Adamantite', x: -1.5, z: 3.15, rot: 1.1, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.adamant },
   { id: 'runite', materialId: 'runite', name: 'Runite', x: -4.05, z: 1.7, rot: 0.2, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.runite },
   { id: 'dragon', materialId: 'dragon', name: 'Dragon Ore', x: -4.05, z: -1.35, rot: -0.9, rock: ORE_ROCK_BASE, vein: ORE_VEIN_COLOR.dragon },
+  // North wall, between the old essence skeleton and mithril — clear of the ladder and the east aisle.
+  { id: 'clay', materialId: 'hard_clay', name: 'Clay', x: 1.9, z: 3.15, rot: 0.55, rock: 0x8a6230, vein: 0xc48a4a },
 ];
 
 export function treeInspect() {

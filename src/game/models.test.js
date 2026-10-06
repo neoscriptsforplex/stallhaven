@@ -495,7 +495,7 @@ describe('bundled prop swaps', () => {
     for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'flax-plant', 'rock', 'fountain', 'skeleton']) {
       assert.ok(ids.includes(id), id);
     }
-    for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-runite', 'ore-dragon', 'ore-essence']) {
+    for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-runite', 'ore-dragon', 'ore-essence', 'ore-clay']) {
       assert.ok(ids.includes(id), id);
     }
     for (const id of ['food-bread', 'food-pizza', 'food-cake', 'food-pie', 'food-fish-pie', 'food-salmon', 'food-lobster', 'food-chocolate-cake', 'food-monkfish', 'food-curry', 'food-shark', 'food-summer-pie', 'food-anglerfish']) {
@@ -1036,6 +1036,7 @@ describe('bundled prop swaps', () => {
     assert.equal(byId['ore-runite'], 'dungeon-rocks/rune-rocks');
     assert.equal(byId['ore-dragon'], 'dungeon-rocks/dragon-rocks');
     assert.equal(byId['ore-essence'], 'dungeon-rocks/essence');
+    assert.equal(byId['ore-clay'], 'dungeon-rocks/clay-rocks');
     assert.equal(byId['craft-ore-bronze'], 'ores/bronze-ore');
     assert.equal(byId['craft-ore-iron'], 'ores/iron-ore');
     assert.equal(byId['craft-ore-steel'], 'ores/steel-ore');
@@ -1247,6 +1248,7 @@ describe('bundled prop swaps', () => {
       runite: 'dungeon-rocks/rune-rocks',
       dragon: 'dungeon-rocks/dragon-rocks',
       essence: 'dungeon-rocks/essence',
+      clay: 'dungeon-rocks/clay-rocks',
     };
     for (const folder of Object.values(folders)) {
       assert.equal(isDungeonRockDump(folder), true);
@@ -1331,6 +1333,19 @@ describe('bundled prop swaps', () => {
     }
   });
 
+  it('uses a clay-coloured procedural rock when the clay dump is missing', () => {
+    setBundledLook('ore-clay', null);
+    const clay = buildDungeon().boulders.find((item) => item.name === 'boulder-clay');
+    assert.ok(clay);
+    let clayColored = 0;
+    clay.traverse((child) => {
+      if (!child.isMesh || child.userData?.kind === 'boulder') return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      if (mats.some((mat) => mat?.color?.getHex?.() === 0x8a6230)) clayColored += 1;
+    });
+    assert.ok(clayColored >= 1);
+  });
+
   it('sits every dungeon ore rock on the floor plane', async () => {
     const folders = {
       bronze: 'dungeon-rocks/bronze-rocks',
@@ -1341,6 +1356,7 @@ describe('bundled prop swaps', () => {
       runite: 'dungeon-rocks/rune-rocks',
       dragon: 'dungeon-rocks/dragon-rocks',
       essence: 'dungeon-rocks/essence',
+      clay: 'dungeon-rocks/clay-rocks',
     };
     for (const [id, folder] of Object.entries(folders)) {
       try {
@@ -1362,6 +1378,18 @@ describe('bundled prop swaps', () => {
           `${boulder.name} should sit on the floor, minY=${box.min.y}`,
         );
       }
+      const spanOf = (name) => {
+        const visual = built.boulders.find((item) => item.name === name)
+          ?.children.find((child) => child.name?.startsWith('ore-'));
+        const size = measureVisibleBox(visual).getSize(new THREE.Vector3());
+        return Math.max(size.x, size.y, size.z);
+      };
+      const claySpan = spanOf('boulder-clay');
+      const bronzeSpan = spanOf('boulder-bronze');
+      assert.ok(
+        Math.abs(claySpan - bronzeSpan) < 0.12,
+        `clay rock should match bronze size, ${claySpan} vs ${bronzeSpan}`,
+      );
     } finally {
       for (const id of Object.keys(folders)) setBundledLook(`ore-${id}`, null);
     }

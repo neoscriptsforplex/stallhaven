@@ -227,7 +227,7 @@ export const DUNGEON_ROCK_AMBIENT = 0.08;
 /** Fraction of lifted albedo copied to emissive so cave shadows still show Kd. */
 export const DUNGEON_ROCK_EMIT = 0.25;
 
-const DUNGEON_ROCK_FILE = /^(bronze|iron|steel|mithril|adamant|rune|dragon)-rocks$|^essence$/i;
+const DUNGEON_ROCK_FILE = /^(bronze|iron|steel|mithril|adamant|rune|dragon|clay)-rocks$|^essence$/i;
 
 export function isDungeonRockFolder(folder = '') {
   return String(folder).replace(/\\/g, '/').toLowerCase().includes('dungeon-rocks/');
@@ -369,6 +369,7 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'ore-runite', folder: 'dungeon-rocks/rune-rocks' },
   { id: 'ore-dragon', folder: 'dungeon-rocks/dragon-rocks' },
   { id: 'ore-essence', folder: 'dungeon-rocks/essence' },
+  { id: 'ore-clay', folder: 'dungeon-rocks/clay-rocks' },
   ...recipeList()
     .filter((recipe) => recipe.category === 'food')
     .map((recipe) => {

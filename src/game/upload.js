@@ -6,7 +6,7 @@ import { BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, recipeList } from './catalog.js'
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
 import { UPLOADS_CLEARED, clearModels, saveModel } from './storage.js';
-import { normalizeImported } from './models.js';
+import { normalizeImported, RIGGED_BUYER_MODELS } from './models.js';
 
 export { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
 
@@ -571,6 +571,23 @@ export async function loadBundledRiggedGoblin() {
 /** Fetch rat_rigged.glb. Throws so the caller can keep the old rat. */
 export async function loadBundledRiggedRat() {
   return loadBundledGltf('npc/rat_rigged.glb');
+}
+
+/** Fetch the five adventurer buyer GLBs. A missing file is omitted so that look keeps its dump. */
+export async function loadBundledRiggedBuyers() {
+  const entries = await Promise.all(RIGGED_BUYER_MODELS.map(async (spec) => {
+    try {
+      return [spec.lookId, await loadBundledGltf(spec.file)];
+    } catch (err) {
+      console.warn(`Rigged buyer ${spec.lookId} skipped:`, err?.message || err);
+      return [spec.lookId, null];
+    }
+  }));
+  const loaded = {};
+  for (const [id, gltf] of entries) {
+    if (gltf) loaded[id] = gltf;
+  }
+  return loaded;
 }
 
 export async function loadBundledPropScene(folder, rev) {

@@ -282,13 +282,14 @@ describe('unlock lines', () => {
     assert.equal(unlockNeed(6), 70);
   });
 
-  it('keeps bronze, staff, blue d hide, and bread unlocked on a new shop', () => {
+  it('keeps bronze, staff, green d hide, and bread unlocked on a new shop', () => {
     const state = createState();
     assert.equal(isUnlocked(state, 'bronze_sword'), true);
     assert.equal(isUnlocked(state, 'staff'), true);
-    assert.equal(isUnlocked(state, 'blue_dhide_body'), false);
+    assert.equal(isUnlocked(state, 'green_dhide_body'), false);
     placeStation(state, 'loom');
-    assert.equal(isUnlocked(state, 'blue_dhide_body'), true);
+    assert.equal(isUnlocked(state, 'green_dhide_body'), true);
+    assert.equal(isUnlocked(state, 'blue_dhide_body'), false);
     assert.equal(isUnlocked(state, 'bread'), false);
     placeStation(state, 'range');
     assert.equal(isUnlocked(state, 'bread'), true);
@@ -300,7 +301,7 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
     assert.equal(isUnlocked(state, 'magic_staff_air'), false);
-    assert.equal(isUnlocked(state, 'green_dhide_body'), false);
+    assert.equal(isUnlocked(state, 'blue_dhide_body'), false);
     assert.equal(isUnlocked(state, 'pizza'), false);
     assert.equal(isUnlocked(state, 'salmon'), false);
     assert.equal(isUnlocked(state, 'cake'), false);
@@ -621,31 +622,41 @@ describe('catalog', () => {
     assert.deepEqual(DHIDE.map((color) => color.id), ['blue', 'green', 'red', 'black']);
     assert.equal(RECIPES.green_dragon_mask.name, 'Green Dragon Mask');
     assert.equal(RECIPES.blue_dragon_mask.previousId, 'green_dragon_mask');
-    assert.equal(RECIPES.blue_dhide_body.previousId, null);
-    assert.equal(RECIPES.green_dhide_body.previousId, 'blue_dhide_body');
-    assert.equal(RECIPES.blue_dhide_body.tier, 1);
-    assert.equal(RECIPES.green_dhide_body.tier, 2);
+    assert.equal(RECIPES.green_dhide_body.previousId, null);
+    assert.equal(RECIPES.blue_dhide_body.previousId, 'green_dhide_body');
+    assert.equal(RECIPES.green_dhide_body.tier, 1);
+    assert.equal(RECIPES.blue_dhide_body.tier, 2);
     assert.equal(RECIPES.black_dragon_mask.name, 'Black Dragon Mask');
-    for (const piece of ['body', 'chaps', 'vambraces', 'boots']) {
+    for (const piece of ['body', 'chaps', 'vambraces']) {
       const green = RECIPES[`green_dhide_${piece}`];
       const blue = RECIPES[`blue_dhide_${piece}`];
       const red = RECIPES[`red_dhide_${piece}`];
       assert.ok(green && blue && red, piece);
+      assert.equal(green.tier, 1, `${piece} green tier`);
+      assert.equal(blue.tier, 2, `${piece} blue tier`);
+      assert.equal(green.previousId, null);
+      assert.equal(blue.previousId, `green_dhide_${piece}`);
+      assert.equal(red.previousId, `blue_dhide_${piece}`);
+      assert.ok(green.price < blue.price, `${piece} green should sell below blue`);
+      assert.ok(green.time < blue.time, `${piece} green should craft faster than blue`);
+      assert.ok((green.cost?.gold ?? 0) < (blue.cost?.gold ?? 0), `${piece} green gold cost`);
+      assert.equal(green.unlockNeed, 0);
+      assert.equal(blue.unlockNeed, 20);
+      const withLoom = createState();
+      placeStation(withLoom, 'loom');
+      assert.equal(isUnlocked(withLoom, green.id), true);
+      assert.equal(isUnlocked(createState(), green.id), false);
+      assert.equal(isUnlocked(withLoom, blue.id), false);
+    }
+    for (const piece of ['boots']) {
+      const green = RECIPES[`green_dhide_${piece}`];
+      const blue = RECIPES[`blue_dhide_${piece}`];
+      const red = RECIPES[`red_dhide_${piece}`];
       assert.equal(blue.tier, 1, `${piece} blue tier`);
       assert.equal(green.tier, 2, `${piece} green tier`);
       assert.equal(blue.previousId, null);
       assert.equal(green.previousId, `blue_dhide_${piece}`);
       assert.equal(red.previousId, `green_dhide_${piece}`);
-      assert.ok(blue.price < green.price, `${piece} blue should sell below green`);
-      assert.ok(blue.time < green.time, `${piece} blue should craft faster than green`);
-      assert.ok((blue.cost?.gold ?? 0) < (green.cost?.gold ?? 0), `${piece} blue gold cost`);
-      assert.equal(blue.unlockNeed, 0);
-      assert.equal(green.unlockNeed, 20);
-      const withLoom = createState();
-      placeStation(withLoom, 'loom');
-      assert.equal(isUnlocked(withLoom, blue.id), true);
-      assert.equal(isUnlocked(createState(), blue.id), false);
-      assert.equal(isUnlocked(withLoom, green.id), false);
     }
     assert.equal(RECIPES.black_dragon_mask.slot, 'helm');
     assert.equal(RECIPES.wizard_gloves, undefined);
@@ -1968,7 +1979,7 @@ describe('sell price rebalance', () => {
     assert.ok(RECIPES.bread.time < 3);
     assert.ok(RECIPES.anglerfish.time < 12);
     assert.ok(RECIPES.green_dhide_body.price < RECIPES.black_dhide_body.price);
-    assert.ok(RECIPES.blue_dhide_body.price < RECIPES.green_dhide_body.price);
+    assert.ok(RECIPES.green_dhide_body.price < RECIPES.blue_dhide_body.price);
   });
 });
 

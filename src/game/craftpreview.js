@@ -23,7 +23,8 @@ export function isRunePreview(id) {
  *
  * Mystic robe tops are the reference: collar up, sleeves to the left and
  * right, chest toward the +Z camera. Wizard tops need the opposite roll.
- * Splitbark tops are about 45° off a quarter-turn; -45° stands the torso up.
+ * Splitbark tops add one clockwise quarter-turn on top of the upright roll,
+ * the same camera-facing roll the platebody uses.
  * Platebodies lie flat until they are pitched onto the chest and rolled
  * collar-up. Dragon masks need a half-turn so the horns are up and the face
  * points at the camera.
@@ -39,7 +40,7 @@ const PREVIEW_EULER = {
 
 const MYSTIC_UPRIGHT = { x: 0, y: 0, z: -Math.PI / 2 };
 const WIZARD_UPRIGHT = { x: 0, y: 0, z: Math.PI / 2 };
-const SPLITBARK_UPRIGHT = { x: 0, y: 0, z: -Math.PI / 4 };
+const SPLITBARK_UPRIGHT = { x: 0, y: 0, z: -Math.PI / 4 - Math.PI / 2 };
 const MASK_FACE_CAMERA = { x: 0, y: 0, z: Math.PI };
 
 /** Preview-only pose for dumps whose mannequin yaw is already baked in. */

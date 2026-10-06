@@ -17,33 +17,37 @@ export function isRunePreview(id) {
 
 /**
  * Craft-preview only. The shop mannequin keeps the ware mesh as built
- * (including wareDisplayYaw). These turns are applied on the preview object.
+ * (including wareDisplayYaw). These turns are a fixed base pose on an inner
+ * group. The spin is a separate yaw on the outer parent around world Y, so
+ * turning does not twist this Euler.
  *
- * Platebodies, wizard robes, mystic robe tops, and the splitbark top sit
- * sideways (sleeves up and down). A clockwise quarter-turn, as seen from the
- * +Z camera, stands them upright: collar at the top, sleeves left and right,
- * chest toward the camera. Dragon masks are tipped a quarter-turn forward so
- * the face points at that camera.
+ * Mystic robe tops are the reference: collar up, sleeves to the left and
+ * right, chest toward the +Z camera. Wizard tops need the opposite roll.
+ * Splitbark tops are about 45° off a quarter-turn; -45° stands the torso up.
+ * Platebodies lie flat until they are pitched onto the chest and rolled
+ * collar-up. Dragon masks need a half-turn so the horns are up and the face
+ * points at the camera.
  */
 const PREVIEW_EULER = {
   robe_bottom: { x: 0, y: 0, z: -Math.PI / 4 },
   platelegs: { x: Math.PI, y: 0, z: 0 },
   dhide_chaps: { x: Math.PI, y: 0, z: 0 },
-  // Existing yaw brings the chest toward the camera; clockwise roll stands it up.
-  platebody: { x: 0, y: Math.PI / 2, z: -Math.PI / 2 },
+  platebody: { x: Math.PI / 2, y: 0, z: -Math.PI / 2 },
   robe_top: { x: Math.PI, y: 0, z: 0 },
   plateskirt: { x: Math.PI / 2, y: 0, z: 0 },
 };
 
-const CLOCKWISE_QUARTER = { x: 0, y: 0, z: -Math.PI / 2 };
-const TIP_FORWARD = { x: Math.PI / 2, y: 0, z: 0 };
+const MYSTIC_UPRIGHT = { x: 0, y: 0, z: -Math.PI / 2 };
+const WIZARD_UPRIGHT = { x: 0, y: 0, z: Math.PI / 2 };
+const SPLITBARK_UPRIGHT = { x: 0, y: 0, z: -Math.PI / 4 };
+const MASK_FACE_CAMERA = { x: 0, y: 0, z: Math.PI };
 
 /** Preview-only pose for dumps whose mannequin yaw is already baked in. */
 function previewOnlyEuler(id) {
-  if (id === 'wizard_robe' || id === 'mystic_robe_top' || id === 'splitbark_robe_top') {
-    return CLOCKWISE_QUARTER;
-  }
-  if (String(id).endsWith('_dragon_mask')) return TIP_FORWARD;
+  if (id === 'mystic_robe_top') return MYSTIC_UPRIGHT;
+  if (id === 'wizard_robe') return WIZARD_UPRIGHT;
+  if (id === 'splitbark_robe_top') return SPLITBARK_UPRIGHT;
+  if (String(id).endsWith('_dragon_mask')) return MASK_FACE_CAMERA;
   return null;
 }
 
@@ -57,7 +61,21 @@ export function craftPreviewEuler(id) {
 export function applyCraftPreviewEuler(object, id) {
   const euler = craftPreviewEuler(id);
   if (!object || !euler) return;
+  object.rotation.order = 'XYZ';
   object.rotation.set(euler.x, euler.y, euler.z);
+}
+
+/**
+ * Inner group holds the fixed base pose. The returned parent is yawed around
+ * world Y while the item stays upright.
+ */
+export function wrapCraftPreviewSpin(ware, id) {
+  const pose = new THREE.Group();
+  applyCraftPreviewEuler(pose, id);
+  if (ware) pose.add(ware);
+  const spin = new THREE.Group();
+  spin.add(pose);
+  return spin;
 }
 
 /**
@@ -151,11 +169,15 @@ export function createCraftPreview(canvas) {
     runeFront = false;
     runeSpin = 0;
     if (!next) return;
-    mesh = buildWare(next);
-    mesh.position.set(0, 0, 0);
+    const ware = buildWare(next);
+    ware.position.set(0, 0, 0);
     runeFront = isRunePreview(next);
-    if (runeFront) poseRuneForFrontView(mesh, 0);
-    else applyCraftPreviewEuler(mesh, next);
+    if (runeFront) {
+      poseRuneForFrontView(ware, 0);
+      mesh = ware;
+    } else {
+      mesh = wrapCraftPreviewSpin(ware, next);
+    }
     scene.add(mesh);
     frame = frameCraftPreview(mesh, camera, 1.42, null, previewOpts());
   }

@@ -47,6 +47,8 @@ import {
   gardenBox,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  plantedTrunkRadius,
+  TREE_CLICK_RADIUS,
   pickFlaxNode,
   rollFlaxSpots,
   sproutDueFlax,
@@ -122,6 +124,7 @@ import {
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRug, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
+import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 import { mountDisplayBasePose } from './craftpreview.js';
 
@@ -1784,7 +1787,12 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (data.kind === 'tree') {
-        queueUse('tree', { x: data.x, z: data.z, materialId: 'logs' });
+        queueUse('tree', {
+          x: data.x,
+          z: data.z,
+          materialId: 'logs',
+          trunkRadius: data.trunkRadius ?? plantedTrunkRadius(data.x, data.z),
+        });
         return;
       }
       if (data.kind === 'flax') {
@@ -1838,10 +1846,15 @@ export function createWorld(canvas, state, opts = {}) {
       }
       if (sceneMode === 'shop') {
         const tree = gardenTreeSpots(state.expansions ?? []).find((spot) => (
-          Math.hypot(point.x - spot.x, point.z - spot.z) <= 1.15
+          Math.hypot(point.x - spot.x, point.z - spot.z) <= TREE_CLICK_RADIUS
         ));
         if (tree) {
-          queueUse('tree', { x: tree.x, z: tree.z, materialId: 'logs' });
+          queueUse('tree', {
+            x: tree.x,
+            z: tree.z,
+            materialId: 'logs',
+            trunkRadius: plantedTrunkRadius(tree.x, tree.z),
+          });
           return;
         }
         const plant = flaxNodes.find((node) => (
@@ -2841,7 +2854,12 @@ export function createWorld(canvas, state, opts = {}) {
     useBoulder(pose) {
       if (!pose) return;
       if (pose.kind === 'tree') {
-        queueUse('tree', { x: pose.x, z: pose.z, materialId: 'logs' });
+        queueUse('tree', {
+          x: pose.x,
+          z: pose.z,
+          materialId: 'logs',
+          trunkRadius: pose.trunkRadius ?? plantedTrunkRadius(pose.x, pose.z),
+        });
         return;
       }
       if (pose.kind === 'flax') {
@@ -3099,27 +3117,45 @@ export function createWorld(canvas, state, opts = {}) {
       };
     },
     getMinimapSnapshot() {
-      if (sceneMode !== 'shop') {
+      const player = {
+        x: shopkeeper.position.x,
+        z: shopkeeper.position.z,
+        facing: shopkeeper.rotation.y,
+      };
+      if (sceneMode === 'dungeon') {
         return {
-          hidden: true,
+          hidden: false,
           sceneMode,
-          player: {
-            x: shopkeeper.position.x,
-            z: shopkeeper.position.z,
-            facing: shopkeeper.rotation.y,
+          yaw: cam.yaw,
+          bounds: dungeonMapBounds(),
+          focus: dungeonMapFocus(),
+          player,
+          rocks: DUNGEON_BOULDERS.map((spot) => ({
+            id: spot.id,
+            materialId: spot.materialId,
+            x: spot.x,
+            z: spot.z,
+            scale: spot.scale ?? 1,
+            vein: spot.vein,
+            essence: Boolean(spot.essence),
+          })),
+          ladder: {
+            x: dungeon?.ladder?.position.x ?? -5.2,
+            z: dungeon?.ladder?.position.z ?? 0.4,
           },
+          rats: (dungeon?.rats ?? []).map((rat) => ({
+            x: rat.position.x,
+            z: rat.position.z,
+          })),
         };
       }
+      if (sceneMode !== 'shop') return { hidden: true, sceneMode };
       return {
         hidden: false,
         sceneMode,
         yaw: cam.yaw,
         expansions: state.expansions ?? [],
-        player: {
-          x: shopkeeper.position.x,
-          z: shopkeeper.position.z,
-          facing: shopkeeper.rotation.y,
-        },
+        player,
         customers: customers
           .filter((actor) => actor.mesh.visible)
           .map((actor) => ({ x: actor.mesh.position.x, z: actor.mesh.position.z })),

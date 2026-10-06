@@ -106,6 +106,61 @@ export const SHELF_WALL_OUTSET = 0.04;
 export const SHELF_FROM_WALL = 0.26;
 export const TREE_BED_CLEAR = 1.7;
 
+/** Uniform scale for every outdoor pine, all axes, versus the pre-stretch fit. */
+export const OUTDOOR_TREE_SCALE = 2;
+/**
+ * Bundled trunk column at the 2× fit, measured on the bark above the root fins.
+ * Each planted pine can override this with its own measured radius.
+ */
+export const TREE_TRUNK_RADIUS = 0.18;
+/**
+ * Walk block for that column. Wide enough to keep a body off the bark, and
+ * narrow enough that the chop stand can still reach it.
+ */
+export const TREE_WALK_BLOCK = TREE_TRUNK_RADIUS * 2 + 0.24;
+/** Grass-click radius around a tree. Was 1.15 before the pines doubled. */
+export const TREE_CLICK_RADIUS = 1.15 * OUTDOOR_TREE_SCALE;
+/**
+ * Horizontal half-extent of a scale-1 fitted pine crown, before per-tree
+ * variation and the outdoor scale.
+ */
+export const TREE_CANOPY_UNIT = 0.66;
+/** Garden pines vary uniformly by this much around the 2× fit. */
+export const TREE_SCALE_SPREAD = 0.15;
+
+/** Widest crown for a garden pine, including the ±15% size roll. */
+export function treeCanopyRadius(side = 'left') {
+  void side;
+  return TREE_CANOPY_UNIT * (1 + TREE_SCALE_SPREAD) * OUTDOOR_TREE_SCALE;
+}
+
+/** Block width for a pine whose trunk column has this radius. */
+export function treeWalkBlock(radius = TREE_TRUNK_RADIUS) {
+  const r = Number.isFinite(radius) && radius > 0 ? radius : TREE_TRUNK_RADIUS;
+  const pad = TREE_WALK_BLOCK - TREE_TRUNK_RADIUS * 2;
+  return r * 2 + pad;
+}
+
+const plantedTrunkRadii = new Map();
+
+function trunkKey(x, z) {
+  return `${Number(x).toFixed(2)},${Number(z).toFixed(2)}`;
+}
+
+export function resetPlantedTrunks() {
+  plantedTrunkRadii.clear();
+}
+
+export function notePlantedTrunk(x, z, radius) {
+  const r = Number(radius);
+  if (!Number.isFinite(r) || r <= 0) return;
+  plantedTrunkRadii.set(trunkKey(x, z), r);
+}
+
+export function plantedTrunkRadius(x, z) {
+  return plantedTrunkRadii.get(trunkKey(x, z)) ?? TREE_TRUNK_RADIUS;
+}
+
 export const GRASS_PAD = 9;
 export const FOUNTAIN = { x: 0, z: 8.85, radius: 0.7, apron: 1.42 };
 export const PATH_HALF_W = 0.72;
@@ -694,41 +749,106 @@ export function gardenSpotClearOfBeds(spot, expansionIds = [], minDist = TREE_BE
   ));
 }
 
+function treeSitRadius(side = 'left') {
+  return side === 'edge' ? treeCanopyRadius('edge') : treeCanopyRadius('left');
+}
+
+/** Push a pine off boulders and neighbouring crowns. Loops are capped. */
+function settleGardenTree(spot, others, rocks, grass) {
+  const inset = treeSitRadius(spot.side);
+  let x = spot.x;
+  let z = spot.z;
+  const clamp = () => {
+    x = Math.min(grass.maxX - inset, Math.max(grass.minX + inset, x));
+    z = Math.min(grass.maxZ - inset, Math.max(grass.minZ + inset, z));
+  };
+  clamp();
+  for (let pass = 0; pass < 8; pass += 1) {
+    let moved = false;
+    for (const rock of rocks) {
+      const need = gardenRockRadius(rock.scale ?? 1) + 1.05;
+      let dx = x - rock.x;
+      let dz = z - rock.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist >= need) continue;
+      if (dist < 1e-4) {
+        dx = spot.x >= rock.x ? 1 : -1;
+        dz = 0;
+      }
+      const push = (need - Math.max(dist, 1e-4)) + 0.04;
+      const len = Math.hypot(dx, dz) || 1;
+      x += (dx / len) * push;
+      z += (dz / len) * push;
+      moved = true;
+    }
+    const mine = treeSitRadius(spot.side);
+    for (const other of others) {
+      const need = (mine + treeSitRadius(other.side)) * 0.86;
+      let dx = x - other.x;
+      let dz = z - other.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist >= need) continue;
+      if (dist < 1e-4) {
+        dx = 1;
+        dz = 0;
+      }
+      const push = (need - Math.max(dist, 1e-4)) * 0.5 + 0.02;
+      const len = Math.hypot(dx, dz) || 1;
+      x += (dx / len) * push;
+      z += (dz / len) * push;
+      moved = true;
+    }
+    clamp();
+    if (!moved) break;
+  }
+  return { ...spot, x, z };
+}
+
 export function gardenTreeSpots(expansionIds = []) {
   const box = footprintBox(expansionIds);
   const grass = gardenBox(expansionIds);
   const cx = (box.minX + box.maxX) / 2;
   const cz = (box.minZ + box.maxZ) / 2;
   const spots = [
-    { x: box.minX - 2.2, z: box.minZ + 1.4, side: 'left' },
-    { x: box.minX - 2.8, z: cz, side: 'left' },
-    { x: box.minX - 1.8, z: box.maxZ - 1.2, side: 'left' },
-    { x: box.maxX + 2.2, z: box.minZ + 1.4, side: 'right' },
-    { x: box.maxX + 2.6, z: cz, side: 'right' },
-    { x: box.maxX + 1.9, z: box.maxZ - 1.4, side: 'right' },
-    { x: cx - 3.2, z: box.minZ - 2.4, side: 'rear' },
-    { x: cx + 3.2, z: box.minZ - 2.4, side: 'rear' },
-    { x: cx, z: box.minZ - 2.8, side: 'rear' },
-    { x: box.minX - 1.6, z: box.maxZ + 2.4, side: 'front-left' },
-    { x: box.maxX + 1.6, z: box.maxZ + 2.4, side: 'front-right' },
-    { x: -4.45, z: 6.35, side: 'path' },
-    { x: 4.55, z: 6.55, side: 'path' },
-    { x: -4.65, z: 9.25, side: 'path' },
-    { x: 4.75, z: 9.45, side: 'path' },
-    { x: -4.15, z: 12.35, side: 'path' },
-    { x: 4.25, z: 12.15, side: 'path' },
-    { x: grass.minX + 1.4, z: grass.minZ + 1.6, side: 'edge' },
-    { x: grass.maxX - 1.4, z: grass.minZ + 1.8, side: 'edge' },
-    { x: grass.minX + 1.6, z: grass.maxZ - 1.5, side: 'edge' },
-    { x: grass.maxX - 1.7, z: grass.maxZ - 1.6, side: 'edge' },
-    { x: grass.minX + 2.2, z: cz, side: 'edge' },
-    { x: grass.maxX - 2.1, z: cz, side: 'edge' },
-    { x: cx - 5.4, z: grass.minZ + 1.3, side: 'edge' },
-    { x: cx + 5.6, z: grass.minZ + 1.4, side: 'edge' },
+    { x: box.minX - 2.45, z: box.minZ + 1.5, side: 'left' },
+    { x: box.minX - 2.9, z: cz - 0.2, side: 'left' },
+    { x: box.minX - 2.2, z: box.maxZ - 0.45, side: 'left' },
+    { x: box.maxX + 2.45, z: box.minZ + 1.35, side: 'right' },
+    { x: box.maxX + 2.85, z: cz + 0.45, side: 'right' },
+    { x: box.maxX + 2.2, z: box.maxZ - 0.7, side: 'right' },
+    { x: cx - 3.6, z: box.minZ - 5.0, side: 'rear' },
+    { x: cx + 3.6, z: box.minZ - 4.8, side: 'rear' },
+    { x: cx, z: box.minZ - 3.15, side: 'rear' },
+    { x: box.minX - 3.4, z: box.maxZ + 1.55, side: 'front-left' },
+    { x: box.maxX + 3.4, z: box.maxZ + 1.7, side: 'front-right' },
+    { x: -4.7, z: 6.2, side: 'path' },
+    { x: 5.0, z: 6.0, side: 'path' },
+    { x: -6.5, z: 8.7, side: 'path' },
+    { x: 6.2, z: 8.2, side: 'path' },
+    { x: -4.85, z: 10.45, side: 'path' },
+    { x: 5.1, z: 10.5, side: 'path' },
+    { x: grass.minX + 2.25, z: grass.minZ + 2.4, side: 'edge' },
+    { x: grass.maxX - 2.25, z: grass.minZ + 2.55, side: 'edge' },
+    { x: grass.minX + 2.25, z: grass.maxZ - 2.4, side: 'edge' },
+    { x: grass.maxX - 2.25, z: grass.maxZ - 2.55, side: 'edge' },
+    { x: grass.minX + 2.25, z: cz - 3.5, side: 'edge' },
+    { x: grass.maxX - 2.25, z: cz + 3.3, side: 'edge' },
+    { x: cx - 7.5, z: grass.minZ + 2.4, side: 'edge' },
+    { x: cx + 7.7, z: grass.minZ + 2.5, side: 'edge' },
   ];
-  return spots.filter((spot) => (
-    keepGardenSpot(spot, expansionIds) && gardenSpotClearOfBeds(spot, expansionIds)
-  ));
+  const rocks = gardenRockSpots(expansionIds);
+  const kept = [];
+  for (const spot of spots) {
+    const settled = settleGardenTree(spot, kept, rocks, grass);
+    if (!keepGardenSpot(settled, expansionIds)) continue;
+    if (!gardenSpotClearOfBeds(settled, expansionIds)) continue;
+    const stillInRock = rocks.some((rock) => (
+      Math.hypot(settled.x - rock.x, settled.z - rock.z) < gardenRockRadius(rock.scale ?? 1) + 0.45
+    ));
+    if (stillInRock) continue;
+    kept.push(settled);
+  }
+  return kept;
 }
 
 export function gardenRockSpots(expansionIds = []) {
@@ -773,7 +893,8 @@ export const FLAX_RESPAWN_SEC = 6;
 export const FLAX_CLICK_RADIUS = 0.72;
 
 const FLAX_EDGE = 0.7;
-const FLAX_TREE_CLEAR = 1.35;
+/** Stay outside the doubled crown and the widened grass-click radius. */
+const FLAX_TREE_CLEAR = Math.max(treeCanopyRadius('edge'), TREE_CLICK_RADIUS) + 0.25;
 const FLAX_BED_CLEAR = 1.05;
 const FLAX_STATION_CLEAR = 1.45;
 const FLAX_DISPLAY_CLEAR = 1.2;

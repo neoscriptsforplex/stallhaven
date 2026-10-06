@@ -721,6 +721,7 @@ function addMagicArmour({
   unlockAt = null,
   cloth = 1,
   weightKey,
+  gold = null,
 }) {
   const set = MAGIC_SETS[setIndex];
   addRecipe({
@@ -737,7 +738,7 @@ function addMagicArmour({
     previousId,
     unlockNeed: unlockAt ?? unlockNeed(lineIndex),
     tier: lineIndex + 1,
-    cost: { materials: { cloth }, gold: setIndex * 2 },
+    cost: { materials: { cloth }, gold: gold ?? setIndex * 2 },
     time: 4 + setIndex,
     price: tierSellPrice(setIndex, { count: MAGIC_SETS.length, weight: MAGIC_ARMOUR_WEIGHT[weightKey] ?? 1 }),
     buyers: ['hedgemage'],
@@ -791,26 +792,31 @@ addMagicArmour({
   id: 'splitbark_hat', name: 'Splitbark Hat', slot: 'helm', shape: 'wizard_hat',
   setIndex: 2, lineId: 'magic-hat', lineName: 'Hat', lineIndex: 2,
   previousId: 'mystic_hat', weightKey: 'hat',
+  gold: RECIPES.mystic_hat.cost.gold + 40,
 });
 addMagicArmour({
   id: 'splitbark_robe_top', name: 'Splitbark Robe Top', slot: 'body', shape: 'robe_top',
   setIndex: 2, lineId: 'magic-robe', lineName: 'Robe', lineIndex: 2,
   previousId: 'mystic_robe_top', cloth: 2, weightKey: 'robe_top',
+  gold: RECIPES.mystic_robe_top.cost.gold + 40,
 });
 addMagicArmour({
   id: 'splitbark_robe_bottom', name: 'Splitbark Robe Bottom', slot: 'legs', shape: 'robe_bottom',
   setIndex: 2, lineId: 'magic-robe-bottom', lineName: 'Robe Bottom', lineIndex: 2,
   previousId: 'mystic_robe_bottom', weightKey: 'robe_bottom',
+  gold: RECIPES.mystic_robe_bottom.cost.gold + 40,
 });
 addMagicArmour({
   id: 'splitbark_gauntlets', name: 'Splitbark Gauntlets', slot: 'gloves', shape: 'magic_gloves',
   setIndex: 2, lineId: 'magic-gloves', lineName: 'Gloves', lineIndex: 2,
   previousId: 'mystic_gloves', weightKey: 'gloves',
+  gold: RECIPES.mystic_gloves.cost.gold + 40,
 });
 addMagicArmour({
   id: 'splitbark_boots', name: 'Splitbark Boots', slot: 'boots', shape: 'magic_boots',
   setIndex: 2, lineId: 'magic-boots', lineName: 'Boots', lineIndex: 2,
   previousId: 'mystic_boots', weightKey: 'boots',
+  gold: RECIPES.mystic_boots.cost.gold + 40,
 });
 
 const LATER_PIECES = [

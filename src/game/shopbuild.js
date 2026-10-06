@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   EXPANSION_PADS,
   FOUNTAIN,
@@ -10,8 +11,8 @@ import {
   SHOP_FURNITURE_FLOOR_Y,
   cobblePathSpan,
   cobbleRingTuck,
-  gardenBedSpots,
   gardenBox,
+  gardenFlowerSpots,
   gardenGrassClusters,
   gardenRockSpots,
   gardenTrapdoorSpot,
@@ -124,10 +125,158 @@ function cobbleMap() {
 }
 
 const COBBLE_U = 4.2 / ROOM_W;
-const COBBLE_V = 2.6 / 2.7;
 /** Path-only UV scale: cobbles read about 3× smaller than the wall stone. */
 export const PATH_COBBLE_SCALE = 3;
 const PATH_COBBLE_U = COBBLE_U * PATH_COBBLE_SCALE;
+
+/**
+ * Tiles of shop_wall_512.png per world metre, on both S and T.
+ * The tile is 4 bricks across and 8 rows of 2:1 bricks, so one tile per metre
+ * draws a brick about 25cm wide and 12.5cm tall — the same size as the shop
+ * cobble this replaces (8 stones across 4.2 tiles per 8.2m, and 8 stones up
+ * 2.6 tiles per 2.7m, about 24cm × 13cm).
+ */
+export const SHOP_WALL_REPEAT = 1;
+const SHOP_WALL_FILE = 'shop_wall_512.png';
+
+function assetBaseUrl() {
+  try {
+    return import.meta.env.BASE_URL || './';
+  } catch {
+    return './';
+  }
+}
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function shopWallTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${SHOP_WALL_FILE}`,
+    `${envBase}public/textures/${SHOP_WALL_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${SHOP_WALL_FILE}`, `./public/textures/${SHOP_WALL_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let shopWallSource = null;
+const shopWallClones = [];
+
+function configureShopWallTexture(tex) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  return tex;
+}
+
+function applyShopWallImage(loaded) {
+  if (!shopWallSource || !loaded?.image) return;
+  shopWallSource.image = loaded.image;
+  shopWallSource.needsUpdate = true;
+  for (const tex of shopWallClones) {
+    tex.image = loaded.image;
+    tex.needsUpdate = true;
+  }
+  shopWallClones.length = 0;
+}
+
+function beginShopWallLoad() {
+  const urls = shopWallTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyShopWallImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function shopWallMap() {
+  if (!shopWallSource) {
+    shopWallSource = configureShopWallTexture(new THREE.Texture());
+    shopWallSource.userData.kind = 'shop-wall';
+    beginShopWallLoad();
+  }
+  const tex = configureShopWallTexture(shopWallSource.clone());
+  tex.userData.kind = 'shop-wall';
+  if (shopWallSource.image) {
+    tex.image = shopWallSource.image;
+    tex.needsUpdate = true;
+  } else {
+    shopWallClones.push(tex);
+  }
+  return tex;
+}
+
+function shopWallMat() {
+  const map = shopWallMap();
+  map.repeat.set(1, 1);
+  map.offset.set(0, 0);
+  const mat = new THREE.MeshStandardMaterial({
+    map,
+    roughness: 0.94,
+    metalness: 0.03,
+    color: 0xffffff,
+  });
+  mat.userData.shopWall = true;
+  return mat;
+}
+
+const wallUvA = new THREE.Vector3();
+const wallUvB = new THREE.Vector3();
+const wallUvC = new THREE.Vector3();
+const wallUvN = new THREE.Vector3();
+const wallUvP = new THREE.Vector3();
+
+/** World-space UVs so each face, including cut edges, repeats SHOP_WALL_REPEAT per metre. */
+function writeShopWallUVs(geo, wx, wy, wz) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  const index = geo.getIndex();
+  const count = index ? index.count : pos.count;
+  const at = (k) => (index ? index.getX(k) : k);
+  const seen = new Set();
+  for (let f = 0; f < count; f += 3) {
+    wallUvA.fromBufferAttribute(pos, at(f));
+    wallUvB.fromBufferAttribute(pos, at(f + 1));
+    wallUvC.fromBufferAttribute(pos, at(f + 2));
+    wallUvN.subVectors(wallUvB, wallUvA).cross(wallUvC.sub(wallUvA));
+    const ax = Math.abs(wallUvN.x);
+    const ay = Math.abs(wallUvN.y);
+    const az = Math.abs(wallUvN.z);
+    let uKey = 'x';
+    let vKey = 'y';
+    if (ay >= ax && ay >= az) {
+      uKey = 'x';
+      vKey = 'z';
+    } else if (ax >= az) {
+      uKey = 'z';
+      vKey = 'y';
+    }
+    for (let k = 0; k < 3; k += 1) {
+      const vi = at(f + k);
+      if (seen.has(vi)) continue;
+      seen.add(vi);
+      wallUvP.fromBufferAttribute(pos, vi);
+      const worldX = wallUvP.x + wx;
+      const worldY = wallUvP.y + wy;
+      const worldZ = wallUvP.z + wz;
+      const world = uKey === 'z' ? worldZ : worldX;
+      const up = vKey === 'z' ? worldZ : worldY;
+      uv.setXY(vi, world * SHOP_WALL_REPEAT, up * SHOP_WALL_REPEAT);
+    }
+  }
+  uv.needsUpdate = true;
+}
 
 function grassGroundMat() {
   return new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 });
@@ -145,27 +294,17 @@ function cobbleMat(repeatX, repeatY, offsetX = 0, offsetY = 0) {
   });
 }
 
-function cobbleSlabMat(alongSize, height, along0, y0) {
-  return cobbleMat(
-    Math.max(0.08, alongSize * COBBLE_U),
-    Math.max(0.08, height * COBBLE_V),
-    along0 * COBBLE_U,
-    y0 * COBBLE_V,
-  );
-}
-
-function addWallSlab(root, mat, x, y, z, sx, sy, sz, uvAlong = null, uvY = null) {
+function addWallSlab(root, x, y, z, sx, sy, sz) {
   if (sx < 0.03 || sy < 0.03 || sz < 0.03) return;
-  const slabMat = uvAlong == null
-    ? mat
-    : cobbleSlabMat(uvAlong.size, sy, uvAlong.origin - uvAlong.size / 2, (uvY ?? y) - sy / 2);
-  const mesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), slabMat));
+  const geo = new THREE.BoxGeometry(sx, sy, sz);
+  writeShopWallUVs(geo, x, y, z);
+  const mesh = addShadow(new THREE.Mesh(geo, shopWallMat()));
   mesh.position.set(x, y, z);
   mesh.userData.shopWall = true;
   root.add(mesh);
 }
 
-function addWallWithWindow(root, mat, {
+function addWallWithWindow(root, {
   x, y, z, w, h, t, axis, winAlong, winY, winW, winH,
 }) {
   const along0 = axis === 'x' ? x : z;
@@ -180,15 +319,12 @@ function addWallWithWindow(root, mat, {
   const place = (along, cy, sw, sh) => {
     addWallSlab(
       root,
-      mat,
       axis === 'x' ? along : x,
       cy,
       axis === 'x' ? z : along,
       axis === 'x' ? sw : t,
       sh,
       axis === 'x' ? t : sw,
-      { origin: along, size: sw },
-      cy,
     );
   };
   place(left + (winL - left) / 2, y, winL - left, h);
@@ -197,7 +333,7 @@ function addWallWithWindow(root, mat, {
   place(winAlong, winT + (top - winT) / 2, winW, top - winT);
 }
 
-function addWallWithDoor(root, mat, {
+function addWallWithDoor(root, {
   x, y, z, w, h, t, axis, doorAlong, doorW = 1.28, doorH = 2.18,
 }) {
   const along0 = axis === 'x' ? x : z;
@@ -209,15 +345,12 @@ function addWallWithDoor(root, mat, {
   const place = (along, cy, sw, sh) => {
     addWallSlab(
       root,
-      mat,
       axis === 'x' ? along : x,
       cy,
       axis === 'x' ? z : along,
       axis === 'x' ? sw : t,
       sh,
       axis === 'x' ? t : sw,
-      { origin: along, size: sw },
-      cy,
     );
   };
   place(left + (doorL - left) / 2, y, doorL - left, h);
@@ -570,7 +703,7 @@ function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
   return group;
 }
 
-/** Match shop-wall cobble size: texture U/V is world metres times the wall repeat per metre. */
+/** Match shop-wall bricks: texture U/V is world metres times SHOP_WALL_REPEAT. */
 function writeGableUVs(geo, end, wallTop) {
   const pos = geo.getAttribute('position');
   const uv = geo.getAttribute('uv');
@@ -584,7 +717,7 @@ function writeGableUVs(geo, end, wallTop) {
     const worldY = wallTop + ly;
     const worldZ = end.z - lx * sin + lz * cos;
     const along = end.side ? worldZ : worldX;
-    uv.setXY(i, along * COBBLE_U, worldY * COBBLE_V);
+    uv.setXY(i, along * SHOP_WALL_REPEAT, worldY * SHOP_WALL_REPEAT);
   }
   uv.needsUpdate = true;
 }
@@ -609,7 +742,7 @@ function addRoofGables(group, center, neigh, ridgeY) {
     const geo = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false, steps: 1 });
     geo.translate(0, 0, -thick / 2);
     writeGableUVs(geo, end, wallTop);
-    const mat = cobbleMat(1, 1);
+    const mat = shopWallMat();
     mat.transparent = true;
     mat.opacity = 1;
     mat.depthWrite = true;
@@ -655,9 +788,24 @@ function addOriginFront(root, center) {
     post.position.set(x, 1.2, z);
     root.add(post);
   }
-  const awning = addShadow(new THREE.Mesh(new THREE.BoxGeometry(8.1, 0.06, 1.7), cloth(0x8b4336)));
-  awning.position.set(center.x, 2.32, center.z + ROOM_D / 2 + 0.47);
-  awning.rotation.x = -0.18;
+  // The red canopy used to run through the wall and hang inside the room. Keep its
+  // outer lip and stop the cloth on the exterior face so that inside bar is gone.
+  const awningTilt = -0.18;
+  const awningCos = Math.cos(awningTilt);
+  const awningSin = Math.sin(awningTilt);
+  const oldHalf = 0.85;
+  const oldCenterY = 2.32;
+  const oldCenterZ = center.z + ROOM_D / 2 + 0.47;
+  const outerZ = oldCenterZ + oldHalf * awningCos;
+  const outerY = oldCenterY - oldHalf * awningSin;
+  const wallOuterZ = center.z + ROOM_D / 2 + 0.08;
+  const awningHalf = (outerZ - wallOuterZ) / (2 * awningCos);
+  const awning = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(8.1, 0.06, awningHalf * 2),
+    cloth(0x8b4336),
+  ));
+  awning.position.set(center.x, outerY + awningHalf * awningSin, wallOuterZ + awningHalf * awningCos);
+  awning.rotation.x = awningTilt;
   root.add(awning);
   const stripe = addShadow(new THREE.Mesh(new THREE.BoxGeometry(8.12, 0.02, 0.28), cloth(0xead3ae)));
   stripe.position.set(center.x, 2.36, center.z + ROOM_D / 2 - 0.03);
@@ -673,6 +821,7 @@ function addOriginFront(root, center) {
   ));
   join.position.set(center.x, 2.64, center.z + ROOM_D / 2 + 0.1);
   root.add(join);
+
   const fascia = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(ROOM_W + 0.12, 0.16, 0.28),
     cobbleMat(4.2, 0.4),
@@ -732,9 +881,6 @@ function addOriginDecor(root, center) {
 
 function addRoomWalls(root, cell, neigh, isOrigin) {
   const c = roomCenter(cell.gx, cell.gz);
-  const stoneFront = cobbleMat(4.2, 2.6);
-  const stoneSide = cobbleMat(7.2, 2.6);
-  const stoneBack = cobbleMat(8.2, 2.6);
   const h = 2.7;
   const t = 0.16;
   const y = 1.4;
@@ -744,7 +890,7 @@ function addRoomWalls(root, cell, neigh, isOrigin) {
   const frontZ = c.z + ROOM_D / 2;
 
   if (!neigh.left) {
-    addWallWithWindow(root, stoneSide, {
+    addWallWithWindow(root, {
       x: leftX, y, z: c.z, w: ROOM_D, h, t, axis: 'z',
       winAlong: c.z, winY: 1.42, winW: 0.86, winH: 0.95,
     });
@@ -752,11 +898,11 @@ function addRoomWalls(root, cell, neigh, isOrigin) {
   }
 
   if (neigh.right) {
-    addWallWithDoor(root, stoneSide, {
+    addWallWithDoor(root, {
       x: rightX, y, z: c.z, w: ROOM_D, h, t, axis: 'z', doorAlong: c.z,
     });
   } else {
-    addWallWithWindow(root, stoneSide, {
+    addWallWithWindow(root, {
       x: rightX, y, z: c.z, w: ROOM_D, h, t, axis: 'z',
       winAlong: c.z, winY: 1.42, winW: 0.86, winH: 0.95,
     });
@@ -764,14 +910,11 @@ function addRoomWalls(root, cell, neigh, isOrigin) {
   }
 
   if (neigh.back) {
-    addWallWithDoor(root, stoneBack, {
+    addWallWithDoor(root, {
       x: c.x, y, z: backZ, w: ROOM_W, h, t, axis: 'x', doorAlong: c.x,
     });
   } else {
-    const back = addShadow(new THREE.Mesh(new THREE.BoxGeometry(ROOM_W, h, t), stoneBack));
-    back.position.set(c.x, y, backZ);
-    back.userData.shopWall = true;
-    root.add(back);
+    addWallSlab(root, c.x, y, backZ, ROOM_W, h, t);
     const cap = addShadow(new THREE.Mesh(
       new THREE.BoxGeometry(ROOM_W + 0.08, 0.14, 0.22),
       wood(0x3c2616, 0.78),
@@ -784,11 +927,11 @@ function addRoomWalls(root, cell, neigh, isOrigin) {
     if (isOrigin) {
       const doorHalf = 0.58;
       const wallSpan = ROOM_W / 2 - doorHalf;
-      addWallWithWindow(root, stoneFront, {
+      addWallWithWindow(root, {
         x: c.x - ROOM_W / 2 + wallSpan / 2, y, z: frontZ, w: wallSpan, h, t, axis: 'x',
         winAlong: c.x - 1.48, winY: 1.42, winW: 0.82, winH: 0.95,
       });
-      addWallWithWindow(root, stoneFront, {
+      addWallWithWindow(root, {
         x: c.x + ROOM_W / 2 - wallSpan / 2, y, z: frontZ, w: wallSpan, h, t, axis: 'x',
         winAlong: c.x + 1.48, winY: 1.42, winW: 0.82, winH: 0.95,
       });
@@ -796,11 +939,11 @@ function addRoomWalls(root, cell, neigh, isOrigin) {
       addShopWindow(root, { x: c.x + 1.48, y: 1.42, z: frontZ - 0.08 });
       addOriginFront(root, c);
     } else {
-      addWallWithWindow(root, stoneFront, {
+      addWallWithWindow(root, {
         x: c.x - ROOM_W / 4, y, z: frontZ, w: ROOM_W / 2, h, t, axis: 'x',
         winAlong: c.x - ROOM_W / 4, winY: 1.42, winW: 0.82, winH: 0.95,
       });
-      addWallWithWindow(root, stoneFront, {
+      addWallWithWindow(root, {
         x: c.x + ROOM_W / 4, y, z: frontZ, w: ROOM_W / 2, h, t, axis: 'x',
         winAlong: c.x + ROOM_W / 4, winY: 1.42, winW: 0.82, winH: 0.95,
       });
@@ -1656,27 +1799,93 @@ function addFountain(root, x, z) {
   return group;
 }
 
-function addGardenBed(root, x, z, rand) {
-  const soil = addShadow(new THREE.Mesh(
-    new THREE.CylinderGeometry(0.55, 0.62, 0.12, 10),
-    new THREE.MeshStandardMaterial({ color: 0x4a331c, roughness: 1 }),
-  ));
-  soil.position.set(x, 0.04, z);
-  root.add(soil);
-  const flowers = buildFlowerCluster(rand);
-  flowers.position.set(x, 0.08, z);
-  root.add(flowers);
-}
+const FLOWER_TINTS = [0xffffff, 0xffb7c8, 0xffd56a, 0xf3efe6, 0xd98ad4, 0xff8a5b];
 
 function buildFlowerCluster(rand) {
   const target = buildProceduralFlowerCluster(rand);
   const bundled = getBundledLook('flowers');
   if (bundled) {
-    const mesh = wrapBundledProp(bundled, target, { name: 'flowers', fit: 'max' });
-    mesh.rotation.y = rand() * Math.PI * 2;
-    return mesh;
+    return wrapBundledProp(bundled, target, { name: 'flowers', fit: 'max' });
   }
   return target;
+}
+
+function meshTint(material) {
+  const mat = Array.isArray(material) ? material[0] : material;
+  return mat?.color ?? new THREE.Color(1, 1, 1);
+}
+
+/** One grounded flower, vertex colours baked, ready to instance. */
+function flowerGeometry(rand) {
+  const visual = buildFlowerCluster(rand);
+  // Keep the fitted wrapper scale. Zeroing it restores the raw dump, which is metres wide.
+  visual.updateMatrixWorld(true);
+  const pieces = [];
+  visual.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    if (child.material && child.material.visible === false) return;
+    const source = child.geometry.index ? child.geometry.toNonIndexed() : child.geometry.clone();
+    source.applyMatrix4(child.matrixWorld);
+    const position = source.getAttribute('position');
+    if (!position) return;
+    if (!source.getAttribute('normal')) source.computeVertexNormals();
+    const tint = meshTint(child.material);
+    const colors = new Float32Array(position.count * 3);
+    for (let i = 0; i < position.count; i += 1) {
+      colors[i * 3] = tint.r;
+      colors[i * 3 + 1] = tint.g;
+      colors[i * 3 + 2] = tint.b;
+    }
+    const next = new THREE.BufferGeometry();
+    next.setAttribute('position', position.clone());
+    next.setAttribute('normal', source.getAttribute('normal').clone());
+    next.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    pieces.push(next);
+    source.dispose();
+  });
+  if (!pieces.length) return null;
+  const merged = mergeGeometries(pieces, false);
+  pieces.forEach((geo) => geo.dispose());
+  if (!merged) return null;
+  merged.computeBoundingBox();
+  const box = merged.boundingBox;
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  merged.translate(-center.x, -box.min.y, -center.z);
+  return merged;
+}
+
+function addGrassFlowers(root, expansionIds) {
+  const spots = gardenFlowerSpots(expansionIds);
+  const geometry = flowerGeometry(randAt(8801));
+  if (!spots.length || !geometry) return;
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.72,
+    metalness: 0,
+  });
+  const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
+  mesh.name = 'flowers';
+  mesh.userData.kind = 'decor';
+  mesh.castShadow = false;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  mesh.raycast = () => {};
+  const dummy = new THREE.Object3D();
+  const color = new THREE.Color();
+  for (let i = 0; i < spots.length; i += 1) {
+    const spot = spots[i];
+    dummy.position.set(spot.x, GRASS_PLANE_Y, spot.z);
+    dummy.rotation.set(0, spot.yaw, 0);
+    dummy.scale.setScalar(spot.scale);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+    color.setHex(FLOWER_TINTS[spot.tint % FLOWER_TINTS.length]);
+    mesh.setColorAt(i, color);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  root.add(mesh);
 }
 
 function buildProceduralFlowerCluster(rand) {
@@ -1704,19 +1913,6 @@ function buildProceduralFlowerCluster(rand) {
 }
 
 function addGarden(root, cells, expansionIds = []) {
-  const box = {
-    minX: Infinity,
-    maxX: -Infinity,
-    minZ: Infinity,
-    maxZ: -Infinity,
-  };
-  for (const cell of cells) {
-    const c = roomCenter(cell.gx, cell.gz);
-    box.minX = Math.min(box.minX, c.x - ROOM_W / 2);
-    box.maxX = Math.max(box.maxX, c.x + ROOM_W / 2);
-    box.minZ = Math.min(box.minZ, c.z - ROOM_D / 2);
-    box.maxZ = Math.max(box.maxZ, c.z + ROOM_D / 2);
-  }
   const grass = gardenBox(expansionIds);
   const grassW = grass.maxX - grass.minX;
   const grassD = grass.maxZ - grass.minZ;
@@ -1732,10 +1928,6 @@ function addGarden(root, cells, expansionIds = []) {
 
   addCobblePath(root, expansionIds);
   if (keepFountain(expansionIds)) addFountain(root, FOUNTAIN.x, FOUNTAIN.z);
-
-  gardenBedSpots(expansionIds).forEach((spot, i) => {
-    addGardenBed(root, spot.x, spot.z, randAt(2201 + i * 1110));
-  });
 
   const rand = randAt(1337 + cells.length * 17);
   resetPlantedTrunks();
@@ -1767,24 +1959,7 @@ function addGarden(root, cells, expansionIds = []) {
     root.add(door);
   }
   addLushGrass(root, grass, expansionIds, rand);
-  for (let i = 0; i < 14; i += 1) {
-    const leftSide = i % 2 === 0;
-    const side = leftSide ? box.minX - 1.1 : box.maxX + 1.1;
-    const z = box.minZ - 1.2 + rand() * ((box.maxZ - box.minZ) + 3);
-    const x = side + (rand() - 0.5);
-    if (!keepGardenSpot({ x, z, side: leftSide ? 'left' : 'right' }, expansionIds)) continue;
-    const flowers = buildFlowerCluster(rand);
-    flowers.position.set(x, 0, z);
-    root.add(flowers);
-  }
-  for (let i = 0; i < 6; i += 1) {
-    const x = box.minX + rand() * (box.maxX - box.minX);
-    const z = box.minZ - 1.4 - rand() * 1.6;
-    if (!keepGardenSpot({ x, z, side: 'rear' }, expansionIds)) continue;
-    const flowers = buildFlowerCluster(rand);
-    flowers.position.set(x, 0, z);
-    root.add(flowers);
-  }
+  addGrassFlowers(root, expansionIds);
 }
 
 function addPathRect(root, minX, maxX, minZ, maxZ) {

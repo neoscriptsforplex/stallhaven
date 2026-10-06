@@ -104,6 +104,7 @@ async function bootGame() {
   window.stallhaven = {
     world,
     state,
+    uploadsReady: false,
     bundled: {
       player: Boolean(riggedPlayer || bundledPlayer),
       looks: Object.keys(bundledLooks ?? {}),
@@ -131,7 +132,10 @@ async function bootGame() {
       try {
         const scene = await parseModelBuffer(record.buffer, record.name, record.sidecars ?? {});
         if (record.kind === 'player') {
-          const result = world.setPlayerLook(scene);
+          const result = world.setPlayerLook(scene, {
+            yaw180: Boolean(record.yaw180),
+            name: record.name,
+          });
           if (!result?.ok) continue;
         } else if (record.kind === 'customer') {
           const result = world.setCustomerLook(scene);
@@ -151,6 +155,10 @@ async function bootGame() {
       }
     }
     hud.render(performance.now() / 1000);
+  }).catch(() => {
+    // A stored model that cannot be read leaves the current adventurer in place.
+  }).finally(() => {
+    window.stallhaven.uploadsReady = true;
   });
 
   let last = performance.now();

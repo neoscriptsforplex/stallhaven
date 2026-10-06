@@ -361,9 +361,16 @@ This will allow you to load it back again.
         Photo mode
       </label>
       <p class="meta">Hides shop customers and their speech bubbles.</p>
-      <h3>Player Avatar</h3>
-      <p class="meta">Hair, shirt, legs, boots, and face hair save with the shop.</p>
-      <button type="button" data-look-open>Player Avatar: Customize</button>
+      <h3>Player model</h3>
+      <p class="meta">The default adventurer is Rig's rigged character. Upload a .glb, .gltf, .fbx, or .obj to replace them. The file stays in this browser until you reset. A file that cannot be read leaves the current model in place.</p>
+      <p data-player-model-note class="craft-note" hidden></p>
+      <input type="file" data-player-model-file accept=".glb,.gltf,.fbx,.obj,model/gltf-binary,model/gltf+json" hidden />
+      <div class="row furn-row">
+        <button type="button" data-player-model-upload>Upload player model</button>
+        <button type="button" data-player-model-reset>Reset to default</button>
+      </div>
+      <button type="button" data-player-model-yaw hidden aria-pressed="false">Rotate 180°</button>
+      <p class="meta" data-player-model-hint hidden>This model may face backwards or use Z as up. Rotate 180° if it looks wrong.</p>
       <h3>Cheats</h3>
       <p class="meta">Type a code and press Enter. Codes are not case-sensitive.</p>
       <form data-cheat-form class="cheat-form">
@@ -372,25 +379,6 @@ This will allow you to load it back again.
       </form>
       <p data-cheat-note class="craft-note" hidden></p>
       <button type="button" class="ghost" data-settings-close>Close</button>
-    </aside>
-
-    <aside id="look-dock" class="expand-dock" hidden>
-      <h2>Player Avatar</h2>
-      <p class="meta" data-look-note>Hair, shirt, legs, boots, and face hair save with the shop.</p>
-      <p class="look-label">Hair</p>
-      <div class="skybox-grid" data-look="hair"></div>
-      <p class="look-label">Shirt</p>
-      <div class="skybox-grid" data-look="shirt"></div>
-      <p class="look-label">Legs</p>
-      <div class="skybox-grid" data-look="legs"></div>
-      <p class="look-label">Boots</p>
-      <div class="skybox-grid" data-look="boots"></div>
-      <p class="look-label">Face hair</p>
-      <div class="skybox-grid" data-look="faceHair"></div>
-      <div class="row furn-row">
-        <button type="button" data-look-back>Back to Settings</button>
-        <button type="button" class="ghost" data-look-close>Close</button>
-      </div>
     </aside>
 
     <aside id="music-dock" class="expand-dock" hidden>

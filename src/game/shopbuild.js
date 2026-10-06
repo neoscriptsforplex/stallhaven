@@ -1295,13 +1295,35 @@ function makeNameSprite(text) {
   return sprite;
 }
 
+/**
+ * Outdoor pines are twice as tall as the fit target.
+ * XZ stays put so trunk width, the walk block, and chop stand points still meet.
+ */
+export const TREE_HEIGHT_SCALE = 2;
+
 export function buildTree(scale = 1) {
   const target = buildProceduralTree(scale);
   const bundled = getBundledLook('tree');
-  if (bundled) {
-    return wrapBundledProp(bundled, target, { name: 'pine', fit: 'height' });
-  }
-  return target;
+  const fitted = bundled
+    ? wrapBundledProp(bundled, target, { name: 'pine', fit: 'height' })
+    : null;
+  return raiseOutdoorTree(fitted || target);
+}
+
+/**
+ * Stretch the fitted pine on Y only, then sit its base on y = 0.
+ * The visual lives under a placement group so the garden can pin the group
+ * to the grass without lifting the trunk. Materials stay opaque: the roof
+ * fade adopts transparent meshes, and this must not join that pass.
+ */
+function raiseOutdoorTree(visual) {
+  visual.scale.y *= TREE_HEIGHT_SCALE;
+  sitVisibleOnY(visual, 0);
+  visual.name = 'pine-visual';
+  const root = new THREE.Group();
+  root.name = 'pine';
+  root.add(visual);
+  return root;
 }
 
 /** Knee-high next to the shopkeeper. The uploaded dump is a wide flat spray. */
@@ -2038,9 +2060,15 @@ function shadeHex(hex, factor) {
   return color.getHex();
 }
 
+const TREE_PICK_XZ = 0.85;
+
 function attachTreePick(tree, spot) {
-  const pick = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.7, 0.85), pickMat());
-  pick.position.y = 0.85;
+  const box = measureVisibleBox(tree);
+  const base = Number.isFinite(box.min.y) ? box.min.y : 0;
+  const top = Number.isFinite(box.max.y) ? box.max.y : base + 1.7;
+  const height = Math.max(1.7, top - base);
+  const pick = new THREE.Mesh(new THREE.BoxGeometry(TREE_PICK_XZ, height, TREE_PICK_XZ), pickMat());
+  pick.position.y = base + height / 2;
   pick.userData.kind = 'tree';
   pick.userData.materialId = 'logs';
   pick.userData.name = 'Tree';

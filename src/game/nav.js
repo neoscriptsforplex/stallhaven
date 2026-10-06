@@ -345,7 +345,17 @@ export function pointInRect(x, z, rect, pad = 0) {
     && z <= rect.maxZ + pad;
 }
 
-export function isWalkable(x, z, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR]) {
+/** A chop stand may overlap its own tree block. Other blockers still count. */
+function blockReleased(x, z, block, release) {
+  if (!release?.points?.length) return false;
+  const cx = (block.minX + block.maxX) / 2;
+  const cz = (block.minZ + block.maxZ) / 2;
+  if (Math.hypot(cx - release.x, cz - release.z) > 0.35) return false;
+  const reach = release.reach ?? 0.36;
+  return release.points.some((point) => Math.hypot(x - point.x, z - point.z) <= reach);
+}
+
+export function isWalkable(x, z, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR], release = null) {
   const onFloor = floors.some((rect) => (
     x >= rect.minX + radius
     && x <= rect.maxX - radius
@@ -353,11 +363,13 @@ export function isWalkable(x, z, obstacles, radius = PLAYER_RADIUS, floors = [FL
     && z <= rect.maxZ - radius
   ));
   if (!onFloor) return false;
-  return !obstacles.some((block) => pointInRect(x, z, block, radius));
+  return !obstacles.some((block) => (
+    !blockReleased(x, z, block, release) && pointInRect(x, z, block, radius)
+  ));
 }
 
-export function nearestWalkable(x, z, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR]) {
-  if (isWalkable(x, z, obstacles, radius, floors)) return { x, z };
+export function nearestWalkable(x, z, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR], release = null) {
+  if (isWalkable(x, z, obstacles, radius, floors, release)) return { x, z };
   const maxR = 2.4;
   const step = 0.12;
   for (let ring = step; ring <= maxR; ring += step) {
@@ -366,13 +378,13 @@ export function nearestWalkable(x, z, obstacles, radius = PLAYER_RADIUS, floors 
       const angle = (i / samples) * Math.PI * 2;
       const nx = x + Math.cos(angle) * ring;
       const nz = z + Math.sin(angle) * ring;
-      if (isWalkable(nx, nz, obstacles, radius, floors)) return { x: nx, z: nz };
+      if (isWalkable(nx, nz, obstacles, radius, floors, release)) return { x: nx, z: nz };
     }
   }
   return null;
 }
 
-export function hasLineOfSight(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR]) {
+export function hasLineOfSight(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR], release = null) {
   const dx = to.x - from.x;
   const dz = to.z - from.z;
   const dist = Math.hypot(dx, dz);
@@ -382,7 +394,7 @@ export function hasLineOfSight(from, to, obstacles, radius = PLAYER_RADIUS, floo
   const pad = radius + 0.04;
   for (let i = 1; i <= steps; i += 1) {
     const t = i / steps;
-    if (!isWalkable(from.x + dx * t, from.z + dz * t, obstacles, pad, floors)) return false;
+    if (!isWalkable(from.x + dx * t, from.z + dz * t, obstacles, pad, floors, release)) return false;
   }
   return true;
 }
@@ -430,9 +442,9 @@ function cellWorld(ix, iz) {
 }
 
 /** A* cells must be walkable; a walkable world point can still round onto a blocked cell. */
-function toWalkableCell(x, z, obstacles, radius, floors) {
+function toWalkableCell(x, z, obstacles, radius, floors, release) {
   const [ix0, iz0] = toCell(x, z);
-  if (isWalkable(ix0 * CELL, iz0 * CELL, obstacles, radius, floors)) return [ix0, iz0];
+  if (isWalkable(ix0 * CELL, iz0 * CELL, obstacles, radius, floors, release)) return [ix0, iz0];
   let best = null;
   let bestD = Infinity;
   for (let ring = 1; ring <= 4; ring += 1) {
@@ -442,7 +454,7 @@ function toWalkableCell(x, z, obstacles, radius, floors) {
         const ix = ix0 + dx;
         const iz = iz0 + dz;
         const world = cellWorld(ix, iz);
-        if (!isWalkable(world.x, world.z, obstacles, radius, floors)) continue;
+        if (!isWalkable(world.x, world.z, obstacles, radius, floors, release)) continue;
         const dist = Math.hypot(world.x - x, world.z - z);
         if (dist < bestD) {
           best = [ix, iz];
@@ -455,7 +467,7 @@ function toWalkableCell(x, z, obstacles, radius, floors) {
   return [ix0, iz0];
 }
 
-function routeFrom(came, key, goal, obstacles, radius, floors, start, allowGoal) {
+function routeFrom(came, key, goal, obstacles, radius, floors, start, allowGoal, release) {
   const cells = [];
   let walk = key;
   const guard = new Set();
@@ -470,13 +482,28 @@ function routeFrom(came, key, goal, obstacles, radius, floors, start, allowGoal)
   const points = cells.map((cell) => cellWorld(cell.ix, cell.iz));
   const tail = points[points.length - 1];
   if (allowGoal && tail && goal && Math.hypot(tail.x - goal.x, tail.z - goal.z) > 0.001
-    && hasLineOfSight(tail, goal, obstacles, radius, floors)) {
+    && (release
+      ? denseStandClear(tail, goal, obstacles, radius, floors, release)
+      : hasLineOfSight(tail, goal, obstacles, radius, floors, null))) {
     points.push(goal);
   }
-  return smoothPath(start, points, obstacles, radius, floors);
+  return smoothPath(start, points, obstacles, radius, floors, null);
 }
 
-function smoothPath(start, points, obstacles, radius, floors) {
+/** The last step onto a chop stand may cross that tree's own block, and nothing else. */
+function denseStandClear(from, to, obstacles, radius, floors, release) {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const dist = Math.hypot(dx, dz);
+  const steps = Math.max(1, Math.ceil(dist / 0.05));
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    if (!isWalkable(from.x + dx * t, from.z + dz * t, obstacles, radius, floors, release)) return false;
+  }
+  return true;
+}
+
+function smoothPath(start, points, obstacles, radius, floors, release) {
   if (!points.length) return [];
   const out = [];
   let from = start;
@@ -484,7 +511,7 @@ function smoothPath(start, points, obstacles, radius, floors) {
   while (i < points.length) {
     let best = i;
     for (let j = points.length - 1; j > i; j -= 1) {
-      if (hasLineOfSight(from, points[j], obstacles, radius, floors)) {
+      if (hasLineOfSight(from, points[j], obstacles, radius, floors, release)) {
         best = j;
         break;
       }
@@ -496,14 +523,16 @@ function smoothPath(start, points, obstacles, radius, floors) {
   return out;
 }
 
-export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR], wallBlocked = null) {
-  const start = nearestWalkable(from.x, from.z, obstacles, radius, floors) ?? from;
-  const goal = nearestWalkable(to.x, to.z, obstacles, radius, floors);
-  const aim = goal ?? { x: to.x, z: to.z };
-  if (goal && hasLineOfSight(start, goal, obstacles, radius, floors)) return [goal];
-
-  const [sx, sz] = toWalkableCell(start.x, start.z, obstacles, radius, floors);
-  const [gx, gz] = toWalkableCell(aim.x, aim.z, obstacles, radius, floors);
+export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR], wallBlocked = null, release = null) {
+  const start = nearestWalkable(from.x, from.z, obstacles, radius, floors, null) ?? from;
+  const exact = to && isWalkable(to.x, to.z, obstacles, radius, floors, null);
+  if (exact && hasLineOfSight(start, to, obstacles, radius, floors, null)) return [{ x: to.x, z: to.z }];
+  const goal = exact
+    ? { x: to.x, z: to.z }
+    : nearestWalkable(to.x, to.z, obstacles, radius, floors, null);
+  const aim = { x: to.x, z: to.z };
+  const [sx, sz] = toWalkableCell(start.x, start.z, obstacles, radius, floors, null);
+  const [gx, gz] = toWalkableCell(aim.x, aim.z, obstacles, radius, floors, null);
   const startKey = `${sx},${sz}`;
   const goalKey = `${gx},${gz}`;
   const open = [{ ix: sx, iz: sz, g: 0, f: Math.hypot(gx - sx, gz - sz) }];
@@ -527,7 +556,7 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
       bestKey = key;
     }
     if (key === goalKey) {
-      return routeFrom(came, key, goal, obstacles, radius, floors, start, true);
+      return routeFrom(came, key, release ? aim : (goal ?? aim), obstacles, radius, floors, start, true, release);
     }
     for (const [dx, dz, cost] of NEIGHBORS) {
       const nix = cur.ix + dx;
@@ -538,11 +567,11 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
       if (dx !== 0 && dz !== 0) {
         if (wallBlocked?.has(`${cur.ix + dx},${cur.iz}`)) continue;
         if (wallBlocked?.has(`${cur.ix},${cur.iz + dz}`)) continue;
-        if (!isWalkable((cur.ix + dx) * CELL, cur.iz * CELL, obstacles, radius, floors)) continue;
-        if (!isWalkable(cur.ix * CELL, (cur.iz + dz) * CELL, obstacles, radius, floors)) continue;
+        if (!isWalkable((cur.ix + dx) * CELL, cur.iz * CELL, obstacles, radius, floors, null)) continue;
+        if (!isWalkable(cur.ix * CELL, (cur.iz + dz) * CELL, obstacles, radius, floors, null)) continue;
       }
       const world = cellWorld(nix, niz);
-      if (!isWalkable(world.x, world.z, obstacles, radius, floors)) continue;
+      if (!isWalkable(world.x, world.z, obstacles, radius, floors, null)) continue;
       const g = cur.g + cost;
       if (g >= (gScore.get(nKey) ?? Infinity)) continue;
       gScore.set(nKey, g);
@@ -556,11 +585,11 @@ export function findPath(from, to, obstacles, radius = PLAYER_RADIUS, floors = [
     }
   }
   if (!bestKey) return [];
-  return routeFrom(came, bestKey, goal, obstacles, radius, floors, start, false);
+  return routeFrom(came, bestKey, release ? aim : (goal ?? aim), obstacles, radius, floors, start, Boolean(release), release);
 }
 
-export function planWalk(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR]) {
-  return findPath(from, to, obstacles, radius, floors);
+export function planWalk(from, to, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR], release = null) {
+  return findPath(from, to, obstacles, radius, floors, null, release ?? to?.releaseTree ?? null);
 }
 
 export function planPlayerWalk(from, to, state, radius = PLAYER_RADIUS) {
@@ -568,11 +597,11 @@ export function planPlayerWalk(from, to, state, radius = PLAYER_RADIUS) {
   const floors = playerWalkFloors(ids);
   const obstacles = playerObstacles(state);
   const wallBlocked = shopWallNavGrid(ids, radius);
-  return findPath(from, to, obstacles, radius, floors, wallBlocked);
+  return findPath(from, to, obstacles, radius, floors, wallBlocked, to?.releaseTree ?? null);
 }
 
-function slideStep(x, z, nx, nz, obstacles, radius, floors) {
-  const ok = (px, pz) => isWalkable(px, pz, obstacles, radius, floors);
+function slideStep(x, z, nx, nz, obstacles, radius, floors, release) {
+  const ok = (px, pz) => isWalkable(px, pz, obstacles, radius, floors, release);
   const hitsBlock = (px, pz) => obstacles.some((block) => pointInRect(px, pz, block, radius));
   if (ok(nx, nz)) return { x: nx, z: nz, blocked: false };
   if (!ok(x, z)) {
@@ -587,7 +616,7 @@ function slideStep(x, z, nx, nz, obstacles, radius, floors) {
 }
 
 /** Step toward a point without entering a wall or other blocker. Slides along a face. */
-export function moveWithCollision(x, z, nx, nz, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR]) {
+export function moveWithCollision(x, z, nx, nz, obstacles, radius = PLAYER_RADIUS, floors = [FLOOR], release = null) {
   const dist = Math.hypot(nx - x, nz - z);
   if (dist < 1e-6) return { x, z, blocked: false };
   const steps = Math.max(1, Math.ceil(dist / (CELL * 0.45)));
@@ -604,6 +633,7 @@ export function moveWithCollision(x, z, nx, nz, obstacles, radius = PLAYER_RADIU
       obstacles,
       radius,
       floors,
+      release,
     );
     if (next.blocked) blocked = true;
     if (next.x === cx && next.z === cz) break;

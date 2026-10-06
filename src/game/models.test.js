@@ -56,8 +56,8 @@ import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
-import { gardenObstacles, PLAYER_RADIUS } from './nav.js';
-import { GATHER_CONTACT, GATHER_MODEL_SCALE, gatherStandCandidates } from './interact.js';
+import { gardenObstacles } from './nav.js';
+import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -1157,7 +1157,8 @@ describe('bundled prop swaps', () => {
 
   it('doubles outdoor trees on every axis, keeps them grounded, and off the roof fade', () => {
     assert.equal(OUTDOOR_TREE_SCALE, 2);
-    assert.deepEqual(GATHER_CONTACT.tree, { x: 0.21, z: 0.62 });
+    assert.deepEqual(GATHER_CONTACT.tree, { x: 0.078, z: 0.641 });
+    assert.deepEqual(GATHER_CONTACT.rock, { x: -0.017, z: 0.557 });
     const tree = buildTree(1);
     const visual = tree.getObjectByName('pine-visual');
     assert.ok(visual, 'the pine visual should live under the placement group');
@@ -1178,18 +1179,28 @@ describe('bundled prop swaps', () => {
         `${axis} ${big[axis]} vs ${half[axis]}`,
       );
     }
-    const reach = Math.hypot(GATHER_CONTACT.tree.x, GATHER_CONTACT.tree.z) * GATHER_MODEL_SCALE;
-    const bite = (radius) => {
+    const chopAt = (radius) => {
+      const offset = treeTrunkOffset(radius);
       const stand = gatherStandCandidates('tree', { x: 0, z: 0, trunkRadius: radius })[0];
       const standDist = Math.hypot(stand.x, stand.z);
-      assert.ok(standDist > treeWalkBlock(radius) / 2 + PLAYER_RADIUS, `stand ${standDist} is inside the ${radius} trunk block`);
-      return radius - (standDist - reach);
+      assert.ok(Math.abs(standDist - chopStandDistance(radius)) < 1e-6, `stand ${standDist} left the trunk-centre formula`);
+      assert.ok(Math.abs(stand.x - -offset.x) < 1e-6 && Math.abs(stand.z - -offset.z) < 1e-6);
+      const faceX = offset.x - 0.995 * radius;
+      const faceZ = offset.z + 0.105 * radius;
+      assert.ok(Math.abs(faceX - GATHER_CONTACT.tree.x) < 1e-9, `axe edge x ${faceX}`);
+      assert.ok(Math.abs(faceZ - GATHER_CONTACT.tree.z) < 1e-9, `axe edge z ${faceZ}`);
+      return standDist;
     };
-    assert.ok(bite(TREE_TRUNK_RADIUS) > 0.02, 'the default chop should meet the bark');
-    assert.ok(bite(TREE_TRUNK_RADIUS * 1.15) > 0.02, 'a larger trunk should still be in reach');
-    const slim = Math.hypot(...['x', 'z'].map((axis) => gatherStandCandidates('tree', { trunkRadius: 0.16 })[0][axis]));
-    const thick = Math.hypot(...['x', 'z'].map((axis) => gatherStandCandidates('tree', { trunkRadius: 0.28 })[0][axis]));
-    assert.ok(thick > slim + 0.05, 'a thicker trunk steps the chop stand back');
+    const doubled = chopAt(0.31);
+    assert.ok(Math.abs(doubled - 0.721) < 0.002, `doubled pine stand ${doubled}`);
+    chopAt(TREE_TRUNK_RADIUS);
+    chopAt(TREE_TRUNK_RADIUS * 1.15);
+    const slim = chopStandDistance(0.16);
+    const thick = chopStandDistance(0.28);
+    assert.ok(thick > slim, 'a thicker trunk steps the chop stand back');
+    assert.ok(treeTrunkOffset(0.28).x > treeTrunkOffset(0.16).x + 0.1, 'the trunk centre moves with the radius');
+    assert.ok(Math.abs(mineStandDistance('bronze') - Math.hypot(0.017, 0.557 + 0.52)) < 1e-9);
+    assert.ok(Math.abs(mineStandDistance('essence') - Math.hypot(0.017, 0.557 + 1.04)) < 1e-9);
     let roofMarked = 0;
     let transparentMats = 0;
     tree.traverse((child) => {

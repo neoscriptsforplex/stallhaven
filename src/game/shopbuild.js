@@ -31,7 +31,7 @@ import { METALS } from './catalog.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
-import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp, dumpStandEuler } from './models.js';
+import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
 import { prepareDungeonRockMaterials } from './upload.js';
 
 export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
@@ -2260,7 +2260,7 @@ function addDungeonWallTorches(root, W = 11, D = 9) {
   }
 }
 
-export function buildDungeon() {
+export function buildDungeon(opts = {}) {
   const root = new THREE.Group();
   root.name = 'dungeon';
   const grounds = new THREE.Group();
@@ -2345,8 +2345,9 @@ export function buildDungeon() {
     [2.8, -1.8],
   ];
   for (let i = 0; i < ratStarts.length; i += 1) {
-    const rat = buildRat();
+    const rat = buildRat(opts.riggedRat ?? null);
     rat.position.set(ratStarts[i][0], 0.06, ratStarts[i][1]);
+    if (rat.userData.clipLocomotion) rat.userData.groundY = 0.06;
     initRatWander(rat, i);
     root.add(rat);
     rats.push(rat);
@@ -2365,7 +2366,14 @@ export function buildDungeon() {
   return { root, grounds, rats, ladder, boulders, size: { w: W, d: D } };
 }
 
-export function buildRat() {
+export function buildRat(riggedGltf = null) {
+  if (riggedGltf) {
+    try {
+      return wrapRiggedRat(riggedGltf);
+    } catch (err) {
+      console.warn('Rigged rat skipped:', err?.message || err);
+    }
+  }
   const bundled = getBundledLook('rat');
   const visual = bundled
     ? wrapBundledProp(bundled, buildProceduralRat(), { name: 'rat-mesh', fit: 'max', rotateY: RAT_DUMP_YAW })

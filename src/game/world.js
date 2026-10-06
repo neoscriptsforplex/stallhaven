@@ -383,6 +383,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   let riggedPlayerGltf = opts.riggedPlayer ?? null;
   let riggedGoblinGltf = opts.riggedGoblin ?? null;
+  let riggedRatGltf = opts.riggedRat ?? null;
   let bundledPlayerSource = opts.bundledPlayer ?? null;
   let customPlayerSource = null;
   let customCustomerSource = null;
@@ -2631,7 +2632,17 @@ export function createWorld(canvas, state, opts = {}) {
       tickFlax(now);
       tickFountainWater(architecture, now);
     } else if (dungeon?.rats) {
-      dungeon.rats.forEach((rat) => stepRatWander(rat, dt, now));
+      dungeon.rats.forEach((rat) => {
+        const x0 = rat.position.x;
+        const z0 = rat.position.z;
+        stepRatWander(rat, dt, now);
+        const loco = rat.userData.clipLocomotion;
+        if (!loco) return;
+        const moved = Math.hypot(rat.position.x - x0, rat.position.z - z0);
+        const moving = moved > 1e-5;
+        loco.speed = dt > 0 && moving ? moved / dt : 0;
+        updateWalkPose(rat, moving, dt, now);
+      });
     }
     const wheel = fixtureMeshes.wheel?.mesh?.userData.spinWheel;
     if (wheel) {
@@ -2714,7 +2725,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function ensureDungeon() {
     if (dungeon) return dungeon;
-    dungeon = buildDungeon();
+    dungeon = buildDungeon({ riggedRat: riggedRatGltf });
     dungeon.root.visible = false;
     dungeon.grounds.visible = false;
     scene.add(dungeon.root);
@@ -3131,7 +3142,7 @@ export function createWorld(canvas, state, opts = {}) {
         const keepVisible = dungeon.root.visible;
         scene.remove(dungeon.root);
         scene.remove(dungeon.grounds);
-        dungeon = buildDungeon();
+        dungeon = buildDungeon({ riggedRat: riggedRatGltf });
         dungeon.root.visible = keepVisible;
         dungeon.grounds.visible = keepVisible;
         scene.add(dungeon.root);

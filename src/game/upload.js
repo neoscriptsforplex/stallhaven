@@ -568,6 +568,11 @@ export async function loadBundledRiggedGoblin() {
   return loadBundledGltf('npc/goblin_rigged.glb');
 }
 
+/** Fetch rat_rigged.glb. Throws so the caller can keep the old rat. */
+export async function loadBundledRiggedRat() {
+  return loadBundledGltf('npc/rat_rigged.glb');
+}
+
 export async function loadBundledPropScene(folder, rev) {
   const baseName = String(folder).split('/').pop();
   const names = [`${baseName}.obj`, `${folder}.obj`, 'model.obj', 'player.obj'];

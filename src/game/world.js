@@ -87,6 +87,7 @@ import {
   setChestLid,
   setDoorOpen,
   setSpeechText,
+  fitMannequinWear,
   slotPose,
   setHeldTool,
   updateMinePose,
@@ -1885,8 +1886,10 @@ export function createWorld(canvas, state, opts = {}) {
       const recipeId = want[name];
       if (!recipeId || isHandOrFootWare(recipeId)) continue;
       const mesh = mountDisplayBasePose(makeWareMesh(recipeId), recipeId, { mannequin: true });
-      const pose = slotPose(name);
-      mesh.position.set(pose.x, pose.y, pose.z);
+      if (!fitMannequinWear(mesh, recipeId)) {
+        const pose = slotPose(name);
+        mesh.position.set(pose.x, pose.y, pose.z);
+      }
       slot.wareAnchor.add(mesh);
       slot.slotMeshes[name] = mesh;
     }

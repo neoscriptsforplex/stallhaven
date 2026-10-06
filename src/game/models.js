@@ -17,7 +17,7 @@ import {
   normalizeAppearance,
   isShelfItem,
 } from './catalog.js';
-import { SHOP_FURNITURE_FLOOR_Y } from './layout.js';
+import { SHOP_FURNITURE_FLOOR_Y, shopDoorOpening } from './layout.js';
 import { wornMetal, weaveCloth, woodSurface, scaleHide, checkCloth } from './surfaces.js';
 
 function wood(color, roughness = 0.86) {
@@ -380,6 +380,22 @@ function doorLeafFitTarget() {
   return mesh;
 }
 
+/**
+ * Lift a fitted leaf onto the floorboards and stretch only its height so the
+ * top meets the lintel. Width and the hinge pivot stay put.
+ */
+function seatDoorLeaf(leaf) {
+  const { floorY, height } = shopDoorOpening();
+  leaf.updateMatrixWorld(true);
+  const box = measureVisibleBox(leaf);
+  const current = Math.max(box.max.y - box.min.y, 1e-4);
+  leaf.scale.y *= height / current;
+  leaf.updateMatrixWorld(true);
+  const raised = measureVisibleBox(leaf);
+  leaf.position.y += floorY - raised.min.y;
+  return leaf;
+}
+
 function buildBundledShopDoor(source) {
   const root = new THREE.Group();
   root.name = 'shop-door';
@@ -391,6 +407,7 @@ function buildBundledShopDoor(source) {
   const box = measureVisibleBox(leaf);
   leaf.position.x -= box.min.x;
   hinge.add(leaf);
+  seatDoorLeaf(leaf);
   hinge.rotation.y = OPEN_DOOR_ANGLE;
   root.add(hinge);
   root.userData.hinge = hinge;
@@ -402,33 +419,29 @@ function buildProceduralShopDoor() {
   root.name = 'shop-door';
   const hingeX = DOOR_HINGE.x;
   const hingeZ = DOOR_HINGE.z;
-  for (const y of [0.38, 1.12, 1.86]) {
-    const knuckle = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.16, 8), metal(0xe3b34a)));
-    knuckle.rotation.x = Math.PI / 2;
-    knuckle.position.set(hingeX, y, hingeZ);
-    root.add(knuckle);
-  }
   const hinge = new THREE.Group();
   hinge.position.set(hingeX, 0, hingeZ);
+  const leaf = new THREE.Group();
+  leaf.name = 'door-leaf';
   const oak = wood(0x8a5230, 0.68);
-  const leaf = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.1), oak));
-  leaf.position.set(0.56, 1.12, 0);
-  hinge.add(leaf);
+  const slab = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.1), oak));
+  slab.position.set(0.56, 1.12, 0);
+  leaf.add(slab);
   const panel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.72, 0.05), wood(0xb06a38, 0.74)));
   panel.position.set(0.56, 0.62, 0.05);
-  hinge.add(panel);
+  leaf.add(panel);
   const panel2 = panel.clone();
   panel2.position.y = 1.48;
-  hinge.add(panel2);
+  leaf.add(panel2);
   const mid = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.1, 0.12), wood(0x3f2716)));
   mid.position.set(0.56, 1.06, 0.04);
-  hinge.add(mid);
+  leaf.add(mid);
   const strap = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.0, 0.12), metal(0xe3b34a)));
   strap.position.set(0.12, 1.12, 0.04);
-  hinge.add(strap);
+  leaf.add(strap);
   const strap2 = strap.clone();
   strap2.position.x = 1.0;
-  hinge.add(strap2);
+  leaf.add(strap2);
   const window = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(0.32, 0.28, 0.05),
     new THREE.MeshStandardMaterial({
@@ -440,10 +453,20 @@ function buildProceduralShopDoor() {
     }),
   ));
   window.position.set(0.56, 1.62, 0.06);
-  hinge.add(window);
+  leaf.add(window);
   const handle = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), metal(0xe8c56a)));
   handle.position.set(1.0, 1.02, 0.1);
-  hinge.add(handle);
+  leaf.add(handle);
+  hinge.add(leaf);
+  seatDoorLeaf(leaf);
+  const { floorY, height } = shopDoorOpening();
+  const oldBottom = 0.08;
+  for (const y of [0.38, 1.12, 1.86]) {
+    const knuckle = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.16, 8), metal(0xe3b34a)));
+    knuckle.rotation.x = Math.PI / 2;
+    knuckle.position.set(hingeX, floorY + ((y - oldBottom) / DOOR_LEAF.h) * height, hingeZ);
+    root.add(knuckle);
+  }
   hinge.rotation.y = OPEN_DOOR_ANGLE;
   root.add(hinge);
   root.userData.hinge = hinge;

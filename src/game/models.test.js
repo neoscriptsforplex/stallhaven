@@ -53,7 +53,7 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
+import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
 import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles, PLAYER_RADIUS } from './nav.js';
@@ -432,6 +432,23 @@ describe('outdoor and dungeon extras', () => {
     });
     assert.ok(boards > 10);
     assert.ok(Math.abs(maxZ - shopFloorFootprint(0, 0).maxZ) < 1e-3, `lip ${maxZ}`);
+  });
+
+  it('keeps the storefront lintel underside on the door opening', () => {
+    const shop = buildShop([]).root;
+    const opening = shopDoorOpening();
+    let lintel = null;
+    shop.traverse((child) => {
+      if (!child.isMesh) return;
+      const height = child.geometry?.parameters?.height;
+      const width = child.geometry?.parameters?.width;
+      if (height !== 0.38 || !(width > 1.2)) return;
+      if (Math.abs(child.position.y - 2.52) > 1e-6) return;
+      lintel = child;
+    });
+    assert.ok(lintel, 'origin shop should include the timber lintel');
+    const bottom = lintel.position.y - lintel.geometry.parameters.height / 2;
+    assert.ok(Math.abs(bottom - opening.topY) < 1e-6, `lintel underside ${bottom}`);
   });
 
   it('builds a floor piece for every expansion room', () => {
@@ -927,6 +944,29 @@ describe('bundled prop swaps', () => {
       const door = buildShopDoor();
       assert.ok(door.userData.hinge);
       assert.ok(door.userData.hinge.rotation.y > 1.5);
+      const hinge = door.userData.hinge;
+      const leaf = door.getObjectByName('door-leaf');
+      assert.equal(hinge.position.x, -0.58);
+      assert.equal(hinge.position.y, 0);
+      assert.equal(hinge.position.z, 3.4);
+      assert.ok(Math.abs(leaf.scale.x - leaf.scale.z) < 1e-4);
+      const opening = shopDoorOpening();
+      assert.ok(Math.abs(leaf.scale.y / leaf.scale.x - opening.height / 2.08) < 0.02);
+      hinge.rotation.y = 0;
+      door.updateMatrixWorld(true);
+      const box = measureVisibleBox(leaf);
+      assert.ok(Math.abs(box.min.y - opening.floorY) < 0.02, `bottom ${box.min.y}`);
+      assert.ok(Math.abs(box.max.y - opening.topY) < 0.02, `top ${box.max.y}`);
+      const fitted = wrapBundledProp(
+        bundled,
+        new THREE.Mesh(new THREE.BoxGeometry(1.12, 2.08, 0.1)),
+        { name: 'door-leaf', fit: 'max' },
+      );
+      const want = measureVisibleBox(fitted);
+      const width = box.max.x - box.min.x;
+      const depth = box.max.z - box.min.z;
+      assert.ok(Math.abs(width - (want.max.x - want.min.x)) < 0.03, `width ${width}`);
+      assert.ok(Math.abs(depth - (want.max.z - want.min.z)) < 0.03, `depth ${depth}`);
     } finally {
       setBundledLook('door', null);
     }
@@ -2302,6 +2342,27 @@ describe('shop props', () => {
     door.userData.hinge.rotation.y = 0.2;
     setDoorOpen(door, true, 1);
     assert.ok(door.userData.hinge.rotation.y > 1.4);
+  });
+
+  it('seats the front door on the floorboards and up to the lintel', () => {
+    const door = buildShopDoor();
+    const hinge = door.userData.hinge;
+    const leaf = door.getObjectByName('door-leaf');
+    assert.equal(hinge.position.x, -0.58);
+    assert.equal(hinge.position.y, 0);
+    assert.equal(hinge.position.z, 3.4);
+    assert.ok(Math.abs(hinge.scale.x - 1) < 1e-6);
+    assert.ok(Math.abs(leaf.scale.x - 1) < 1e-6);
+    assert.ok(Math.abs(leaf.scale.z - 1) < 1e-6);
+    assert.ok(leaf.scale.y > 1);
+    hinge.rotation.y = 0;
+    door.updateMatrixWorld(true);
+    const box = measureVisibleBox(leaf);
+    const opening = shopDoorOpening();
+    assert.ok(Math.abs(box.min.y - opening.floorY) < 0.01, `bottom ${box.min.y} vs ${opening.floorY}`);
+    assert.ok(Math.abs(box.max.y - opening.topY) < 0.01, `top ${box.max.y} vs ${opening.topY}`);
+    const width = box.max.x - box.min.x;
+    assert.ok(Math.abs(width - 1.12) < 0.02, `width ${width}`);
   });
 
   it('builds a clean anvil without a resting hammer', () => {

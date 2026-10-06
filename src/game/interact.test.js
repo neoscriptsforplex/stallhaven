@@ -2,11 +2,15 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHOP } from './catalog.js';
 import { createState } from './economy.js';
+import { PLAYER_RADIUS, isWalkable, playerObstacles } from './nav.js';
+import { playerWalkFloors } from './layout.js';
 import {
   STATION_ARRIVE,
   STATION_HIT,
   USE_KINDS,
   pickUseHit,
+  rangeFaceYaw,
+  rangeStandWorld,
   resolveStationUse,
   stationAtFloor,
 } from './interact.js';
@@ -106,19 +110,49 @@ describe('station walk-then-open', () => {
     assert.ok(end.x > 5);
   });
 
-  it('walks to the cook-face of the range, not behind it', () => {
+  it('stands one step in front of the range pan, not at the chimney', () => {
     const state = createState();
     state.furniture.range = { x: SHOP.range.x, z: SHOP.range.z, rot: 0 };
-    const plan = resolveStationUse(
-      { x: SHOP.keeper.x, z: SHOP.keeper.z },
+    const from = { x: SHOP.keeper.x, z: SHOP.keeper.z };
+    const plan = resolveStationUse(from, state.furniture.range, state, undefined, 'range');
+    const stand = rangeStandWorld(state.furniture.range);
+    assert.equal(plan.action, 'walk');
+    assert.ok(Math.hypot(plan.dest.x - stand.x, plan.dest.z - stand.z) < 1e-6);
+    // Start yaw −π/2: front (local −X) is world −Z; pan (local −Z) is world +X.
+    assert.ok(plan.dest.z < state.furniture.range.z - 0.9, 'one step out from the front face');
+    assert.ok(plan.dest.x > state.furniture.range.x + 0.2, 'lined up with the pan, not the chimney');
+    const end = plan.path[plan.path.length - 1];
+    assert.ok(Math.hypot(end.x - stand.x, end.z - stand.z) < 0.05, 'path ends on the stand');
+    assert.equal(
+      isWalkable(stand.x, stand.z, playerObstacles(state), PLAYER_RADIUS, playerWalkFloors([])),
+      true,
+    );
+    assert.ok(Math.abs(rangeFaceYaw(state.furniture.range)) < 1e-9, 'face world +Z, into the range');
+
+    const atChimney = resolveStationUse(
+      { x: state.furniture.range.x - 0.85, z: state.furniture.range.z },
       state.furniture.range,
       state,
       undefined,
       'range',
     );
-    assert.equal(plan.action, 'walk');
-    assert.ok(plan.dest.x < state.furniture.range.x - 0.4, 'stand on the cook-face (−X after start yaw)');
-    assert.ok(Math.abs(plan.dest.z - state.furniture.range.z) < 0.35);
+    assert.equal(atChimney.action, 'walk');
+    assert.ok(atChimney.dest.z < state.furniture.range.z - 0.9);
+
+    const already = resolveStationUse(stand, state.furniture.range, state, undefined, 'range');
+    assert.equal(already.action, 'open');
+
+    state.furniture.range = { x: SHOP.range.x, z: SHOP.range.z, rot: Math.PI / 2 };
+    const turned = resolveStationUse(from, state.furniture.range, state, undefined, 'range');
+    const turnedStand = rangeStandWorld(state.furniture.range);
+    assert.equal(turned.action, 'walk');
+    assert.ok(Math.hypot(turned.dest.x - turnedStand.x, turned.dest.z - turnedStand.z) < 1e-6);
+    assert.ok(turned.dest.x < state.furniture.range.x - 0.9, 'front stays local −X after a quarter turn');
+    assert.ok(turned.dest.z < state.furniture.range.z - 0.2, 'pan stays local −Z after a quarter turn');
+    assert.equal(
+      isWalkable(turnedStand.x, turnedStand.z, playerObstacles(state), PLAYER_RADIUS, playerWalkFloors([])),
+      true,
+    );
   });
 
   it('walks behind the counter to the shopkeeper side, not the buyer queue', () => {

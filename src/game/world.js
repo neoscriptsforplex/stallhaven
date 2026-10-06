@@ -14,6 +14,7 @@ import {
   SPAWN_GAP_MIN,
   decideRequest,
   displayKind,
+  isHandOrFootWare,
   MATERIALS,
   CHOP_DURATION,
   CHOP_YIELD,
@@ -1875,13 +1876,14 @@ export function createWorld(canvas, state, opts = {}) {
     let dirty = false;
     for (const name of ARMOUR_SLOTS) {
       const have = slot.slotMeshes[name]?.userData.recipeId ?? null;
-      if (have !== (want[name] ?? null)) dirty = true;
+      const nextId = isHandOrFootWare(want[name]) ? null : (want[name] ?? null);
+      if (have !== nextId) dirty = true;
     }
     if (!dirty && !(slot.wareMesh && !hasSet)) return;
     clearSlotMeshes(slot);
     for (const name of ARMOUR_SLOTS) {
       const recipeId = want[name];
-      if (!recipeId) continue;
+      if (!recipeId || isHandOrFootWare(recipeId)) continue;
       const mesh = mountDisplayBasePose(makeWareMesh(recipeId), recipeId, { mannequin: true });
       const pose = slotPose(name);
       mesh.position.set(pose.x, pose.y, pose.z);

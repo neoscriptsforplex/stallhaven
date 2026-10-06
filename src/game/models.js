@@ -776,13 +776,13 @@ export const RIGGED_CLIP_FADE = 0.2;
  */
 export const BUYER_MODEL_SCALE = 0.863;
 /**
- * Rigged looks that replace the adventurer and melee OBJ dumps.
+ * Rigged looks that replace the adventurer, melee, and ranger OBJ dumps.
  * speed is the no-slide Walk rate at scale 1 (m/s), matching extras.walk_speed_mps.
  * Playback is timeScale = moveSpeed / (speed * BUYER_MODEL_SCALE).
- * height is the mesh top at scale 1 (Donie's staff tip, the barbarian's horns and mace).
+ * height is the mesh top at scale 1 (Donie's staff tip, the barbarian's horns, the salesman's hood).
  * Donie's staff is rigid on Hand_R, so the carry grip uses Hand_L.
- * The barbarian's mace and the guard's sword and shield are already on the hands,
- * so those looks set carryHand to false and the purchase grip stays on the group.
+ * Melee and ranger weapons are already on the hands, so those looks set carryHand
+ * to false and the purchase grip stays on the group with no extra tool attached.
  */
 export const RIGGED_BUYER_MODELS = [
   {
@@ -828,6 +828,20 @@ export const RIGGED_BUYER_MODELS = [
     file: 'npc/guard_level_21_rigged.glb',
     speed: 0.849001881856245,
     height: 1.797281847145991,
+    carryHand: false,
+  },
+  {
+    lookId: 'buyer-ranger-armour-salesman',
+    file: 'npc/armour_salesman_rigged.glb',
+    speed: 0.8408164574874722,
+    height: 1.8195126764724472,
+    carryHand: false,
+  },
+  {
+    lookId: 'buyer-ranger-ranging-guild-doorman',
+    file: 'npc/ranging_guild_doorman_rigged.glb',
+    speed: 0.8554402772901675,
+    height: 1.7619561333281135,
     carryHand: false,
   },
 ];
@@ -3865,7 +3879,7 @@ function riggedBuyerSpec(lookId) {
  * nameplate, speech bubble, click box, and ring. Walk and Idle crossfade
  * on the same mixer path as the goblin. Facing stays +Z; walkToward yaws the group.
  * Donie's staff is already on Hand_R, so her purchase grip uses Hand_L.
- * Melee weapons are baked onto both hands, so those grips stay off the skeleton.
+ * Melee and ranger weapons are baked onto the hands, so those grips stay off the skeleton.
  */
 export function wrapRiggedBuyer(gltf, typeId, opts = {}) {
   const spec = riggedBuyerSpec(opts.lookId);

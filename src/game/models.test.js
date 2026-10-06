@@ -451,6 +451,27 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(Math.abs(bottom - opening.topY) < 1e-6, `lintel underside ${bottom}`);
   });
 
+  it('drops the full-width timber beam inside the front wall and keeps the fascia', () => {
+    for (const ids of [[], ['left', 'right', 'back']]) {
+      const shop = buildShop(ids).root;
+      shop.traverse((child) => {
+        if (!child.isMesh || child.geometry?.type !== 'BoxGeometry') return;
+        const { width, height, depth } = child.geometry.parameters;
+        const longInsideBeam = width > ROOM_W && height > 0.2 && depth > 0.3
+          && Math.abs(child.position.y - 2.64) < 0.08;
+        assert.equal(longInsideBeam, false, `front beam remains for ${ids.join('+') || 'origin'}`);
+      });
+    }
+    const origin = buildShop([]).root;
+    let fascia = false;
+    origin.traverse((child) => {
+      if (!child.isMesh || child.geometry?.type !== 'BoxGeometry') return;
+      const { width, height } = child.geometry.parameters;
+      if (width > ROOM_W && height === 0.16 && Math.abs(child.position.y - 2.78) < 1e-6) fascia = true;
+    });
+    assert.equal(fascia, true);
+  });
+
   it('builds a floor piece for every expansion room', () => {
     const ids = EXPANSION_PADS.map((pad) => pad.id);
     const pieces = measureShopFloorPieces(buildShop(ids).root);

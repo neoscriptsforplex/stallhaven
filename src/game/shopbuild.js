@@ -667,12 +667,6 @@ function addOriginFront(root, center) {
   stripe2.position.z = center.z + ROOM_D / 2 + 0.62;
   root.add(stripe2);
 
-  const join = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(ROOM_W + 0.18, 0.28, 0.48),
-    wood(0x3c2616, 0.78),
-  ));
-  join.position.set(center.x, 2.64, center.z + ROOM_D / 2 + 0.1);
-  root.add(join);
   const fascia = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(ROOM_W + 0.12, 0.16, 0.28),
     cobbleMat(4.2, 0.4),

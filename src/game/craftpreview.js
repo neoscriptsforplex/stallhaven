@@ -100,18 +100,21 @@ export function wrapCraftPreviewSpin(ware, id) {
 /**
  * Mannequin and table mount. Same base pose as the craft preview, in the
  * caller's local space, so it follows the display when the furniture yaws.
- * Mystic and splitbark robe bottoms, and plate skirts, use that pose on a
- * mannequin only. Plate skirts are exported flat; the preview pitch is what
- * hangs them, and the euler itself is unchanged. Tables stay unposed.
+ * Mystic and splitbark robe bottoms, plate skirts, and platelegs use that
+ * pose on a mannequin only. Platelegs are exported feet-up; the preview's
+ * half-turn puts the waist up. Plate skirts are exported flat; the preview
+ * pitch hangs them. The euler values are unchanged. Tables stay unposed.
  * Does not apply wareDisplayYaw; that yaw is already baked into the mesh.
  * Reseats the posed item so its bottom center stays on the slot origin.
  * Does not change scale.
  */
 export function mountDisplayBasePose(ware, id, opts = {}) {
+  const shape = RECIPES[id]?.shape;
   const robeBottomOnMannequin = opts.mannequin
     && (id === 'mystic_robe_bottom' || id === 'splitbark_robe_bottom');
-  const skirtOnMannequin = opts.mannequin && RECIPES[id]?.shape === 'plateskirt';
-  if (!ware || (!displayUsesPreviewBasePose(id) && !robeBottomOnMannequin && !skirtOnMannequin)) return ware;
+  const skirtOnMannequin = opts.mannequin && shape === 'plateskirt';
+  const platelegsOnMannequin = opts.mannequin && shape === 'platelegs';
+  if (!ware || (!displayUsesPreviewBasePose(id) && !robeBottomOnMannequin && !skirtOnMannequin && !platelegsOnMannequin)) return ware;
   const euler = previewBasePose(id);
   if (!euler) return ware;
   const pose = new THREE.Group();

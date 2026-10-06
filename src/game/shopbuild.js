@@ -2444,33 +2444,48 @@ function ladderFitTarget() {
   return mesh;
 }
 
-/** Half the rail width, then stretch Y so the top meets the wall. Depth stays put. */
-function stretchLadderToWall(mesh) {
-  mesh.updateMatrixWorld(true);
-  const size = measureVisibleBox(mesh).getSize(new THREE.Vector3());
-  if (size.x > 1e-4) mesh.scale.x *= 0.5;
-  if (size.y > 1e-4) mesh.scale.y *= DUNGEON_WALL_H / size.y;
-  sitVisibleOnY(mesh, 0);
-  return mesh;
+/** One copy at half the fitted size, so width, height, and depth stay in proportion. */
+function makeProportionalLadderCopy() {
+  const bundled = getBundledLook('ladder');
+  const visual = bundled
+    ? wrapBundledProp(bundled, ladderFitTarget(), { name: 'ladder-mesh', fit: 'max' })
+    : buildProceduralDungeonLadder();
+  visual.name = 'ladder-mesh';
+  markLadder(visual);
+  visual.traverse((child) => markLadder(child));
+  visual.scale.multiplyScalar(0.5);
+  sitVisibleOnY(visual, 0);
+  return visual;
+}
+
+/**
+ * Two half-size copies, one above the other, then one uniform scale so the
+ * stack meets the wall. Rails share the same X so the joint reads as one ladder.
+ */
+function stackLadderToWall() {
+  const lower = makeProportionalLadderCopy();
+  const upper = makeProportionalLadderCopy();
+  lower.updateMatrixWorld(true);
+  const copyHeight = measureVisibleBox(lower).getSize(new THREE.Vector3()).y;
+  upper.position.y += copyHeight;
+  const stack = new THREE.Group();
+  stack.name = 'ladder-stack';
+  stack.add(lower);
+  stack.add(upper);
+  stack.updateMatrixWorld(true);
+  const stacked = measureVisibleBox(stack).getSize(new THREE.Vector3()).y;
+  if (stacked > 1e-4) stack.scale.multiplyScalar(DUNGEON_WALL_H / stacked);
+  sitVisibleOnY(stack, 0);
+  return stack;
 }
 
 export function buildDungeonLadder() {
-  const bundled = getBundledLook('ladder');
-  let visual;
-  if (bundled) {
-    visual = wrapBundledProp(bundled, ladderFitTarget(), { name: 'ladder-mesh', fit: 'max' });
-    visual.name = 'ladder-mesh';
-    markLadder(visual);
-    visual.traverse((child) => markLadder(child));
-  } else {
-    visual = buildProceduralDungeonLadder();
-  }
-  stretchLadderToWall(visual);
-  visual.updateMatrixWorld(true);
-  const width = measureVisibleBox(visual).getSize(new THREE.Vector3()).x;
+  const stack = stackLadderToWall();
+  stack.updateMatrixWorld(true);
+  const width = measureVisibleBox(stack).getSize(new THREE.Vector3()).x;
   const ladder = new THREE.Group();
   ladder.name = 'ladder';
-  ladder.add(visual);
+  ladder.add(stack);
   ladder.add(makeLadderPick(width));
   markLadder(ladder);
   // Dump and rails are wide in X; yaw so the face sits flat on the west wall.

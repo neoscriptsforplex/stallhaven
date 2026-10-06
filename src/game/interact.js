@@ -38,8 +38,46 @@ const APPROACH_DIST = 0.85;
 const STAND_FRONT = new Set(['counter', 'chest']);
 
 /**
- * Local +Z is the cook-face on the range and the shopkeeper side of the
- * counter. The chest latch is dump local −X (into the room at visual yaw 0).
+ * Cook stand in the range mesh's own XZ, in metres, so it yaws with the station.
+ * Local +Z is the chimney end. The pan and the left red grill sit toward −Z
+ * (about z = −0.40). Local −X is the front face the handle points out of;
+ * the left section's face is near x = −0.37, and −1.17 is about one step out.
+ */
+export const RANGE_STAND_LOCAL = { x: -1.17, z: -0.40 };
+
+export function rangeFaceYaw(pose) {
+  const yaw = furnitureVisualYaw('range', pose?.rot ?? 0);
+  return Math.atan2(Math.cos(yaw), -Math.sin(yaw));
+}
+
+export function rangeStandWorld(pose) {
+  const yaw = furnitureVisualYaw('range', pose?.rot ?? 0);
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  const { x, z } = RANGE_STAND_LOCAL;
+  return {
+    x: (pose?.x ?? 0) + x * c + z * s,
+    z: (pose?.z ?? 0) - x * s + z * c,
+  };
+}
+
+function rangeStandCandidates(pose) {
+  const yaw = furnitureVisualYaw('range', pose?.rot ?? 0);
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  return [0, 0.22, 0.44].map((extra) => {
+    const x = RANGE_STAND_LOCAL.x - extra;
+    const z = RANGE_STAND_LOCAL.z;
+    return {
+      x: (pose?.x ?? 0) + x * c + z * s,
+      z: (pose?.z ?? 0) - x * s + z * c,
+    };
+  });
+}
+
+/**
+ * Local +Z is the shopkeeper side of the counter. The chest latch is dump
+ * local −X (into the room at visual yaw 0).
  */
 function facingApproachOffsets(kind, pose) {
   const yaw = furnitureVisualYaw(kind, pose?.rot ?? 0);
@@ -109,8 +147,19 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
     }
     return { action: 'blocked' };
   }
+  if (kind === 'range') {
+    const face = rangeFaceYaw(pose);
+    const spots = rangeStandCandidates(pose);
+    const stand = spots[0];
+    if (isNearPoint(from, stand, 0.45)) return { action: 'open', dest: stand, face };
+    for (const dest of spots) {
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      if (path.length) return { action: 'walk', path, dest, face };
+    }
+    return { action: 'blocked', dest: stand, face };
+  }
   if (isNearPoint(from, pose, STATION_ARRIVE)) return { action: 'open' };
-  const offsets = kind === 'range' ? facingApproachOffsets(kind, pose) : APPROACH_OFFSETS;
+  const offsets = APPROACH_OFFSETS;
   for (const [dx, dz] of offsets) {
     const dest = { x: pose.x + dx, z: pose.z + dz };
     const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];

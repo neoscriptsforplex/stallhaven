@@ -64,6 +64,7 @@ import {
   STATION_ARRIVE,
   STATION_HIT,
   pickUseHit,
+  rangeFaceYaw,
   resolveStationUse,
   stationAtFloor,
 } from './interact.js';
@@ -1006,7 +1007,7 @@ export function createWorld(canvas, state, opts = {}) {
         planWalk(start, dest, [], PLAYER_RADIUS, sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors)
       ), type)
       : resolveStationUse(from, pose, state, planPlayerWalk, type);
-    const standFront = type === 'counter' || type === 'chest';
+    const standFront = type === 'counter' || type === 'chest' || type === 'range';
     const atStation = standFront
       ? plan.action === 'open'
       : (plan.action === 'open' || isNearPose(pose, arrive));
@@ -1014,6 +1015,7 @@ export function createWorld(canvas, state, opts = {}) {
       pendingUse = null;
       playerPath.length = 0;
       moveMarker.visible = false;
+      if (type === 'range') shopkeeper.rotation.y = rangeFaceYaw(pose);
       if (type === 'counter') {
         playClick('ui');
         return;
@@ -1042,6 +1044,7 @@ export function createWorld(canvas, state, opts = {}) {
         arrive: standFront ? 0.55 : arrive,
         openOnArrive: type !== 'counter',
         materialId: pose.materialId,
+        faceYaw: type === 'range' ? rangeFaceYaw(pose) : null,
       };
       playClick('move');
       return;
@@ -1058,6 +1061,7 @@ export function createWorld(canvas, state, opts = {}) {
         arrive: standFront ? 0.55 : arrive,
         openOnArrive: type !== 'counter',
         materialId: pose.materialId,
+        faceYaw: type === 'range' ? rangeFaceYaw(pose) : null,
       };
       playClick('move');
       return;
@@ -1069,6 +1073,7 @@ export function createWorld(canvas, state, opts = {}) {
       arrive: standFront ? 0.55 : arrive,
       openOnArrive: false,
       materialId: pose.materialId,
+      faceYaw: type === 'range' ? rangeFaceYaw(pose) : null,
     };
     playClick('ui');
   }
@@ -1089,6 +1094,7 @@ export function createWorld(canvas, state, opts = {}) {
         playerPath.shift();
         if (!playerPath.length) {
           moveMarker.visible = false;
+          if (pendingUse?.faceYaw != null) shopkeeper.rotation.y = pendingUse.faceYaw;
           if (pendingUse && (pendingUse.openOnArrive || isNearPose(pendingUse, pendingUse.arrive ?? STATION_ARRIVE))) {
             finishPendingUse();
           }

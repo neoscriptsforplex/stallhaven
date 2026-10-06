@@ -1408,53 +1408,110 @@ export function slotPose(slot) {
 }
 
 /**
- * Mannequin sections these shapes are fitted to. Sizes come from buildArmourStand
- * plus a small margin so the wood stays inside the gear.
- * Shoulder bar: 0.50 wide, centered at y=1.16. Torso box: 0.14 deep.
- * Hip block: 0.34 wide, 0.14 deep, top at y=0.53. Base top at y=0.08.
- * Platebodies are raised so their shoulder line, not the collar tip, meets
- * the shoulder bar, while the hem still reaches the waist.
- * Plate skirts are raised so the waistband sits on the hip line.
+ * Wood the gear has to hide, in the stand's local space.
+ * Shoulder bar: y 1.13–1.19, half-width 0.25, half-depth 0.06.
+ * Torso block plus the arm posts: y 0.71–1.13, arms out to x ≈ ±0.27.
+ * Hip block: y 0.47–0.53, half-width 0.17, half-depth 0.07.
+ * The hem stays at `bottom` so the pole under the piece stays covered.
+ * `top` is where a body shoulder line or a leg waist sits before any raise.
  */
-export const MANNEQUIN_WEAR_FIT = {
-  torso: { width: 0.60, depth: 0.30, bottom: 0.48, top: 1.16, shoulderY: 1.20 },
-  legs: { width: 0.46, depth: 0.28, bottom: 0.10, top: 0.54 },
-  plateskirt: { width: 0.46, depth: 0.28, bottom: 0.10, top: 0.62 },
+const MANNEQUIN_WOOD = {
+  torso: {
+    bottom: 0.48,
+    top: 1.20,
+    checks: [
+      { y0: 1.13, y1: 1.19, halfW: 0.25, halfD: 0.06 },
+      { y0: 0.78, y1: 1.08, halfW: 0.27, halfD: 0.07 },
+    ],
+  },
+  legs: {
+    bottom: 0.10,
+    top: 0.54,
+    checks: [
+      { y0: 0.47, y1: 0.53, halfW: 0.17, halfD: 0.07 },
+    ],
+  },
 };
 
-const MANNEQUIN_WEAR_KIND = {
-  platebody: 'torso',
-  chainbody: 'torso',
-  robe_top: 'torso',
-  dhide_body: 'torso',
-  platelegs: 'legs',
-  plateskirt: 'legs',
-  robe_bottom: 'legs',
-  dhide_chaps: 'legs',
+/**
+ * Every worn shape fits its section box plus `margin` on each side.
+ * `raise` lifts the shoulder line or the waist and keeps the hem put.
+ * `shoulders` parks the wide shoulder band on that line (platebodies and
+ * splitbark tops) instead of the narrow collar. A robe that is only wide
+ * at the hem grows until the shoulder slice still clears the bar.
+ */
+const MANNEQUIN_TUNE = {
+  platebody: { section: 'torso', margin: 0.06, raise: 0, shoulders: true },
+  chainbody: { section: 'torso', margin: 0.06, raise: 0.02, shoulders: false },
+  robe_top: { section: 'torso', margin: 0.06, raise: 0.04, shoulders: false },
+  dhide_body: { section: 'torso', margin: 0.08, raise: 0.06, shoulders: false },
+  platelegs: { section: 'legs', margin: 0.06, raise: 0, shoulders: false },
+  plateskirt: { section: 'legs', margin: 0.06, raise: 0.08, shoulders: false },
+  robe_bottom: { section: 'legs', margin: 0.06, raise: 0.04, shoulders: false },
+  dhide_chaps: { section: 'legs', margin: 0.08, raise: 0.06, shoulders: false },
 };
+
+const MANNEQUIN_ID_TUNE = {
+  wizard_robe: { margin: 0.08, raise: 0.06 },
+  splitbark_robe_top: { margin: 0.06, raise: 0.02, shoulders: true },
+  splitbark_robe_bottom: { margin: 0.06, raise: 0.08 },
+  mystic_robe_top: { margin: 0.08, raise: 0.06 },
+  mystic_robe_bottom: { margin: 0.08, raise: 0.06 },
+};
+
+export const MANNEQUIN_WEAR_FIT = MANNEQUIN_WOOD;
 
 const _fitSize = new THREE.Vector3();
 const _fitPoint = new THREE.Vector3();
 const _fitInv = new THREE.Matrix4();
 
-/** Real vertices in root local space, plus their tight box. */
+/** Real vertices in root local space, plus edges so a slice can cross a big triangle. */
 function meshLocalPoints(root) {
   const box = new THREE.Box3();
   const pts = [];
+  const edges = [];
   root.updateMatrixWorld(true);
   _fitInv.copy(root.matrixWorld).invert();
+  const toLocal = (child, index) => {
+    _fitPoint.fromBufferAttribute(child.geometry.attributes.position, index);
+    child.localToWorld(_fitPoint);
+    _fitPoint.applyMatrix4(_fitInv);
+    return [_fitPoint.x, _fitPoint.y, _fitPoint.z];
+  };
   root.traverse((child) => {
     const pos = child.isMesh && child.geometry?.attributes?.position;
     if (!pos) return;
+    const local = new Array(pos.count);
     for (let i = 0; i < pos.count; i += 1) {
-      _fitPoint.fromBufferAttribute(pos, i);
-      child.localToWorld(_fitPoint);
-      _fitPoint.applyMatrix4(_fitInv);
+      const p = toLocal(child, i);
+      local[i] = p;
       box.expandByPoint(_fitPoint);
-      pts.push(_fitPoint.x, _fitPoint.y, _fitPoint.z);
+      pts.push(p[0], p[1], p[2]);
+    }
+    const pushEdge = (a, b) => {
+      const p = local[a];
+      const q = local[b];
+      edges.push(p[0], p[1], p[2], q[0], q[1], q[2]);
+    };
+    const index = child.geometry.index;
+    if (index) {
+      for (let i = 0; i < index.count; i += 3) {
+        const a = index.getX(i);
+        const b = index.getX(i + 1);
+        const c = index.getX(i + 2);
+        pushEdge(a, b);
+        pushEdge(b, c);
+        pushEdge(c, a);
+      }
+    } else {
+      for (let i = 0; i < pos.count; i += 3) {
+        pushEdge(i, i + 1);
+        pushEdge(i + 1, i + 2);
+        pushEdge(i + 2, i);
+      }
     }
   });
-  return { box, pts };
+  return { box, pts, edges };
 }
 
 /**
@@ -1481,46 +1538,147 @@ function plateShoulderFrac(pts, box) {
   return 0.85;
 }
 
+function fitPercentile(sorted, t) {
+  const last = sorted.length - 1;
+  return sorted[Math.min(last, Math.max(0, Math.round(t * last)))];
+}
+
+/** X/Z samples where cloth actually crosses one local-Y band, including triangle edges. */
+function fitBandSamples(pts, edges, yLo, yHi) {
+  const xs = [];
+  const zs = [];
+  const lo = Math.min(yLo, yHi);
+  const hi = Math.max(yLo, yHi);
+  for (let i = 0; i < pts.length; i += 3) {
+    const y = pts[i + 1];
+    if (y < lo || y > hi) continue;
+    xs.push(pts[i]);
+    zs.push(pts[i + 2]);
+  }
+  const planes = [lo, (lo + hi) * 0.5, hi];
+  for (let p = 0; p < planes.length; p += 1) {
+    const y = planes[p];
+    for (let i = 0; i < edges.length; i += 6) {
+      const y0 = edges[i + 1];
+      const y1 = edges[i + 4];
+      const den = y1 - y0;
+      if (Math.abs(den) < 1e-8) continue;
+      const t = (y - y0) / den;
+      if (t <= 0 || t >= 1) continue;
+      xs.push(edges[i] + (edges[i + 3] - edges[i]) * t);
+      zs.push(edges[i + 2] + (edges[i + 5] - edges[i + 2]) * t);
+    }
+  }
+  xs.sort((a, b) => a - b);
+  zs.sort((a, b) => a - b);
+  return { xs, zs };
+}
+
+/** 5th–95th span, so one stray vertex does not set the size. */
+function fitShell(sorted) {
+  const lo = fitPercentile(sorted, 0.05);
+  const hi = fitPercentile(sorted, 0.95);
+  return { lo, hi, mid: (lo + hi) * 0.5, span: Math.max(hi - lo, 1e-4) };
+}
+
+/**
+ * Uniform scale and shift that put every band's shell around the origin
+ * with at least `need` on both sides. Grows the scale when two bands
+ * want different centers.
+ */
+function fitCoverAxis(bands) {
+  let s = 0;
+  for (const band of bands) s = Math.max(s, (band.need * 2) / band.span);
+  if (!(s > 0)) return null;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    let loP = -Infinity;
+    let hiP = Infinity;
+    for (const band of bands) {
+      loP = Math.max(loP, band.need - band.hi * s);
+      hiP = Math.min(hiP, -band.need - band.lo * s);
+    }
+    if (loP <= hiP + 1e-5) return { s, p: (loP + hiP) * 0.5 };
+    s *= 1.25;
+  }
+  return { s, p: 0 };
+}
+
 /**
  * Scale one body or leg mesh so it sits over that mannequin section.
- * Width and depth clear the wooden torso or hips. Platebodies are lifted
- * until their shoulder line meets the shoulder bar. Plate skirts are lifted
- * until the waistband sits on the hip line. Rotation is left to the caller.
+ * The hem stays at the bottom of the section. `raise` lifts the shoulder
+ * line or the waist. Width and depth come from the cloth that actually
+ * crosses each wooden bar, plus the category margin, so a narrow shoulder
+ * grows until the bar is inside it. Rotation is left to the caller.
  * Returns false for helms, shields, weapons, and anything else.
  */
 export function fitMannequinWear(mesh, recipeId) {
   const shape = RECIPES[recipeId]?.shape;
-  const kind = MANNEQUIN_WEAR_KIND[shape];
-  const section = shape === 'plateskirt' ? MANNEQUIN_WEAR_FIT.plateskirt : MANNEQUIN_WEAR_FIT[kind];
-  if (!mesh || !section) return false;
-  const { box, pts } = meshLocalPoints(mesh);
+  const tune = { ...MANNEQUIN_TUNE[shape], ...MANNEQUIN_ID_TUNE[recipeId] };
+  const wood = tune.section ? MANNEQUIN_WOOD[tune.section] : null;
+  if (!mesh || !wood) return false;
+  const { box, pts, edges } = meshLocalPoints(mesh);
   if (box.isEmpty()) return false;
   const size = box.getSize(_fitSize);
   if (size.x < 1e-4 || size.y < 1e-4 || size.z < 1e-4) return false;
-  let bottom = section.bottom;
-  let height = section.top - section.bottom;
-  if (shape === 'platebody') {
+  const margin = tune.margin ?? 0.06;
+  const raise = tune.raise ?? 0;
+  const hem = wood.bottom;
+  const line = wood.top + raise;
+  let height = line - hem;
+  if (tune.shoulders) {
     const frac = Math.min(0.92, Math.max(0.55, plateShoulderFrac(pts, box)));
-    height = (section.shoulderY - section.bottom) / frac;
+    height = (line - hem) / frac;
   }
-  const sx = section.width / size.x;
   const sy = height / size.y;
-  // Depth uses the inner shell, not a single sticking-out vertex, then
-  // centers that shell on the stand so the wood is inside the gear.
-  const zs = [];
-  for (let i = 2; i < pts.length; i += 3) zs.push(pts[i]);
-  zs.sort((a, b) => a - b);
-  const last = zs.length - 1;
-  const zLo = zs[Math.min(last, Math.round(0.05 * last))];
-  const zHi = zs[Math.min(last, Math.round(0.95 * last))];
-  const shell = Math.max(zHi - zLo, 1e-4);
-  const sz = section.depth / shell;
-  mesh.scale.set(sx, sy, sz);
-  mesh.position.set(
-    -((box.min.x + box.max.x) * 0.5) * sx,
-    bottom - box.min.y * sy,
-    -((zLo + zHi) * 0.5) * sz,
-  );
+  const xBands = [];
+  const zBands = [];
+  for (const check of wood.checks) {
+    const y0 = box.min.y + (check.y0 - hem) / sy;
+    const y1 = box.min.y + (check.y1 - hem) / sy;
+    const band = fitBandSamples(pts, edges, y0, y1);
+    if (band.xs.length < 6) continue;
+    const xShell = fitShell(band.xs);
+    const zShell = fitShell(band.zs);
+    xBands.push({ ...xShell, need: check.halfW + margin });
+    zBands.push({ ...zShell, need: check.halfD + margin });
+  }
+  let coveredX = fitCoverAxis(xBands);
+  let coveredZ = fitCoverAxis(zBands);
+  if (!coveredX || !coveredZ) {
+    const halfW = Math.max(...wood.checks.map((check) => check.halfW));
+    const halfD = Math.max(...wood.checks.map((check) => check.halfD));
+    coveredX = { s: ((halfW + margin) * 2) / size.x, p: -((box.min.x + box.max.x) * 0.5) * ((halfW + margin) * 2) / size.x };
+    coveredZ = { s: ((halfD + margin) * 2) / size.z, p: -((box.min.z + box.max.z) * 0.5) * ((halfD + margin) * 2) / size.z };
+  }
+  let sz = coveredZ.s;
+  let pz = coveredZ.p;
+  // Depth follows the garment's real shell. A single flat ring must not
+  // thicken the whole piece into a slab, and a chainbody's hem tabs must
+  // not fly off when the sheet itself is paper-thin.
+  const allZ = [];
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 2; i < pts.length; i += 3) {
+    allZ.push(pts[i]);
+    minZ = Math.min(minZ, pts[i]);
+    maxZ = Math.max(maxZ, pts[i]);
+  }
+  allZ.sort((a, b) => a - b);
+  const globalZ = fitShell(allZ);
+  const needD = zBands.reduce((max, band) => Math.max(max, band.need), 0);
+  const szShell = needD > 0 ? (needD * 2) / globalZ.span : sz;
+  if (sz > szShell) {
+    sz = szShell;
+    pz = -globalZ.mid * sz;
+  }
+  const zMid = (minZ + maxZ) * 0.5;
+  const zHalf = Math.max(Math.abs(minZ - zMid), Math.abs(maxZ - zMid), 1e-4);
+  if (sz * zHalf > 0.7) {
+    sz = 0.45 / zHalf;
+    pz = -zMid * sz;
+  }
+  mesh.scale.set(coveredX.s, sy, sz);
+  mesh.position.set(coveredX.p, hem - box.min.y * sy, pz);
   return true;
 }
 

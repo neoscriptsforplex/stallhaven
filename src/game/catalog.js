@@ -965,13 +965,13 @@ addFoodLine(FOOD_LINE, 'food-bake', 'Kitchen', 'kitchen');
 addFoodLine(FEAST_LINE, 'food-feast', 'Feast', 'feast', 'bread');
 
 const POTION_LINE = [
-  { id: 'strength_potion', name: 'Strength Potion', tint: 0xe8d24a, buyers: ['mercenary'], price: 1000 },
-  { id: 'prayer_potion', name: 'Prayer Potion', tint: 0x3ec8c4, buyers: ['pilgrim', 'hedgemage'], price: 1500 },
-  { id: 'attack_potion', name: 'Attack Potion', tint: 0x40c8c0, buyers: ['mercenary'], price: 2250 },
-  { id: 'anti_poison_potion', name: 'Anti Poison Potion', tint: 0x8ee53f, buyers: ['mercenary', 'ranger'], price: 3500 },
-  { id: 'ranging_potion', name: 'Ranging Potion', tint: 0x87ceeb, buyers: ['ranger'], price: 5000 },
+  { id: 'attack_potion', name: 'Attack Potion', tint: 0x40c8c0, buyers: ['mercenary'], price: 1000 },
+  { id: 'strength_potion', name: 'Strength Potion', tint: 0xe8d24a, buyers: ['mercenary'], price: 1500 },
+  { id: 'anti_poison_potion', name: 'Antipoison Potion', tint: 0x8ee53f, buyers: ['mercenary', 'ranger'], price: 2250 },
+  { id: 'energy_potion', name: 'Energy Potion', tint: 0xe87aa8, buyers: ['pilgrim', 'ranger'], price: 3500 },
+  { id: 'prayer_potion', name: 'Prayer Potion', tint: 0x3ec8c4, buyers: ['pilgrim', 'hedgemage'], price: 5000 },
   { id: 'antifire_potion', name: 'Antifire Potion', tint: 0x8a4ec8, buyers: ['mercenary', 'ranger'], price: 7500 },
-  { id: 'energy_potion', name: 'Energy Potion', tint: 0xe87aa8, buyers: ['pilgrim', 'ranger'], price: 11000 },
+  { id: 'ranging_potion', name: 'Ranging Potion', tint: 0x87ceeb, buyers: ['ranger'], price: 11000 },
   { id: 'magic_potion', name: 'Magic Potion', tint: 0xf4c49a, buyers: ['hedgemage'], price: 16000 },
 ];
 
@@ -1570,7 +1570,10 @@ export function isCraftHidden(recipe) {
 
 export function recipesForTab(tabId, subtabId = null) {
   const shown = (list) => list.filter((recipe) => !isCraftHidden(recipe));
-  if (tabId === 'potion') return shown(recipeList().filter((recipe) => recipe.category === 'potion'));
+  if (tabId === 'potion') {
+    return shown(recipeList().filter((recipe) => recipe.category === 'potion'))
+      .sort((a, b) => a.lineIndex - b.lineIndex);
+  }
   if (tabId === 'food') return shown(recipeList().filter((recipe) => recipe.category === 'food'));
   if (tabId === 'smelt') return shown(recipeList().filter((recipe) => recipe.category === 'smelt'));
   if (tabId === 'spin') return shown(recipeList().filter((recipe) => recipe.category === 'spin'));

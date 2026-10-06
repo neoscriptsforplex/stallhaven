@@ -829,7 +829,17 @@ describe('catalog', () => {
     assert.ok(hatchets.every((r) => r.category === 'hatchet'));
     assert.ok(pickaxes.every((r) => r.category === 'pickaxe'));
     assert.equal(RECIPES.strength_potion.name, 'Strength Potion');
-    assert.equal(RECIPES.anti_poison_potion.name, 'Anti Poison Potion');
+    assert.equal(RECIPES.anti_poison_potion.name, 'Antipoison Potion');
+    assert.deepEqual(potions.map((recipe) => recipe.id), [
+      'attack_potion',
+      'strength_potion',
+      'anti_poison_potion',
+      'energy_potion',
+      'prayer_potion',
+      'antifire_potion',
+      'ranging_potion',
+      'magic_potion',
+    ]);
   });
 
   it('groups matching helm, body, and legs for a stand', () => {
@@ -1030,21 +1040,21 @@ describe('cauldron unlock', () => {
 
   it('brews potions only after a cauldron is placed, using herbs and water', () => {
     const state = createState();
-    assert.match(craftBlockReason(state, 'strength_potion'), /cauldron/i);
-    assert.match(craftBlockReason(state, 'strength_potion'), /Build/);
-    assert.equal(canCraft(state, 'strength_potion'), false);
-    assert.equal(isUnlocked(state, 'prayer_potion'), false);
+    assert.match(craftBlockReason(state, 'attack_potion'), /cauldron/i);
+    assert.match(craftBlockReason(state, 'attack_potion'), /Build/);
+    assert.equal(canCraft(state, 'attack_potion'), false);
+    assert.equal(isUnlocked(state, 'strength_potion'), false);
     state.gold = CAULDRON_COST;
     buyCauldron(state, { x: 0, z: 0.8, rot: 0 });
-    assert.equal(isUnlocked(state, 'strength_potion'), true);
-    assert.equal(isUnlocked(state, 'prayer_potion'), false);
-    assert.equal(canCraft(state, 'strength_potion'), true);
-    finishCraft(state, 'strength_potion');
-    assert.equal(state.chest.strength_potion, 1);
+    assert.equal(isUnlocked(state, 'attack_potion'), true);
+    assert.equal(isUnlocked(state, 'strength_potion'), false);
+    assert.equal(canCraft(state, 'attack_potion'), true);
+    finishCraft(state, 'attack_potion');
+    assert.equal(state.chest.attack_potion, 1);
     assert.equal(state.materials.herbs, 7);
     assert.equal(state.materials.water, 11);
-    state.craftCounts.strength_potion = 5;
-    assert.equal(isUnlocked(state, 'prayer_potion'), true);
+    state.craftCounts.attack_potion = 5;
+    assert.equal(isUnlocked(state, 'strength_potion'), true);
   });
 });
 
@@ -1808,34 +1818,40 @@ describe('display runes and ammo', () => {
 
 describe('potion sell prices', () => {
   it('starts at 5,000g and climbs by rarity, with comma labels and offer markdown', () => {
-    const prices = [
-      RECIPES.strength_potion.price,
-      RECIPES.prayer_potion.price,
-      RECIPES.attack_potion.price,
-      RECIPES.anti_poison_potion.price,
-      RECIPES.ranging_potion.price,
-      RECIPES.antifire_potion.price,
-      RECIPES.energy_potion.price,
-      RECIPES.magic_potion.price,
+    const order = [
+      'attack_potion',
+      'strength_potion',
+      'anti_poison_potion',
+      'energy_potion',
+      'prayer_potion',
+      'antifire_potion',
+      'ranging_potion',
+      'magic_potion',
     ];
+    const prices = order.map((id) => RECIPES[id].price);
     assert.equal(prices[0], 5000);
     for (let i = 1; i < prices.length; i += 1) {
-      assert.ok(prices[i] > prices[i - 1], `${i} should sell for more`);
+      assert.ok(prices[i] > prices[i - 1], `${order[i]} should sell for more`);
+      assert.equal(RECIPES[order[i]].tier, i + 1);
+      assert.equal(RECIPES[order[i]].previousId, order[i - 1]);
     }
+    assert.equal(RECIPES.attack_potion.tier, 1);
+    assert.equal(RECIPES.attack_potion.previousId, null);
     assert.equal(prices[prices.length - 1], 60000);
-    assert.match(costLabel(RECIPES.strength_potion), /sells 5,000g/);
+    assert.equal(RECIPES.anti_poison_potion.name, 'Antipoison Potion');
+    assert.match(costLabel(RECIPES.attack_potion), /sells 5,000g/);
     assert.match(costLabel(RECIPES.magic_potion), /sells 60,000g/);
     const ask = decideRequest('hedgemage', () => 0.9, createState());
     if (ask.recipeId === 'magic_potion' || RECIPES[ask.recipeId]?.category === 'potion') {
       assert.equal(ask.gold, RECIPES[ask.recipeId].price);
     }
-    assert.equal(reducedSalePrice(RECIPES.strength_potion.price), 3250);
+    assert.equal(reducedSalePrice(RECIPES.attack_potion.price), 3250);
     const state = createState();
     state.gold = 20000;
     state.furniture.cauldron = { x: 0, z: 0, rot: 0 };
-    finishCraft(state, 'strength_potion');
-    const offer = offerChoices(state, 'prayer_potion')[0];
-    assert.equal(offer.recipeId, 'strength_potion');
+    finishCraft(state, 'attack_potion');
+    const offer = offerChoices(state, 'strength_potion')[0];
+    assert.equal(offer.recipeId, 'attack_potion');
     assert.equal(offer.listPrice, 5000);
     assert.equal(offer.gold, 3250);
   });

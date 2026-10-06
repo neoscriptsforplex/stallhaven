@@ -406,6 +406,11 @@ export function placeFloors(expansionIds = []) {
 }
 
 const DOOR_HALF = 1.05;
+/**
+ * Side lawns overlap the front and rear lawns so a player-radius inset still
+ * leaves a walkable corner. Without it the player cannot go around the shop.
+ */
+const OUTDOOR_CORNER_LINK = 1.15;
 
 function smooth01(t) {
   const x = Math.min(1, Math.max(0, t));
@@ -454,11 +459,17 @@ export function outdoorWalkFloors(expansionIds = []) {
     minZ: ORIGIN_FLOOR.maxZ - 1.05,
     maxZ: Math.max(shop.maxZ + 1.45, PATH_START_Z + 1.15),
   };
+  const sideMinZ = Math.max(grass.minZ, shop.minZ - OUTDOOR_CORNER_LINK);
+  const sideMaxZ = Math.min(grass.maxZ, shop.maxZ + OUTDOOR_CORNER_LINK);
+  // One lawn rect, not only the strips around the room box. An L-shaped
+  // expansion leaves grass in the notch, and strip seams drop the corners.
+  const lawn = { minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: grass.maxZ };
   return [
+    lawn,
     { minX: grass.minX, maxX: grass.maxX, minZ: shop.maxZ, maxZ: grass.maxZ },
     { minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: shop.minZ },
-    { minX: grass.minX, maxX: shop.minX, minZ: shop.minZ, maxZ: shop.maxZ },
-    { minX: shop.maxX, maxX: grass.maxX, minZ: shop.minZ, maxZ: shop.maxZ },
+    { minX: grass.minX, maxX: shop.minX, minZ: sideMinZ, maxZ: sideMaxZ },
+    { minX: shop.maxX, maxX: grass.maxX, minZ: sideMinZ, maxZ: sideMaxZ },
     frontDoor,
   ];
 }

@@ -526,7 +526,7 @@ function addBeams(root, center) {
   root.add(sideBeam2);
 }
 
-function addRoofForRoom(roofs, walls, center, neigh = {}, isOrigin = false) {
+function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
   const group = new THREE.Group();
   group.position.copy(new THREE.Vector3(center.x, 0, center.z));
   const thatch = new THREE.MeshStandardMaterial({
@@ -557,11 +557,30 @@ function addRoofForRoom(roofs, walls, center, neigh = {}, isOrigin = false) {
   rafter.position.set(0, 2.55, 0);
   group.add(rafter);
   roofs.add(group);
-  addRoofGables(walls, center, neigh, ridgeY);
+  addRoofGables(group, center, neigh, ridgeY);
   return group;
 }
 
-function addRoofGables(root, center, neigh, ridgeY) {
+/** Match shop-wall cobble size: texture U/V is world metres times the wall repeat per metre. */
+function writeGableUVs(geo, end, wallTop) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  const cos = Math.cos(end.rotY);
+  const sin = Math.sin(end.rotY);
+  for (let i = 0; i < pos.count; i += 1) {
+    const lx = pos.getX(i);
+    const ly = pos.getY(i);
+    const lz = pos.getZ(i);
+    const worldX = end.x + lx * cos + lz * sin;
+    const worldY = wallTop + ly;
+    const worldZ = end.z - lx * sin + lz * cos;
+    const along = end.side ? worldZ : worldX;
+    uv.setXY(i, along * COBBLE_U, worldY * COBBLE_V);
+  }
+  uv.needsUpdate = true;
+}
+
+function addRoofGables(group, center, neigh, ridgeY) {
   const wallTop = 2.66;
   const peakH = Math.max(0.2, ridgeY - wallTop);
   const thick = 0.2;
@@ -580,11 +599,17 @@ function addRoofGables(root, center, neigh, ridgeY) {
     shape.closePath();
     const geo = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false, steps: 1 });
     geo.translate(0, 0, -thick / 2);
-    const mat = cobbleMat(width * COBBLE_U, Math.max(0.45, height * 1.05));
+    writeGableUVs(geo, end, wallTop);
+    const mat = cobbleMat(1, 1);
+    mat.transparent = true;
+    mat.opacity = 1;
+    mat.depthWrite = true;
+    mat.userData.isRoof = true;
     const mesh = addShadow(new THREE.Mesh(geo, mat));
-    mesh.position.set(end.x, wallTop, end.z);
+    mesh.name = 'roof-gable';
+    mesh.position.set(end.x - center.x, wallTop, end.z - center.z);
     mesh.rotation.y = end.rotY;
-    root.add(mesh);
+    group.add(mesh);
   }
 }
 
@@ -1879,7 +1904,7 @@ export function buildShop(expansionIds = []) {
     addFloor(root, c, cell);
     addBeams(root, c);
     addRoomWalls(root, cell, neigh, isOrigin);
-    addRoofForRoom(roofs, root, c, neigh, isOrigin);
+    addRoofForRoom(roofs, c, neigh, isOrigin);
     if (isOrigin) addOriginDecor(root, c);
     else addRoomTorches(root, c, neigh);
 

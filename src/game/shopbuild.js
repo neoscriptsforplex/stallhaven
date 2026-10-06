@@ -822,11 +822,17 @@ function addOriginFront(root, center) {
   join.position.set(center.x, 2.64, center.z + ROOM_D / 2 + 0.1);
   root.add(join);
 
-  const fascia = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(ROOM_W + 0.12, 0.16, 0.28),
-    cobbleMat(4.2, 0.4),
-  ));
-  fascia.position.set(center.x, 2.78, center.z + ROOM_D / 2 + 0.02);
+  const fasciaW = ROOM_W + 0.12;
+  const fasciaH = 0.16;
+  const fasciaD = 0.28;
+  const fasciaX = center.x;
+  const fasciaY = 2.78;
+  const fasciaZ = center.z + ROOM_D / 2 + 0.02;
+  const fasciaGeo = new THREE.BoxGeometry(fasciaW, fasciaH, fasciaD);
+  writeShopWallUVs(fasciaGeo, fasciaX, fasciaY, fasciaZ);
+  const fascia = addShadow(new THREE.Mesh(fasciaGeo, shopWallMat()));
+  fascia.name = 'fascia';
+  fascia.position.set(fasciaX, fasciaY, fasciaZ);
   root.add(fascia);
   for (const side of [-1, 1]) {
     const cap = addShadow(new THREE.Mesh(

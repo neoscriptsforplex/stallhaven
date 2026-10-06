@@ -1386,10 +1386,21 @@ export function nearestShelfSlot(localX, localY, localZ = 0) {
   return best;
 }
 
+/** Essence (and any unlisted mine) per completed bar. Ore rocks use ORE_MINE_YIELD. */
 export const MINE_YIELD = 5;
 export const MINE_DURATION = 3.2;
 export const CLAY_MINE_YIELD = 1;
 export const CLAY_MINE_DURATION = 1;
+/** Ore (or that rock's existing resource) granted each time its mining bar completes. */
+export const ORE_MINE_YIELD = {
+  bronze: 5,
+  iron: 4,
+  steel: 3,
+  mithril: 3,
+  adamant: 2,
+  runite: 2,
+  dragon: 1,
+};
 export const CHOP_YIELD = 5;
 export const CHOP_DURATION = 3.2;
 /** One flax per pick. The bar matches mining and chopping. */
@@ -1400,6 +1411,8 @@ export const FLAX_ARRIVE = 0.85;
 
 export function mineTiming(materialId) {
   if (materialId === 'hard_clay') return { duration: CLAY_MINE_DURATION, yield: CLAY_MINE_YIELD };
+  const oreYield = ORE_MINE_YIELD[materialId];
+  if (oreYield != null) return { duration: MINE_DURATION, yield: oreYield };
   return { duration: MINE_DURATION, yield: MINE_YIELD };
 }
 

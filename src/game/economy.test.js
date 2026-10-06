@@ -953,26 +953,42 @@ describe('material regen', () => {
     assert.equal(restock(state, 'essence'), false);
   });
 
-  it('grants five mined ores or essence per fill, capped at 250', () => {
+  it('grants tiered ore per mining bar, essence five, clay one, capped at 250', () => {
     const state = createState();
     state.materials.essence = 0;
     assert.equal(MINE_YIELD, 5);
     assert.equal(isMinedMaterial('essence'), true);
     assert.equal(isMinedMaterial('bronze'), true);
     assert.equal(isMinedMaterial('flour'), false);
+    const oreYield = {
+      bronze: 5,
+      iron: 4,
+      steel: 3,
+      mithril: 3,
+      adamant: 2,
+      runite: 2,
+      dragon: 1,
+    };
+    for (const [id, amount] of Object.entries(oreYield)) {
+      const timing = mineTiming(id);
+      assert.equal(timing.duration, 3.2, id);
+      assert.equal(timing.yield, amount, id);
+      const before = state.materials[id];
+      assert.equal(grantMinedMaterial(state, id), amount);
+      assert.equal(state.materials[id], before + amount);
+    }
+    assert.equal(mineTiming('essence').duration, 3.2);
+    assert.equal(mineTiming('essence').yield, MINE_YIELD);
     assert.equal(grantMinedMaterial(state, 'essence'), 5);
     assert.equal(state.materials.essence, 5);
-    assert.equal(grantMinedMaterial(state, 'bronze'), 5);
-    assert.equal(state.materials.bronze, 17);
-    state.materials.runite = 248;
-    assert.equal(grantMinedMaterial(state, 'runite'), 2);
+    state.materials.runite = 249;
+    assert.equal(grantMinedMaterial(state, 'runite'), 1);
     assert.equal(state.materials.runite, 250);
     assert.equal(grantMinedMaterial(state, 'flour'), 0);
     assert.equal(CLAY_MINE_YIELD, 1);
     assert.equal(CLAY_MINE_DURATION, 1);
     assert.equal(isMinedMaterial('hard_clay'), true);
     assert.deepEqual(mineTiming('hard_clay'), { duration: 1, yield: 1 });
-    assert.equal(mineTiming('bronze').yield, MINE_YIELD);
     assert.equal(mineTiming('bronze').duration, 3.2);
     assert.equal(MATERIALS.hard_clay.name, 'Hard clay');
     assert.equal(MATERIALS.hard_clay.tint, 0xb56a3a);

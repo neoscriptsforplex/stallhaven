@@ -119,8 +119,9 @@ import {
   wrapImportedCharacter,
   wrapRiggedShopkeeper,
   wrapShopPlayer,
+  wrapUploadedPlayer,
+  defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
-  UPLOADED_PLAYER_HEIGHT,
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRug, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
@@ -393,7 +394,40 @@ export function createWorld(canvas, state, opts = {}) {
   let riggedRatGltf = opts.riggedRat ?? null;
   let bundledPlayerSource = opts.bundledPlayer ?? null;
   let customPlayerSource = null;
+  let customPlayerYaw = false;
+  let customPlayerHint = null;
+  let customPlayerName = '';
   let customCustomerSource = null;
+
+  function clearCustomPlayer() {
+    customPlayerSource = null;
+    customPlayerYaw = false;
+    customPlayerHint = null;
+    customPlayerName = '';
+  }
+
+  function friendlyPlayerReason(err) {
+    const raw = err?.message || '';
+    if (/unchanged/i.test(raw)) return raw;
+    if (/no visible mesh/i.test(raw)) return 'That file has no visible mesh. The current model is unchanged.';
+    return 'Could not use that as a player model. The current model is unchanged.';
+  }
+
+  function applyUploadedPlayer(model, opts = {}) {
+    const yaw180 = Boolean(opts.yaw180);
+    const wrapped = wrapUploadedPlayer(model, {
+      animations: opts.animations ?? model.animations ?? [],
+      yaw180,
+      height: defaultPlayerWorldHeight(),
+      chefHatOn: Boolean(state.chefHat),
+    });
+    customPlayerSource = model;
+    customPlayerYaw = yaw180;
+    customPlayerHint = wrapped.userData.orientationHint ?? null;
+    if (opts.name) customPlayerName = opts.name;
+    replaceShopkeeperMesh(wrapped);
+    return { ok: true, hint: customPlayerHint, yaw180 };
+  }
 
   function makeDefaultKeeper() {
     if (riggedPlayerGltf) {
@@ -2753,7 +2787,6 @@ export function createWorld(canvas, state, opts = {}) {
   function replaceShopkeeperMesh(next) {
     next.position.copy(shopkeeper.position);
     next.rotation.copy(shopkeeper.rotation);
-    next.scale.copy(shopkeeper.scale);
     next.userData.groundY = shopkeeper.userData.groundY ?? next.position.y;
     scene.add(next);
     scene.remove(shopkeeper);
@@ -3154,39 +3187,82 @@ export function createWorld(canvas, state, opts = {}) {
       state.chefHat = Boolean(on);
       setChefHatVisible(shopkeeper, state.chefHat);
     },
-    setAppearance(look) {
-      state.appearance = look;
-      if (customPlayerSource || bundledPlayerSource || riggedPlayerGltf) return false;
-      const next = buildShopkeeper({
-        chefHat: Boolean(state.chefHat),
-        appearance: state.appearance,
-      });
-      next.scale.setScalar(PLAYER_WORLD_SCALE);
-      replaceShopkeeperMesh(next);
-      return true;
-    },
     hasCustomPlayer() {
       return Boolean(customPlayerSource);
     },
-    usesBundledPlayer() {
-      return Boolean(riggedPlayerGltf || bundledPlayerSource) && !customPlayerSource;
+    playerYaw180() {
+      return customPlayerYaw;
     },
-    setPlayerLook(model) {
+    playerOrientationHint() {
+      return customPlayerHint;
+    },
+    playerModelName() {
+      return customPlayerName;
+    },
+    getPlayerFit() {
+      const visual = shopkeeper.getObjectByName('uploaded-player')
+        || shopkeeper.getObjectByName('rigged-player')
+        || shopkeeper;
+      visual.updateMatrixWorld(true);
+      const box = new THREE.Box3();
+      let any = false;
+      const gearName = /pickaxe|hatchet|chef-hat|importedGrip|hammer/i;
+      visual.traverse((child) => {
+        if (!child.isMesh || !child.geometry) return;
+        let node = child;
+        let gear = false;
+        while (node && node !== visual) {
+          if (gearName.test(node.name || '')) {
+            gear = true;
+            break;
+          }
+          node = node.parent;
+        }
+        if (gear) return;
+        box.expandByObject(child);
+        any = true;
+      });
+      const ground = shopkeeper.userData.groundY ?? shopkeeper.position.y;
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const loco = shopkeeper.userData.clipLocomotion;
+      return {
+        custom: Boolean(customPlayerSource),
+        yaw180: customPlayerYaw,
+        name: customPlayerName,
+        animated: Boolean(loco?.walk || loco?.idle),
+        height: any ? size.y : 0,
+        feet: any ? box.min.y - ground : 0,
+        centerX: any ? center.x - shopkeeper.position.x : 0,
+        centerZ: any ? center.z - shopkeeper.position.z : 0,
+        x: shopkeeper.position.x,
+        z: shopkeeper.position.z,
+        hint: customPlayerHint,
+      };
+    },
+    setPlayerLook(model, opts = {}) {
       try {
         if (!model) {
-          customPlayerSource = null;
+          clearCustomPlayer();
           replaceShopkeeperMesh(makeDefaultKeeper());
           return { ok: true };
         }
-        const wrapped = wrapShopPlayer(model, {
-          height: UPLOADED_PLAYER_HEIGHT,
-          chefHatOn: Boolean(state.chefHat),
-        });
-        customPlayerSource = model;
-        replaceShopkeeperMesh(wrapped);
-        return { ok: true };
+        return applyUploadedPlayer(model, opts);
       } catch (err) {
-        return { ok: false, reason: err.message || 'Could not use that as a player model.' };
+        return { ok: false, reason: friendlyPlayerReason(err) };
+      }
+    },
+    setPlayerYaw180(on) {
+      if (!customPlayerSource) {
+        return { ok: false, reason: 'No uploaded player model. The current model is unchanged.' };
+      }
+      try {
+        return applyUploadedPlayer(customPlayerSource, {
+          yaw180: Boolean(on),
+          name: customPlayerName,
+        });
+      } catch (err) {
+        return { ok: false, reason: friendlyPlayerReason(err) };
       }
     },
     setCustomerLook(model) {
@@ -3363,7 +3439,7 @@ export function createWorld(canvas, state, opts = {}) {
       spawnGoblins();
     },
     clearUploads() {
-      customPlayerSource = null;
+      clearCustomPlayer();
       customCustomerSource = null;
       state.wareLooks = {};
       displays.forEach((slot, i) => {

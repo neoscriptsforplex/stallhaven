@@ -1,6 +1,6 @@
 import { FLAX_ARRIVE } from './catalog.js';
 import { PLAYER_RADIUS, isWalkable, planPlayerWalk, playerObstacles } from './nav.js';
-import { furnitureHalfSize, furnitureVisualYaw, playerWalkFloors } from './layout.js';
+import { furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter'];
 export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder']);
@@ -128,7 +128,8 @@ function fletchStandCandidates(pose) {
  * Gathering contacts in character-local units (the rig is 1.8 tall and then
  * scaled by about 0.863). The player stands so this point lands on the node.
  * Rock is the tip on the near face; the centre is farther along the same line.
- * Tree is the trunk centre for a radius-0.12 trunk. Flax is the plant base.
+ * Tree is the trunk centre for a radius-0.12 trunk. The pine is now uniformly
+ * twice as wide, so the stand steps back by the extra bark. Flax is the plant base.
  */
 export const GATHER_MODEL_SCALE = 0.863;
 export const GATHER_CONTACT = {
@@ -151,7 +152,16 @@ function gatherCentreOffset(kind, pose, scale) {
     const grow = (len + boulderFaceRadius(pose?.materialId)) / len;
     return { x: lx * grow, z: lz * grow };
   }
-  const local = kind === 'tree' ? GATHER_CONTACT.tree : GATHER_CONTACT.flax;
+  if (kind === 'tree') {
+    const local = GATHER_CONTACT.tree;
+    const lx = local.x * scale;
+    const lz = local.z * scale;
+    const len = Math.hypot(lx, lz) || 1;
+    const extraBark = Math.max(0, TREE_TRUNK_RADIUS - 0.12);
+    const grow = (len + extraBark) / len;
+    return { x: lx * grow, z: lz * grow };
+  }
+  const local = GATHER_CONTACT.flax;
   return { x: local.x * scale, z: local.z * scale };
 }
 
@@ -174,10 +184,17 @@ export function gatherStandAt(node, offset, yaw) {
   };
 }
 
-/** Closest alignments first. Trees start a step back: the trunk block sits just outside the ideal. */
+/** Step back far enough that the body clears the doubled trunk block. */
+function treeStandExtras(baseLen) {
+  const clear = TREE_WALK_BLOCK / 2 + PLAYER_RADIUS + 0.06;
+  const first = Math.max(0.04, clear - baseLen);
+  return [first, first + 0.12, first + 0.26, first + 0.46];
+}
+
+/** Closest alignments first. Trees start just outside the widened trunk block. */
 export function gatherStandCandidates(kind, pose, scale = GATHER_MODEL_SCALE) {
   const base = gatherCentreOffset(kind, pose, scale);
-  const extras = kind === 'tree' ? [0.08, 0.14, 0.24, 0.4] : [0, 0.08, 0.18, 0.36];
+  const extras = kind === 'tree' ? treeStandExtras(Math.hypot(base.x, base.z)) : [0, 0.08, 0.18, 0.36];
   const spots = [];
   for (const extra of extras) {
     for (let i = 0; i < 8; i += 1) {

@@ -47,6 +47,7 @@ import {
   gardenBox,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  TREE_CLICK_RADIUS,
   pickFlaxNode,
   rollFlaxSpots,
   sproutDueFlax,
@@ -1841,7 +1842,7 @@ export function createWorld(canvas, state, opts = {}) {
       }
       if (sceneMode === 'shop') {
         const tree = gardenTreeSpots(state.expansions ?? []).find((spot) => (
-          Math.hypot(point.x - spot.x, point.z - spot.z) <= 1.15
+          Math.hypot(point.x - spot.x, point.z - spot.z) <= TREE_CLICK_RADIUS
         ));
         if (tree) {
           queueUse('tree', { x: tree.x, z: tree.z, materialId: 'logs' });

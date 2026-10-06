@@ -15,6 +15,7 @@ import {
   gardenRockSpots,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  OUTDOOR_TREE_SCALE,
   keepFountain,
   keepGardenSpot,
   pointHitsTrapdoor,
@@ -1298,29 +1299,22 @@ function makeNameSprite(text) {
   return sprite;
 }
 
-/**
- * Outdoor pines are twice as tall as the fit target.
- * XZ stays put so trunk width, the walk block, and chop stand points still meet.
- */
-export const TREE_HEIGHT_SCALE = 2;
-
 export function buildTree(scale = 1) {
-  const target = buildProceduralTree(scale);
+  const target = buildProceduralTree(scale * OUTDOOR_TREE_SCALE);
   const bundled = getBundledLook('tree');
   const fitted = bundled
     ? wrapBundledProp(bundled, target, { name: 'pine', fit: 'height' })
-    : null;
-  return raiseOutdoorTree(fitted || target);
+    : target;
+  return mountOutdoorTree(fitted);
 }
 
 /**
- * Stretch the fitted pine on Y only, then sit its base on y = 0.
+ * Sit the uniformly scaled pine on the grass.
  * The visual lives under a placement group so the garden can pin the group
- * to the grass without lifting the trunk. Materials stay opaque: the roof
- * fade adopts transparent meshes, and this must not join that pass.
+ * without lifting the trunk. Materials stay opaque: the roof fade adopts
+ * transparent meshes, and this must not join that pass.
  */
-function raiseOutdoorTree(visual) {
-  visual.scale.y *= TREE_HEIGHT_SCALE;
+function mountOutdoorTree(visual) {
   sitVisibleOnY(visual, 0);
   visual.name = 'pine-visual';
   const root = new THREE.Group();
@@ -2063,7 +2057,7 @@ function shadeHex(hex, factor) {
   return color.getHex();
 }
 
-const TREE_PICK_XZ = 0.85;
+const TREE_PICK_XZ = 0.85 * OUTDOOR_TREE_SCALE;
 
 function attachTreePick(tree, spot) {
   const box = measureVisibleBox(tree);

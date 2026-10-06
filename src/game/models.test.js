@@ -53,11 +53,11 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR } from './layout.js';
+import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, pointHitsShop, ROOM_W, roomCenter, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_WALK_BLOCK } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_WALL_H, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, TREE_HEIGHT_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
-import { gardenObstacles } from './nav.js';
-import { GATHER_CONTACT } from './interact.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_WALL_H, ESSENCE_OLD_XZ, measureShopFloorPieces, measureShopFloorTop, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, WHEEL_WORLD_SCALE, mountFountainWater } from './shopbuild.js';
+import { gardenObstacles, PLAYER_RADIUS } from './nav.js';
+import { GATHER_CONTACT, GATHER_MODEL_SCALE, gatherStandCandidates } from './interact.js';
 
 function cueNames(root) {
   const names = new Set();
@@ -683,7 +683,7 @@ describe('bundled prop swaps', () => {
     assert.ok(ids.includes('goblin'));
   });
 
-  it('doubles a bundled outdoor tree on Y only and keeps it grounded', async () => {
+  it('doubles a bundled outdoor tree on every axis and keeps it grounded', async () => {
     const dump = await loadFolder('tree');
     setBundledLook('tree', dump);
     try {
@@ -692,21 +692,20 @@ describe('bundled prop swaps', () => {
       tree.rotation.y = 0.7;
       tree.updateMatrixWorld(true);
       const visual = tree.getObjectByName('pine-visual');
-      assert.ok(Math.abs(visual.scale.y - visual.scale.x * TREE_HEIGHT_SCALE) < 1e-6);
-      assert.ok(Math.abs(visual.scale.x - visual.scale.z) < 1e-6);
+      assert.ok(Math.abs(visual.scale.x - visual.scale.y) < 1e-6, 'bundled pine should stay uniform');
+      assert.ok(Math.abs(visual.scale.y - visual.scale.z) < 1e-6);
       const box = measureVisibleBox(tree);
       assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `bundled base minY=${box.min.y}`);
-      const tall = box.getSize(new THREE.Vector3());
-      const savedY = visual.scale.y;
-      visual.scale.y = visual.scale.x;
-      visual.updateMatrixWorld(true);
-      const short = measureVisibleBox(tree).getSize(new THREE.Vector3());
-      visual.scale.y = savedY;
-      assert.ok(short.y > 1.4 && short.y < 3.2, `fit height before the stretch should stay the old pine, got ${short.y}`);
-      assert.ok(Math.abs(tall.y - short.y * TREE_HEIGHT_SCALE) < 0.08, `bundled height ${tall.y} vs ${short.y}`);
-      assert.ok(Math.abs(tall.x - short.x) < 0.05 && Math.abs(tall.z - short.z) < 0.05);
-      assert.ok(tall.x < short.x * 1.15 && tall.z < short.z * 1.15, `crown widened to ${tall.x} x ${tall.z}`);
-      assert.ok(tall.x < 2.2 && tall.z < 2.2, `crown should stay under the old width, got ${tall.x} x ${tall.z}`);
+      const big = box.getSize(new THREE.Vector3());
+      const half = measureVisibleBox(buildTree(0.5)).getSize(new THREE.Vector3());
+      assert.ok(half.y > 1.4 && half.y < 3.2, `half-scale pine should stay the old size, got ${half.y}`);
+      for (const axis of ['x', 'y', 'z']) {
+        assert.ok(
+          Math.abs(big[axis] - half[axis] * OUTDOOR_TREE_SCALE) < 0.08,
+          `${axis} ${big[axis]} vs ${half[axis]}`,
+        );
+      }
+      assert.ok(big.x > half.x * 1.8 && big.z > half.z * 1.8, `crown should widen, got ${big.x} x ${big.z}`);
     } finally {
       setBundledLook('tree', null);
     }
@@ -1115,30 +1114,34 @@ describe('bundled prop swaps', () => {
     assert.ok(trees > 0, `garden trees should be choppable, trees=${trees}`);
   });
 
-  it('doubles outdoor tree height, keeps the trunk footprint, and stays on the grass', () => {
-    assert.equal(TREE_HEIGHT_SCALE, 2);
+  it('doubles outdoor trees on every axis, keeps them grounded, and off the roof fade', () => {
+    assert.equal(OUTDOOR_TREE_SCALE, 2);
     assert.deepEqual(GATHER_CONTACT.tree, { x: 0.21, z: 0.62 });
     const tree = buildTree(1);
     tree.position.set(4.2, 0, -3.4);
     tree.rotation.y = 1.1;
     tree.updateMatrixWorld(true);
     const visual = tree.getObjectByName('pine-visual');
-    assert.ok(visual, 'height stretch should live on the visual, not the placement group');
-    assert.ok(Math.abs(visual.scale.y - visual.scale.x * TREE_HEIGHT_SCALE) < 1e-6);
-    assert.ok(Math.abs(visual.scale.x - visual.scale.z) < 1e-6);
+    assert.ok(visual, 'the pine visual should live under the placement group');
+    assert.ok(Math.abs(visual.scale.x - visual.scale.y) < 1e-6);
+    assert.ok(Math.abs(visual.scale.y - visual.scale.z) < 1e-6);
     const box = measureVisibleBox(tree);
     assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `base should sit on the grass, minY=${box.min.y}`);
-    const tall = box.getSize(new THREE.Vector3());
-    const savedY = visual.scale.y;
-    visual.scale.y = visual.scale.x;
-    visual.updateMatrixWorld(true);
-    const short = measureVisibleBox(tree).getSize(new THREE.Vector3());
-    visual.scale.y = savedY;
-    visual.updateMatrixWorld(true);
-    assert.ok(Math.abs(tall.y - short.y * TREE_HEIGHT_SCALE) < 0.08, `height ${tall.y} vs ${short.y}`);
-    assert.ok(Math.abs(tall.x - short.x) < 0.05, `width changed ${tall.x} vs ${short.x}`);
-    assert.ok(Math.abs(tall.z - short.z) < 0.05, `depth changed ${tall.z} vs ${short.z}`);
-    assert.ok(short.y > 1.5 && short.y < 2.3, `unstretched pine should stay knee-to-head height, got ${short.y}`);
+    const big = box.getSize(new THREE.Vector3());
+    const half = measureVisibleBox(buildTree(0.5)).getSize(new THREE.Vector3());
+    assert.ok(half.y > 1.5 && half.y < 2.4, `half scale should stay the old pine, got ${half.y}`);
+    for (const axis of ['x', 'y', 'z']) {
+      assert.ok(
+        Math.abs(big[axis] - half[axis] * OUTDOOR_TREE_SCALE) < 0.08,
+        `${axis} ${big[axis]} vs ${half[axis]}`,
+      );
+    }
+    const reach = Math.hypot(GATHER_CONTACT.tree.x, GATHER_CONTACT.tree.z) * GATHER_MODEL_SCALE;
+    const stand = gatherStandCandidates('tree', { x: 0, z: 0 })[0];
+    const standDist = Math.hypot(stand.x, stand.z);
+    assert.ok(standDist > TREE_WALK_BLOCK / 2 + PLAYER_RADIUS, `stand ${standDist} is inside the trunk block`);
+    const gap = standDist - reach;
+    assert.ok(gap < 0.5, `chop stand stepped too far from the trunk, gap=${gap}`);
     let roofMarked = 0;
     let transparentMats = 0;
     tree.traverse((child) => {
@@ -1153,7 +1156,7 @@ describe('bundled prop swaps', () => {
     assert.equal(transparentMats, 0, 'tree materials stay opaque so the camera roof fade cannot claim them');
   });
 
-  it('keeps garden tree colliders and chop blocks at the old footprint', () => {
+  it('scales garden tree click boxes and walk blocks with the wider trunks', () => {
     const shop = buildShop([]).root;
     let picks = 0;
     shop.updateMatrixWorld(true);
@@ -1162,16 +1165,18 @@ describe('bundled prop swaps', () => {
       picks += 1;
       const params = child.geometry?.parameters;
       assert.ok(params, 'chop pick should stay a box');
-      assert.ok(Math.abs(params.width - 0.85) < 1e-6, `pick width ${params.width}`);
-      assert.ok(Math.abs(params.depth - 0.85) < 1e-6, `pick depth ${params.depth}`);
+      assert.ok(Math.abs(params.width - 0.85 * OUTDOOR_TREE_SCALE) < 1e-6, `pick width ${params.width}`);
+      assert.ok(Math.abs(params.depth - 0.85 * OUTDOOR_TREE_SCALE) < 1e-6, `pick depth ${params.depth}`);
       assert.ok(params.height > 2.8, `pick should cover the taller crown, height=${params.height}`);
       const pine = child.parent;
       pine.updateMatrixWorld(true);
       const box = measureVisibleBox(pine);
       assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `placed tree should stay grounded, minY=${box.min.y}`);
       assert.ok(params.height + 0.05 >= box.max.y - box.min.y, 'pick should reach the crown');
+      const wide = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
+      assert.ok(params.width + 0.15 >= wide * 0.45, `pick should cover the wider trunk, width=${params.width} crown=${wide}`);
       const ray = new THREE.Raycaster(
-        new THREE.Vector3(child.userData.x, box.max.y - 0.2, child.userData.z + 3),
+        new THREE.Vector3(child.userData.x, box.max.y - 0.2, child.userData.z + 4),
         new THREE.Vector3(0, 0, -1),
       );
       assert.ok(ray.intersectObject(child, false).length > 0, 'upper crown should still be clickable');
@@ -1186,7 +1191,7 @@ describe('bundled prop swaps', () => {
       assert.ok(block, `missing walk block for tree at ${spot.x},${spot.z}`);
       const w = block.maxX - block.minX;
       const d = block.maxZ - block.minZ;
-      assert.ok(Math.abs(w - 0.62) < 1e-6 && Math.abs(d - 0.62) < 1e-6, `tree block grew to ${w}x${d}`);
+      assert.ok(Math.abs(w - TREE_WALK_BLOCK) < 1e-6 && Math.abs(d - TREE_WALK_BLOCK) < 1e-6, `tree block ${w}x${d}`);
     }
   });
 

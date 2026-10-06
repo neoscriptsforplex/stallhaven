@@ -29,6 +29,14 @@ import {
   furnitureBuyCost,
   gardenTreeSpots,
   gardenRockSpots,
+  FLAX_COUNT,
+  FLAX_SPACING,
+  FLAX_RESPAWN_SEC,
+  rollFlaxSpots,
+  flaxSpotBlocked,
+  pickFlaxNode,
+  sproutDueFlax,
+  pointOnPath,
   gardenRockRadius,
   gardenTrapdoorSpot,
   gardenBedSpots,
@@ -477,5 +485,64 @@ describe('layout numbers', () => {
     const table = furnitureHalfSize('table');
     assert.equal(table.hw, 0.76);
     assert.equal(table.hd, 0.51);
+  });
+});
+
+function flaxRng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+describe('flax field', () => {
+  it('scatters twenty plants on the grass, clear of the shop, path, stations, and each other', () => {
+    const furniture = defaultFurniture();
+    furniture.wheel = { x: -8.2, z: 8.4, rot: 0 };
+    for (const seed of [1, 7, 42]) {
+      const spots = rollFlaxSpots([], { rng: flaxRng(seed), furniture });
+      assert.equal(spots.length, FLAX_COUNT, `seed ${seed}`);
+      for (let i = 0; i < spots.length; i += 1) {
+        const spot = spots[i];
+        assert.equal(flaxSpotBlocked(spot.x, spot.z, [], {
+          occupied: spots.filter((_, j) => j !== i),
+          furniture,
+        }), false, `${spot.x},${spot.z}`);
+        assert.equal(pointHitsShop(spot.x, spot.z, [], 0.2), false);
+        assert.equal(pointOnPath(spot.x, spot.z, [], 0), false);
+        assert.ok(Math.hypot(spot.x - furniture.wheel.x, spot.z - furniture.wheel.z) >= 1.45);
+        for (let j = i + 1; j < spots.length; j += 1) {
+          assert.ok(
+            Math.hypot(spot.x - spots[j].x, spot.z - spots[j].z) >= FLAX_SPACING - 1e-6,
+          );
+        }
+      }
+    }
+  });
+
+  it('keeps flax off a built room', () => {
+    const spots = rollFlaxSpots(['left'], { rng: flaxRng(9) });
+    assert.equal(spots.length, FLAX_COUNT);
+    assert.equal(spots.some((spot) => pointHitsShop(spot.x, spot.z, ['left'], 0)), false);
+  });
+
+  it('hides a picked plant and sprouts a replacement after a short delay', () => {
+    const nodes = rollFlaxSpots([], { rng: flaxRng(3) }).map((spot, index) => ({
+      id: index + 1,
+      x: spot.x,
+      z: spot.z,
+      alive: true,
+      respawnAt: 0,
+    }));
+    assert.equal(pickFlaxNode(nodes, 1, 10), true);
+    assert.equal(nodes.filter((node) => node.alive).length, FLAX_COUNT - 1);
+    assert.equal(sproutDueFlax(nodes, 10 + FLAX_RESPAWN_SEC - 0.01, () => ({ x: 99, z: 99 })), false);
+    assert.equal(nodes[0].alive, false);
+    const next = { x: -9.4, z: -8.2 };
+    assert.equal(sproutDueFlax(nodes, 10 + FLAX_RESPAWN_SEC, () => next), true);
+    assert.equal(nodes.filter((node) => node.alive).length, FLAX_COUNT);
+    assert.equal(nodes[0].x, next.x);
+    assert.equal(nodes[0].z, next.z);
   });
 });

@@ -117,7 +117,7 @@ import {
   STATION_UNLOCKS,
 } from './layout.js';
 import { clampMapZoom, drawMinimap, mapToWorld, shopMapBounds } from './minimap.js';
-import { boulderInspect, treeInspect } from './shopbuild.js';
+import { boulderInspect, flaxInspect, treeInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
 import {
@@ -378,7 +378,9 @@ export function bindHud(root, state, world) {
           ? '<span class="mat-crafted">Crafted</span>'
           : isMinedMaterial(mat.id)
             ? '<span class="mat-crafted">Mined</span>'
-            : `<button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>`}
+            : mat.gathered
+              ? '<span class="mat-crafted">Picked</span>'
+              : `<button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>`}
       </div>
     `).join('');
     container.dataset.ready = '1';
@@ -585,17 +587,17 @@ export function bindHud(root, state, world) {
     if (!inspectPop) return;
     furnMenu.hidden = true;
     furnTarget = null;
-    const kind = pose?.kind === 'tree' ? 'tree' : 'boulder';
+    const kind = pose?.kind === 'tree' ? 'tree' : pose?.kind === 'flax' ? 'flax' : 'boulder';
     inspectTarget = materialId
-      ? { materialId, x: pose?.x, z: pose?.z, kind }
+      ? { materialId, x: pose?.x, z: pose?.z, kind, plantId: pose?.plantId }
       : null;
-    const info = kind === 'tree' ? treeInspect() : boulderInspect(materialId);
+    const info = kind === 'tree' ? treeInspect() : kind === 'flax' ? flaxInspect() : boulderInspect(materialId);
     const nameEl = inspectPop.querySelector('[data-inspect-name]');
     const blurbEl = inspectPop.querySelector('[data-inspect-blurb]');
     const mineBtn = inspectPop.querySelector('[data-inspect-mine]');
     if (nameEl) nameEl.textContent = info.name;
     if (blurbEl) blurbEl.textContent = info.blurb;
-    if (mineBtn) mineBtn.textContent = kind === 'tree' ? 'Chop' : 'Mine';
+    if (mineBtn) mineBtn.textContent = kind === 'tree' ? 'Chop' : kind === 'flax' ? 'Pick' : 'Mine';
     inspectPop.hidden = false;
     const x = Math.min(window.innerWidth - 250, Math.max(8, clientX ?? 24));
     const y = Math.min(window.innerHeight - 180, Math.max(8, clientY ?? 80));
@@ -2267,7 +2269,10 @@ export function bindHud(root, state, world) {
     if (event.type === 'tree-inspect') {
       showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'tree' });
     }
-    if (event.type === 'mined' || event.type === 'chopped') {
+    if (event.type === 'flax-inspect') {
+      showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'flax' });
+    }
+    if (event.type === 'mined' || event.type === 'chopped' || event.type === 'picked') {
       if (activeCraftYield) {
         activeCraftYield.classList.add('is-grant');
         window.setTimeout(() => activeCraftYield.classList.remove('is-grant'), 280);

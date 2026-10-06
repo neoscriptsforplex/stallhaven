@@ -616,6 +616,97 @@ function gardenRockOnGrass(spot, expansionIds = []) {
     && spot.z <= grass.maxZ - pad;
 }
 
+/** Outdoor flax nodes. Picked plants leave and sprout again after a short delay. */
+export const FLAX_COUNT = 20;
+export const FLAX_SPACING = 1.2;
+export const FLAX_RESPAWN_SEC = 6;
+export const FLAX_CLICK_RADIUS = 0.72;
+
+const FLAX_EDGE = 0.7;
+const FLAX_TREE_CLEAR = 1.35;
+const FLAX_BED_CLEAR = 1.05;
+const FLAX_STATION_CLEAR = 1.45;
+const FLAX_DISPLAY_CLEAR = 1.2;
+const FLAX_TRAP_CLEAR = 1.25;
+const FLAX_STATION_IDS = ['counter', 'anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter'];
+
+export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furniture = null } = {}) {
+  const grass = gardenBox(expansionIds);
+  if (x < grass.minX + FLAX_EDGE || x > grass.maxX - FLAX_EDGE) return true;
+  if (z < grass.minZ + FLAX_EDGE || z > grass.maxZ - FLAX_EDGE) return true;
+  if (!keepGardenSpot({ x, z, side: 'edge' }, expansionIds)) return true;
+  if (pointOnFloors(x, z, walkFloors(expansionIds), 0.4)) return true;
+  if (pointHitsTrapdoor(x, z, FLAX_TRAP_CLEAR)) return true;
+  for (const tree of gardenTreeSpots(expansionIds)) {
+    if (Math.hypot(x - tree.x, z - tree.z) < FLAX_TREE_CLEAR) return true;
+  }
+  for (const rock of gardenRockSpots(expansionIds)) {
+    if (Math.hypot(x - rock.x, z - rock.z) < gardenRockRadius(rock.scale ?? 1) + 0.3) return true;
+  }
+  for (const bed of gardenBedSpots(expansionIds)) {
+    if (Math.hypot(x - bed.x, z - bed.z) < FLAX_BED_CLEAR) return true;
+  }
+  const furn = furniture ?? defaultFurniture();
+  for (const id of FLAX_STATION_IDS) {
+    const pose = furn[id];
+    if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) continue;
+    if (Math.hypot(x - pose.x, z - pose.z) < FLAX_STATION_CLEAR) return true;
+  }
+  for (const pose of furn.displays ?? []) {
+    if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) continue;
+    if (Math.hypot(x - pose.x, z - pose.z) < FLAX_DISPLAY_CLEAR) return true;
+  }
+  for (const other of occupied) {
+    if (Math.hypot(x - other.x, z - other.z) < FLAX_SPACING) return true;
+  }
+  return false;
+}
+
+/** Random grass spots that stay off the shop, path, stations, and each other. */
+export function rollFlaxSpots(expansionIds = [], opts = {}) {
+  const count = Math.max(0, opts.count ?? FLAX_COUNT);
+  const rng = opts.rng ?? Math.random;
+  const furniture = opts.furniture ?? null;
+  const occupied = opts.occupied ?? [];
+  const grass = gardenBox(expansionIds);
+  const spanX = Math.max(0.1, grass.maxX - grass.minX - FLAX_EDGE * 2);
+  const spanZ = Math.max(0.1, grass.maxZ - grass.minZ - FLAX_EDGE * 2);
+  const spots = [];
+  const maxTries = Math.max(800, count * 200);
+  for (let i = 0; i < maxTries && spots.length < count; i += 1) {
+    const x = grass.minX + FLAX_EDGE + rng() * spanX;
+    const z = grass.minZ + FLAX_EDGE + rng() * spanZ;
+    if (flaxSpotBlocked(x, z, expansionIds, { occupied: [...occupied, ...spots], furniture })) continue;
+    spots.push({ x, z });
+  }
+  return spots;
+}
+
+export function pickFlaxNode(nodes, id, now, delay = FLAX_RESPAWN_SEC) {
+  const node = nodes.find((item) => item.id === id && item.alive);
+  if (!node) return false;
+  node.alive = false;
+  node.respawnAt = now + delay;
+  return true;
+}
+
+/** Grow back nodes whose delay has passed. `rollSpot` receives currently living positions. */
+export function sproutDueFlax(nodes, now, rollSpot) {
+  let changed = false;
+  for (const node of nodes) {
+    if (node.alive || !(now >= (node.respawnAt ?? 0))) continue;
+    const occupied = nodes.filter((item) => item.alive).map((item) => ({ x: item.x, z: item.z }));
+    const spot = rollSpot(occupied);
+    if (!spot) continue;
+    node.x = spot.x;
+    node.z = spot.z;
+    node.alive = true;
+    node.respawnAt = 0;
+    changed = true;
+  }
+  return changed;
+}
+
 export function gardenTrapdoorSpot(expansionIds = []) {
   const spot = { ...TRAPDOOR, side: 'path' };
   return keepGardenSpot(spot, expansionIds) ? spot : null;

@@ -1228,6 +1228,76 @@ export function buildTree(scale = 1) {
   return target;
 }
 
+/** Knee-high next to the shopkeeper. The uploaded dump is a wide flat spray. */
+export const FLAX_PLANT_HEIGHT = 0.5;
+
+export function buildProceduralFlax() {
+  const group = new THREE.Group();
+  group.name = 'flax-plant';
+  group.userData.flaxProcedural = true;
+  const stemMat = new THREE.MeshStandardMaterial({ color: 0x2a7a32, roughness: 0.86 });
+  const flowerMat = new THREE.MeshStandardMaterial({ color: 0x6ec8d4, roughness: 0.62 });
+  const stems = [
+    { x: 0, z: 0, h: FLAX_PLANT_HEIGHT, lean: 0.06 },
+    { x: 0.07, z: 0.04, h: 0.42, lean: -0.14 },
+    { x: -0.06, z: 0.05, h: 0.46, lean: 0.16 },
+    { x: 0.02, z: -0.07, h: 0.36, lean: -0.08 },
+  ];
+  for (const stem of stems) {
+    const mesh = addShadow(new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.02, stem.h, 5),
+      stemMat,
+    ));
+    mesh.position.set(stem.x, stem.h / 2, stem.z);
+    mesh.rotation.z = stem.lean;
+    group.add(mesh);
+    const flower = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.038, 6, 5), flowerMat));
+    flower.position.set(
+      stem.x + Math.sin(stem.lean) * stem.h * 0.45,
+      stem.h + 0.01,
+      stem.z,
+    );
+    group.add(flower);
+  }
+  return group;
+}
+
+function flaxDoubleSide(root) {
+  root.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    const copies = mats.map((mat) => {
+      const copy = mat.clone();
+      copy.side = THREE.DoubleSide;
+      return copy;
+    });
+    child.material = Array.isArray(child.material) ? copies : copies[0];
+  });
+}
+
+/** Uploaded flax dump, stood up and fit to the procedural plant. Procedural if the dump is missing. */
+export function buildFlaxPlant() {
+  const target = buildProceduralFlax();
+  const bundled = getBundledLook('flax-plant');
+  if (!bundled) return target;
+  try {
+    const fitted = wrapBundledProp(bundled, target, {
+      name: 'flax-plant',
+      fit: 'height',
+      // The dump lies flat in XZ (broad face, short Y). Tip it so that face stands up.
+      rotateX: -Math.PI / 2,
+    });
+    if (!fitted) return target;
+    fitted.userData.flaxProcedural = false;
+    flaxDoubleSide(fitted);
+    sitVisibleOnY(fitted, 0);
+    return fitted;
+  } catch (err) {
+    console.warn('Flax plant model skipped:', err?.message || err);
+    return target;
+  }
+}
+
 function buildProceduralTree(scale = 1) {
   const group = new THREE.Group();
   group.name = 'pine';
@@ -1868,6 +1938,10 @@ export const DUNGEON_BOULDERS = [
 
 export function treeInspect() {
   return { name: 'Tree', blurb: 'An outdoor pine. Chop it for Logs.' };
+}
+
+export function flaxInspect() {
+  return { name: 'Flax', blurb: 'A knee-high flax plant. Left-click to walk over and pick it. You get 1 flax.' };
 }
 
 export function boulderInspect(materialId) {

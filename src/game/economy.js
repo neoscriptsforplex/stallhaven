@@ -11,6 +11,7 @@ import {
   isMinedMaterial,
   isMaterialCraft,
   CHOP_YIELD,
+  FLAX_YIELD,
   MINE_YIELD,
   SHOP,
   SHELF_SLOT_COUNT,
@@ -192,6 +193,8 @@ export function applyCheat(state, raw) {
     if (state.furniture) {
       for (const station of STATION_UNLOCKS) state.furniture[station.id] = null;
     }
+    if (state.materials) state.materials.flax = MATERIALS.flax.start;
+    if (state.materialAcc) state.materialAcc.flax = 0;
     return 'noob';
   }
   if (code === 'freshstart') {
@@ -1105,6 +1108,10 @@ export function grantMinedMaterial(state, materialId, amount = MINE_YIELD) {
 
 export function grantChoppedLogs(state, amount = CHOP_YIELD) {
   return grantMaterial(state, 'logs', amount);
+}
+
+export function grantPickedFlax(state, amount = FLAX_YIELD) {
+  return grantMaterial(state, 'flax', amount);
 }
 
 export function placeOnDisplay(state, recipeId, displayIndex = state.selectedDisplay, slotIndex = 0) {

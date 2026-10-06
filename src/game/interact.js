@@ -1,3 +1,4 @@
+import { FLAX_ARRIVE } from './catalog.js';
 import { PLAYER_RADIUS, planPlayerWalk } from './nav.js';
 import { furnitureVisualYaw } from './layout.js';
 
@@ -208,6 +209,25 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
       }
     }
     return { action: 'blocked', dest: spots[0], face };
+  }
+  if (kind === 'flax') {
+    if (isNearPoint(from, pose, FLAX_ARRIVE)) return { action: 'open' };
+    const offsets = [
+      [0, 0.55],
+      [0.55, 0],
+      [-0.55, 0],
+      [0, -0.55],
+      [0.4, 0.4],
+      [-0.4, 0.4],
+      [0.4, -0.4],
+      [-0.4, -0.4],
+    ];
+    for (const [dx, dz] of offsets) {
+      const dest = { x: pose.x + dx, z: pose.z + dz };
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      if (path.length) return { action: 'walk', path, dest };
+    }
+    return { action: 'blocked' };
   }
   if (isNearPoint(from, pose, STATION_ARRIVE)) return { action: 'open' };
   const offsets = APPROACH_OFFSETS;

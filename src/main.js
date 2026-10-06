@@ -2,7 +2,7 @@ import { RECIPES } from './game/catalog.js';
 import { completeCrafts, createState, pushLog, tickMaterials } from './game/economy.js';
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
-import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledLooks } from './game/upload.js';
+import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledRiggedGoblin, loadBundledLooks } from './game/upload.js';
 import { loadBundledMusic } from './game/audio.js';
 import { createWorld } from './game/world.js';
 import { normalizeImported, setBundledLooks } from './game/models.js';
@@ -55,9 +55,10 @@ async function bootGame() {
 
   let bundledPlayer = null;
   let riggedPlayer = null;
+  let riggedGoblin = null;
   let bundledLooks = {};
   try {
-    const [rigged, looks] = await Promise.all([
+    const [rigged, looks, , goblin] = await Promise.all([
       loadBundledRiggedPlayer().catch((err) => {
         console.warn('Rigged player skipped:', err?.message || err);
         return null;
@@ -69,8 +70,13 @@ async function bootGame() {
         console.warn('Bundled music skipped:', err?.message || err);
         return [];
       }),
+      loadBundledRiggedGoblin().catch((err) => {
+        console.warn('Rigged goblin skipped:', err?.message || err);
+        return null;
+      }),
     ]);
     riggedPlayer = rigged;
+    riggedGoblin = goblin;
     if (!riggedPlayer) {
       bundledPlayer = await loadBundledPlayerScene().catch((err) => {
         console.warn('Bundled player skipped:', err?.message || err);
@@ -84,7 +90,7 @@ async function bootGame() {
     console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
   }
 
-  const world = createWorld(canvas, state, { bundledPlayer, riggedPlayer });
+  const world = createWorld(canvas, state, { bundledPlayer, riggedPlayer, riggedGoblin });
   window.stallhaven = {
     world,
     state,

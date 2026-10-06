@@ -91,6 +91,7 @@ import {
   buildDust,
   buildFurniture,
   buildGoblin,
+  wrapRiggedGoblin,
   buildShopDoor,
   buildShopkeeper,
   buildWare,
@@ -374,6 +375,7 @@ export function createWorld(canvas, state, opts = {}) {
   scene.add(dust);
 
   let riggedPlayerGltf = opts.riggedPlayer ?? null;
+  let riggedGoblinGltf = opts.riggedGoblin ?? null;
   let bundledPlayerSource = opts.bundledPlayer ?? null;
   let customPlayerSource = null;
   let customCustomerSource = null;
@@ -897,12 +899,24 @@ export function createWorld(canvas, state, opts = {}) {
     if (changed) syncFlaxMeshes();
   }
 
+  function makeGoblinMesh() {
+    if (riggedGoblinGltf) {
+      try {
+        return wrapRiggedGoblin(riggedGoblinGltf);
+      } catch (err) {
+        console.warn('Rigged goblin skipped:', err?.message || err);
+        riggedGoblinGltf = null;
+      }
+    }
+    return buildGoblin();
+  }
+
   function spawnGoblins() {
     for (const gob of goblins) scene.remove(gob.mesh);
     goblins.length = 0;
     for (let i = 0; i < GOBLIN_COUNT; i += 1) {
       const start = grassWanderPoint();
-      const mesh = buildGoblin();
+      const mesh = makeGoblinMesh();
       mesh.position.set(start.x, 0, start.z);
       scene.add(mesh);
       goblins.push({
@@ -918,6 +932,7 @@ export function createWorld(canvas, state, opts = {}) {
     for (const gob of goblins) {
       if (now < gob.waitUntil) {
         gob.mesh.rotation.y += dt * 0.4;
+        if (gob.mesh.userData.clipLocomotion) gob.mesh.userData.clipLocomotion.speed = 0;
         updateWalkPose(gob.mesh, false, dt, now);
         continue;
       }
@@ -942,6 +957,9 @@ export function createWorld(canvas, state, opts = {}) {
       pos.x = nx;
       pos.z = nz;
       gob.mesh.rotation.y = Math.atan2(dx, dz);
+      if (gob.mesh.userData.clipLocomotion) {
+        gob.mesh.userData.clipLocomotion.speed = dt > 0 ? (dist * t) / dt : 0;
+      }
       updateWalkPose(gob.mesh, true, dt, now);
     }
   }

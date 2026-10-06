@@ -521,11 +521,11 @@ export async function loadBundledPlayerScene() {
   return fetchObjMtl('player', 'player.obj', 'player.mtl');
 }
 
-/** Fetch character_rigged.glb from the same models roots as the OBJ player. */
-export async function loadBundledRiggedPlayer() {
+/** Fetch a shipped GLB from the same models roots as the other public assets. */
+async function loadBundledGltf(file) {
   await resolveBundledModelRoot();
   const roots = cachedModelsRoot ? [cachedModelsRoot] : bundledModelRoots();
-  const file = 'player/character_rigged.glb';
+  const base = file.includes('/') ? file.slice(0, file.lastIndexOf('/') + 1) : '';
   let lastMissing = missingModel(`models/${file}`);
   for (const root of roots) {
     try {
@@ -542,9 +542,9 @@ export async function loadBundledRiggedPlayer() {
         continue;
       }
       const gltf = await new Promise((resolve, reject) => {
-        gltfLoader.parse(buffer, `${root}player/`, resolve, reject);
+        gltfLoader.parse(buffer, `${root}${base}`, resolve, reject);
       });
-      if (!gltf?.scene) throw new Error('Rigged player has no scene.');
+      if (!gltf?.scene) throw new Error(`Rigged model ${file} has no scene.`);
       cachedModelsRoot = root;
       return gltf;
     } catch (err) {
@@ -556,6 +556,16 @@ export async function loadBundledRiggedPlayer() {
     }
   }
   throw lastMissing;
+}
+
+/** Fetch character_rigged.glb from the same models roots as the OBJ player. */
+export async function loadBundledRiggedPlayer() {
+  return loadBundledGltf('player/character_rigged.glb');
+}
+
+/** Fetch goblin_rigged.glb. Throws so the caller can keep the old goblin. */
+export async function loadBundledRiggedGoblin() {
+  return loadBundledGltf('npc/goblin_rigged.glb');
 }
 
 export async function loadBundledPropScene(folder, rev) {

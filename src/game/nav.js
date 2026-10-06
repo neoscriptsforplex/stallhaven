@@ -276,6 +276,27 @@ export function dungeonWallObstacles() {
   ];
 }
 
+/** Near-face radius used by gather stands. Essence is the large centre rock. */
+function dungeonRockFace(spot) {
+  if (Number.isFinite(spot?.face)) return spot.face;
+  return spot?.materialId === 'essence' || spot?.essence ? 1.04 : 0.52;
+}
+
+/**
+ * Square blockers inside each rock. Sized so a mining stand around the face
+ * stays walkable after the player-radius pad, including the diagonal.
+ */
+export function dungeonBoulderObstacles(spots = []) {
+  return spots.map((spot) => {
+    const span = dungeonRockFace(spot) * 1.55;
+    return rectFromCenter(spot.x ?? 0, spot.z ?? 0, span, span);
+  });
+}
+
+export function dungeonMoveObstacles(spots = []) {
+  return [...dungeonWallObstacles(), ...dungeonBoulderObstacles(spots)];
+}
+
 export function playerObstacles(state, shop = SHOP) {
   return [
     ...liveObstacles(state, shop),

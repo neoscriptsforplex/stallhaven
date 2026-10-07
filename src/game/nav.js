@@ -1,4 +1,5 @@
 import { SHOP } from './catalog.js';
+import { isTreeStump } from './trees.js';
 import {
   FOUNTAIN,
   ROOM_D,
@@ -149,6 +150,10 @@ export function gardenObstacles(expansionIds = []) {
     blocks.push(rectFromCenter(FOUNTAIN.x, FOUNTAIN.z, size, size));
   }
   for (const tree of gardenTreeSpots(expansionIds)) {
+    // A standing trunk blocks the body. A stump does not: the walk block is
+    // the trunk column, and a short stump is not that column. The block
+    // returns when the pine grows back.
+    if (isTreeStump(tree.x, tree.z)) continue;
     const block = treeWalkBlock(plantedTrunkRadius(tree.x, tree.z));
     blocks.push(rectFromCenter(tree.x, tree.z, block, block));
   }

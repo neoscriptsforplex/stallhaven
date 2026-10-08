@@ -66,7 +66,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -1004,11 +1004,36 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(Math.abs(bottom - opening.topY) < 1e-6, `lintel underside ${bottom}`);
   });
 
-  it('keeps the red awning outside the room and keeps the inside timber and fascia', () => {
+  it('tiles the shop awning with dark boards and keeps it outside the room', () => {
+    assert.equal(AWNING_TILE_M, 2);
+    const urls = awningTextureUrls();
+    assert.ok(urls.some((url) => url.endsWith('textures/awning_512.png')));
+    assert.ok(urls.some((url) => url.includes('public/textures/awning_512.png')));
+    const texDir = join(dirname(fileURLToPath(import.meta.url)), '../../public/textures');
+    assert.equal(existsSync(join(texDir, 'awning_256.png')), true);
+    assert.equal(existsSync(join(texDir, 'awning_512.png')), true);
+    assert.equal(existsSync(join(texDir, 'awning_1024.png')), true);
+
     const front = roomCenter(0, 0);
     const interiorZ = front.z + ROOM_D / 2 - 0.08;
+    const tilt = -0.18;
+    const cos = Math.cos(tilt);
+    const sin = Math.sin(tilt);
+    const oldHalf = 0.85;
+    const oldCenterY = 2.32;
+    const oldCenterZ = front.z + ROOM_D / 2 + 0.47;
+    const outerZ = oldCenterZ + oldHalf * cos;
+    const outerY = oldCenterY - oldHalf * sin;
+    const wallOuterZ = front.z + ROOM_D / 2 + 0.08;
+    const awningHalf = (outerZ - wallOuterZ) / (2 * cos);
+    const depth = awningHalf * 2;
+    const expectY = outerY + awningHalf * sin;
+    const expectZ = wallOuterZ + awningHalf * cos;
+    const point = new THREE.Vector3();
+
     for (const ids of [[], ['left', 'right', 'back']]) {
-      const shop = buildShop(ids).root;
+      const built = buildShop(ids);
+      const shop = built.root;
       shop.updateMatrixWorld(true);
       let awnings = 0;
       let join = false;
@@ -1018,11 +1043,73 @@ describe('outdoor and dungeon extras', () => {
         if (!child.isMesh || child.geometry?.type !== 'BoxGeometry') return;
         const { width, height } = child.geometry.parameters;
         const color = child.material?.color?.getHex?.();
-        if (color === 0x8b4336 && width > 7) {
+        if (child.name === 'awning') {
           awnings += 1;
+          assert.equal(width, 8.1);
+          assert.equal(height, 0.06);
+          assert.ok(Math.abs(child.geometry.parameters.depth - depth) < 1e-6);
+          assert.ok(Math.abs(child.rotation.x - tilt) < 1e-6);
+          assert.ok(Math.abs(child.position.x - front.x) < 1e-6);
+          assert.ok(Math.abs(child.position.y - expectY) < 1e-6);
+          assert.ok(Math.abs(child.position.z - expectZ) < 1e-6);
           const box = new THREE.Box3().setFromObject(child);
           assert.ok(box.min.z >= interiorZ - 0.01, `awning enters the room at z=${box.min.z}`);
+
+          const mat = child.material;
+          const map = mat.map;
+          assert.equal(map?.userData?.kind, 'awning');
+          assert.equal(mat.userData.awning, true);
+          assert.equal(map.wrapS, THREE.RepeatWrapping);
+          assert.equal(map.wrapT, THREE.RepeatWrapping);
+          assert.equal(map.colorSpace, THREE.SRGBColorSpace);
+          assert.equal(map.anisotropy, 4);
+          assert.equal(map.generateMipmaps, true);
+          assert.equal(map.minFilter, THREE.LinearMipmapLinearFilter);
+          assert.equal(map.magFilter, THREE.LinearFilter);
+          assert.equal(map.flipY, true);
+          assert.ok(Math.abs(map.repeat.x - 1) < 1e-6 && Math.abs(map.repeat.y - 1) < 1e-6);
+          assert.ok(Math.abs(map.offset.x) < 1e-6 && Math.abs(map.offset.y) < 1e-6);
+          assert.equal(mat.color.getHex(), 0xffffff);
+          assert.equal(mat.emissive.getHex(), 0x000000);
+          assert.equal(mat.emissiveMap ?? null, null);
+          assert.equal(mat.roughness, 0.92);
+          assert.equal(mat.metalness, 0);
+
+          const geo = child.geometry;
+          const pos = geo.getAttribute('position');
+          const uv = geo.getAttribute('uv');
+          const halfZ = depth / 2;
+          const tile = AWNING_TILE_M;
+          child.updateWorldMatrix(true, false);
+          const ends = { wall: { y: 0, z: 0, v: 0, n: 0 }, lip: { y: 0, z: 0, v: 0, n: 0 } };
+          for (let i = 0; i < pos.count; i += 1) {
+            const x = pos.getX(i);
+            const z = pos.getZ(i);
+            assert.ok(Math.abs(uv.getX(i) - x / tile) < 1e-4, `u ${uv.getX(i)}`);
+            assert.ok(Math.abs(uv.getY(i) - (halfZ - z) / tile) < 1e-4, `v ${uv.getY(i)}`);
+            const end = Math.abs(z - halfZ) < 1e-4 ? ends.lip : Math.abs(z + halfZ) < 1e-4 ? ends.wall : null;
+            if (!end) continue;
+            point.fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
+            end.y += point.y;
+            end.z += point.z;
+            end.v += uv.getY(i);
+            end.n += 1;
+          }
+          assert.ok(ends.wall.n > 0 && ends.lip.n > 0);
+          const wallV = ends.wall.v / ends.wall.n;
+          const lipV = ends.lip.v / ends.lip.n;
+          const wallY = ends.wall.y / ends.wall.n;
+          const lipY = ends.lip.y / ends.lip.n;
+          const wallZ = ends.wall.z / ends.wall.n;
+          const lipZ = ends.lip.z / ends.lip.n;
+          assert.ok(lipZ > wallZ, 'local +Z stays the outer lip');
+          assert.ok(Math.abs(lipV) < 1e-4, `outer lip V ${lipV} should be the bottom of the image`);
+          assert.ok(Math.abs(wallV - depth / tile) < 1e-4, `wall V ${wallV} vs slope length`);
+          assert.ok(wallV > lipV, 'top of the image sits toward the wall');
+          const rise = Math.abs(wallY - lipY);
+          assert.ok(Math.abs((wallV - lipV) - rise / tile) > 0.05, 'V must follow slope length, not height');
         }
+        if (child.userData?.shopWall) assert.notEqual(child.material?.map?.userData?.kind, 'awning');
         if (width > ROOM_W && height > 0.2 && Math.abs(child.position.y - 2.64) < 0.05) join = true;
         if (width > ROOM_W && height === 0.16 && Math.abs(child.position.y - 2.78) < 1e-6) {
           fascia = true;
@@ -1032,6 +1119,9 @@ describe('outdoor and dungeon extras', () => {
           assert.equal(child.material.map.wrapT, THREE.RepeatWrapping);
         }
         if (color === 0xead3ae && width > 7) cream += 1;
+      });
+      built.roofs.traverse((child) => {
+        assert.notEqual(child.material?.map?.userData?.kind, 'awning');
       });
       assert.equal(awnings, 1, `origin awning only for ${ids.join('+') || 'origin'}`);
       assert.equal(join, true);

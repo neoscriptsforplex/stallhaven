@@ -1,0 +1,15 @@
+newmtl c0
+Ka 0.000000 0.000000 0.000000
+Kd 0.494118 0.032944 0.032944
+Ks 0.000000 0.000000 0.000000
+adobe_interior_color 0.803922 0.803922 0.803922
+Ns 2.000000
+d 1.000000
+Tr 0.000000
+Pr 0.333333
+Pm 0.080000
+adobe_density 0.000000
+adobe_translucence 0.000000
+adobe_glow 0.000000
+map_Kd c0 - Default Texture.psd 
+

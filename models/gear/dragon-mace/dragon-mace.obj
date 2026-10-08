@@ -1,0 +1,241 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib dragon-mace.mtl
+o Item Dragon mace 2026-09-24_13-38-52
+v 2 21 14
+v 3 24 21
+v 16 7 21
+v -3 16 17
+v 4 8 2
+v -5 23 6
+v 1 32 10
+v 18 28 13
+v 2 34 18
+v -2 31 28
+v 9 22 39
+v -2 18 24
+v -6 0 27
+v -14 15 19
+v -10 18 8
+v -15 10 -16
+v -12 14 -19
+v -15 16 -19
+v -12 29 5
+v 1 35 -8
+v -5 37 9
+v 10 49 7
+v -13 18 26
+v -29 4 29
+v -21 20 18
+v -24 6 6
+v -16 23 7
+v -18 13 -17
+v -16 5 -27
+v -13 8 -30
+v -21 9 -28
+v -17 12 -31
+v -19 22 25
+v -37 25 22
+v -22 30 14
+v -5 39 17
+v 9 52 32
+v -8 36 27
+v -5 38 48
+v -7 26 31
+v -20 34 21
+v -34 48 13
+v -17 36 11
+v -27 33 -3
+v -15 39 18
+v -13 54 8
+v -22 47 34
+v -14 31 30
+v -21 19 48
+usemtl c0
+f 1 2 3
+f 1 3 4
+usemtl c1
+f 1 4 5
+usemtl c2
+f 1 5 6
+usemtl c3
+f 1 6 7
+usemtl c2
+f 1 7 8
+usemtl c1
+f 1 8 2
+usemtl c4
+f 2 8 9
+usemtl c5
+f 2 9 10
+usemtl c6
+f 2 10 11
+usemtl c2
+f 2 11 12
+usemtl c7
+f 2 12 3
+f 3 12 4
+usemtl c2
+f 4 12 13
+usemtl c8
+f 4 13 14
+usemtl c9
+f 4 14 15
+usemtl c4
+f 4 15 5
+usemtl c9
+f 5 15 6
+usemtl c10
+f 6 15 16
+usemtl c11
+f 6 16 17
+f 6 17 18
+usemtl c12
+f 6 18 19
+usemtl c5
+f 6 19 20
+usemtl c0
+f 6 20 7
+usemtl c1
+f 7 20 21
+usemtl c0
+f 7 21 22
+f 7 22 9
+usemtl c1
+f 7 9 8
+usemtl c13
+f 14 23 24
+usemtl c6
+f 14 24 25
+usemtl c14
+f 14 25 26
+usemtl c6
+f 14 26 15
+usemtl c15
+f 15 26 27
+usemtl c16
+f 15 27 16
+usemtl c17
+f 16 27 28
+usemtl c18
+f 16 28 29
+usemtl c19
+f 16 29 30
+usemtl c20
+f 16 30 17
+usemtl c21
+f 16 17 18
+usemtl c22
+f 16 18 28
+usemtl c16
+f 28 18 31
+usemtl c23
+f 28 31 29
+usemtl c24
+f 29 31 32
+usemtl c25
+f 29 32 30
+usemtl c26
+f 30 32 18
+usemtl c20
+f 30 18 17
+usemtl c27
+f 23 33 24
+usemtl c14
+f 24 33 25
+usemtl c28
+f 25 33 34
+usemtl c13
+f 25 34 35
+usemtl c28
+f 25 35 27
+usemtl c7
+f 25 27 26
+f 21 36 22
+usemtl c29
+f 22 36 9
+usemtl c2
+f 9 36 37
+usemtl c6
+f 9 37 10
+usemtl c30
+f 10 37 38
+usemtl c13
+f 10 38 39
+usemtl c9
+f 10 39 40
+usemtl c14
+f 10 40 11
+usemtl c31
+f 11 40 12
+usemtl c4
+f 12 40 23
+usemtl c31
+f 12 23 13
+usemtl c14
+f 13 23 14
+f 35 41 42
+usemtl c6
+f 35 42 43
+usemtl c14
+f 35 43 44
+usemtl c7
+f 35 44 27
+usemtl c15
+f 27 44 19
+usemtl c32
+f 27 19 18
+usemtl c17
+f 27 18 28
+usemtl c27
+f 41 45 42
+usemtl c6
+f 42 45 43
+usemtl c30
+f 43 45 46
+usemtl c8
+f 43 46 21
+usemtl c9
+f 43 21 19
+usemtl c6
+f 43 19 44
+usemtl c31
+f 45 36 46
+usemtl c0
+f 46 36 21
+usemtl c14
+f 33 41 34
+usemtl c28
+f 34 41 35
+f 45 41 47
+usemtl c9
+f 45 47 38
+usemtl c33
+f 45 38 36
+usemtl c31
+f 36 38 37
+usemtl c14
+f 41 48 47
+usemtl c33
+f 47 48 38
+usemtl c31
+f 38 48 39
+usemtl c27
+f 39 48 40
+usemtl c33
+f 40 48 49
+usemtl c9
+f 40 49 23
+usemtl c34
+f 23 49 33
+usemtl c27
+f 33 49 48
+usemtl c35
+f 33 48 41
+usemtl c4
+f 19 21 20
+usemtl c36
+f 32 31 18
+usemtl c37
+f 15 6 19
+usemtl c38
+f 15 19 27

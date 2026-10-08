@@ -1949,6 +1949,7 @@ function addGarden(root, cells, expansionIds = []) {
     tree.userData.trunkRadius = trunkRadius;
     notePlantedTrunk(spot.x, spot.z, trunkRadius);
     attachTreePick(tree, spot);
+    attachTreeStump(tree);
     root.add(tree);
   }
   for (const spot of gardenRockSpots(expansionIds)) {
@@ -2415,6 +2416,32 @@ function attachTreePick(tree, spot) {
   pick.userData.z = spot.z;
   pick.userData.trunkRadius = tree.userData.trunkRadius;
   tree.add(pick);
+}
+
+/** Short cut trunk. Hidden until the pine is felled; the crown stays the click target. */
+function attachTreeStump(tree) {
+  const radius = Number(tree.userData.trunkRadius) > 0
+    ? tree.userData.trunkRadius
+    : TREE_TRUNK_RADIUS;
+  const height = 0.36;
+  const stump = new THREE.Group();
+  stump.name = 'tree-stump';
+  const bark = new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.94 });
+  const cut = new THREE.MeshStandardMaterial({ color: 0xc4a06a, roughness: 0.78 });
+  const body = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(radius * 1.05, radius * 1.35, height, 8),
+    bark,
+  ));
+  body.position.y = height / 2;
+  stump.add(body);
+  const face = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(radius * 0.92, radius * 0.92, 0.025, 8),
+    cut,
+  ));
+  face.position.y = height + 0.01;
+  stump.add(face);
+  stump.visible = false;
+  tree.add(stump);
 }
 
 function attachBoulderPick(group, spot) {

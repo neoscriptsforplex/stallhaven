@@ -80,6 +80,14 @@ import {
 } from './nav.js';
 import { playClick } from './audio.js';
 import {
+  completeTreeChop,
+  ensureTreeNode,
+  isTreeStump,
+  reviveDueTrees,
+  setTreeFallen,
+  treeCanChop,
+} from './trees.js';
+import {
   STATION_ARRIVE,
   STATION_HIT,
   fletchFaceYaw,
@@ -367,6 +375,7 @@ export function createWorld(canvas, state, opts = {}) {
     floors = floorsForState(state);
     placeRects = placeFloors(state.expansions ?? []);
     playerFloors = playerWalkFloors(state.expansions ?? []);
+    syncTreeVisuals();
     rebuildNav();
     rebuildSnapGrid();
     if (flaxReady) refillFlaxField();
@@ -1047,7 +1056,10 @@ export function createWorld(canvas, state, opts = {}) {
   function shopUsePicks() {
     const found = [];
     architecture?.traverse((child) => {
-      if (child.userData?.kind === 'trapdoor' || child.userData?.kind === 'tree') found.push(child);
+      if (child.userData?.kind === 'trapdoor') found.push(child);
+      if (child.userData?.kind === 'tree' && !child.userData.depleted && !isTreeStump(child.userData.x, child.userData.z)) {
+        found.push(child);
+      }
     });
     flaxGroup?.traverse((child) => {
       if (child.userData?.kind === 'flax') found.push(child);
@@ -1229,6 +1241,8 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function startChopping(pose) {
+    if (!pose || !treeCanChop(pose.x, pose.z)) return;
+    ensureTreeNode(pose.x, pose.z);
     mining = {
       materialId: 'logs',
       name: 'Tree',
@@ -1236,13 +1250,46 @@ export function createWorld(canvas, state, opts = {}) {
       startedAt: performance.now() / 1000,
       duration: CHOP_DURATION,
       yield: CHOP_YIELD,
-      x: pose?.x ?? shopkeeper.position.x,
-      z: pose?.z ?? shopkeeper.position.z,
+      x: pose.x,
+      z: pose.z,
       faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : null,
     };
     setHeldTool(shopkeeper, 'hatchet');
     faceGather(pose);
     setGatherClip(shopkeeper, 'chop');
+  }
+
+  function syncTreeVisuals() {
+    architecture?.traverse((child) => {
+      if (child.name !== 'pine' || child.userData?.gardenSide == null) return;
+      const node = ensureTreeNode(child.position.x, child.position.z);
+      setTreeFallen(child, !node.alive);
+    });
+  }
+
+  function fellChoppedTree(x, z, now) {
+    const result = completeTreeChop(x, z, now);
+    if (!result.felled) return false;
+    syncTreeVisuals();
+    rebuildNav();
+    if (
+      pendingUse?.type === 'tree'
+      && isTreeStump(pendingUse.nodeX ?? pendingUse.x, pendingUse.nodeZ ?? pendingUse.z)
+    ) {
+      pendingUse = null;
+      playerPath.length = 0;
+      moveMarker.visible = false;
+    }
+    stopMining();
+    pushLog(state, 'The tree falls.');
+    return true;
+  }
+
+  function tickTrees(now) {
+    const revived = reviveDueTrees(now);
+    if (!revived.length) return;
+    syncTreeVisuals();
+    rebuildNav();
   }
 
   function startPicking(pose) {
@@ -1286,6 +1333,10 @@ export function createWorld(canvas, state, opts = {}) {
       stopMining();
       return;
     }
+    if (mining.mode === 'chop' && isTreeStump(mining.x, mining.z)) {
+      stopMining();
+      return;
+    }
     const got = mining.mode === 'chop'
       ? grantChoppedLogs(state, CHOP_YIELD)
       : grantMinedMaterial(state, mining.materialId, barYield(mining));
@@ -1297,6 +1348,7 @@ export function createWorld(canvas, state, opts = {}) {
         amount: got,
       });
     }
+    if (mining.mode === 'chop' && got > 0 && fellChoppedTree(mining.x, mining.z, now)) return;
     mining.startedAt = now;
   }
 
@@ -1427,6 +1479,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function queueUse(type, pose) {
     if (!pose) return;
+    if (type === 'tree' && !treeCanChop(pose.x, pose.z)) return;
     if (type !== 'counter') servingAtCounter = false;
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
     const arrive = type === 'flax' ? FLAX_ARRIVE : type === 'trapdoor' || type === 'ladder' ? 1.35 : STATION_ARRIVE;
@@ -1563,7 +1616,7 @@ export function createWorld(canvas, state, opts = {}) {
       updateMinePose(shopkeeper, dt, now);
       if (mining?.mode === 'pick') updateHeldFlax(riggedClipTime(shopkeeper));
       tickMining(now);
-      return;
+      if (mining) return;
     }
     updateWalkPose(shopkeeper, false, dt, now);
     if (pendingUse && isNearPose(pendingUse, pendingUse.arrive ?? 1.35)) {
@@ -1872,6 +1925,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (data.kind === 'tree') {
+        if (data.depleted || !treeCanChop(data.x, data.z)) return;
         queueUse('tree', {
           x: data.x,
           z: data.z,
@@ -1931,7 +1985,8 @@ export function createWorld(canvas, state, opts = {}) {
       }
       if (sceneMode === 'shop') {
         const tree = gardenTreeSpots(state.expansions ?? []).find((spot) => (
-          Math.hypot(point.x - spot.x, point.z - spot.z) <= TREE_CLICK_RADIUS
+          treeCanChop(spot.x, spot.z)
+          && Math.hypot(point.x - spot.x, point.z - spot.z) <= TREE_CLICK_RADIUS
         ));
         if (tree) {
           queueUse('tree', {
@@ -2097,6 +2152,7 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     if (data.kind === 'tree') {
+      if (data.depleted || isTreeStump(data.x, data.z)) return;
       playClick('ui');
       pickHandler?.({
         type: 'tree-inspect',
@@ -2750,6 +2806,7 @@ export function createWorld(canvas, state, opts = {}) {
       puff.position.x += (puff.userData.drift ?? 0.15) * dt;
       if (puff.position.x > 28) puff.position.x = -28;
     }
+    tickTrees(now);
     syncDisplays();
     refreshSelection();
     const selected = displays[state.selectedDisplay];
@@ -2950,6 +3007,7 @@ export function createWorld(canvas, state, opts = {}) {
     useBoulder(pose) {
       if (!pose) return;
       if (pose.kind === 'tree') {
+        if (!treeCanChop(pose.x, pose.z)) return;
         queueUse('tree', {
           x: pose.x,
           z: pose.z,

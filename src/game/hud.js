@@ -2486,7 +2486,7 @@ export function bindHud(root, state, world) {
     const xp = shopProgress(state.shopXp ?? 0);
     const levelEl = document.querySelector('#shop-level');
     const xpBar = document.querySelector('[data-shop-xp-bar]');
-    if (levelEl) levelEl.textContent = `Lv ${xp.level}`;
+    if (levelEl) levelEl.textContent = `Shop Level ${xp.level}`;
     if (xpBar) {
       const bar = xpBar.parentElement;
       if (bar) bar.style.setProperty('--t', String(xp.t));

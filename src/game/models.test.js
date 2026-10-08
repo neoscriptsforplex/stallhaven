@@ -66,7 +66,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -616,6 +616,147 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(walls.east >= 2, `east ${walls.east}`);
     assert.ok(walls.north >= 2, `north ${walls.north}`);
     assert.ok(walls.south >= 2, `south ${walls.south}`);
+  });
+
+  it('tiles every shop floor, including expansions, at 4 m per texture', () => {
+    assert.equal(SHOP_FLOOR_TILE_M, 4);
+    const urls = shopFloorTextureUrls();
+    assert.ok(urls.some((url) => url.endsWith('textures/shop_floor_512.png')));
+    assert.ok(urls.some((url) => url.includes('public/textures/shop_floor_512.png')));
+    const texDir = join(dirname(fileURLToPath(import.meta.url)), '../../public/textures');
+    assert.equal(existsSync(join(texDir, 'shop_floor_256.png')), true);
+    assert.equal(existsSync(join(texDir, 'shop_floor_512.png')), true);
+    assert.equal(existsSync(join(texDir, 'shop_floor_1024.png')), true);
+
+    const ids = EXPANSION_PADS.map((pad) => pad.id);
+    const built = buildShop(ids);
+    const rooms = [{ gx: 0, gz: 0 }, ...EXPANSION_PADS];
+    const slabs = [];
+    let planks = 0;
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    const n = new THREE.Vector3();
+    const p = new THREE.Vector3();
+    const tile = SHOP_FLOOR_TILE_M;
+
+    built.root.traverse((child) => {
+      if (!child.isMesh || (child.userData?.shopFloor !== 'plank' && child.userData?.shopFloor !== 'slab')) {
+        assert.notEqual(child.material?.map?.userData?.kind, 'shop-floor');
+        return;
+      }
+      const map = child.material?.map;
+      assert.equal(map?.userData?.kind, 'shop-floor');
+      assert.equal(map.wrapS, THREE.RepeatWrapping);
+      assert.equal(map.wrapT, THREE.RepeatWrapping);
+      assert.equal(map.colorSpace, THREE.SRGBColorSpace);
+      assert.equal(map.anisotropy, 4);
+      assert.equal(map.generateMipmaps, true);
+      assert.equal(map.minFilter, THREE.LinearMipmapLinearFilter);
+      assert.equal(map.magFilter, THREE.LinearFilter);
+      assert.ok(Math.abs(map.repeat.x - 1) < 1e-6 && Math.abs(map.repeat.y - 1) < 1e-6);
+      assert.ok(Math.abs(map.offset.x) < 1e-6 && Math.abs(map.offset.y) < 1e-6);
+      assert.equal(child.material.color.getHex(), 0xffffff);
+      assert.equal(child.userData.kind, 'ground');
+
+      const geo = child.geometry;
+      const pos = geo.getAttribute('position');
+      const uv = geo.getAttribute('uv');
+      const index = geo.getIndex();
+      assert.ok(index, 'shop floor should stay an indexed box');
+      child.updateWorldMatrix(true, false);
+      const at = (k, target) => target.fromBufferAttribute(pos, index.getX(k)).applyMatrix4(child.matrixWorld);
+      for (let f = 0; f < index.count; f += 3) {
+        at(f, a);
+        at(f + 1, b);
+        at(f + 2, c);
+        n.subVectors(b, a).cross(c.clone().sub(a));
+        const ax = Math.abs(n.x);
+        const ay = Math.abs(n.y);
+        const az = Math.abs(n.z);
+        for (let k = 0; k < 3; k += 1) {
+          const vi = index.getX(f + k);
+          p.fromBufferAttribute(pos, vi).applyMatrix4(child.matrixWorld);
+          const wantU = (ay >= ax && ay >= az ? p.x : ax >= az ? p.z : p.x) / tile;
+          const wantV = (ay >= ax && ay >= az ? p.z : p.y) / tile;
+          assert.ok(Math.abs(uv.getX(vi) - wantU) < 1e-4, `u ${uv.getX(vi)} vs ${wantU}`);
+          assert.ok(Math.abs(uv.getY(vi) - wantV) < 1e-4, `v ${uv.getY(vi)} vs ${wantV}`);
+        }
+      }
+
+      if (child.userData.shopFloor === 'slab') slabs.push(child);
+      else planks += 1;
+    });
+
+    assert.equal(slabs.length, rooms.length);
+    assert.ok(planks >= rooms.length * 10, `expected boards in every room, got ${planks}`);
+    for (const room of rooms) {
+      assert.ok(slabs.some((mesh) => mesh.userData.floorGx === room.gx && mesh.userData.floorGz === room.gz), `${room.gx},${room.gz}`);
+    }
+
+    const horizontalUvAt = (mesh, x, z) => {
+      const pos = mesh.geometry.getAttribute('position');
+      const uv = mesh.geometry.getAttribute('uv');
+      const index = mesh.geometry.getIndex();
+      let best = null;
+      let bestD = Infinity;
+      const at = (k, target) => target.fromBufferAttribute(pos, index.getX(k)).applyMatrix4(mesh.matrixWorld);
+      for (let f = 0; f < index.count; f += 3) {
+        at(f, a);
+        at(f + 1, b);
+        at(f + 2, c);
+        n.subVectors(b, a).cross(c.clone().sub(a));
+        if (Math.abs(n.y) < Math.abs(n.x) || Math.abs(n.y) < Math.abs(n.z)) continue;
+        for (let k = 0; k < 3; k += 1) {
+          const vi = index.getX(f + k);
+          p.fromBufferAttribute(pos, vi).applyMatrix4(mesh.matrixWorld);
+          const dist = Math.hypot(p.x - x, p.z - z);
+          if (dist < bestD) {
+            bestD = dist;
+            best = { u: uv.getX(vi), v: uv.getY(vi) };
+          }
+        }
+      }
+      return { ...best, dist: bestD };
+    };
+    const origin = slabs.find((mesh) => mesh.userData.floorGx === 0 && mesh.userData.floorGz === 0);
+    const right = slabs.find((mesh) => mesh.userData.floorGx === 1 && mesh.userData.floorGz === 0);
+    const back = slabs.find((mesh) => mesh.userData.floorGx === 0 && mesh.userData.floorGz === -1);
+    const seamX = ROOM_W / 2;
+    const seamZ = roomCenter(0, 0).z - ROOM_D / 2;
+    const originSeam = horizontalUvAt(origin, seamX, seamZ);
+    const rightSeam = horizontalUvAt(right, seamX, seamZ);
+    const backSeam = horizontalUvAt(back, seamX, seamZ);
+    assert.ok(originSeam.dist < 1e-4 && rightSeam.dist < 1e-4 && backSeam.dist < 1e-4);
+    assert.ok(Math.abs(originSeam.u - seamX / tile) < 1e-4);
+    assert.ok(Math.abs(originSeam.v - seamZ / tile) < 1e-4);
+    assert.ok(Math.abs(rightSeam.u - originSeam.u) < 1e-4 && Math.abs(rightSeam.v - originSeam.v) < 1e-4);
+    assert.ok(Math.abs(backSeam.u - originSeam.u) < 1e-4 && Math.abs(backSeam.v - originSeam.v) < 1e-4);
+
+    built.root.traverse((child) => {
+      if (child.userData?.pathCobble || child.userData?.fountainApron || child.name === 'grass-ground' || child.name === 'fountain') {
+        assert.notEqual(child.material?.map?.userData?.kind, 'shop-floor');
+      }
+    });
+    for (const group of [built.grounds, built.roofs]) {
+      group.traverse((child) => {
+        assert.notEqual(child.material?.map?.userData?.kind, 'shop-floor');
+      });
+    }
+    let picks = 0;
+    built.grounds.traverse((child) => {
+      if (child.userData?.kind !== 'ground' || child.geometry?.type !== 'PlaneGeometry') return;
+      picks += 1;
+      assert.equal(child.material?.map ?? null, null);
+      assert.equal(child.material?.opacity, 0);
+    });
+    assert.ok(picks >= rooms.length, 'click-to-walk planes stay on the shop floor');
+
+    const dungeon = buildDungeon().root;
+    dungeon.traverse((child) => {
+      assert.notEqual(child.material?.map?.userData?.kind, 'shop-floor');
+      assert.equal(child.userData?.shopFloor, undefined);
+    });
   });
 
   it('builds shop boards whose top is the walkable floor', () => {

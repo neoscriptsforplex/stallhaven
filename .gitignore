@@ -4,3 +4,6 @@ play-dist
 .DS_Store
 *.local
 .vite
+
+# Milestone snapshots are produced by the Pages workflow, not stored on main.
+versions/*/

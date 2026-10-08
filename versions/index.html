@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RuneCraft versions</title>
+    <meta name="description" content="Play older RuneCraft milestones. Each archived build keeps its own save." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%236b4423' width='64' height='64' rx='10'/%3E%3Cpath fill='%23e8c37a' d='M12 40h40v8H12z'/%3E%3Cpath fill='%238b4336' d='M8 20h48l-6 12H14z'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --ink: #ead8b8;
+        --gold: #e3b34a;
+        --line: rgba(236, 214, 176, 0.28);
+        --panel: rgba(36, 22, 12, 0.86);
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; }
+      body {
+        color: var(--ink);
+        font-family: Palatino, "Palatino Linotype", Georgia, "Times New Roman", serif;
+        background:
+          linear-gradient(rgba(18, 10, 6, 0.72), rgba(18, 10, 6, 0.84)),
+          url("../public/runecraft_loading_bg.jpg") center center / cover no-repeat fixed;
+      }
+      main { max-width: 760px; margin: 0 auto; padding: 36px 16px 72px; }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px 18px 8px 8px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+        padding: 22px 22px 8px;
+      }
+      h1 { margin: 0 0 8px; color: #f0d27a; font-weight: 600; font-size: 2rem; }
+      .intro { margin: 0 0 8px; line-height: 1.45; }
+      .milestones { list-style: none; margin: 12px 0 0; padding: 0; }
+      .milestones li {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: center;
+        padding: 14px 0;
+        border-top: 1px solid var(--line);
+      }
+      h2 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+      .when, .note { margin: 4px 0 0; }
+      .when { color: #d7c09a; font-size: 0.92rem; }
+      .note { color: #f0c2b0; font-size: 0.92rem; }
+      .links { display: flex; gap: 14px; align-items: center; flex-shrink: 0; margin: 0; }
+      a.play {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: radial-gradient(circle at 30% 30%, #f0d27a, #b8862f);
+        color: #3a240e;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      a.code { color: var(--gold); }
+      a.code:hover, a.play:hover { filter: brightness(1.06); }
+      @media (max-width: 560px) {
+        .milestones li { flex-direction: column; align-items: flex-start; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="panel">
+        <h1>RuneCraft versions</h1>
+        <p class="intro">Milestones, newest first. Latest is the live game. An older build keeps its own save in this browser and does not read or overwrite the live shop.</p>
+        <ol class="milestones">
+        <li>
+          <div>
+            <h2>Oct 8 / Latest (live main)</h2>
+            <p class="when">Live game</p>
+          </div>
+          <p class="links"><a class="play" href="../">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/tree/main">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Oct 6, big polish day (fountain cobble)</h2>
+            <p class="when">2026-10-06 · 9a339c5</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-10-06/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/9a339c57615ce1e574f11f4c29893896896894d3">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Oct 2, craft preview rotation</h2>
+            <p class="when">2026-10-02 · a8cc40c</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-10-02/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/a8cc40cb572f09785dca58931075c1977a6a0b64">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 25, fire battlestaff</h2>
+            <p class="when">2026-09-25 · 791dbca</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-25/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/791dbcadf506f5280304e10270c37bde959f8d48">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 24, model uploads</h2>
+            <p class="when">2026-09-24 · 138bad4</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-24/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/138bad42e866f4937ff7f836e6fda5bc610b7b44">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 21, README update</h2>
+            <p class="when">2026-09-21 · 248dd5c</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-21/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/248dd5cd61d7e2954094576cc120f37930cda84e">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 20, dungeon bones</h2>
+            <p class="when">2026-09-20 · 7471f6d</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-20/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/7471f6ddca24a8f130b0caf415b03f9d20fbe3d4">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 13, blank-screen model fix</h2>
+            <p class="when">2026-09-13 · 76fb1a6</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-13/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/76fb1a62c86fdaf428fba84fb6f11337d9c3b107">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 12, minimap, fountain, ores, pickaxe</h2>
+            <p class="when">2026-09-12 · 6578658</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-12/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/6578658a5a633255bc0dcfc53dd79eb864505af6">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 11, outdoor walk and idle</h2>
+            <p class="when">2026-09-11 · e1b4cb0</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-11/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/e1b4cb0cb0ab580921e66a2799ef2f3705b668a0">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 10, RuneCraft shop systems</h2>
+            <p class="when">2026-09-10 · ee9724c</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-10/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/ee9724c3c9450108d66dc323e322afba195e05ac">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 8, open front door</h2>
+            <p class="when">2026-09-08 · 7d0b698</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-08/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/7d0b698f551b0615e7ac37dc0bbd775ef0101750">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 6, click-to-move, follow camera, counter queue</h2>
+            <p class="when">2026-09-06 · 2ce44ea</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-06/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/2ce44ea742af1a127ba4f52d126d499dfc9650b8">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 5, buyer sell and refuse working</h2>
+            <p class="when">2026-09-05 · 5515b3a</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-05/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/5515b3a39d0dd53deb8211f08afe9ee91fcd89ac">Code</a></p>
+        </li>
+        <li>
+          <div>
+            <h2>Sep 3, first build</h2>
+            <p class="when">2026-09-03 · e8e6e3b</p>
+          </div>
+          <p class="links"><a class="play" href="./2026-09-03/">Play</a><a class="code" href="https://github.com/neoscriptsforplex/stallhaven/commit/e8e6e3b87ba6ab7e0ea8eb90f41d1bcc610e7b11">Code</a></p>
+        </li>
+        </ol>
+      </div>
+    </main>
+  </body>
+</html>

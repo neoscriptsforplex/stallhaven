@@ -10,6 +10,8 @@ A free browser game.
 
 No account, no download, no paywall. This link updates on every merge to `main`.
 
+Older milestones are at **https://neoscriptsforplex.github.io/stallhaven/versions/**.
+
 ## How to play
 
 1. **Click the floor** to walk, including **behind the counter**. The camera follows you — scroll or `-` / `=` to zoom (zoom far out to see the **roof** and garden), arrow keys or hold **middle mouse** and drag to change the angle. Click the **minimap** above the shop XP bar to walk there (hidden in the dungeon). Customers still line up on the customer side of the counter. The garden **trapdoor** opens a dungeon: click Essence or ore boulders to mine.

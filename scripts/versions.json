@@ -1,0 +1,77 @@
+[
+  {
+    "slug": "2026-09-03",
+    "label": "Sep 3, first build",
+    "sha": "e8e6e3b87ba6ab7e0ea8eb90f41d1bcc610e7b11"
+  },
+  {
+    "slug": "2026-09-05",
+    "label": "Sep 5, buyer sell and refuse working",
+    "sha": "5515b3a39d0dd53deb8211f08afe9ee91fcd89ac"
+  },
+  {
+    "slug": "2026-09-06",
+    "label": "Sep 6, click-to-move, follow camera, counter queue",
+    "sha": "2ce44ea742af1a127ba4f52d126d499dfc9650b8"
+  },
+  {
+    "slug": "2026-09-08",
+    "label": "Sep 8, open front door",
+    "sha": "7d0b698f551b0615e7ac37dc0bbd775ef0101750"
+  },
+  {
+    "slug": "2026-09-10",
+    "label": "Sep 10, RuneCraft shop systems",
+    "sha": "ee9724c3c9450108d66dc323e322afba195e05ac"
+  },
+  {
+    "slug": "2026-09-11",
+    "label": "Sep 11, outdoor walk and idle",
+    "sha": "e1b4cb0cb0ab580921e66a2799ef2f3705b668a0"
+  },
+  {
+    "slug": "2026-09-12",
+    "label": "Sep 12, minimap, fountain, ores, pickaxe",
+    "sha": "6578658a5a633255bc0dcfc53dd79eb864505af6"
+  },
+  {
+    "slug": "2026-09-13",
+    "label": "Sep 13, blank-screen model fix",
+    "sha": "76fb1a62c86fdaf428fba84fb6f11337d9c3b107"
+  },
+  {
+    "slug": "2026-09-20",
+    "label": "Sep 20, dungeon bones",
+    "sha": "7471f6ddca24a8f130b0caf415b03f9d20fbe3d4"
+  },
+  {
+    "slug": "2026-09-21",
+    "label": "Sep 21, README update",
+    "sha": "248dd5cd61d7e2954094576cc120f37930cda84e"
+  },
+  {
+    "slug": "2026-09-24",
+    "label": "Sep 24, model uploads",
+    "sha": "138bad42e866f4937ff7f836e6fda5bc610b7b44"
+  },
+  {
+    "slug": "2026-09-25",
+    "label": "Sep 25, fire battlestaff",
+    "sha": "791dbcadf506f5280304e10270c37bde959f8d48"
+  },
+  {
+    "slug": "2026-10-02",
+    "label": "Oct 2, craft preview rotation",
+    "sha": "a8cc40cb572f09785dca58931075c1977a6a0b64"
+  },
+  {
+    "slug": "2026-10-06",
+    "label": "Oct 6, big polish day (fountain cobble)",
+    "sha": "9a339c57615ce1e574f11f4c29893896896894d3"
+  },
+  {
+    "slug": "latest",
+    "label": "Oct 8 / Latest (live main)",
+    "sha": null
+  }
+]

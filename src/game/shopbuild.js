@@ -735,31 +735,132 @@ function addBeams(root, center) {
   root.add(sideBeam2);
 }
 
-function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
-  const group = new THREE.Group();
-  group.userData.isRoof = true;
-  group.position.copy(new THREE.Vector3(center.x, 0, center.z));
-  const thatch = new THREE.MeshStandardMaterial({
-    color: 0x6b3a24,
+/** Metres of roof covered by one seamless roof tile on the main shop. */
+export const SHOP_ROOF_TILE_M = 6;
+/** Expansion and other small roof pieces use a slightly smaller tile. */
+export const SHOP_ROOF_SMALL_TILE_M = 5;
+const SHOP_ROOF_FILE = 'roof_512.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function shopRoofTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${SHOP_ROOF_FILE}`,
+    `${envBase}public/textures/${SHOP_ROOF_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${SHOP_ROOF_FILE}`, `./public/textures/${SHOP_ROOF_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let shopRoofSource = null;
+
+function configureShopRoofTexture(tex) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.repeat.set(1, 1);
+  tex.offset.set(0, 0);
+  tex.userData.kind = 'shop-roof';
+  return tex;
+}
+
+function applyShopRoofImage(loaded) {
+  if (!shopRoofSource || !loaded?.image) return;
+  shopRoofSource.image = loaded.image;
+  shopRoofSource.needsUpdate = true;
+}
+
+function beginShopRoofLoad() {
+  const urls = shopRoofTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyShopRoofImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function shopRoofMap() {
+  if (!shopRoofSource) {
+    shopRoofSource = configureShopRoofTexture(new THREE.Texture());
+    beginShopRoofLoad();
+  }
+  return shopRoofSource;
+}
+
+function shopRoofMat() {
+  const mat = new THREE.MeshStandardMaterial({
+    map: shopRoofMap(),
+    color: 0xffffff,
     roughness: 0.92,
     metalness: 0.02,
     transparent: true,
     opacity: 1,
     depthWrite: true,
   });
+  mat.userData.isRoof = true;
+  return mat;
+}
+
+/**
+ * U runs along the eave (local Z). V is 0 at the eave — the bottom of the
+ * image — and increases toward the ridge by distance along the slope, not
+ * by vertical rise. ridgeSign is +1 when local +X is the ridge.
+ */
+function writeRoofSlopeUVs(geo, tileM, ridgeSign) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i);
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+  }
+  const eaveX = ridgeSign > 0 ? minX : maxX;
+  const scale = 1 / tileM;
+  for (let i = 0; i < pos.count; i += 1) {
+    const alongSlope = (pos.getX(i) - eaveX) * ridgeSign;
+    uv.setXY(i, pos.getZ(i) * scale, alongSlope * scale);
+  }
+  uv.needsUpdate = true;
+}
+
+function addRoofSlope(group, mat, tileM, ridgeSign, x, y, rotZ, roofSpan) {
+  const geo = new THREE.BoxGeometry(roofSpan, 0.1, ROOM_D + 0.55);
+  writeRoofSlopeUVs(geo, tileM, ridgeSign);
+  const slope = addShadow(new THREE.Mesh(geo, mat));
+  slope.position.set(x, y, 0);
+  slope.rotation.z = rotZ;
+  group.add(slope);
+  return slope;
+}
+
+function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
+  const group = new THREE.Group();
+  group.userData.isRoof = true;
+  group.position.copy(new THREE.Vector3(center.x, 0, center.z));
   const tilt = 0.42;
   const roofSpan = ROOM_W / 2 + 0.45;
   const rise = (roofSpan / 2) * Math.sin(tilt);
   const eaveY = 2.82;
   const ridgeY = eaveY + rise * 2;
-  const slope = addShadow(new THREE.Mesh(new THREE.BoxGeometry(roofSpan, 0.1, ROOM_D + 0.55), thatch));
-  slope.position.set(-ROOM_W / 4, eaveY + rise, 0);
-  slope.rotation.z = tilt;
-  group.add(slope);
-  const slope2 = slope.clone();
-  slope2.position.x = ROOM_W / 4;
-  slope2.rotation.z = -tilt;
-  group.add(slope2);
+  const tileM = isOrigin ? SHOP_ROOF_TILE_M : SHOP_ROOF_SMALL_TILE_M;
+  const roofMat = shopRoofMat();
+  const slopeY = eaveY + rise;
+  addRoofSlope(group, roofMat, tileM, 1, -ROOM_W / 4, slopeY, tilt, roofSpan);
+  addRoofSlope(group, roofMat, tileM, -1, ROOM_W / 4, slopeY, -tilt, roofSpan);
   const ridge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, ROOM_D + 0.4), wood(0x3c2616)));
   ridge.position.set(0, ridgeY, 0);
   group.add(ridge);

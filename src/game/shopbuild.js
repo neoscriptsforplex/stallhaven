@@ -3061,6 +3061,173 @@ function addDungeonWallTorches(root, W = 11, D = 9) {
   }
 }
 
+/**
+ * Metres of wall covered by one dungeon_wall tile.
+ * UVs are world metres divided by this, so an 11 m run and a 0.22 m edge
+ * keep the same stone size. Vertical faces use world Y as V, so the image
+ * top stays at the top of every wall.
+ */
+export const DUNGEON_WALL_TILE_M = 3;
+const DUNGEON_WALL_FILE = 'dungeon_wall_512.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function dungeonWallTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${DUNGEON_WALL_FILE}`,
+    `${envBase}public/textures/${DUNGEON_WALL_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${DUNGEON_WALL_FILE}`, `./public/textures/${DUNGEON_WALL_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let dungeonWallSource = null;
+const dungeonWallClones = [];
+
+function configureDungeonWallTexture(tex) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.userData.kind = 'dungeon-wall';
+  return tex;
+}
+
+function applyDungeonWallImage(loaded) {
+  if (!dungeonWallSource || !loaded?.image) return;
+  dungeonWallSource.image = loaded.image;
+  dungeonWallSource.needsUpdate = true;
+  for (const tex of dungeonWallClones) {
+    tex.image = loaded.image;
+    tex.needsUpdate = true;
+  }
+  dungeonWallClones.length = 0;
+}
+
+function beginDungeonWallLoad() {
+  const urls = dungeonWallTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyDungeonWallImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function dungeonWallMap() {
+  if (!dungeonWallSource) {
+    dungeonWallSource = configureDungeonWallTexture(new THREE.Texture());
+    beginDungeonWallLoad();
+  }
+  const tex = configureDungeonWallTexture(dungeonWallSource.clone());
+  if (dungeonWallSource.image) {
+    tex.image = dungeonWallSource.image;
+    tex.needsUpdate = true;
+  } else {
+    dungeonWallClones.push(tex);
+  }
+  return tex;
+}
+
+function dungeonWallMat() {
+  const map = dungeonWallMap();
+  map.repeat.set(1, 1);
+  map.offset.set(0, 0);
+  const mat = new THREE.MeshStandardMaterial({
+    map,
+    roughness: 0.94,
+    metalness: 0.03,
+    color: 0xffffff,
+  });
+  mat.userData.dungeonWall = true;
+  return mat;
+}
+
+const dungeonUvA = new THREE.Vector3();
+const dungeonUvB = new THREE.Vector3();
+const dungeonUvC = new THREE.Vector3();
+const dungeonUvN = new THREE.Vector3();
+const dungeonUvE = new THREE.Vector3();
+
+/**
+ * World-space UVs. Vertical faces take V from world Y (image top at the wall
+ * top) and U from the horizontal axis, signed so the tile reads the same way
+ * when looking at either side. Caps keep courses along the long axis.
+ */
+function writeDungeonWallUVs(geo, wx, wy, wz) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  const index = geo.getIndex();
+  const count = index ? index.count : pos.count;
+  const at = (k) => (index ? index.getX(k) : k);
+  const tile = DUNGEON_WALL_TILE_M;
+  const seen = new Set();
+  const coord = (axis, x, y, z) => (axis === 'x' ? x : axis === 'y' ? y : z);
+  for (let f = 0; f < count; f += 3) {
+    const i0 = at(f);
+    const i1 = at(f + 1);
+    const i2 = at(f + 2);
+    dungeonUvA.fromBufferAttribute(pos, i0);
+    dungeonUvB.fromBufferAttribute(pos, i1);
+    dungeonUvC.fromBufferAttribute(pos, i2);
+    dungeonUvN.subVectors(dungeonUvB, dungeonUvA).cross(dungeonUvE.subVectors(dungeonUvC, dungeonUvA));
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const i of [i0, i1, i2]) {
+      minX = Math.min(minX, pos.getX(i));
+      maxX = Math.max(maxX, pos.getX(i));
+      minZ = Math.min(minZ, pos.getZ(i));
+      maxZ = Math.max(maxZ, pos.getZ(i));
+    }
+    const spanX = maxX - minX;
+    const spanZ = maxZ - minZ;
+    const ax = Math.abs(dungeonUvN.x);
+    const ay = Math.abs(dungeonUvN.y);
+    const az = Math.abs(dungeonUvN.z);
+    let uAxis = 'x';
+    let vAxis = 'y';
+    let uSign = 1;
+    if (ay >= ax && ay >= az) {
+      if (spanX >= spanZ) {
+        uAxis = 'x';
+        vAxis = 'z';
+      } else {
+        uAxis = 'z';
+        vAxis = 'x';
+      }
+    } else if (ax >= az) {
+      uAxis = 'z';
+      vAxis = 'y';
+      uSign = -(Math.sign(dungeonUvN.x) || 1);
+    } else {
+      uAxis = 'x';
+      vAxis = 'y';
+      uSign = Math.sign(dungeonUvN.z) || 1;
+    }
+    for (const i of [i0, i1, i2]) {
+      if (seen.has(i)) continue;
+      seen.add(i);
+      const x = pos.getX(i) + wx;
+      const y = pos.getY(i) + wy;
+      const z = pos.getZ(i) + wz;
+      uv.setXY(i, (uSign * coord(uAxis, x, y, z)) / tile, coord(vAxis, x, y, z) / tile);
+    }
+  }
+  uv.needsUpdate = true;
+}
+
 /** Cobble wall height. The exit ladder is stretched to this top. */
 export const DUNGEON_WALL_H = 3.4;
 
@@ -3088,7 +3255,7 @@ export function buildDungeon(opts = {}) {
   ground.userData.kind = 'ground';
   grounds.add(ground);
 
-  const wallMat = cobbleMat(6.5, 2.8);
+  const wallMat = dungeonWallMat();
   const walls = [
     { x: 0, z: -D / 2, w: W, d: 0.22 },
     { x: 0, z: D / 2, w: W, d: 0.22 },
@@ -3096,8 +3263,11 @@ export function buildDungeon(opts = {}) {
     { x: W / 2, z: 0, w: 0.22, d: D },
   ];
   for (const wall of walls) {
-    const mesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(wall.w, H, wall.d), wallMat));
+    const geo = new THREE.BoxGeometry(wall.w, H, wall.d);
+    writeDungeonWallUVs(geo, wall.x, H / 2, wall.z);
+    const mesh = addShadow(new THREE.Mesh(geo, wallMat));
     mesh.position.set(wall.x, H / 2, wall.z);
+    mesh.userData.dungeonWall = true;
     root.add(mesh);
   }
 

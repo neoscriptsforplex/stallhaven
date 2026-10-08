@@ -66,7 +66,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -386,6 +386,135 @@ describe('outdoor and dungeon extras', () => {
       assert.notEqual(child.material?.map?.userData?.kind, 'shop-wall');
       assert.notEqual(child.userData?.shopWall, true);
     });
+  });
+
+  it('tiles dungeon walls at 3 m with horizontal courses and V upright', () => {
+    assert.equal(DUNGEON_WALL_TILE_M, 3);
+    const urls = dungeonWallTextureUrls();
+    assert.ok(urls.some((url) => url.endsWith('textures/dungeon_wall_512.png')));
+    assert.ok(urls.some((url) => url.includes('public/textures/dungeon_wall_512.png')));
+    const texDir = join(dirname(fileURLToPath(import.meta.url)), '../../public/textures');
+    assert.equal(existsSync(join(texDir, 'dungeon_wall_256.png')), true);
+    assert.equal(existsSync(join(texDir, 'dungeon_wall_512.png')), true);
+    assert.equal(existsSync(join(texDir, 'dungeon_wall_1024.png')), true);
+
+    const built = buildDungeon();
+    const tile = DUNGEON_WALL_TILE_M;
+    const expected = [
+      { x: 0, z: -built.size.d / 2, w: built.size.w, d: 0.22 },
+      { x: 0, z: built.size.d / 2, w: built.size.w, d: 0.22 },
+      { x: -built.size.w / 2, z: 0, w: 0.22, d: built.size.d },
+      { x: built.size.w / 2, z: 0, w: 0.22, d: built.size.d },
+    ];
+    const walls = [];
+    let floor = null;
+    built.root.traverse((child) => {
+      if (!child.isMesh) return;
+      if (child.userData?.dungeonWall) walls.push(child);
+      const { width, height, depth } = child.geometry?.parameters ?? {};
+      if (width === built.size.w && height === 0.12 && depth === built.size.d) floor = child;
+    });
+    assert.equal(walls.length, 4);
+    assert.ok(floor, 'dungeon floor slab should stay');
+    assert.ok(Math.abs(floor.position.y - (-0.04)) < 1e-6);
+    assert.ok(Math.abs(floor.material.map.repeat.x - 6.5) < 1e-6);
+    assert.ok(Math.abs(floor.material.map.repeat.y - 5.2) < 1e-6);
+    assert.notEqual(floor.material.map.userData?.kind, 'dungeon-wall');
+
+    for (const mesh of walls) {
+      const { width, height, depth } = mesh.geometry.parameters;
+      const spec = expected.find((item) => (
+        Math.abs(item.x - mesh.position.x) < 1e-6
+        && Math.abs(item.z - mesh.position.z) < 1e-6
+        && item.w === width
+        && item.d === depth
+      ));
+      assert.ok(spec, `unexpected dungeon wall at ${mesh.position.x},${mesh.position.z}`);
+      assert.equal(height, DUNGEON_WALL_H);
+      assert.ok(Math.abs(mesh.position.y - DUNGEON_WALL_H / 2) < 1e-6);
+      assert.equal(mesh.rotation.x, 0);
+      assert.equal(mesh.rotation.y, 0);
+      assert.equal(mesh.rotation.z, 0);
+      assert.ok(mesh.geometry.getIndex(), 'wall should stay an indexed box');
+      const map = mesh.material?.map;
+      assert.equal(map?.userData?.kind, 'dungeon-wall');
+      assert.equal(mesh.material.userData?.dungeonWall, true);
+      assert.equal(map.wrapS, THREE.RepeatWrapping);
+      assert.equal(map.wrapT, THREE.RepeatWrapping);
+      assert.equal(map.colorSpace, THREE.SRGBColorSpace);
+      assert.equal(map.anisotropy, 4);
+      assert.equal(map.generateMipmaps, true);
+      assert.equal(map.minFilter, THREE.LinearMipmapLinearFilter);
+      assert.equal(map.magFilter, THREE.LinearFilter);
+      assert.equal(map.flipY, true);
+      assert.ok(Math.abs(map.repeat.x - 1) < 1e-6 && Math.abs(map.repeat.y - 1) < 1e-6);
+      assert.equal(mesh.material.color.getHex(), 0xffffff);
+
+      const pos = mesh.geometry.getAttribute('position');
+      const uv = mesh.geometry.getAttribute('uv');
+      const index = mesh.geometry.getIndex();
+      const wx = mesh.position.x;
+      const wy = mesh.position.y;
+      const wz = mesh.position.z;
+      for (let f = 0; f < index.count; f += 3) {
+        const ids = [index.getX(f), index.getX(f + 1), index.getX(f + 2)];
+        const a = new THREE.Vector3().fromBufferAttribute(pos, ids[0]);
+        const b = new THREE.Vector3().fromBufferAttribute(pos, ids[1]);
+        const c = new THREE.Vector3().fromBufferAttribute(pos, ids[2]);
+        const n = b.clone().sub(a).cross(c.clone().sub(a));
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        let minZ = Infinity;
+        let maxZ = -Infinity;
+        let minU = Infinity;
+        let maxU = -Infinity;
+        let minV = Infinity;
+        let maxV = -Infinity;
+        for (const i of ids) {
+          minX = Math.min(minX, pos.getX(i));
+          maxX = Math.max(maxX, pos.getX(i));
+          minY = Math.min(minY, pos.getY(i));
+          maxY = Math.max(maxY, pos.getY(i));
+          minZ = Math.min(minZ, pos.getZ(i));
+          maxZ = Math.max(maxZ, pos.getZ(i));
+          minU = Math.min(minU, uv.getX(i));
+          maxU = Math.max(maxU, uv.getX(i));
+          minV = Math.min(minV, uv.getY(i));
+          maxV = Math.max(maxV, uv.getY(i));
+        }
+        const spanX = maxX - minX;
+        const spanY = maxY - minY;
+        const spanZ = maxZ - minZ;
+        if (spanY > 0.05) {
+          assert.ok(Math.abs((maxV - minV) - spanY / tile) < 1e-4, `V span ${maxV - minV}`);
+          assert.ok(Math.abs((maxU - minU) - Math.max(spanX, spanZ) / tile) < 1e-4, `U span ${maxU - minU}`);
+          for (const i of ids) {
+            const x = pos.getX(i) + wx;
+            const y = pos.getY(i) + wy;
+            const z = pos.getZ(i) + wz;
+            const upright = y / tile;
+            assert.ok(Math.abs(uv.getY(i) - upright) < 1e-4, `V ${uv.getY(i)} should track height ${upright}`);
+            let expectedU;
+            if (Math.abs(n.x) >= Math.abs(n.z)) {
+              expectedU = (-(Math.sign(n.x) || 1) * z) / tile;
+            } else {
+              expectedU = ((Math.sign(n.z) || 1) * x) / tile;
+            }
+            assert.ok(Math.abs(uv.getX(i) - expectedU) < 1e-4, `U ${uv.getX(i)} vs ${expectedU}`);
+          }
+        } else {
+          const long = Math.max(spanX, spanZ);
+          const short = Math.min(spanX, spanZ);
+          const mapped = [maxU - minU, maxV - minV].sort((p, q) => q - p);
+          assert.ok(Math.abs(mapped[0] - long / tile) < 1e-4, `cap long ${mapped[0]}`);
+          assert.ok(Math.abs(mapped[1] - short / tile) < 1e-4, `cap short ${mapped[1]}`);
+          const alongU = spanX >= spanZ ? spanX : spanZ;
+          assert.ok(Math.abs((maxU - minU) - alongU / tile) < 1e-4, 'courses should run along the wall');
+        }
+      }
+    }
   });
 
   it('tiles shop walls and gables with the stone brick at one repeat per metre', () => {

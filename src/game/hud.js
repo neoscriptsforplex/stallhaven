@@ -113,7 +113,7 @@ import {
   stationLabel,
   STATION_UNLOCKS,
 } from './layout.js';
-import { clampMapZoom, drawMinimap, mapToWorld, minimapFrame } from './minimap.js';
+import { clampMapZoom, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
 import { boulderInspect, flaxInspect, treeInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
@@ -161,9 +161,13 @@ export function bindHud(root, state, world) {
   let inspectTarget = null;
   const minimap = document.querySelector('#minimap');
   const minimapWrap = document.querySelector('.minimap-wrap');
+  const mapToggle = document.querySelector('[data-map-toggle]');
+  const mapClose = document.querySelector('[data-map-close]');
+  const mapDismiss = document.querySelector('[data-map-dismiss]');
   const mapNorth = document.querySelector('[data-map-north]');
   const mapZoomIn = document.querySelector('[data-map-zoom="in"]');
   const mapZoomOut = document.querySelector('[data-map-zoom="out"]');
+  const portraitTouchMedia = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
   let mapZoom = 1;
   let mapPing = null;
   const shopFade = document.querySelector('#shop-fade');
@@ -2397,10 +2401,51 @@ export function bindHud(root, state, world) {
     mapZoom = clampMapZoom(mapZoom * factor);
   }
 
+  function portraitTouch() {
+    return portraitTouchMedia.matches;
+  }
+
+  function syncMinimapBuffer() {
+    if (!minimap || minimap.hidden) return;
+    const cssSize = minimap.clientWidth;
+    if (!cssSize) return;
+    const px = minimapBufferPixels(cssSize, window.devicePixelRatio || 1);
+    const marked = String(cssSize);
+    if (minimap.dataset.cssSize !== marked) minimap.dataset.cssSize = marked;
+    if (minimap.width !== px) minimap.width = px;
+    if (minimap.height !== px) minimap.height = px;
+  }
+
+  function setMapOpen(open) {
+    const next = Boolean(open) && portraitTouch();
+    minimapWrap?.classList.toggle('is-expanded', next);
+    root.classList.toggle('is-map-open', next);
+    if (mapToggle) mapToggle.setAttribute('aria-expanded', next ? 'true' : 'false');
+    syncMinimapBuffer();
+  }
+
+  mapToggle?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!portraitTouch() || minimapWrap?.hidden || minimap?.hidden) return;
+    setMapOpen(true);
+  });
+  mapClose?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setMapOpen(false);
+  });
+  mapDismiss?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setMapOpen(false);
+  });
+  portraitTouchMedia.addEventListener('change', () => {
+    if (!portraitTouch()) setMapOpen(false);
+  });
+
   minimap?.addEventListener('click', (event) => {
     if (minimap.hidden) return;
     const snap = world.getMinimapSnapshot?.();
     if (!snap || snap.hidden) return;
+    syncMinimapBuffer();
     const rect = minimap.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const size = minimap.width;
@@ -2572,7 +2617,9 @@ export function bindHud(root, state, world) {
       const hideMap = Boolean(mapSnap?.hidden);
       minimap.hidden = hideMap;
       if (minimapWrap) minimapWrap.hidden = hideMap;
+      if (hideMap && root.classList.contains('is-map-open')) setMapOpen(false);
       if (mapSnap && !mapSnap.hidden) {
+        syncMinimapBuffer();
         const ctx = minimap.getContext('2d');
         if (ctx) {
           const frame = minimapFrame(mapSnap);

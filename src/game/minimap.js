@@ -77,6 +77,25 @@ export function clampMapZoom(zoom) {
   return Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, value));
 }
 
+/** Backing-store scale for a minimap: css pixels × min(devicePixelRatio, 2). */
+export function minimapBufferPixels(cssSize, devicePixelRatio = 1) {
+  const css = Number(cssSize);
+  const dpr = Number(devicePixelRatio);
+  const ratio = Math.min(Number.isFinite(dpr) && dpr > 0 ? dpr : 1, 2);
+  const safeCss = Number.isFinite(css) && css > 0 ? css : 1;
+  return Math.max(1, Math.round(safeCss * ratio));
+}
+
+/** Canvas pixels per CSS pixel. 1 when the buffer has not been scaled. */
+function paintScale(ctx) {
+  const canvas = ctx?.canvas;
+  const css = Number(canvas?.dataset?.cssSize);
+  const width = Number(canvas?.width);
+  if (!(css > 0) || !(width > 0)) return 1;
+  const scale = width / css;
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
 function mapYaw(yaw) {
   // Camera yaw is negated so turning left spins the map left. The 180° offset
   // still puts shop-forward (+Z) toward the bottom of the canvas at yaw 0.
@@ -144,14 +163,14 @@ function rectPoints(minX, maxX, minZ, maxZ, bounds, size, yaw, zoom, focus) {
   ];
 }
 
-function drawDot(ctx, pt, r, fill, stroke) {
+function drawDot(ctx, pt, r, fill, stroke, scale = 1) {
   ctx.beginPath();
-  ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+  ctx.arc(pt.x, pt.y, r * scale, 0, Math.PI * 2);
   ctx.fillStyle = fill;
   ctx.fill();
   if (stroke) {
     ctx.strokeStyle = stroke;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = scale;
     ctx.stroke();
   }
 }
@@ -270,25 +289,25 @@ function ensureTrapdoorIcon() {
   return null;
 }
 
-function drawTrapdoorFallback(ctx, pt) {
-  const r = TRAPDOOR_MARKER_RADIUS;
-  drawDot(ctx, pt, r, '#5a3a22', '#d8c4a0');
+function drawTrapdoorFallback(ctx, pt, scale = 1) {
+  const r = TRAPDOOR_MARKER_RADIUS * scale;
+  drawDot(ctx, pt, TRAPDOOR_MARKER_RADIUS, '#5a3a22', '#d8c4a0', scale);
   ctx.fillStyle = '#7a5530';
   ctx.fillRect(pt.x - r * 0.45, pt.y - r * 0.45, r * 0.9, r * 0.9);
   ctx.strokeStyle = '#3a2414';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = scale;
   ctx.strokeRect(pt.x - r * 0.45, pt.y - r * 0.45, r * 0.9, r * 0.9);
 }
 
-function drawTrapdoorMarker(ctx, pt) {
+function drawTrapdoorMarker(ctx, pt, scale = 1) {
   ensureTrapdoorIcon();
   const icon = trapdoorIcon;
-  const size = TRAPDOOR_MARKER_RADIUS * 2;
+  const size = TRAPDOOR_MARKER_RADIUS * 2 * scale;
   if (icon) {
     ctx.drawImage(icon, pt.x - size / 2, pt.y - size / 2, size, size);
     return;
   }
-  drawTrapdoorFallback(ctx, pt);
+  drawTrapdoorFallback(ctx, pt, scale);
 }
 
 function cssHex(value, fallback) {
@@ -297,7 +316,7 @@ function cssHex(value, fallback) {
   return `#${(n >>> 0).toString(16).padStart(6, '0').slice(-6)}`;
 }
 
-function drawPlayerMarker(ctx, snap, toMap, yaw) {
+function drawPlayerMarker(ctx, snap, toMap, yaw, scale = 1) {
   if (!snap.player) return;
   const you = toMap(snap.player.x, snap.player.z);
   ctx.save();
@@ -305,41 +324,41 @@ function drawPlayerMarker(ctx, snap, toMap, yaw) {
   ctx.rotate(-(snap.player.facing ?? 0) + mapYaw(yaw));
   ctx.fillStyle = '#f4f0e4';
   ctx.beginPath();
-  ctx.moveTo(0, -5);
-  ctx.lineTo(3.5, 4);
-  ctx.lineTo(-3.5, 4);
+  ctx.moveTo(0, -5 * scale);
+  ctx.lineTo(3.5 * scale, 4 * scale);
+  ctx.lineTo(-3.5 * scale, 4 * scale);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 }
 
-function drawMovePing(ctx, snap, toMap) {
+function drawMovePing(ctx, snap, toMap, scale = 1) {
   const ping = snap.ping;
   if (!ping || ping.age >= 1) return;
   const pt = toMap(ping.x, ping.z);
   const t = Math.min(1, Math.max(0, ping.age));
   const alpha = 1 - t;
-  const radius = 4 + t * 16;
+  const radius = (4 + t * 16) * scale;
   ctx.save();
   ctx.beginPath();
   ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
   ctx.strokeStyle = `rgba(244, 226, 164, ${0.92 * alpha})`;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2 * scale;
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(pt.x, pt.y, 2.4, 0, Math.PI * 2);
+  ctx.arc(pt.x, pt.y, 2.4 * scale, 0, Math.PI * 2);
   ctx.fillStyle = `rgba(244, 226, 164, ${0.85 * alpha})`;
   ctx.fill();
   ctx.restore();
 }
 
 /** Exit ladder, same weight as the outdoor trapdoor mark. */
-function drawLadderMarker(ctx, pt) {
-  const h = 12;
-  const w = 7;
+function drawLadderMarker(ctx, pt, scale = 1) {
+  const h = 12 * scale;
+  const w = 7 * scale;
   ctx.save();
   ctx.strokeStyle = '#e6d3b0';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.5 * scale;
   ctx.lineCap = 'butt';
   ctx.beginPath();
   ctx.moveTo(pt.x - w / 2, pt.y - h / 2);
@@ -357,6 +376,7 @@ function drawLadderMarker(ctx, pt) {
 
 function drawDungeonMinimap(ctx, snap, frame, zoom) {
   const size = ctx.canvas.width;
+  const scale = paintScale(ctx);
   const { bounds, yaw, focus } = frame;
   const toMap = (x, z) => worldToMap(x, z, bounds, size, yaw, zoom, focus);
   ctx.clearRect(0, 0, size, size);
@@ -373,14 +393,14 @@ function drawDungeonMinimap(ctx, snap, frame, zoom) {
 
   for (const rock of snap.rocks ?? []) {
     const large = rock.essence || (rock.scale ?? 1) >= 1.5;
-    drawDot(ctx, toMap(rock.x, rock.z), large ? 5.4 : 3.4, cssHex(rock.vein, '#6e5a32'), '#1c140e');
+    drawDot(ctx, toMap(rock.x, rock.z), large ? 5.4 : 3.4, cssHex(rock.vein, '#6e5a32'), '#1c140e', scale);
   }
-  if (snap.ladder) drawLadderMarker(ctx, toMap(snap.ladder.x, snap.ladder.z));
+  if (snap.ladder) drawLadderMarker(ctx, toMap(snap.ladder.x, snap.ladder.z), scale);
   for (const rat of snap.rats ?? []) {
-    drawDot(ctx, toMap(rat.x, rat.z), 2.4, '#d7cfc4', '#2a2016');
+    drawDot(ctx, toMap(rat.x, rat.z), 2.4, '#d7cfc4', '#2a2016', scale);
   }
-  drawPlayerMarker(ctx, snap, toMap, yaw);
-  drawMovePing(ctx, snap, toMap);
+  drawPlayerMarker(ctx, snap, toMap, yaw, scale);
+  drawMovePing(ctx, snap, toMap, scale);
 }
 
 export function drawMinimap(ctx, snap) {
@@ -391,6 +411,7 @@ export function drawMinimap(ctx, snap) {
     return;
   }
   const size = ctx.canvas.width;
+  const scale = paintScale(ctx);
   const { bounds, yaw, focus } = frame;
   const toMap = (x, z) => worldToMap(x, z, bounds, size, yaw, zoom, focus);
   ctx.clearRect(0, 0, size, size);
@@ -419,21 +440,21 @@ export function drawMinimap(ctx, snap) {
   void PATH_START_Z;
 
   const fountain = toMap(FOUNTAIN.x, FOUNTAIN.z);
-  drawDot(ctx, fountain, 5, '#6a8aa8', '#d8e8f0');
+  drawDot(ctx, fountain, 5, '#6a8aa8', '#d8e8f0', scale);
   const hatch = gardenTrapdoorSpot(snap.expansions ?? []) ?? TRAPDOOR;
   const mark = dungeonEntranceMarkerWorld(hatch);
-  drawTrapdoorMarker(ctx, toMap(mark.x, mark.z));
+  drawTrapdoorMarker(ctx, toMap(mark.x, mark.z), scale);
 
   const counter = toMap(SHOP.counter.x, SHOP.counter.z);
   ctx.fillStyle = '#6a4220';
-  ctx.fillRect(counter.x - 7, counter.y - 2, 14, 4);
+  ctx.fillRect(counter.x - 7 * scale, counter.y - 2 * scale, 14 * scale, 4 * scale);
 
   for (const piece of snap.furniture ?? []) {
-    drawDot(ctx, toMap(piece.x, piece.z), 2.2, '#c4a05a');
+    drawDot(ctx, toMap(piece.x, piece.z), 2.2, '#c4a05a', undefined, scale);
   }
   for (const actor of snap.customers ?? []) {
-    drawDot(ctx, toMap(actor.x, actor.z), 2.4, '#e8b45a', '#3a240e');
+    drawDot(ctx, toMap(actor.x, actor.z), 2.4, '#e8b45a', '#3a240e', scale);
   }
-  drawPlayerMarker(ctx, snap, toMap, yaw);
-  drawMovePing(ctx, snap, toMap);
+  drawPlayerMarker(ctx, snap, toMap, yaw, scale);
+  drawMovePing(ctx, snap, toMap, scale);
 }

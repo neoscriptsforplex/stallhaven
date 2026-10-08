@@ -49,9 +49,12 @@
     </aside>
 
     <aside id="hud">
+      <button type="button" class="minimap-backdrop" data-map-dismiss tabindex="-1" aria-label="Close map"></button>
         <header class="ledger">
         <div class="minimap-wrap">
           <canvas id="minimap" class="minimap" width="196" height="196" aria-label="Shop map. Click to walk. Scroll to zoom."></canvas>
+          <button type="button" class="minimap-toggle" data-map-toggle aria-expanded="false">Map</button>
+          <button type="button" class="minimap-close" data-map-close aria-label="Close map">Close</button>
           <div class="minimap-compass">
             <button type="button" data-map-north aria-label="Reset camera">N</button>
           </div>

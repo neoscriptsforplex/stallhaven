@@ -130,6 +130,12 @@ body {
   display: none;
 }
 
+.minimap-toggle,
+.minimap-close,
+.minimap-backdrop {
+  display: none;
+}
+
 .minimap {
   display: block;
   width: 100%;
@@ -1565,6 +1571,172 @@ html.is-booting #save-bar {
     width: min(220px, calc(100vw - 16px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
     max-height: calc(100vh - 11rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     max-height: calc(100dvh - 11rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Phone portrait: coins, level and XP in one strip; minimap collapses to a corner. */
+@media (orientation: portrait) and (pointer: coarse) {
+  #hud {
+    --portrait-strip: 36px;
+    --portrait-map: 112px;
+    --portrait-map-open: min(70vw, calc(100vw - 16px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    top: 0;
+    right: 0;
+    left: 0;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    display: block;
+    gap: 0;
+    padding: 0;
+  }
+
+  #hud .ledger {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: calc(var(--portrait-strip) + env(safe-area-inset-top, 0px) + 1px);
+    margin: 0;
+    padding:
+      env(safe-area-inset-top, 0px)
+      max(8px, env(safe-area-inset-right, 0px))
+      0
+      max(8px, env(safe-area-inset-left, 0px));
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  #hud .ledger-row {
+    order: 1;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  #hud .shop-xp {
+    order: 2;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    gap: 6px;
+    grid-template-columns: auto minmax(2rem, 1fr);
+  }
+
+  #hud .gold {
+    max-width: 46vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 2px 8px;
+    font-size: 0.78rem;
+    line-height: 1.15;
+  }
+
+  #hud .xp-bar {
+    height: 7px;
+  }
+
+  #hud .minimap-wrap {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: max(8px, env(safe-area-inset-left, 0px));
+    width: var(--portrait-map);
+    max-width: var(--portrait-map);
+    margin: 0;
+    z-index: 1;
+  }
+
+  #hud .minimap {
+    max-width: var(--portrait-map);
+  }
+
+  #hud .minimap-wrap.is-expanded {
+    width: var(--portrait-map-open);
+    max-width: var(--portrait-map-open);
+    z-index: 5;
+  }
+
+  #hud .minimap-wrap.is-expanded .minimap {
+    width: 100%;
+    max-width: none;
+  }
+
+  #hud.is-map-open {
+    z-index: 6;
+  }
+
+  #hud.is-map-open .minimap-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    z-index: 4;
+    cursor: default;
+  }
+
+  #hud.is-map-open .minimap-backdrop:focus {
+    outline: none;
+  }
+
+  #hud .minimap-toggle,
+  #hud .minimap-close {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 26px;
+    min-width: 40px;
+    padding: 0 7px;
+    border-radius: 6px;
+    border: 1px solid rgba(227, 179, 74, 0.45);
+    background: rgba(28, 18, 10, 0.82);
+    color: #f0d9a8;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  #hud .minimap-close,
+  #hud.is-map-open .minimap-toggle {
+    display: none;
+  }
+
+  #hud.is-map-open .minimap-close {
+    display: inline-flex;
+  }
+
+  #hud .active-craft {
+    position: absolute;
+    top: calc(100% + 8px + var(--portrait-map) + 8px);
+    left: max(8px, env(safe-area-inset-left, 0px));
+    width: min(200px, calc(100vw - 24px));
+    margin: 0;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+    pointer-events: none;
+  }
+
+  #hud.is-map-open .active-craft {
+    top: calc(100% + 16px + var(--portrait-map-open));
   }
 }
 

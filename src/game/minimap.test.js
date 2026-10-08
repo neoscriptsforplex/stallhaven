@@ -16,6 +16,7 @@ import {
   dungeonMapFocus,
   dungeonShellRect,
   mapToWorld,
+  minimapBufferPixels,
   minimapFrame,
   shopMapBounds,
   trapdoorMarkerUrls,
@@ -266,30 +267,144 @@ describe('minimap', () => {
     assert.ok(Math.hypot(end.x - aim.x, end.z - aim.z) < 0.45);
     assert.ok(Math.hypot(end.x, end.z) > 1, 'the path stays off the centre essence rock');
   });
+
+  it('sizes the backing buffer to css pixels times a device ratio capped at 2', () => {
+    assert.equal(minimapBufferPixels(196, 1), 196);
+    assert.equal(minimapBufferPixels(196, 2), 392);
+    assert.equal(minimapBufferPixels(196, 3), 392);
+    assert.equal(minimapBufferPixels(112, 2), 224);
+    assert.equal(minimapBufferPixels(112.4, 2), 225);
+    assert.equal(minimapBufferPixels(70, 1.5), 105);
+    assert.equal(minimapBufferPixels(196, Number.NaN), 196);
+    assert.equal(minimapBufferPixels(0, 2), 2);
+  });
+
+  it('keeps marker strokes at their css weight when the buffer is not scaled', () => {
+    const { ctx, ops } = mockMapCtx(196);
+    drawMinimap(ctx, {
+      sceneMode: 'dungeon',
+      yaw: 0,
+      zoom: 1,
+      player: { x: 0, z: 0, facing: 0 },
+      rocks: [],
+      rats: [],
+      ladder: { x: 1, z: 1 },
+      ping: { x: 0, z: 0, age: 0 },
+    });
+    const ladder = ops.find((op) => op.stroke === '#e6d3b0');
+    const ping = ops.find((op) => String(op.stroke).startsWith('rgba(244, 226, 164'));
+    assert.equal(ladder.lineWidth, 1.5);
+    assert.equal(ping.lineWidth, 2);
+
+    const shop = mockMapCtx(196);
+    drawMinimap(shop.ctx, {
+      sceneMode: 'shop',
+      yaw: 0,
+      zoom: 1,
+      expansions: [],
+      player: { x: 0, z: 0, facing: 0 },
+      customers: [],
+      furniture: [],
+    });
+    const hatch = shop.ops.find((op) => op.fill === '#5a3a22');
+    const hatchStroke = shop.ops.find((op) => op.stroke === '#3a2414');
+    assert.equal(hatch.radius, TRAPDOOR_MARKER_RADIUS);
+    assert.equal(hatchStroke.lineWidth, 1);
+  });
+
+  it('scales fixed line widths and the trapdoor radius with the buffer', () => {
+    const { ctx, ops } = mockMapCtx(392);
+    ctx.canvas.dataset.cssSize = '196';
+    drawMinimap(ctx, {
+      sceneMode: 'dungeon',
+      yaw: 0,
+      zoom: 1,
+      player: { x: 0, z: 0, facing: 0 },
+      rocks: [],
+      rats: [{ x: 1, z: 1 }],
+      ladder: { x: 1, z: 0 },
+      ping: { x: 0, z: 0, age: 0 },
+    });
+    const ladder = ops.find((op) => op.stroke === '#e6d3b0');
+    const ping = ops.find((op) => String(op.stroke).startsWith('rgba(244, 226, 164'));
+    const rat = ops.find((op) => op.fill === '#d7cfc4');
+    assert.equal(ladder.lineWidth, 3);
+    assert.equal(ping.lineWidth, 4);
+    assert.equal(rat.radius, 4.8);
+
+    const shop = mockMapCtx(224);
+    shop.ctx.canvas.dataset.cssSize = '112';
+    drawMinimap(shop.ctx, {
+      sceneMode: 'shop',
+      yaw: 0,
+      zoom: 1,
+      expansions: [],
+      player: { x: 0, z: 0, facing: 0 },
+      customers: [],
+      furniture: [],
+    });
+    const hatch = shop.ops.find((op) => op.fill === '#5a3a22');
+    const hatchStroke = shop.ops.find((op) => op.stroke === '#d8c4a0');
+    assert.equal(hatch.radius, 10);
+    assert.equal(hatchStroke.lineWidth, 2);
+  });
+
+  it('keeps the slim portrait strip and collapsible map on touch portrait only', () => {
+    const root = dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(join(root, '../style.css'), 'utf8');
+    const html = readFileSync(join(root, '../../index.html'), 'utf8');
+    const hud = readFileSync(join(root, 'hud.js'), 'utf8');
+    const start = css.indexOf('/* Phone portrait: coins, level and XP');
+    const end = css.indexOf('/* Touch only:', start);
+    assert.ok(start >= 0 && end > start);
+    const block = css.slice(start, end);
+    assert.match(block, /@media \(orientation: portrait\) and \(pointer: coarse\) \{/);
+    assert.equal(block.includes('max-width: 720px'), false);
+    assert.match(block, /--portrait-strip:\s*36px/);
+    assert.match(block, /--portrait-map:\s*112px/);
+    assert.match(block, /70vw/);
+    assert.match(block, /env\(safe-area-inset-top/);
+    assert.match(block, /\.minimap-wrap\.is-expanded/);
+    assert.match(block, /data-map-dismiss|minimap-backdrop/);
+    assert.match(css, /\.minimap-wrap \{\s*position: relative;\s*max-width: 196px/);
+    assert.match(html, /id="shop-level">Shop Level 1</);
+    assert.match(html, /data-map-toggle[^>]*>Map</);
+    assert.match(html, /data-map-close[^>]*aria-label="Close map"/);
+    assert.match(html, /data-map-dismiss/);
+    assert.match(hud, /Shop Level \$\{xp\.level\}/);
+    assert.match(hud, /matchMedia\('\(orientation: portrait\) and \(pointer: coarse\)'\)/);
+    assert.match(hud, /minimapBufferPixels\(cssSize, window\.devicePixelRatio \|\| 1\)/);
+    assert.match(hud, /setMapOpen\(true\)/);
+    assert.match(hud, /setMapOpen\(false\)/);
+  });
 });
 
 function mockMapCtx(size = 196) {
   const ops = [];
   const ctx = {
-    canvas: { width: size, height: size },
+    canvas: { width: size, height: size, dataset: {} },
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 1,
     lineCap: 'butt',
+    _arcRadius: undefined,
     save() {},
     restore() {},
     translate() {},
     rotate() {},
     clearRect() { ops.push({ op: 'clear' }); },
     fillRect() { ops.push({ op: 'fillRect', fill: this.fillStyle }); },
-    beginPath() {},
+    beginPath() { this._arcRadius = undefined; },
     moveTo() {},
     lineTo() {},
     closePath() {},
-    fill() { ops.push({ op: 'fill', fill: this.fillStyle }); },
-    stroke() { ops.push({ op: 'stroke', stroke: this.strokeStyle }); },
-    strokeRect() { ops.push({ op: 'stroke', stroke: this.strokeStyle }); },
-    arc() {},
+    fill() {
+      ops.push({ op: 'fill', fill: this.fillStyle, radius: this._arcRadius });
+      this._arcRadius = undefined;
+    },
+    stroke() { ops.push({ op: 'stroke', stroke: this.strokeStyle, lineWidth: this.lineWidth }); },
+    strokeRect() { ops.push({ op: 'stroke', stroke: this.strokeStyle, lineWidth: this.lineWidth }); },
+    arc(_x, _y, radius) { this._arcRadius = radius; },
     drawImage() {},
   };
   return { ctx, ops };

@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: read
   pages: write
   id-token: write
@@ -23,6 +24,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cache milestone node_modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/stallhaven-archive-nm
+          key: stallhaven-archive-nm-${{ hashFiles('package-lock.json') }}
+
+      - name: Build version archive
+        env:
+          STALLHAVEN_NM_CACHE: ${{ runner.temp }}/stallhaven-archive-nm
+        run: node scripts/build-versions.mjs
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

@@ -631,8 +631,7 @@ describe('outdoor and dungeon extras', () => {
     const ids = EXPANSION_PADS.map((pad) => pad.id);
     const built = buildShop(ids);
     const rooms = [{ gx: 0, gz: 0 }, ...EXPANSION_PADS];
-    const slabs = [];
-    let planks = 0;
+    const floors = [];
     const a = new THREE.Vector3();
     const b = new THREE.Vector3();
     const c = new THREE.Vector3();
@@ -657,7 +656,14 @@ describe('outdoor and dungeon extras', () => {
       assert.ok(Math.abs(map.repeat.x - 1) < 1e-6 && Math.abs(map.repeat.y - 1) < 1e-6);
       assert.ok(Math.abs(map.offset.x) < 1e-6 && Math.abs(map.offset.y) < 1e-6);
       assert.equal(child.material.color.getHex(), 0xffffff);
+      assert.equal(child.material.normalMap ?? null, null);
+      assert.equal(child.material.bumpMap ?? null, null);
       assert.equal(child.userData.kind, 'ground');
+      assert.equal(child.userData.shopFloor, 'plank');
+      assert.equal(child.geometry.parameters.width, ROOM_W);
+      assert.equal(child.geometry.parameters.depth, ROOM_D);
+      const topY = child.position.y + child.geometry.parameters.height / 2;
+      assert.ok(Math.abs(topY - shopFloorTopY()) < 1e-6, `slab top ${topY}`);
 
       const geo = child.geometry;
       const pos = geo.getAttribute('position');
@@ -684,14 +690,12 @@ describe('outdoor and dungeon extras', () => {
         }
       }
 
-      if (child.userData.shopFloor === 'slab') slabs.push(child);
-      else planks += 1;
+      floors.push(child);
     });
 
-    assert.equal(slabs.length, rooms.length);
-    assert.ok(planks >= rooms.length * 10, `expected boards in every room, got ${planks}`);
+    assert.equal(floors.length, rooms.length);
     for (const room of rooms) {
-      assert.ok(slabs.some((mesh) => mesh.userData.floorGx === room.gx && mesh.userData.floorGz === room.gz), `${room.gx},${room.gz}`);
+      assert.ok(floors.some((mesh) => mesh.userData.floorGx === room.gx && mesh.userData.floorGz === room.gz), `${room.gx},${room.gz}`);
     }
 
     const horizontalUvAt = (mesh, x, z) => {
@@ -719,9 +723,9 @@ describe('outdoor and dungeon extras', () => {
       }
       return { ...best, dist: bestD };
     };
-    const origin = slabs.find((mesh) => mesh.userData.floorGx === 0 && mesh.userData.floorGz === 0);
-    const right = slabs.find((mesh) => mesh.userData.floorGx === 1 && mesh.userData.floorGz === 0);
-    const back = slabs.find((mesh) => mesh.userData.floorGx === 0 && mesh.userData.floorGz === -1);
+    const origin = floors.find((mesh) => mesh.userData.floorGx === 0 && mesh.userData.floorGz === 0);
+    const right = floors.find((mesh) => mesh.userData.floorGx === 1 && mesh.userData.floorGz === 0);
+    const back = floors.find((mesh) => mesh.userData.floorGx === 0 && mesh.userData.floorGz === -1);
     const seamX = ROOM_W / 2;
     const seamZ = roomCenter(0, 0).z - ROOM_D / 2;
     const originSeam = horizontalUvAt(origin, seamX, seamZ);
@@ -958,10 +962,10 @@ describe('outdoor and dungeon extras', () => {
     });
   });
 
-  it('builds shop boards whose top is the walkable floor', () => {
+  it('builds one flat shop slab whose top is the walkable floor', () => {
     const shop = buildShop(['left']).root;
     const top = measureShopFloorTop(shop);
-    assert.ok(Number.isFinite(top), 'shop should have floorboards');
+    assert.ok(Number.isFinite(top), 'shop should have a floor slab');
     assert.ok(Math.abs(top - shopFloorTopY()) < 1e-4, `mesh top ${top} vs config ${shopFloorTopY()}`);
     const feet = [shopFloorFootprint(0, 0), shopFloorFootprint(-1, 0)];
     let boards = 0;
@@ -972,14 +976,14 @@ describe('outdoor and dungeon extras', () => {
       const box = new THREE.Box3().setFromObject(child);
       if (child.userData.shopFloor === 'plank') maxZ = Math.max(maxZ, box.max.z);
       const inside = feet.some((foot) => (
-        box.min.x >= foot.minX - 1e-3
-        && box.max.x <= foot.maxX + 1e-3
-        && box.min.z >= foot.minZ - 1e-3
-        && box.max.z <= foot.maxZ + 1e-3
+        Math.abs(box.min.x - foot.minX) < 1e-3
+        && Math.abs(box.max.x - foot.maxX) < 1e-3
+        && Math.abs(box.min.z - foot.minZ) < 1e-3
+        && Math.abs(box.max.z - foot.maxZ) < 1e-3
       ));
       assert.ok(inside, `floor mesh outside the walk area z ${box.min.z}..${box.max.z}`);
     });
-    assert.ok(boards > 10);
+    assert.equal(boards, 2);
     assert.ok(Math.abs(maxZ - shopFloorFootprint(0, 0).maxZ) < 1e-3, `lip ${maxZ}`);
   });
 

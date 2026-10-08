@@ -173,20 +173,17 @@ export const TRAPDOOR_CLUSTER_CLEAR = 1.22;
 /** Shop plank / station floor plane. Bundled chests sit on this, not at y=0. */
 export const SHOP_FURNITURE_FLOOR_Y = 0.09;
 /**
- * Shop floor mesh. The slab is the room footprint; the boards are the walk
- * surface. Character feet use the board top, which sits above y=0.
+ * Shop floor mesh. One solid slab fills each room. Its top is the old plank
+ * top, above y=0, so feet and furniture stay at the same height.
  */
 export const SHOP_FLOOR_SLAB = { thickness: 0.08, centerY: 0.04 };
 export const SHOP_FLOOR_PLANK = {
   thickness: 0.025,
   centerY: 0.085,
-  pitch: 0.28,
-  gap: 0.03,
-  insetX: 0.18,
 };
 /** Lawn and path height. Feet already rest here outdoors. */
 export const OUTDOOR_GROUND_Y = 0;
-/** Distance in front of the boards where the doorway eases up onto the floor. */
+/** Distance in front of the floor where the doorway eases up onto the floor. */
 export const SHOP_DOOR_STEP = 0.46;
 
 export function shopFloorTopY() {
@@ -290,27 +287,14 @@ export function roomFloor(gx, gz) {
   };
 }
 
-/** World XZ covered by one room's slab and floorboards, including the door lip. */
+/** World XZ of one room's solid floor slab. Neighbouring rooms meet on these edges. */
 export function shopFloorFootprint(gx = 0, gz = 0) {
   const c = roomCenter(gx, gz);
-  const slab = {
+  return {
     minX: c.x - ROOM_W / 2,
     maxX: c.x + ROOM_W / 2,
     minZ: c.z - ROOM_D / 2,
     maxZ: c.z + ROOM_D / 2,
-  };
-  const { pitch, gap, insetX } = SHOP_FLOOR_PLANK;
-  const count = Math.max(1, Math.ceil(ROOM_D / pitch));
-  const depth = pitch - gap;
-  const first = c.z - ROOM_D / 2 + pitch * 0.5;
-  const last = first + (count - 1) * pitch;
-  const half = depth / 2;
-  const span = ROOM_W - insetX;
-  return {
-    minX: Math.min(slab.minX, c.x - span / 2),
-    maxX: Math.max(slab.maxX, c.x + span / 2),
-    minZ: Math.min(slab.minZ, first - half),
-    maxZ: Math.max(slab.maxZ, last + half),
   };
 }
 

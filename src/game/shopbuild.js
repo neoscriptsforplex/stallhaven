@@ -6,8 +6,8 @@ import {
   ROOM_D,
   ROOM_W,
   SHOP_DOOR_LINTEL,
-  SHOP_FLOOR_PLANK,
   SHOP_FLOOR_SLAB,
+  shopFloorTopY,
   SHOP_FURNITURE_FLOOR_Y,
   cobblePathSpan,
   cobbleRingTuck,
@@ -662,35 +662,27 @@ function tagShopFloor(mesh, kind, cell) {
 
 function addFloor(root, center, cell = { gx: 0, gz: 0 }) {
   const slab = SHOP_FLOOR_SLAB;
-  const board = SHOP_FLOOR_PLANK;
-  const slabGeo = new THREE.BoxGeometry(ROOM_W, slab.thickness, ROOM_D);
-  writeShopFloorUVs(slabGeo, center.x, slab.centerY, center.z);
-  const base = addShadow(new THREE.Mesh(slabGeo, shopFloorMat()));
-  base.position.set(center.x, slab.centerY, center.z);
-  markGround(base);
-  tagShopFloor(base, 'slab', cell);
-  root.add(base);
-  const count = Math.ceil(ROOM_D / board.pitch);
-  for (let i = 0; i < count; i += 1) {
-    const z = center.z - ROOM_D / 2 + board.pitch * 0.5 + i * board.pitch;
-    const plankGeo = new THREE.BoxGeometry(ROOM_W - board.insetX, board.thickness, board.pitch - board.gap);
-    writeShopFloorUVs(plankGeo, center.x, board.centerY, z);
-    const plank = addShadow(new THREE.Mesh(plankGeo, shopFloorMat()));
-    plank.position.set(center.x, board.centerY, z);
-    markGround(plank);
-    tagShopFloor(plank, 'plank', cell);
-    root.add(plank);
-  }
+  const top = shopFloorTopY();
+  const bottom = slab.centerY - slab.thickness / 2;
+  const thickness = top - bottom;
+  const centerY = bottom + thickness / 2;
+  const geo = new THREE.BoxGeometry(ROOM_W, thickness, ROOM_D);
+  writeShopFloorUVs(geo, center.x, centerY, center.z);
+  const mesh = addShadow(new THREE.Mesh(geo, shopFloorMat()));
+  mesh.position.set(center.x, centerY, center.z);
+  markGround(mesh);
+  tagShopFloor(mesh, 'plank', cell);
+  root.add(mesh);
 }
 
-/** Top face of the shop floorboards, from the built meshes. */
+/** Top face of the shop floor slabs, from the built meshes. */
 export function measureShopFloorTop(root) {
   const pieces = measureShopFloorPieces(root);
   if (!pieces.length) return -Infinity;
   return Math.max(...pieces.map((piece) => piece.top));
 }
 
-/** Board top and XZ bounds for each built room, including expansion floors. */
+/** Slab top and XZ bounds for each built room, including expansion floors. */
 export function measureShopFloorPieces(root) {
   const groups = new Map();
   root?.updateMatrixWorld?.(true);

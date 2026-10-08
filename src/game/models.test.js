@@ -66,7 +66,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -756,6 +756,205 @@ describe('outdoor and dungeon extras', () => {
     dungeon.traverse((child) => {
       assert.notEqual(child.material?.map?.userData?.kind, 'shop-floor');
       assert.equal(child.userData?.shopFloor, undefined);
+    });
+  });
+
+  it('tiles shop roofs at 6 m on the main roof and 5 m on expansions', () => {
+    assert.equal(SHOP_ROOF_TILE_M, 6);
+    assert.equal(SHOP_ROOF_SMALL_TILE_M, 5);
+    const urls = shopRoofTextureUrls();
+    assert.ok(urls.some((url) => url.endsWith('textures/roof_512.png')));
+    assert.ok(urls.some((url) => url.includes('public/textures/roof_512.png')));
+    const texDir = join(dirname(fileURLToPath(import.meta.url)), '../../public/textures');
+    assert.equal(existsSync(join(texDir, 'roof_256.png')), true);
+    assert.equal(existsSync(join(texDir, 'roof_512.png')), true);
+    assert.equal(existsSync(join(texDir, 'roof_1024.png')), true);
+
+    const roofSpan = ROOM_W / 2 + 0.45;
+    const eaveLen = ROOM_D + 0.55;
+    const tilt = 0.42;
+    const rise = (roofSpan / 2) * Math.sin(tilt);
+    const originAt = roomCenter(0, 0);
+    const point = new THREE.Vector3();
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    const n = new THREE.Vector3();
+
+    const assertSlope = (mesh, tile) => {
+      const geo = mesh.geometry;
+      assert.equal(geo.type, 'BoxGeometry');
+      assert.ok(Math.abs(geo.parameters.width - roofSpan) < 1e-6);
+      assert.ok(Math.abs(geo.parameters.height - 0.1) < 1e-6);
+      assert.ok(Math.abs(geo.parameters.depth - eaveLen) < 1e-6);
+      assert.ok(Math.abs(Math.abs(mesh.position.x) - ROOM_W / 4) < 1e-6);
+      assert.ok(Math.abs(mesh.position.y - (2.82 + rise)) < 1e-6);
+      assert.ok(Math.abs(mesh.position.z) < 1e-6);
+      assert.ok(Math.abs(Math.abs(mesh.rotation.z) - tilt) < 1e-6);
+      assert.ok(mesh.position.x * mesh.rotation.z < 0, 'eaves still fall away from the ridge');
+
+      const map = mesh.material?.map;
+      assert.equal(map?.userData?.kind, 'shop-roof');
+      assert.equal(map.wrapS, THREE.RepeatWrapping);
+      assert.equal(map.wrapT, THREE.RepeatWrapping);
+      assert.equal(map.colorSpace, THREE.SRGBColorSpace);
+      assert.equal(map.anisotropy, 4);
+      assert.equal(map.generateMipmaps, true);
+      assert.equal(map.minFilter, THREE.LinearMipmapLinearFilter);
+      assert.equal(map.magFilter, THREE.LinearFilter);
+      assert.ok(Math.abs(map.repeat.x - 1) < 1e-6 && Math.abs(map.repeat.y - 1) < 1e-6);
+      assert.ok(Math.abs(map.offset.x) < 1e-6 && Math.abs(map.offset.y) < 1e-6);
+      assert.equal(mesh.material.color.getHex(), 0xffffff);
+      assert.equal(mesh.material.transparent, true);
+      assert.equal(mesh.material.opacity, 1);
+      assert.equal(mesh.material.depthWrite, true);
+      assert.equal(mesh.material.userData.isRoof, true);
+      assert.equal(mesh.material.roughness, 0.92);
+      assert.equal(mesh.material.metalness, 0.02);
+
+      const pos = geo.getAttribute('position');
+      const uv = geo.getAttribute('uv');
+      const index = geo.getIndex();
+      assert.ok(index, 'roof slope should stay an indexed box');
+      mesh.updateWorldMatrix(true, false);
+
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (let i = 0; i < pos.count; i += 1) {
+        minX = Math.min(minX, pos.getX(i));
+        maxX = Math.max(maxX, pos.getX(i));
+      }
+      const endAt = (xTarget) => {
+        let y = 0;
+        let v = 0;
+        let count = 0;
+        for (let i = 0; i < pos.count; i += 1) {
+          if (Math.abs(pos.getX(i) - xTarget) > 1e-4) continue;
+          point.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+          y += point.y;
+          v += uv.getY(i);
+          count += 1;
+        }
+        return { y: y / count, v: v / count, count };
+      };
+      const lo = endAt(minX);
+      const hi = endAt(maxX);
+      const ridge = lo.y > hi.y ? lo : hi;
+      const eave = lo.y > hi.y ? hi : lo;
+      assert.ok(lo.count > 0 && hi.count > 0);
+      assert.ok(Math.abs(eave.v) < 1e-4, `eave V ${eave.v} should be the bottom of the image`);
+      assert.ok(Math.abs(ridge.v - roofSpan / tile) < 1e-4, `ridge V ${ridge.v} vs slope length`);
+      assert.ok(ridge.v > eave.v, 'top of the image sits at the ridge');
+      const vertical = Math.abs(ridge.y - eave.y);
+      assert.ok(Math.abs(ridge.v - eave.v - vertical / tile) > 0.05, 'V must follow slope length, not height');
+
+      const faces = [];
+      const at = (k, target) => target.fromBufferAttribute(pos, index.getX(k));
+      for (let f = 0; f < index.count; f += 3) {
+        at(f, a);
+        at(f + 1, b);
+        at(f + 2, c);
+        n.subVectors(b, a).cross(c.clone().sub(a)).normalize();
+        let face = faces.find((entry) => entry.normal.dot(n) > 0.99);
+        if (!face) {
+          face = { normal: n.clone(), ids: new Set() };
+          faces.push(face);
+        }
+        for (let k = 0; k < 3; k += 1) face.ids.add(index.getX(f + k));
+      }
+      assert.equal(faces.length, 6, 'each side of the slope keeps its own face');
+      for (const face of faces) {
+        let minU = Infinity;
+        let maxU = -Infinity;
+        let minV = Infinity;
+        let maxV = -Infinity;
+        let minLY = Infinity;
+        let maxLY = -Infinity;
+        for (const i of face.ids) {
+          minU = Math.min(minU, uv.getX(i));
+          maxU = Math.max(maxU, uv.getX(i));
+          minV = Math.min(minV, uv.getY(i));
+          maxV = Math.max(maxV, uv.getY(i));
+          minLY = Math.min(minLY, pos.getY(i));
+          maxLY = Math.max(maxLY, pos.getY(i));
+        }
+        const uSpan = maxU - minU;
+        const vSpan = maxV - minV;
+        const ax = Math.abs(face.normal.x);
+        const ay = Math.abs(face.normal.y);
+        const az = Math.abs(face.normal.z);
+        const axis = ax >= ay && ax >= az ? 'x' : ay >= az ? 'y' : 'z';
+        if (axis === 'y') {
+          assert.ok(Math.abs(uSpan - eaveLen / tile) < 1e-4, `slope U ${uSpan}`);
+          assert.ok(Math.abs(vSpan - roofSpan / tile) < 1e-4, `slope V ${vSpan}`);
+        } else if (axis === 'z') {
+          assert.ok(Math.abs(uSpan) < 1e-4, 'gable-end U is the thin edge');
+          assert.ok(Math.abs(vSpan - roofSpan / tile) < 1e-4, `gable-end V ${vSpan} should be the slope length`);
+          assert.ok(Math.abs(vSpan - (maxLY - minLY) / tile) > 0.05, 'gable end is not stretched to its height');
+        } else {
+          assert.ok(Math.abs(uSpan - eaveLen / tile) < 1e-4, `eave-edge U ${uSpan}`);
+          assert.ok(Math.abs(vSpan) < 1e-4, 'eave and ridge edges sit on one course');
+        }
+        const eaveX = mesh.rotation.z > 0 ? minX : maxX;
+        const ridgeSign = mesh.rotation.z > 0 ? 1 : -1;
+        for (const i of face.ids) {
+          const along = (pos.getX(i) - eaveX) * ridgeSign;
+          assert.ok(Math.abs(uv.getX(i) - pos.getZ(i) / tile) < 1e-4);
+          assert.ok(Math.abs(uv.getY(i) - along / tile) < 1e-4);
+        }
+      }
+    };
+
+    const collect = (built) => {
+      const slopes = [];
+      let timber = 0;
+      let gables = 0;
+      built.roofs.traverse((child) => {
+        if (!child.isMesh) return;
+        if (child.material?.map?.userData?.kind === 'shop-roof') slopes.push(child);
+        else if (child.name === 'roof-gable') {
+          gables += 1;
+          assert.equal(child.material?.map?.userData?.kind, 'shop-wall');
+        } else {
+          timber += 1;
+          assert.notEqual(child.material?.map?.userData?.kind, 'shop-roof');
+        }
+      });
+      built.root.traverse((child) => {
+        assert.notEqual(child.material?.map?.userData?.kind, 'shop-roof');
+        if (child.name === 'fascia') assert.equal(child.material?.map?.userData?.kind, 'shop-wall');
+      });
+      return { slopes, timber, gables };
+    };
+
+    const origin = collect(buildShop([]));
+    assert.equal(origin.slopes.length, 2);
+    assert.equal(origin.timber, 2, 'ridge and rafter stay timber');
+    assert.ok(origin.gables >= 2);
+    for (const mesh of origin.slopes) {
+      assert.ok(Math.abs(mesh.parent.position.x - originAt.x) < 1e-6);
+      assert.ok(Math.abs(mesh.parent.position.z - originAt.z) < 1e-6);
+      assertSlope(mesh, SHOP_ROOF_TILE_M);
+    }
+
+    const expanded = collect(buildShop(EXPANSION_PADS.map((pad) => pad.id)));
+    let main = 0;
+    let small = 0;
+    for (const mesh of expanded.slopes) {
+      const onOrigin = Math.abs(mesh.parent.position.x - originAt.x) < 1e-6
+        && Math.abs(mesh.parent.position.z - originAt.z) < 1e-6;
+      const tile = onOrigin ? SHOP_ROOF_TILE_M : SHOP_ROOF_SMALL_TILE_M;
+      if (onOrigin) main += 1;
+      else small += 1;
+      assertSlope(mesh, tile);
+    }
+    assert.equal(main, 2);
+    assert.equal(small, EXPANSION_PADS.length * 2);
+    assert.equal(expanded.timber, (EXPANSION_PADS.length + 1) * 2);
+
+    const dungeon = buildDungeon().root;
+    dungeon.traverse((child) => {
+      assert.notEqual(child.material?.map?.userData?.kind, 'shop-roof');
     });
   });
 

@@ -130,8 +130,10 @@ describe('player look UI', () => {
     assert.match(settings, /data-player-model-yaw[^>]*>Rotate 180°/);
     assert.match(settings, /data-player-model-file/);
     assert.match(settings, /\.glb/);
-    assert.match(settings, /data-dungeon-brightness/);
+    assert.match(settings, /data-dungeon-brightness min="0" max="150" value="150"/);
+    assert.match(settings, /data-dungeon-brightness-label>150%/);
     assert.match(settings, /Dungeon brightness/);
+    assert.match(settings, /data-brightness min="50" max="150" value="150"/);
     assert.match(settings, /data-photo-mode/);
     assert.match(settings, /Photo mode/);
     assert.equal(settings.includes('data-look='), false);

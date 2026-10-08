@@ -9,6 +9,8 @@ import {
   DEFAULT_BRIGHTNESS,
   DEFAULT_DUNGEON_BRIGHTNESS,
   DUNGEON_BRIGHTNESS_MAX,
+  DUNGEON_BRIGHTNESS_STORAGE_KEY,
+  LEGACY_DEFAULT_DUNGEON_BRIGHTNESS,
   applySceneLighting,
   brightnessForScene,
   brightnessPercent,
@@ -115,8 +117,56 @@ describe('scene lighting', () => {
     };
     try {
       assert.equal(readStoredDungeonBrightness(), DEFAULT_DUNGEON_BRIGHTNESS);
+      assert.equal(store[DUNGEON_BRIGHTNESS_STORAGE_KEY], undefined);
       writeStoredDungeonBrightness(0.8);
       assert.equal(readStoredDungeonBrightness(), 0.8);
+    } finally {
+      if (previous === undefined) delete globalThis.localStorage;
+      else globalThis.localStorage = previous;
+    }
+  });
+
+  it('raises a stored 100% dungeon baseline to the slider max once', () => {
+    assert.equal(LEGACY_DEFAULT_DUNGEON_BRIGHTNESS, 1);
+    assert.equal(DEFAULT_DUNGEON_BRIGHTNESS, DUNGEON_BRIGHTNESS_MAX);
+    const legacyKey = 'stallhaven-dungeon-brightness';
+    const store = {};
+    const previous = globalThis.localStorage;
+    globalThis.localStorage = {
+      getItem: (key) => (Object.hasOwn(store, key) ? store[key] : null),
+      setItem: (key, value) => { store[key] = String(value); },
+      removeItem: (key) => { delete store[key]; },
+    };
+    try {
+      store['stallhaven-brightness'] = '1';
+      store[legacyKey] = '1';
+      assert.equal(readStoredDungeonBrightness(), DUNGEON_BRIGHTNESS_MAX);
+      assert.equal(store[DUNGEON_BRIGHTNESS_STORAGE_KEY], String(DUNGEON_BRIGHTNESS_MAX));
+      assert.equal(Object.hasOwn(store, legacyKey), false);
+      assert.equal(readStoredBrightness(), 1);
+
+      store[legacyKey] = '1.0';
+      delete store[DUNGEON_BRIGHTNESS_STORAGE_KEY];
+      assert.equal(readStoredDungeonBrightness(), DUNGEON_BRIGHTNESS_MAX);
+
+      delete store[DUNGEON_BRIGHTNESS_STORAGE_KEY];
+      store[legacyKey] = '0.8';
+      assert.equal(readStoredDungeonBrightness(), 0.8);
+      assert.equal(store[DUNGEON_BRIGHTNESS_STORAGE_KEY], '0.8');
+      assert.equal(Object.hasOwn(store, legacyKey), false);
+
+      delete store[DUNGEON_BRIGHTNESS_STORAGE_KEY];
+      store[legacyKey] = '0';
+      assert.equal(readStoredDungeonBrightness(), 0);
+
+      delete store[DUNGEON_BRIGHTNESS_STORAGE_KEY];
+      store[legacyKey] = '1.2';
+      assert.equal(readStoredDungeonBrightness(), 1.2);
+
+      writeStoredDungeonBrightness(LEGACY_DEFAULT_DUNGEON_BRIGHTNESS);
+      assert.equal(readStoredDungeonBrightness(), LEGACY_DEFAULT_DUNGEON_BRIGHTNESS);
+      assert.equal(readStoredBrightness(), 1);
+      assert.equal(store['stallhaven-brightness'], '1');
     } finally {
       if (previous === undefined) delete globalThis.localStorage;
       else globalThis.localStorage = previous;

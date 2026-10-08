@@ -45,6 +45,7 @@ import {
   FLAX_CLICK_RADIUS,
   FLAX_COUNT,
   gardenBox,
+  buyerCobbleRoute,
   gardenTrapdoorSpot,
   gardenTreeSpots,
   plantedTrunkRadius,
@@ -2617,11 +2618,16 @@ export function createWorld(canvas, state, opts = {}) {
     return buildAdventurer(typeId, { seed, lookId });
   }
 
+  function buyerRoute() {
+    return buyerCobbleRoute(state.expansions ?? []);
+  }
+
   function spawnActor(typeId, now, request) {
     const lookId = nextBuyerLookId(typeId);
     const mesh = makeCustomerMesh(typeId, customerSerial + Math.random(), lookId);
     mesh.userData.pick.userData.customerId = customerSerial;
-    mesh.position.set(SHOP.outside.x, 0, SHOP.outside.z + 0.15);
+    const route = buyerRoute();
+    mesh.position.set(route.spawn.x, 0, route.spawn.z);
     setSpeechText(mesh, `${RECIPES[request.recipeId].name}?`);
     scene.add(mesh);
     const actor = {
@@ -2631,6 +2637,7 @@ export function createWorld(canvas, state, opts = {}) {
       mesh,
       state: 'enter',
       path: [
+        ...route.toDoor,
         { x: SHOP.door.x, z: SHOP.door.z + 0.35 },
         { x: SHOP.door.x, z: SHOP.door.z - 0.45 },
         ...browseStops(),
@@ -2721,10 +2728,12 @@ export function createWorld(canvas, state, opts = {}) {
       state.kingRoaldAt = scheduleKingRoald(state.playTime ?? 0);
     }
     actor.state = 'leave';
+    const route = buyerRoute();
     actor.path = [
       { x: SHOP.door.x, z: SHOP.door.z - 0.4 },
       { x: SHOP.door.x, z: SHOP.door.z + 0.45 },
-      { x: SHOP.outside.x, z: SHOP.outside.z },
+      ...[...route.toDoor].reverse(),
+      route.spawn,
     ];
     advanceQueue(lastNow || performance.now() / 1000);
   }

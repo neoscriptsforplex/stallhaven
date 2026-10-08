@@ -7,7 +7,10 @@
     <meta name="description" content="Rune Craft. Craft gear into a chest, then trade with travelers at the counter." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%236b4423' width='64' height='64' rx='10'/%3E%3Cpath fill='%23e8c37a' d='M12 40h40v8H12z'/%3E%3Cpath fill='%238b4336' d='M8 20h48l-6 12H14z'/%3E%3C/svg%3E" />
     <style>
-      html.is-booting, html.is-booting body { background: #050403; }
+      html.is-booting,
+      html.is-booting body {
+        background: url("./public/runecraft_loading_bg.jpg") center center / cover no-repeat;
+      }
       html.is-booting #view,
       html.is-booting #hud,
       html.is-booting #save-bar { visibility: hidden !important; }
@@ -25,8 +28,10 @@
   <body>
     <canvas id="view" aria-label="Rune Craft shop floor"></canvas>
     <div id="boot-cover" role="status" aria-live="polite">
-      <p data-boot-label>Loading models…</p>
-      <div class="boot-track"><div class="boot-bar" data-boot-bar></div></div>
+      <div class="boot-track">
+        <div class="boot-bar" data-boot-bar></div>
+        <p data-boot-label>Loading</p>
+      </div>
     </div>
 
     <aside id="save-bar" aria-label="Save and load">
@@ -56,7 +61,7 @@
           </div>
         </div>
         <div class="shop-xp" aria-label="Shop level">
-          <span id="shop-level">Lv 1</span>
+          <span id="shop-level">Shop Level 1</span>
           <span class="xp-bar" title="Shop XP"><i data-shop-xp-bar></i></span>
         </div>
         <div class="ledger-row">

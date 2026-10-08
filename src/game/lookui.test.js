@@ -25,15 +25,27 @@ describe('player look UI', () => {
     assert.match(help, /The Goal:/);
   });
 
-  it('covers the canvas with a black loading bar until models are ready', () => {
+  it('covers the canvas with the RuneCraft loading art until models are ready', () => {
     assert.match(html, /class="is-booting"/);
     assert.match(html, /id="boot-cover"/);
     assert.match(html, /data-boot-bar/);
     assert.match(html, /data-boot-label/);
     assert.match(html, /html.is-booting #view/);
+    const boot = slice(html, 'id="boot-cover"', 'id="save-bar"');
+    assert.match(boot, />Loading</);
+    assert.match(html, /url\("\.\/public\/runecraft_loading_bg\.jpg"\) center center \/ cover no-repeat/);
+    assert.equal(html.includes('#050403'), false);
     assert.match(css, /#boot-cover\.is-leaving/);
     assert.match(css, /@keyframes boot-slide/);
+    assert.match(css, /url\("\.\.\/public\/runecraft_loading_bg\.jpg"\)/);
+    assert.match(css, /background-position:\s*center center/);
+    assert.match(css, /background-size:\s*cover/);
+    assert.equal(/#boot-cover\s*\{[^}]*#050403/.test(css), false);
+    assert.equal(readFileSync(join(root, '../../public/runecraft_loading_bg.jpg')).equals(
+      readFileSync(join(root, '../../docs/runecraft_banner.jpg')),
+    ), true);
     assert.match(main, /classList.remove\('is-booting'\)/);
+    assert.match(main, /bootLabel\.textContent = 'Loading'/);
     assert.match(main, /requestAnimationFrame/);
     assert.match(main, /setBundledLooks\(bundledLooks\)[\s\S]*createWorld\(canvas/);
     assert.match(main, /world\.tick\(0[\s\S]*hideBootCover\(\)/);

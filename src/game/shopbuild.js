@@ -6,8 +6,8 @@ import {
   ROOM_D,
   ROOM_W,
   SHOP_DOOR_LINTEL,
-  SHOP_FLOOR_PLANK,
   SHOP_FLOOR_SLAB,
+  shopFloorTopY,
   SHOP_FURNITURE_FLOOR_Y,
   cobblePathSpan,
   cobbleRingTuck,
@@ -648,37 +648,120 @@ function makePlaque() {
   return group;
 }
 
-function woodFloorMap() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#6a4a2c';
-  ctx.fillRect(0, 0, 256, 64);
-  let seed = 3181;
-  const rand = () => {
-    seed = (seed * 16807) % 2147483647;
-    return (seed - 1) / 2147483646;
-  };
-  for (let i = 0; i < 40; i += 1) {
-    const y = rand() * 64;
-    ctx.strokeStyle = `rgba(${90 + rand() * 40}, ${50 + rand() * 24}, ${20 + rand() * 16}, ${0.18 + rand() * 0.22})`;
-    ctx.lineWidth = 0.8 + rand();
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.bezierCurveTo(80, y + (rand() - 0.5) * 8, 160, y + (rand() - 0.5) * 8, 256, y);
-    ctx.stroke();
+/** Metres of shop floor covered by one seamless shop_floor tile. */
+export const SHOP_FLOOR_TILE_M = 4;
+const SHOP_FLOOR_FILE = 'shop_floor_512.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function shopFloorTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${SHOP_FLOOR_FILE}`,
+    `${envBase}public/textures/${SHOP_FLOOR_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${SHOP_FLOOR_FILE}`, `./public/textures/${SHOP_FLOOR_FILE}`);
   }
-  ctx.fillStyle = 'rgba(40, 24, 12, 0.35)';
-  ctx.fillRect(0, 0, 256, 3);
-  ctx.fillRect(0, 61, 256, 3);
-  const tex = new THREE.CanvasTexture(canvas);
+  return [...new Set(urls)];
+}
+
+let shopFloorSource = null;
+
+function configureShopFloorTexture(tex) {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  tex.needsUpdate = true;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.repeat.set(1, 1);
+  tex.offset.set(0, 0);
+  tex.userData.kind = 'shop-floor';
   return tex;
+}
+
+function applyShopFloorImage(loaded) {
+  if (!shopFloorSource || !loaded?.image) return;
+  shopFloorSource.image = loaded.image;
+  shopFloorSource.needsUpdate = true;
+}
+
+function beginShopFloorLoad() {
+  const urls = shopFloorTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyShopFloorImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function shopFloorMap() {
+  if (!shopFloorSource) {
+    shopFloorSource = configureShopFloorTexture(new THREE.Texture());
+    beginShopFloorLoad();
+  }
+  return shopFloorSource;
+}
+
+function shopFloorMat() {
+  return new THREE.MeshStandardMaterial({
+    map: shopFloorMap(),
+    roughness: 0.88,
+    metalness: 0.04,
+    color: 0xffffff,
+  });
+}
+
+const floorUvA = new THREE.Vector3();
+const floorUvB = new THREE.Vector3();
+const floorUvC = new THREE.Vector3();
+const floorUvN = new THREE.Vector3();
+const floorUvP = new THREE.Vector3();
+
+/** World-space UVs so every room and board sits on one 4 m tile grid. */
+function writeShopFloorUVs(geo, wx, wy, wz) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  const index = geo.getIndex();
+  const count = index ? index.count : pos.count;
+  const at = (k) => (index ? index.getX(k) : k);
+  const scale = 1 / SHOP_FLOOR_TILE_M;
+  for (let f = 0; f < count; f += 3) {
+    floorUvA.fromBufferAttribute(pos, at(f));
+    floorUvB.fromBufferAttribute(pos, at(f + 1));
+    floorUvC.fromBufferAttribute(pos, at(f + 2));
+    floorUvN.subVectors(floorUvB, floorUvA).cross(floorUvC.sub(floorUvA));
+    const ax = Math.abs(floorUvN.x);
+    const ay = Math.abs(floorUvN.y);
+    const az = Math.abs(floorUvN.z);
+    let uKey = 'x';
+    let vKey = 'y';
+    if (ay >= ax && ay >= az) {
+      uKey = 'x';
+      vKey = 'z';
+    } else if (ax >= az) {
+      uKey = 'z';
+      vKey = 'y';
+    }
+    for (let k = 0; k < 3; k += 1) {
+      const vi = at(f + k);
+      floorUvP.fromBufferAttribute(pos, vi);
+      const worldX = floorUvP.x + wx;
+      const worldY = floorUvP.y + wy;
+      const worldZ = floorUvP.z + wz;
+      const world = uKey === 'z' ? worldZ : worldX;
+      const up = vKey === 'z' ? worldZ : worldY;
+      uv.setXY(vi, world * scale, up * scale);
+    }
+  }
+  uv.needsUpdate = true;
 }
 
 function markGround(mesh) {
@@ -695,45 +778,27 @@ function tagShopFloor(mesh, kind, cell) {
 
 function addFloor(root, center, cell = { gx: 0, gz: 0 }) {
   const slab = SHOP_FLOOR_SLAB;
-  const board = SHOP_FLOOR_PLANK;
-  const base = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(ROOM_W, slab.thickness, ROOM_D),
-    wood(0x5a3a22, 0.92),
-  ));
-  base.position.set(center.x, slab.centerY, center.z);
-  markGround(base);
-  tagShopFloor(base, 'slab', cell);
-  root.add(base);
-  const count = Math.ceil(ROOM_D / board.pitch);
-  for (let i = 0; i < count; i += 1) {
-    const map = woodFloorMap();
-    map.repeat.set(ROOM_W / 1.4, 1);
-    const mat = new THREE.MeshStandardMaterial({
-      map,
-      color: i % 2 ? 0xc4a070 : 0xb48a58,
-      roughness: 0.88,
-      metalness: 0.04,
-    });
-    const plank = addShadow(new THREE.Mesh(
-      new THREE.BoxGeometry(ROOM_W - board.insetX, board.thickness, board.pitch - board.gap),
-      mat,
-    ));
-    const z = center.z - ROOM_D / 2 + board.pitch * 0.5 + i * board.pitch;
-    plank.position.set(center.x, board.centerY, z);
-    markGround(plank);
-    tagShopFloor(plank, 'plank', cell);
-    root.add(plank);
-  }
+  const top = shopFloorTopY();
+  const bottom = slab.centerY - slab.thickness / 2;
+  const thickness = top - bottom;
+  const centerY = bottom + thickness / 2;
+  const geo = new THREE.BoxGeometry(ROOM_W, thickness, ROOM_D);
+  writeShopFloorUVs(geo, center.x, centerY, center.z);
+  const mesh = addShadow(new THREE.Mesh(geo, shopFloorMat()));
+  mesh.position.set(center.x, centerY, center.z);
+  markGround(mesh);
+  tagShopFloor(mesh, 'plank', cell);
+  root.add(mesh);
 }
 
-/** Top face of the shop floorboards, from the built meshes. */
+/** Top face of the shop floor slabs, from the built meshes. */
 export function measureShopFloorTop(root) {
   const pieces = measureShopFloorPieces(root);
   if (!pieces.length) return -Infinity;
   return Math.max(...pieces.map((piece) => piece.top));
 }
 
-/** Board top and XZ bounds for each built room, including expansion floors. */
+/** Slab top and XZ bounds for each built room, including expansion floors. */
 export function measureShopFloorPieces(root) {
   const groups = new Map();
   root?.updateMatrixWorld?.(true);
@@ -778,31 +843,132 @@ function addBeams(root, center) {
   root.add(sideBeam2);
 }
 
-function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
-  const group = new THREE.Group();
-  group.userData.isRoof = true;
-  group.position.copy(new THREE.Vector3(center.x, 0, center.z));
-  const thatch = new THREE.MeshStandardMaterial({
-    color: 0x6b3a24,
+/** Metres of roof covered by one seamless roof tile on the main shop. */
+export const SHOP_ROOF_TILE_M = 6;
+/** Expansion and other small roof pieces use a slightly smaller tile. */
+export const SHOP_ROOF_SMALL_TILE_M = 5;
+const SHOP_ROOF_FILE = 'roof_512.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function shopRoofTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${SHOP_ROOF_FILE}`,
+    `${envBase}public/textures/${SHOP_ROOF_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${SHOP_ROOF_FILE}`, `./public/textures/${SHOP_ROOF_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let shopRoofSource = null;
+
+function configureShopRoofTexture(tex) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.repeat.set(1, 1);
+  tex.offset.set(0, 0);
+  tex.userData.kind = 'shop-roof';
+  return tex;
+}
+
+function applyShopRoofImage(loaded) {
+  if (!shopRoofSource || !loaded?.image) return;
+  shopRoofSource.image = loaded.image;
+  shopRoofSource.needsUpdate = true;
+}
+
+function beginShopRoofLoad() {
+  const urls = shopRoofTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyShopRoofImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function shopRoofMap() {
+  if (!shopRoofSource) {
+    shopRoofSource = configureShopRoofTexture(new THREE.Texture());
+    beginShopRoofLoad();
+  }
+  return shopRoofSource;
+}
+
+function shopRoofMat() {
+  const mat = new THREE.MeshStandardMaterial({
+    map: shopRoofMap(),
+    color: 0xffffff,
     roughness: 0.92,
     metalness: 0.02,
     transparent: true,
     opacity: 1,
     depthWrite: true,
   });
+  mat.userData.isRoof = true;
+  return mat;
+}
+
+/**
+ * U runs along the eave (local Z). V is 0 at the eave — the bottom of the
+ * image — and increases toward the ridge by distance along the slope, not
+ * by vertical rise. ridgeSign is +1 when local +X is the ridge.
+ */
+function writeRoofSlopeUVs(geo, tileM, ridgeSign) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i);
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+  }
+  const eaveX = ridgeSign > 0 ? minX : maxX;
+  const scale = 1 / tileM;
+  for (let i = 0; i < pos.count; i += 1) {
+    const alongSlope = (pos.getX(i) - eaveX) * ridgeSign;
+    uv.setXY(i, pos.getZ(i) * scale, alongSlope * scale);
+  }
+  uv.needsUpdate = true;
+}
+
+function addRoofSlope(group, mat, tileM, ridgeSign, x, y, rotZ, roofSpan) {
+  const geo = new THREE.BoxGeometry(roofSpan, 0.1, ROOM_D + 0.55);
+  writeRoofSlopeUVs(geo, tileM, ridgeSign);
+  const slope = addShadow(new THREE.Mesh(geo, mat));
+  slope.position.set(x, y, 0);
+  slope.rotation.z = rotZ;
+  group.add(slope);
+  return slope;
+}
+
+function addRoofForRoom(roofs, center, neigh = {}, isOrigin = false) {
+  const group = new THREE.Group();
+  group.userData.isRoof = true;
+  group.position.copy(new THREE.Vector3(center.x, 0, center.z));
   const tilt = 0.42;
   const roofSpan = ROOM_W / 2 + 0.45;
   const rise = (roofSpan / 2) * Math.sin(tilt);
   const eaveY = 2.82;
   const ridgeY = eaveY + rise * 2;
-  const slope = addShadow(new THREE.Mesh(new THREE.BoxGeometry(roofSpan, 0.1, ROOM_D + 0.55), thatch));
-  slope.position.set(-ROOM_W / 4, eaveY + rise, 0);
-  slope.rotation.z = tilt;
-  group.add(slope);
-  const slope2 = slope.clone();
-  slope2.position.x = ROOM_W / 4;
-  slope2.rotation.z = -tilt;
-  group.add(slope2);
+  const tileM = isOrigin ? SHOP_ROOF_TILE_M : SHOP_ROOF_SMALL_TILE_M;
+  const roofMat = shopRoofMat();
+  const slopeY = eaveY + rise;
+  addRoofSlope(group, roofMat, tileM, 1, -ROOM_W / 4, slopeY, tilt, roofSpan);
+  addRoofSlope(group, roofMat, tileM, -1, ROOM_W / 4, slopeY, -tilt, roofSpan);
   const ridge = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, ROOM_D + 0.4), wood(0x3c2616)));
   ridge.position.set(0, ridgeY, 0);
   group.add(ridge);
@@ -866,6 +1032,99 @@ function addRoofGables(group, center, neigh, ridgeY) {
   }
 }
 
+/** Metres of awning slope covered by one awning board tile. */
+export const AWNING_TILE_M = 2;
+const AWNING_FILE = 'awning_512.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function awningTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${AWNING_FILE}`,
+    `${envBase}public/textures/${AWNING_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${AWNING_FILE}`, `./public/textures/${AWNING_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let awningSource = null;
+
+function configureAwningTexture(tex) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.repeat.set(1, 1);
+  tex.offset.set(0, 0);
+  tex.userData.kind = 'awning';
+  return tex;
+}
+
+function applyAwningImage(loaded) {
+  if (!awningSource || !loaded?.image) return;
+  awningSource.image = loaded.image;
+  awningSource.needsUpdate = true;
+}
+
+function beginAwningLoad() {
+  const urls = awningTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyAwningImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function awningMap() {
+  if (!awningSource) {
+    awningSource = configureAwningTexture(new THREE.Texture());
+    beginAwningLoad();
+  }
+  return awningSource;
+}
+
+function awningMat() {
+  const mat = new THREE.MeshStandardMaterial({
+    map: awningMap(),
+    // White leaves the dark boards as painted. A lighter tint would brighten them.
+    color: 0xffffff,
+    roughness: 0.92,
+    metalness: 0,
+    side: THREE.DoubleSide,
+  });
+  mat.userData.awning = true;
+  return mat;
+}
+
+/**
+ * U runs along the length (local X), so the boards follow the awning.
+ * V is 0 at the outer lip — the bottom of the image — and increases
+ * toward the wall by distance along the slope (local Z), not by vertical
+ * rise. flipY stays at the default, so V is not flipped.
+ */
+function writeAwningUVs(geo) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  const lipZ = geo.parameters.depth / 2;
+  const scale = 1 / AWNING_TILE_M;
+  for (let i = 0; i < pos.count; i += 1) {
+    const alongSlope = lipZ - pos.getZ(i);
+    uv.setXY(i, pos.getX(i) * scale, alongSlope * scale);
+  }
+  uv.needsUpdate = true;
+}
+
 function addOriginFront(root, center) {
   const beam = wood(0x3c2616, 0.78);
   const doorHalf = 0.58;
@@ -911,10 +1170,10 @@ function addOriginFront(root, center) {
   const outerY = oldCenterY - oldHalf * awningSin;
   const wallOuterZ = center.z + ROOM_D / 2 + 0.08;
   const awningHalf = (outerZ - wallOuterZ) / (2 * awningCos);
-  const awning = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(8.1, 0.06, awningHalf * 2),
-    cloth(0x8b4336),
-  ));
+  const awningGeo = new THREE.BoxGeometry(8.1, 0.06, awningHalf * 2);
+  writeAwningUVs(awningGeo);
+  const awning = addShadow(new THREE.Mesh(awningGeo, awningMat()));
+  awning.name = 'awning';
   awning.position.set(center.x, outerY + awningHalf * awningSin, wallOuterZ + awningHalf * awningCos);
   awning.rotation.x = awningTilt;
   root.add(awning);
@@ -2918,6 +3177,297 @@ function addDungeonWallTorches(root, W = 11, D = 9) {
   }
 }
 
+/**
+ * Metres of wall covered by one dungeon_wall tile.
+ * UVs are world metres divided by this, so an 11 m run and a 0.22 m edge
+ * keep the same stone size. Vertical faces use world Y as V, so the image
+ * top stays at the top of every wall.
+ */
+export const DUNGEON_WALL_TILE_M = 3;
+const DUNGEON_WALL_FILE = 'dungeon_wall_512.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function dungeonWallTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${DUNGEON_WALL_FILE}`,
+    `${envBase}public/textures/${DUNGEON_WALL_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${DUNGEON_WALL_FILE}`, `./public/textures/${DUNGEON_WALL_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let dungeonWallSource = null;
+const dungeonWallClones = [];
+
+function configureDungeonWallTexture(tex) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.userData.kind = 'dungeon-wall';
+  return tex;
+}
+
+function applyDungeonWallImage(loaded) {
+  if (!dungeonWallSource || !loaded?.image) return;
+  dungeonWallSource.image = loaded.image;
+  dungeonWallSource.needsUpdate = true;
+  for (const tex of dungeonWallClones) {
+    tex.image = loaded.image;
+    tex.needsUpdate = true;
+  }
+  dungeonWallClones.length = 0;
+}
+
+function beginDungeonWallLoad() {
+  const urls = dungeonWallTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyDungeonWallImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function dungeonWallMap() {
+  if (!dungeonWallSource) {
+    dungeonWallSource = configureDungeonWallTexture(new THREE.Texture());
+    beginDungeonWallLoad();
+  }
+  const tex = configureDungeonWallTexture(dungeonWallSource.clone());
+  if (dungeonWallSource.image) {
+    tex.image = dungeonWallSource.image;
+    tex.needsUpdate = true;
+  } else {
+    dungeonWallClones.push(tex);
+  }
+  return tex;
+}
+
+function dungeonWallMat() {
+  const map = dungeonWallMap();
+  map.repeat.set(1, 1);
+  map.offset.set(0, 0);
+  const mat = new THREE.MeshStandardMaterial({
+    map,
+    roughness: 0.94,
+    metalness: 0.03,
+    color: 0xffffff,
+  });
+  mat.userData.dungeonWall = true;
+  return mat;
+}
+
+const dungeonUvA = new THREE.Vector3();
+const dungeonUvB = new THREE.Vector3();
+const dungeonUvC = new THREE.Vector3();
+const dungeonUvN = new THREE.Vector3();
+const dungeonUvE = new THREE.Vector3();
+
+/**
+ * World-space UVs. Vertical faces take V from world Y (image top at the wall
+ * top) and U from the horizontal axis, signed so the tile reads the same way
+ * when looking at either side. Caps keep courses along the long axis.
+ */
+function writeDungeonWallUVs(geo, wx, wy, wz) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  const index = geo.getIndex();
+  const count = index ? index.count : pos.count;
+  const at = (k) => (index ? index.getX(k) : k);
+  const tile = DUNGEON_WALL_TILE_M;
+  const seen = new Set();
+  const coord = (axis, x, y, z) => (axis === 'x' ? x : axis === 'y' ? y : z);
+  for (let f = 0; f < count; f += 3) {
+    const i0 = at(f);
+    const i1 = at(f + 1);
+    const i2 = at(f + 2);
+    dungeonUvA.fromBufferAttribute(pos, i0);
+    dungeonUvB.fromBufferAttribute(pos, i1);
+    dungeonUvC.fromBufferAttribute(pos, i2);
+    dungeonUvN.subVectors(dungeonUvB, dungeonUvA).cross(dungeonUvE.subVectors(dungeonUvC, dungeonUvA));
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const i of [i0, i1, i2]) {
+      minX = Math.min(minX, pos.getX(i));
+      maxX = Math.max(maxX, pos.getX(i));
+      minZ = Math.min(minZ, pos.getZ(i));
+      maxZ = Math.max(maxZ, pos.getZ(i));
+    }
+    const spanX = maxX - minX;
+    const spanZ = maxZ - minZ;
+    const ax = Math.abs(dungeonUvN.x);
+    const ay = Math.abs(dungeonUvN.y);
+    const az = Math.abs(dungeonUvN.z);
+    let uAxis = 'x';
+    let vAxis = 'y';
+    let uSign = 1;
+    if (ay >= ax && ay >= az) {
+      if (spanX >= spanZ) {
+        uAxis = 'x';
+        vAxis = 'z';
+      } else {
+        uAxis = 'z';
+        vAxis = 'x';
+      }
+    } else if (ax >= az) {
+      uAxis = 'z';
+      vAxis = 'y';
+      uSign = -(Math.sign(dungeonUvN.x) || 1);
+    } else {
+      uAxis = 'x';
+      vAxis = 'y';
+      uSign = Math.sign(dungeonUvN.z) || 1;
+    }
+    for (const i of [i0, i1, i2]) {
+      if (seen.has(i)) continue;
+      seen.add(i);
+      const x = pos.getX(i) + wx;
+      const y = pos.getY(i) + wy;
+      const z = pos.getZ(i) + wz;
+      uv.setXY(i, (uSign * coord(uAxis, x, y, z)) / tile, coord(vAxis, x, y, z) / tile);
+    }
+  }
+  uv.needsUpdate = true;
+}
+
+/**
+ * Metres of floor covered by one dungeon_floor tile.
+ * UVs are world metres divided by this, so the rocks stay the same size on
+ * every face of the slab. The tile is lit from the top-left, so the mapping
+ * stays fixed: U follows world X and V follows world Z on the top face.
+ */
+export const DUNGEON_FLOOR_TILE_M = 4;
+const DUNGEON_FLOOR_FILE = 'dungeon_floor_1024.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function dungeonFloorTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${DUNGEON_FLOOR_FILE}`,
+    `${envBase}public/textures/${DUNGEON_FLOOR_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${DUNGEON_FLOOR_FILE}`, `./public/textures/${DUNGEON_FLOOR_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let dungeonFloorSource = null;
+
+function configureDungeonFloorTexture(tex) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.repeat.set(1, 1);
+  tex.offset.set(0, 0);
+  tex.rotation = 0;
+  tex.userData.kind = 'dungeon-floor';
+  return tex;
+}
+
+function applyDungeonFloorImage(loaded) {
+  if (!dungeonFloorSource || !loaded?.image) return;
+  dungeonFloorSource.image = loaded.image;
+  dungeonFloorSource.needsUpdate = true;
+}
+
+function beginDungeonFloorLoad() {
+  const urls = dungeonFloorTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyDungeonFloorImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function dungeonFloorMap() {
+  if (!dungeonFloorSource) {
+    dungeonFloorSource = configureDungeonFloorTexture(new THREE.Texture());
+    beginDungeonFloorLoad();
+  }
+  return dungeonFloorSource;
+}
+
+function dungeonFloorMat() {
+  const mat = new THREE.MeshStandardMaterial({
+    map: dungeonFloorMap(),
+    roughness: 0.94,
+    metalness: 0.03,
+    color: 0xffffff,
+  });
+  mat.userData.dungeonFloor = true;
+  return mat;
+}
+
+const dungeonFloorUvA = new THREE.Vector3();
+const dungeonFloorUvB = new THREE.Vector3();
+const dungeonFloorUvC = new THREE.Vector3();
+const dungeonFloorUvN = new THREE.Vector3();
+const dungeonFloorUvP = new THREE.Vector3();
+
+/** World-space UVs so the whole slab sits on one unrotated 4 m tile grid. */
+function writeDungeonFloorUVs(geo, wx, wy, wz) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  const index = geo.getIndex();
+  const count = index ? index.count : pos.count;
+  const at = (k) => (index ? index.getX(k) : k);
+  const scale = 1 / DUNGEON_FLOOR_TILE_M;
+  for (let f = 0; f < count; f += 3) {
+    dungeonFloorUvA.fromBufferAttribute(pos, at(f));
+    dungeonFloorUvB.fromBufferAttribute(pos, at(f + 1));
+    dungeonFloorUvC.fromBufferAttribute(pos, at(f + 2));
+    dungeonFloorUvN.subVectors(dungeonFloorUvB, dungeonFloorUvA).cross(dungeonFloorUvC.sub(dungeonFloorUvA));
+    const ax = Math.abs(dungeonFloorUvN.x);
+    const ay = Math.abs(dungeonFloorUvN.y);
+    const az = Math.abs(dungeonFloorUvN.z);
+    let uKey = 'x';
+    let vKey = 'y';
+    if (ay >= ax && ay >= az) {
+      uKey = 'x';
+      vKey = 'z';
+    } else if (ax >= az) {
+      uKey = 'z';
+      vKey = 'y';
+    }
+    for (let k = 0; k < 3; k += 1) {
+      const vi = at(f + k);
+      dungeonFloorUvP.fromBufferAttribute(pos, vi);
+      const worldX = dungeonFloorUvP.x + wx;
+      const worldY = dungeonFloorUvP.y + wy;
+      const worldZ = dungeonFloorUvP.z + wz;
+      const world = uKey === 'z' ? worldZ : worldX;
+      const up = vKey === 'z' ? worldZ : worldY;
+      uv.setXY(vi, world * scale, up * scale);
+    }
+  }
+  uv.needsUpdate = true;
+}
+
 /** Cobble wall height. The exit ladder is stretched to this top. */
 export const DUNGEON_WALL_H = 3.4;
 
@@ -2929,12 +3479,12 @@ export function buildDungeon(opts = {}) {
   const W = 11;
   const D = 9;
   const H = DUNGEON_WALL_H;
-  /** Top face of the cobble slab (0.12 thick, centered at y=-0.04). */
-  const floor = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(W, 0.12, D),
-    cobbleMat(6.5, 5.2),
-  ));
+  /** Top face of the slab (0.12 thick, centered at y=-0.04). Rocks sit on this. */
+  const floorGeo = new THREE.BoxGeometry(W, 0.12, D);
+  writeDungeonFloorUVs(floorGeo, 0, -0.04, 0);
+  const floor = addShadow(new THREE.Mesh(floorGeo, dungeonFloorMat()));
   floor.position.y = -0.04;
+  floor.userData.dungeonFloor = true;
   root.add(floor);
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(W - 0.2, D - 0.2),
@@ -2945,7 +3495,7 @@ export function buildDungeon(opts = {}) {
   ground.userData.kind = 'ground';
   grounds.add(ground);
 
-  const wallMat = cobbleMat(6.5, 2.8);
+  const wallMat = dungeonWallMat();
   const walls = [
     { x: 0, z: -D / 2, w: W, d: 0.22 },
     { x: 0, z: D / 2, w: W, d: 0.22 },
@@ -2953,8 +3503,11 @@ export function buildDungeon(opts = {}) {
     { x: W / 2, z: 0, w: 0.22, d: D },
   ];
   for (const wall of walls) {
-    const mesh = addShadow(new THREE.Mesh(new THREE.BoxGeometry(wall.w, H, wall.d), wallMat));
+    const geo = new THREE.BoxGeometry(wall.w, H, wall.d);
+    writeDungeonWallUVs(geo, wall.x, H / 2, wall.z);
+    const mesh = addShadow(new THREE.Mesh(geo, wallMat));
     mesh.position.set(wall.x, H / 2, wall.z);
+    mesh.userData.dungeonWall = true;
     root.add(mesh);
   }
 

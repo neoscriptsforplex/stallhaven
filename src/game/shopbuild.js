@@ -532,37 +532,120 @@ function makePlaque(text) {
   return group;
 }
 
-function woodFloorMap() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#6a4a2c';
-  ctx.fillRect(0, 0, 256, 64);
-  let seed = 3181;
-  const rand = () => {
-    seed = (seed * 16807) % 2147483647;
-    return (seed - 1) / 2147483646;
-  };
-  for (let i = 0; i < 40; i += 1) {
-    const y = rand() * 64;
-    ctx.strokeStyle = `rgba(${90 + rand() * 40}, ${50 + rand() * 24}, ${20 + rand() * 16}, ${0.18 + rand() * 0.22})`;
-    ctx.lineWidth = 0.8 + rand();
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.bezierCurveTo(80, y + (rand() - 0.5) * 8, 160, y + (rand() - 0.5) * 8, 256, y);
-    ctx.stroke();
+/** Metres of shop floor covered by one seamless shop_floor tile. */
+export const SHOP_FLOOR_TILE_M = 4;
+const SHOP_FLOOR_FILE = 'shop_floor_512.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function shopFloorTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${SHOP_FLOOR_FILE}`,
+    `${envBase}public/textures/${SHOP_FLOOR_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${SHOP_FLOOR_FILE}`, `./public/textures/${SHOP_FLOOR_FILE}`);
   }
-  ctx.fillStyle = 'rgba(40, 24, 12, 0.35)';
-  ctx.fillRect(0, 0, 256, 3);
-  ctx.fillRect(0, 61, 256, 3);
-  const tex = new THREE.CanvasTexture(canvas);
+  return [...new Set(urls)];
+}
+
+let shopFloorSource = null;
+
+function configureShopFloorTexture(tex) {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  tex.needsUpdate = true;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.repeat.set(1, 1);
+  tex.offset.set(0, 0);
+  tex.userData.kind = 'shop-floor';
   return tex;
+}
+
+function applyShopFloorImage(loaded) {
+  if (!shopFloorSource || !loaded?.image) return;
+  shopFloorSource.image = loaded.image;
+  shopFloorSource.needsUpdate = true;
+}
+
+function beginShopFloorLoad() {
+  const urls = shopFloorTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyShopFloorImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function shopFloorMap() {
+  if (!shopFloorSource) {
+    shopFloorSource = configureShopFloorTexture(new THREE.Texture());
+    beginShopFloorLoad();
+  }
+  return shopFloorSource;
+}
+
+function shopFloorMat() {
+  return new THREE.MeshStandardMaterial({
+    map: shopFloorMap(),
+    roughness: 0.88,
+    metalness: 0.04,
+    color: 0xffffff,
+  });
+}
+
+const floorUvA = new THREE.Vector3();
+const floorUvB = new THREE.Vector3();
+const floorUvC = new THREE.Vector3();
+const floorUvN = new THREE.Vector3();
+const floorUvP = new THREE.Vector3();
+
+/** World-space UVs so every room and board sits on one 4 m tile grid. */
+function writeShopFloorUVs(geo, wx, wy, wz) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  const index = geo.getIndex();
+  const count = index ? index.count : pos.count;
+  const at = (k) => (index ? index.getX(k) : k);
+  const scale = 1 / SHOP_FLOOR_TILE_M;
+  for (let f = 0; f < count; f += 3) {
+    floorUvA.fromBufferAttribute(pos, at(f));
+    floorUvB.fromBufferAttribute(pos, at(f + 1));
+    floorUvC.fromBufferAttribute(pos, at(f + 2));
+    floorUvN.subVectors(floorUvB, floorUvA).cross(floorUvC.sub(floorUvA));
+    const ax = Math.abs(floorUvN.x);
+    const ay = Math.abs(floorUvN.y);
+    const az = Math.abs(floorUvN.z);
+    let uKey = 'x';
+    let vKey = 'y';
+    if (ay >= ax && ay >= az) {
+      uKey = 'x';
+      vKey = 'z';
+    } else if (ax >= az) {
+      uKey = 'z';
+      vKey = 'y';
+    }
+    for (let k = 0; k < 3; k += 1) {
+      const vi = at(f + k);
+      floorUvP.fromBufferAttribute(pos, vi);
+      const worldX = floorUvP.x + wx;
+      const worldY = floorUvP.y + wy;
+      const worldZ = floorUvP.z + wz;
+      const world = uKey === 'z' ? worldZ : worldX;
+      const up = vKey === 'z' ? worldZ : worldY;
+      uv.setXY(vi, world * scale, up * scale);
+    }
+  }
+  uv.needsUpdate = true;
 }
 
 function markGround(mesh) {
@@ -580,29 +663,19 @@ function tagShopFloor(mesh, kind, cell) {
 function addFloor(root, center, cell = { gx: 0, gz: 0 }) {
   const slab = SHOP_FLOOR_SLAB;
   const board = SHOP_FLOOR_PLANK;
-  const base = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(ROOM_W, slab.thickness, ROOM_D),
-    wood(0x5a3a22, 0.92),
-  ));
+  const slabGeo = new THREE.BoxGeometry(ROOM_W, slab.thickness, ROOM_D);
+  writeShopFloorUVs(slabGeo, center.x, slab.centerY, center.z);
+  const base = addShadow(new THREE.Mesh(slabGeo, shopFloorMat()));
   base.position.set(center.x, slab.centerY, center.z);
   markGround(base);
   tagShopFloor(base, 'slab', cell);
   root.add(base);
   const count = Math.ceil(ROOM_D / board.pitch);
   for (let i = 0; i < count; i += 1) {
-    const map = woodFloorMap();
-    map.repeat.set(ROOM_W / 1.4, 1);
-    const mat = new THREE.MeshStandardMaterial({
-      map,
-      color: i % 2 ? 0xc4a070 : 0xb48a58,
-      roughness: 0.88,
-      metalness: 0.04,
-    });
-    const plank = addShadow(new THREE.Mesh(
-      new THREE.BoxGeometry(ROOM_W - board.insetX, board.thickness, board.pitch - board.gap),
-      mat,
-    ));
     const z = center.z - ROOM_D / 2 + board.pitch * 0.5 + i * board.pitch;
+    const plankGeo = new THREE.BoxGeometry(ROOM_W - board.insetX, board.thickness, board.pitch - board.gap);
+    writeShopFloorUVs(plankGeo, center.x, board.centerY, z);
+    const plank = addShadow(new THREE.Mesh(plankGeo, shopFloorMat()));
     plank.position.set(center.x, board.centerY, z);
     markGround(plank);
     tagShopFloor(plank, 'plank', cell);

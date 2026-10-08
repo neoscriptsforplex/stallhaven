@@ -124,11 +124,6 @@ function cobbleMap() {
   return tex.clone();
 }
 
-const COBBLE_U = 4.2 / ROOM_W;
-/** Path-only UV scale: cobbles read about 3× smaller than the wall stone. */
-export const PATH_COBBLE_SCALE = 3;
-const PATH_COBBLE_U = COBBLE_U * PATH_COBBLE_SCALE;
-
 /**
  * Tiles of shop_wall_512.png per world metre, on both S and T.
  * The tile is 4 bricks across and 8 rows of 2:1 bricks, so one tile per metre
@@ -1970,7 +1965,7 @@ function addGarden(root, cells, expansionIds = []) {
 }
 
 /** Metres of ground covered by one seamless fountain_cobble tile. */
-export const FOUNTAIN_COBBLE_TILE_M = 3;
+export const FOUNTAIN_COBBLE_TILE_M = 0.75;
 const FOUNTAIN_COBBLE_FILE = 'fountain_cobble_512.png';
 
 /** Vite public/ root, plus raw-repo / githack paths that still include public/. */
@@ -2042,9 +2037,10 @@ function fountainCobbleMap() {
   return tex;
 }
 
-function fountainCobbleMat(repeatX, repeatY) {
+function fountainCobbleMat(repeatX, repeatY, offsetX = 0, offsetY = 0) {
   const map = fountainCobbleMap();
   map.repeat.set(repeatX, repeatY);
+  map.offset.set(offsetX, offsetY);
   const mat = new THREE.MeshStandardMaterial({
     map,
     roughness: 0.94,
@@ -2055,13 +2051,23 @@ function fountainCobbleMat(repeatX, repeatY) {
   return mat;
 }
 
+/**
+ * Plane and ring UVs both span 0..1 across their world extent. Repeat is that
+ * extent divided by the tile so stones stay square, and the offset locks every
+ * piece to the same world grid (texture V grows toward -Z after the ground tilt).
+ */
+function fountainCobbleGroundMat(spanX, spanZ, minX, maxZ) {
+  const tile = FOUNTAIN_COBBLE_TILE_M;
+  return fountainCobbleMat(spanX / tile, spanZ / tile, minX / tile, -maxZ / tile);
+}
+
 function addPathRect(root, minX, maxX, minZ, maxZ) {
   const w = maxX - minX;
   const d = maxZ - minZ;
   if (w < 0.05 || d < 0.05) return;
   const mesh = addShadow(new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
-    cobbleMat(w * PATH_COBBLE_U, d * PATH_COBBLE_U),
+    fountainCobbleGroundMat(w, d, minX, maxZ),
   ));
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set((minX + maxX) / 2, -0.008, (minZ + maxZ) / 2);
@@ -2081,10 +2087,9 @@ function addCobblePath(root, expansionIds = []) {
     const tuck = cobbleRingTuck(apron, (span.maxX - span.minX) / 2);
     addPathRect(root, span.minX, span.maxX, span.minZ, FOUNTAIN.z - apron + tuck);
     addPathRect(root, span.minX, span.maxX, FOUNTAIN.z + apron - tuck, span.maxZ);
-    const apronRepeat = (apron * 2) / FOUNTAIN_COBBLE_TILE_M;
     const ring = addShadow(new THREE.Mesh(
       new THREE.RingGeometry(FOUNTAIN.radius + 0.04, apron, 28),
-      fountainCobbleMat(apronRepeat, apronRepeat),
+      fountainCobbleGroundMat(apron * 2, apron * 2, FOUNTAIN.x - apron, FOUNTAIN.z + apron),
     ));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(FOUNTAIN.x, -0.006, FOUNTAIN.z);

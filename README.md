@@ -8,17 +8,7 @@ A free browser game.
 
 **https://neoscriptsforplex.github.io/stallhaven/**
 
-No account, no download, no paywall.
-
-If GitHub shows “Site not found”, play here while Pages is switched on:
-
-**https://raw.githack.com/neoscriptsforplex/stallhaven/play/index.html**
-
-To turn on the official GitHub Pages link (one time, free, no coding):
-
-1. Open [Settings → Pages](https://github.com/neoscriptsforplex/stallhaven/settings/pages)
-2. Under **Build and deployment**, set **Source** to **GitHub Actions** (or Branch `gh-pages`, folder `/`)
-3. Save, wait a minute, then open https://neoscriptsforplex.github.io/stallhaven/
+No account, no download, no paywall. This link updates on every merge to `main`.
 
 ## How to play
 
@@ -107,7 +97,7 @@ Brew on a placed **cauldron** from **Herbs** and **Water**: Attack (turquoise), 
 
 ## For tinkerers
 
-This is a static [Vite](https://vitejs.dev/) + [Three.js](https://threejs.org/) app. GitHub Pages serves the built files.
+This is a static [Vite](https://vitejs.dev/) + [Three.js](https://threejs.org/) app. GitHub Pages serves the repository as static files (`index.html`, `src/`, and `public/`), the same layout that runs without a build.
 
 ```bash
 npm install

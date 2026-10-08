@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -15,100 +15,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    outputs:
-      pages_enabled: ${{ steps.pages.outputs.enabled }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install
-        run: npm ci
-      - name: Test
-        run: npm test
-      - name: Build Pages
-        run: npm run build
-      - name: Build play copy
-        run: npx vite build --base=./ --outDir play-dist --emptyOutDir
-      - name: Check Pages
-        id: pages
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if gh api "repos/${GITHUB_REPOSITORY}/pages" >/dev/null 2>&1; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "GitHub Pages is not enabled yet. Skipping official deploy."
-            echo "Enable it at https://github.com/${GITHUB_REPOSITORY}/settings/pages"
-          fi
-      - name: Setup Pages
-        if: steps.pages.outputs.enabled == 'true'
-        uses: actions/configure-pages@v5
-      - name: Upload Pages artifact
-        if: steps.pages.outputs.enabled == 'true'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-      - name: Upload dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist
-      - name: Upload play copy
-        uses: actions/upload-artifact@v4
-        with:
-          name: play-dist
-          path: play-dist
-
   deploy:
-    needs: build
-    if: needs.build.outputs.pages_enabled == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-  publish-branches:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Download Pages build
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist
-      - name: Download play build
-        uses: actions/download-artifact@v4
-        with:
-          name: play-dist
-          path: play-dist
-      - name: Publish gh-pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: dist
-          publish_branch: gh-pages
-          force_orphan: true
-          user_name: github-actions[bot]
-          user_email: 41898282+github-actions[bot]@users.noreply.github.com
-      - name: Publish play
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: play-dist
-          publish_branch: play
-          force_orphan: true
-          user_name: github-actions[bot]
-          user_email: 41898282+github-actions[bot]@users.noreply.github.com

@@ -64,9 +64,9 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { cobblePathSpan, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
+import { characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, PATH_COBBLE_SCALE, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -306,34 +306,50 @@ describe('outdoor and dungeon extras', () => {
     assert.equal(ground.material?.color?.getHex?.(), 0x4f7a3a);
   });
 
-  it('tiles only the outdoor cobble path about 3× finer than shop wall stone', () => {
-    assert.equal(PATH_COBBLE_SCALE, 3);
+  it('tiles the fountain apron and outdoor path at 0.75 m per flagstone', () => {
+    assert.equal(FOUNTAIN_COBBLE_TILE_M, 0.75);
     const shop = buildShop([]).root;
-    const span = cobblePathSpan([]);
-    const pathW = span.maxX - span.minX;
-    const want = pathW * (4.2 / ROOM_W) * PATH_COBBLE_SCALE;
     let pathPlanes = 0;
     let pathRing = 0;
     let wallSlabs = 0;
     let shopBrick = 0;
+    const assertFlagstone = (map, repeatX, repeatY, offsetX, offsetY, label) => {
+      assert.ok(Math.abs(map.repeat.x - repeatX) < 1e-6, `${label} repeat.x ${map.repeat.x} vs ${repeatX}`);
+      assert.ok(Math.abs(map.repeat.y - repeatY) < 1e-6, `${label} repeat.y ${map.repeat.y} vs ${repeatY}`);
+      assert.ok(Math.abs(map.offset.x - offsetX) < 1e-6, `${label} offset.x ${map.offset.x} vs ${offsetX}`);
+      assert.ok(Math.abs(map.offset.y - offsetY) < 1e-6, `${label} offset.y ${map.offset.y} vs ${offsetY}`);
+      assert.equal(map.userData?.kind, 'fountain-cobble');
+      assert.equal(map.wrapS, THREE.RepeatWrapping);
+      assert.equal(map.wrapT, THREE.RepeatWrapping);
+      assert.equal(map.colorSpace, THREE.SRGBColorSpace);
+      assert.equal(map.anisotropy, 4);
+      assert.equal(map.generateMipmaps, true);
+      assert.equal(map.minFilter, THREE.LinearMipmapLinearFilter);
+      assert.equal(map.magFilter, THREE.LinearFilter);
+    };
     shop.traverse((child) => {
       const map = child.material?.map;
       if (!map?.repeat) return;
       if (child.userData?.pathCobble && child.geometry?.type === 'PlaneGeometry') {
-        assert.ok(Math.abs(map.repeat.x - want) < 1e-6, `path repeat.x ${map.repeat.x} vs ${want}`);
-        assert.notEqual(map.userData?.kind, 'fountain-cobble');
+        const { width, height } = child.geometry.parameters;
+        const tile = FOUNTAIN_COBBLE_TILE_M;
+        const minX = child.position.x - width / 2;
+        const maxZ = child.position.z + height / 2;
+        assertFlagstone(map, width / tile, height / tile, minX / tile, -maxZ / tile, 'path');
         pathPlanes += 1;
       }
       if (child.userData?.fountainApron && child.geometry?.type === 'RingGeometry') {
         const outer = child.geometry.parameters.outerRadius;
-        const ringWant = (outer * 2) / FOUNTAIN_COBBLE_TILE_M;
-        assert.ok(Math.abs(map.repeat.x - ringWant) < 1e-6, `ring repeat.x ${map.repeat.x} vs ${ringWant}`);
-        assert.ok(Math.abs(map.repeat.y - ringWant) < 1e-6, `ring repeat.y ${map.repeat.y} vs ${ringWant}`);
-        assert.equal(map.userData?.kind, 'fountain-cobble');
-        assert.equal(map.wrapS, THREE.RepeatWrapping);
-        assert.equal(map.wrapT, THREE.RepeatWrapping);
-        assert.equal(map.colorSpace, THREE.SRGBColorSpace);
-        assert.equal(map.anisotropy, 4);
+        const tile = FOUNTAIN_COBBLE_TILE_M;
+        const span = outer * 2;
+        assertFlagstone(
+          map,
+          span / tile,
+          span / tile,
+          (child.position.x - outer) / tile,
+          -(child.position.z + outer) / tile,
+          'ring',
+        );
         assert.equal(child.userData.pathCobble, undefined);
         pathRing += 1;
       }
@@ -344,7 +360,6 @@ describe('outdoor and dungeon extras', () => {
         wallSlabs += 1;
       }
     });
-    assert.equal(FOUNTAIN_COBBLE_TILE_M, 3);
     const cobbleUrls = fountainCobbleTextureUrls();
     assert.ok(cobbleUrls.some((url) => url.endsWith('textures/fountain_cobble_512.png')));
     assert.ok(cobbleUrls.some((url) => url.includes('public/textures/fountain_cobble_512.png')));

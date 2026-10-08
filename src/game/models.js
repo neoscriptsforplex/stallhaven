@@ -771,18 +771,21 @@ export const RAT_WALK_SPEED = RAT_WALK_UNIT_SPEED * RAT_MODEL_SCALE;
 /** Crossfade between Walk, Idle, and the gathering clips. */
 export const RIGGED_CLIP_FADE = 0.2;
 /**
- * World scale for the rigged buyer looks.
+ * World scale for rigged buyer looks that do not set their own.
  * Same 0.863 used for the player rig and the yard goblin.
+ * Mage looks set a per-model scale. Playback is always
+ * timeScale = moveSpeed / (speed * scale).
  */
 export const BUYER_MODEL_SCALE = 0.863;
 /**
- * Rigged looks that replace the adventurer, melee, and ranger OBJ dumps.
+ * Rigged looks that replace the adventurer, melee, ranger, and mage OBJ dumps.
  * speed is the no-slide Walk rate at scale 1 (m/s), matching extras.walk_speed_mps.
- * Playback is timeScale = moveSpeed / (speed * BUYER_MODEL_SCALE).
- * height is the mesh top at scale 1 (Donie's staff tip, the barbarian's horns, the salesman's hood).
+ * scale, when set, replaces BUYER_MODEL_SCALE for that look.
+ * height is the mesh top at scale 1 (Donie's staff tip, the barbarian's horns,
+ * the salesman's hood, the archmage's staff).
  * Donie's staff is rigid on Hand_R, so the carry grip uses Hand_L.
- * Melee and ranger weapons are already on the hands, so those looks set carryHand
- * to false and the purchase grip stays on the group with no extra tool attached.
+ * Melee, ranger, and mage props are already on the mesh, so those looks set
+ * carryHand to false and the purchase grip stays on the group with no extra tool.
  */
 export const RIGGED_BUYER_MODELS = [
   {
@@ -842,6 +845,54 @@ export const RIGGED_BUYER_MODELS = [
     file: 'npc/ranging_guild_doorman_rigged.glb',
     speed: 0.8554402772901675,
     height: 1.7619561333281135,
+    carryHand: false,
+  },
+  {
+    lookId: 'buyer-wizard-archmage-sedridor',
+    file: 'npc/archmage_sedridor_rigged.glb',
+    speed: 0.8372872306049526,
+    height: 2.1061288808817222,
+    scale: 0.837,
+    carryHand: false,
+  },
+  {
+    lookId: 'buyer-wizard-wizard-level-9',
+    file: 'npc/wizard_level_9_rigged.glb',
+    speed: 0.8372872306049526,
+    height: 2.0581528899830497,
+    scale: 0.837,
+    carryHand: false,
+  },
+  {
+    lookId: 'buyer-wizard-wizard-grayzag',
+    file: 'npc/wizard_grayzag_rigged.glb',
+    speed: 0.8372872306049526,
+    height: 2.04921568986809,
+    scale: 0.837,
+    carryHand: false,
+  },
+  {
+    lookId: 'buyer-wizard-wizard-jalarast',
+    file: 'npc/wizard_jalarast_rigged.glb',
+    speed: 0.8441735559023843,
+    height: 2.060020606795308,
+    scale: 0.844,
+    carryHand: false,
+  },
+  {
+    lookId: 'buyer-wizard-wizard-mizgog',
+    file: 'npc/wizard_mizgog_rigged.glb',
+    speed: 0.8372872306049526,
+    height: 1.7817847668959625,
+    scale: 0.837,
+    carryHand: false,
+  },
+  {
+    lookId: 'buyer-wizard-wizard-traiborn',
+    file: 'npc/wizard_traiborn_rigged.glb',
+    speed: 0.8372872306049526,
+    height: 2.0669583667751423,
+    scale: 0.837,
     carryHand: false,
   },
 ];
@@ -3879,7 +3930,7 @@ function riggedBuyerSpec(lookId) {
  * nameplate, speech bubble, click box, and ring. Walk and Idle crossfade
  * on the same mixer path as the goblin. Facing stays +Z; walkToward yaws the group.
  * Donie's staff is already on Hand_R, so her purchase grip uses Hand_L.
- * Melee and ranger weapons are baked onto the hands, so those grips stay off the skeleton.
+ * Melee, ranger, and mage props are baked into the mesh, so those grips stay off the skeleton.
  */
 export function wrapRiggedBuyer(gltf, typeId, opts = {}) {
   const spec = riggedBuyerSpec(opts.lookId);
@@ -3888,13 +3939,14 @@ export function wrapRiggedBuyer(gltf, typeId, opts = {}) {
   const walkClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Walk');
   const idleClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Idle');
   if (!walkClip || !idleClip) throw new Error(`Rigged buyer ${spec.lookId} is missing Walk or Idle.`);
+  const scale = spec.scale ?? BUYER_MODEL_SCALE;
 
   const visual = cloneSkinned(gltf.scene);
   visual.name = 'rigged-buyer';
   visual.rotation.y = RIGGED_FACING_YAW;
   hideWalkDebug(visual);
   prepareRiggedSurface(visual);
-  visual.scale.setScalar(BUYER_MODEL_SCALE);
+  visual.scale.setScalar(scale);
 
   const mixer = new THREE.AnimationMixer(visual);
   const walk = mixer.clipAction(walkClip);
@@ -3915,7 +3967,7 @@ export function wrapRiggedBuyer(gltf, typeId, opts = {}) {
   }
   const box = new THREE.Box3().setFromObject(visual);
   const meshHeight = Math.max(0.9, box.max.y - Math.min(0, box.min.y));
-  const labelTop = Math.max(meshHeight, spec.height * BUYER_MODEL_SCALE);
+  const labelTop = Math.max(meshHeight, spec.height * scale);
 
   const group = new THREE.Group();
   group.name = typeId;
@@ -3963,19 +4015,19 @@ export function wrapRiggedBuyer(gltf, typeId, opts = {}) {
     group.add(grip);
   }
 
-  const walkStride = spec.speed * BUYER_MODEL_SCALE;
+  const walkStride = spec.speed * scale;
   group.userData.clipLocomotion = {
     mixer,
     walk,
     idle,
-    modelScale: BUYER_MODEL_SCALE,
+    modelScale: scale,
     walkStride,
     mode: 'idle',
     speed: 0,
     gather: null,
     eventPrev: null,
   };
-  group.userData.modelScale = BUYER_MODEL_SCALE;
+  group.userData.modelScale = scale;
   group.userData.walkPhase = 0;
   group.userData.speech = speech;
   group.userData.pick = pick;

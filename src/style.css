@@ -1328,3 +1328,31 @@ html.is-booting #save-bar {
     right: 8px;
   }
 }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .sheet.craft-sheet,
+  #potion-modal .sheet.craft-sheet {
+    overflow-y: auto;
+  }
+
+  .craft-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(12rem, min(40vh, 22rem)) auto;
+    max-height: none;
+  }
+
+  .craft-sheet > .craft-body {
+    flex-shrink: 0;
+  }
+
+  .craft-preview-pane {
+    order: 0;
+  }
+
+  .craft-sheet #crafts,
+  .craft-sheet #potion-crafts {
+    min-height: 12rem;
+    height: clamp(12rem, 40vh, 22rem);
+    overflow: auto;
+  }
+}

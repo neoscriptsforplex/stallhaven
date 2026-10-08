@@ -35,8 +35,10 @@
   border: 1px solid #4a301c;
 }
 
-*::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(#f0d27a, #c45a32);
+@media (hover: hover) {
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(#f0d27a, #c45a32);
+  }
 }
 
 *::-webkit-scrollbar-corner {
@@ -176,9 +178,11 @@ body {
   cursor: pointer;
 }
 
-.minimap-compass button:hover,
-.minimap-zoom button:hover {
-  background: rgba(56, 36, 18, 0.88);
+@media (hover: hover) {
+  .minimap-compass button:hover,
+  .minimap-zoom button:hover {
+    background: rgba(56, 36, 18, 0.88);
+  }
 }
 
 .shop-xp {
@@ -458,8 +462,10 @@ button {
   padding: 6px 9px;
 }
 
-button:hover:not(:disabled) {
-  background: linear-gradient(#7c5132, #4a2e1a);
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    background: linear-gradient(#7c5132, #4a2e1a);
+  }
 }
 
 button:disabled {
@@ -1338,6 +1344,7 @@ html.is-booting #save-bar {
   .craft-body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(12rem, min(40vh, 22rem)) auto;
+    grid-template-rows: minmax(12rem, min(40dvh, 22rem)) auto;
     max-height: none;
   }
 
@@ -1353,6 +1360,7 @@ html.is-booting #save-bar {
   .craft-sheet #potion-crafts {
     min-height: 12rem;
     height: clamp(12rem, 40vh, 22rem);
+    height: clamp(12rem, 40dvh, 22rem);
     overflow: auto;
   }
 }
@@ -1361,6 +1369,7 @@ html.is-booting #save-bar {
 @media (orientation: portrait) and (pointer: coarse) {
   :root {
     --portrait-thumb: 64px;
+    --portrait-thumb: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 
   #save-bar {
@@ -1376,6 +1385,11 @@ html.is-booting #save-bar {
     align-items: stretch;
     gap: 4px;
     padding: 8px 4px;
+    padding:
+      8px
+      max(4px, env(safe-area-inset-right, 0px))
+      calc(8px + env(safe-area-inset-bottom, 0px))
+      max(4px, env(safe-area-inset-left, 0px));
     background: var(--panel);
     border-top: 1px solid var(--line);
   }
@@ -1398,11 +1412,144 @@ html.is-booting #save-bar {
 
   /* Docks open from the top and end above the bar, so their buttons stay clear. */
   .expand-dock {
+    top: 58px;
+    top: calc(58px + env(safe-area-inset-top, 0px));
+    right: 16px;
+    right: max(16px, env(safe-area-inset-right, 0px));
     max-height: calc(100vh - 58px - var(--portrait-thumb) - 8px);
+    max-height: calc(100dvh - 58px - env(safe-area-inset-top, 0px) - var(--portrait-thumb) - 8px);
   }
 
   /* Sheets sit above the bar. Craft and cauldron keep the layout from PR #99. */
+  .modal {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
   .modal:not(#craft-modal):not(#potion-modal) {
     padding-bottom: var(--portrait-thumb);
+  }
+}
+
+/* Phone portrait: dynamic viewport, so the browser toolbar does not cover full-height UI. */
+@media (orientation: portrait) and (pointer: coarse) {
+  html,
+  body {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  body {
+    position: relative;
+  }
+
+  #view,
+  #boot-cover,
+  #nowebgl {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  #hud {
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    left: calc(16px + env(safe-area-inset-left, 0px));
+    max-height: calc(100vh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .sheet {
+    max-height: calc(min(88vh, 820px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(min(88dvh, 820px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .chest-sheet {
+    max-height: calc(min(82vh, 720px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(min(82dvh, 720px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .craft-sheet,
+  #potion-modal .craft-sheet {
+    max-height: calc(min(92vh, 920px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(min(92dvh, 920px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  #chest-items {
+    max-height: calc(min(52vh, 440px) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(min(52dvh, 440px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .offer-list {
+    max-height: min(40vh, 320px);
+    max-height: min(40dvh, 320px);
+  }
+
+  .playlist {
+    max-height: min(36vh, 280px);
+    max-height: min(36dvh, 280px);
+  }
+
+  [data-recipes] {
+    max-height: 40vh;
+    max-height: 40dvh;
+  }
+
+  h2 {
+    font-size: clamp(0.78rem, 0.72rem + 0.4vw, 0.95rem);
+  }
+
+  .sheet h2 {
+    font-size: clamp(1.05rem, 0.95rem + 1.1vw, 1.35rem);
+  }
+
+  .tab,
+  .meta,
+  .line,
+  .mat,
+  #shop-level,
+  .active-craft p {
+    font-size: clamp(0.78rem, 0.72rem + 0.4vw, 0.9rem);
+  }
+
+  .group,
+  .mat-crafted,
+  .craft-qty-hint,
+  .active-craft-yield,
+  .offer-was,
+  .restock,
+  .craft-qty button {
+    font-size: clamp(0.78rem, 0.7rem + 0.45vw, 0.9rem);
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 720px) {
+  #hud {
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    left: calc(8px + env(safe-area-inset-left, 0px));
+    width: min(220px, calc(100vw - 16px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    max-height: calc(100vh - 11rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 11rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Touch only: block double-tap zoom on the UI. The canvas keeps pinch for the camera. */
+@media (pointer: coarse) {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body,
+  button,
+  .sheet,
+  .expand-dock,
+  #hud,
+  #save-bar,
+  .modal,
+  .minimap,
+  .furn-menu,
+  .inspect-pop {
+    touch-action: manipulation;
   }
 }

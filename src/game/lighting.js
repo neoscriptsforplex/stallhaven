@@ -30,8 +30,12 @@ export const BRIGHTNESS_STORAGE_KEY = 'stallhaven-brightness';
 /** Dungeon-only slider: 0% to 150% of the cave baseline. Independent of shop brightness. */
 export const DUNGEON_BRIGHTNESS_MIN = 0;
 export const DUNGEON_BRIGHTNESS_MAX = 1.5;
+/** New players, unset settings, and a stored 100% baseline start at the slider maximum. */
 export const DEFAULT_DUNGEON_BRIGHTNESS = DUNGEON_BRIGHTNESS_MAX;
-export const DUNGEON_BRIGHTNESS_STORAGE_KEY = 'stallhaven-dungeon-brightness';
+/** 100% cave baseline. A stored copy of this previous default is raised to the slider max once. */
+export const LEGACY_DEFAULT_DUNGEON_BRIGHTNESS = 1;
+const LEGACY_DUNGEON_BRIGHTNESS_STORAGE_KEY = 'stallhaven-dungeon-brightness';
+export const DUNGEON_BRIGHTNESS_STORAGE_KEY = 'stallhaven-dungeon-brightness-v2';
 export const PHOTO_MODE_STORAGE_KEY = 'stallhaven-photo-mode';
 
 export function clampBrightness(value, fallback = DEFAULT_BRIGHTNESS) {
@@ -66,23 +70,42 @@ export function writeStoredBrightness(value) {
   }
 }
 
+function isLegacyDefaultDungeonBrightness(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) && Math.abs(n - LEGACY_DEFAULT_DUNGEON_BRIGHTNESS) < 1e-6;
+}
+
 export function readStoredDungeonBrightness() {
   if (typeof localStorage === 'undefined') return DEFAULT_DUNGEON_BRIGHTNESS;
   try {
     const raw = localStorage.getItem(DUNGEON_BRIGHTNESS_STORAGE_KEY);
-    if (raw == null || raw === '') return DEFAULT_DUNGEON_BRIGHTNESS;
-    return clampDungeonBrightness(raw, DEFAULT_DUNGEON_BRIGHTNESS);
+    if (raw != null && raw !== '') return clampDungeonBrightness(raw, DEFAULT_DUNGEON_BRIGHTNESS);
+    const legacy = localStorage.getItem(LEGACY_DUNGEON_BRIGHTNESS_STORAGE_KEY);
+    if (legacy == null || legacy === '') return DEFAULT_DUNGEON_BRIGHTNESS;
+    const migrated = isLegacyDefaultDungeonBrightness(legacy)
+      ? DEFAULT_DUNGEON_BRIGHTNESS
+      : clampDungeonBrightness(legacy, DEFAULT_DUNGEON_BRIGHTNESS);
+    if (writeStoredDungeonBrightness(migrated)) {
+      try {
+        localStorage.removeItem(LEGACY_DUNGEON_BRIGHTNESS_STORAGE_KEY);
+      } catch {
+        // The versioned key already holds the migrated value.
+      }
+    }
+    return migrated;
   } catch {
     return DEFAULT_DUNGEON_BRIGHTNESS;
   }
 }
 
 export function writeStoredDungeonBrightness(value) {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof localStorage === 'undefined') return false;
   try {
     localStorage.setItem(DUNGEON_BRIGHTNESS_STORAGE_KEY, String(clampDungeonBrightness(value)));
+    return true;
   } catch {
     // Private mode / quota — save JSON still keeps the value.
+    return false;
   }
 }
 

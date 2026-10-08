@@ -1115,10 +1115,19 @@ html.is-booting #save-bar {
   visibility: hidden;
 }
 
+html.is-booting.is-scene-live #view {
+  visibility: visible !important;
+}
+
 #boot-cover {
   position: fixed;
   inset: 0;
   z-index: 40;
+  height: 100vh;
+  height: 100dvh;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -1142,6 +1151,36 @@ html.is-booting #save-bar {
 #boot-cover.is-leaving {
   opacity: 0;
   pointer-events: none;
+}
+
+#boot-cover.is-ready {
+  cursor: pointer;
+}
+
+#boot-cover.is-ready .boot-bar {
+  animation: none;
+  opacity: 0;
+}
+
+#boot-cover.is-ready .boot-track {
+  height: auto;
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+#boot-cover.is-ready [data-boot-label] {
+  letter-spacing: 0.08em;
+  font-size: 1.05rem;
+  padding: 10px 0;
+}
+
+#boot-cover.is-ready:focus {
+  outline: none;
+}
+
+#boot-cover.is-ready:focus-visible .boot-track {
+  border-color: rgba(248, 241, 226, 0.85);
+  box-shadow: 0 0 0 2px rgba(227, 179, 74, 0.55), 0 8px 22px rgba(0, 0, 0, 0.35);
 }
 
 #boot-cover[hidden] {
@@ -1469,6 +1508,18 @@ html.is-booting #save-bar {
   }
 }
 
+@media (orientation: landscape) and (pointer: coarse) {
+  #boot-cover {
+    height: 100vh;
+    height: 100dvh;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+
+  #boot-cover .boot-track {
+    width: min(22rem, 70vw);
+  }
+}
+
 /* Phone portrait: dynamic viewport, so the browser toolbar does not cover full-height UI. */
 @media (orientation: portrait) and (pointer: coarse) {
   html,
@@ -1753,6 +1804,7 @@ html.is-booting #save-bar {
   .expand-dock,
   #hud,
   #save-bar,
+  #boot-cover,
   .modal,
   .minimap,
   .furn-menu,

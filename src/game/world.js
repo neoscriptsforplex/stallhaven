@@ -2962,8 +2962,20 @@ export function createWorld(canvas, state, opts = {}) {
     shopkeeper.rotation.y = Math.PI;
   }
 
+  async function warmScene() {
+    syncLighting(sceneMode);
+    try {
+      if (typeof renderer.compileAsync === 'function') await renderer.compileAsync(scene, camera);
+      else renderer.compile?.(scene, camera);
+    } catch {
+      // Shader warmup is best-effort. Frames under the loader still draw the lit shop.
+    }
+    renderer.render(scene, camera);
+  }
+
   return {
     tick,
+    warmScene,
     syncDisplays,
     refreshSelection,
     replaceFurniture,

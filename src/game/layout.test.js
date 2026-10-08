@@ -52,6 +52,8 @@ import {
   gardenBox,
   cobblePathSpan,
   cobbleRingTuck,
+  cobblePathGate,
+  buyerCobbleRoute,
   keepFountain,
   keepGardenSpot,
   FOUNTAIN,
@@ -87,7 +89,7 @@ import {
   shopFloorFootprint,
   characterGroundY,
 } from './layout.js';
-import { FLOOR, isWalkable, shopObstacles } from './nav.js';
+import { FLOOR, gardenObstacles, isWalkable, shopObstacles } from './nav.js';
 import { SHOP } from './catalog.js';
 
 describe('layout numbers', () => {
@@ -279,6 +281,42 @@ describe('layout numbers', () => {
     assert.ok(tuck > apron - side, 'straight path should pass the side intersection');
     assert.ok(FOUNTAIN.z - apron + tuck < FOUNTAIN.z - (FOUNTAIN.radius + 0.04));
     assert.ok(FOUNTAIN.z + apron <= grass.maxZ);
+  });
+
+  it('spawns buyers at the far cobble edge and walks them past the fountain', () => {
+    const grass = gardenBox([]);
+    const span = cobblePathSpan([]);
+    const gate = cobblePathGate();
+    const route = buyerCobbleRoute();
+    assert.deepEqual(route.spawn, gate);
+    assert.ok(gate.z > FOUNTAIN.z + 2, 'spawn is the far end, past the fountain');
+    assert.ok(gate.z <= span.maxZ);
+    assert.ok(gate.z > span.maxZ - 0.4, 'spawn sits on the end of the cobble');
+    assert.ok(gate.z > grass.maxZ - 0.45, 'spawn sits at the grass edge');
+    assert.ok(Math.abs(gate.x) < 0.05);
+    assert.equal(pointOnPath(gate.x, gate.z, [], 0), true);
+    assert.equal(
+      isWalkable(gate.x, gate.z, gardenObstacles([]), 0.28, playerWalkFloors([])),
+      true,
+      'spawn must be walkable ground',
+    );
+    assert.ok(route.toDoor.length >= 3, 'route bows around the fountain');
+    const door = { x: SHOP.door.x, z: SHOP.door.z + 0.35 };
+    const line = [route.spawn, ...route.toDoor, door];
+    for (let i = 1; i < line.length; i += 1) {
+      assert.ok(line[i].z < line[i - 1].z, 'route heads up the path toward the shop');
+      const steps = 20;
+      for (let s = 0; s <= steps; s += 1) {
+        const t = s / steps;
+        const x = line[i - 1].x + (line[i].x - line[i - 1].x) * t;
+        const z = line[i - 1].z + (line[i].z - line[i - 1].z) * t;
+        const dist = Math.hypot(x - FOUNTAIN.x, z - FOUNTAIN.z);
+        assert.ok(dist > FOUNTAIN.radius + 0.22, `route clips the basin at ${x.toFixed(2)},${z.toFixed(2)}`);
+      }
+    }
+    const leave = [...route.toDoor].reverse();
+    assert.ok(leave[leave.length - 1].z < route.spawn.z, 'the way out ends at the grass-edge gate');
+    assert.ok(leave[0].z < FOUNTAIN.z, 'leaving buyers pass the fountain on the way out');
   });
 
   it('clears grass and garden beds in a side-expansion footprint like trees', () => {

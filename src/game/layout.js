@@ -675,6 +675,41 @@ export function cobbleRingTuck(apron = FOUNTAIN.apron ?? 1.42, halfW = PATH_HALF
   return (apron - side) + 0.14;
 }
 
+/**
+ * Far end of the cobble, at the grass edge. Buyers appear here and walk
+ * back out to the same spot. Inset so a standing body is on the stones
+ * and inside the lawn.
+ */
+export function cobblePathGate(expansionIds = [], radius = 0.28) {
+  const span = cobblePathSpan(expansionIds);
+  const grass = gardenBox(expansionIds);
+  const x = (span.minX + span.maxX) / 2;
+  const z = Math.min(span.maxZ - 0.02, grass.maxZ - Math.max(0, radius) - 0.01);
+  return { x, z };
+}
+
+/**
+ * Walk from the path gate up the cobble to the shop side of the fountain.
+ * The basin fills the straight path, so the route bows onto the apron.
+ */
+export function buyerCobbleRoute(expansionIds = [], radius = 0.28) {
+  const spawn = cobblePathGate(expansionIds, radius);
+  const toDoor = [];
+  const apron = FOUNTAIN.apron ?? 1.42;
+  if (!keepFountain(expansionIds) || !(FOUNTAIN.z < spawn.z - apron)) return { spawn, toDoor };
+  const passR = Math.min(apron - 0.18, FOUNTAIN.radius + 0.52);
+  const bow = (turn) => ({
+    x: FOUNTAIN.x + Math.sin(turn) * passR,
+    z: FOUNTAIN.z + Math.cos(turn) * passR,
+  });
+  const ahead = { x: spawn.x, z: FOUNTAIN.z + apron + 0.2 };
+  const back = { x: spawn.x, z: FOUNTAIN.z - apron - 0.2 };
+  if (ahead.z < spawn.z - 0.35) toDoor.push(ahead);
+  toDoor.push(bow(Math.PI * 0.21), bow(Math.PI / 2), bow(Math.PI * 0.79));
+  if (back.z > PATH_START_Z + 0.4) toDoor.push(back);
+  return { spawn, toDoor };
+}
+
 export function pointHitsShop(x, z, expansionIds = [], pad = 1.15) {
   return occupiedCells(expansionIds).some((cell) => {
     const c = roomCenter(cell.gx, cell.gz);

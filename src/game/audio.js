@@ -37,6 +37,12 @@ let shuffle = false;
 let loopTrack = false;
 let autoplayArmed = false;
 let autoplayCancelled = false;
+let pageHidden = false;
+let holdMusic = false;
+let holdContext = false;
+let visibilityBound = false;
+let visibilityDoc = null;
+let visibilityWin = null;
 export const DEFAULT_AUTOPLAY_TRACK = 'Newbie Melody';
 
 function makeAudioElement(url, { preload = 'auto' } = {}) {
@@ -304,11 +310,13 @@ export async function playMusic() {
 
 export function pauseMusic() {
   if (!bg) return;
+  holdMusic = false;
   bg.pause();
 }
 
 export function stopMusic() {
   cancelMusicAutoplay();
+  holdMusic = false;
   stopCurrent(true);
 }
 
@@ -429,8 +437,127 @@ export async function startMusicOnLoad({
   return { played, track: getMusicTrackName(), reason: played ? 'playing' : 'gesture' };
 }
 
+function ignoreRejection(result) {
+  if (result && typeof result.catch === 'function') result.catch(() => {});
+}
+
+function suspendHeldContext() {
+  if (!ctx || ctx.state !== 'running' || typeof ctx.suspend !== 'function') return;
+  try {
+    ignoreRejection(ctx.suspend());
+  } catch {
+    // suspend() can throw if the context is already closing
+  }
+}
+
+function suspendAudioForHiddenPage() {
+  if (pageHidden) return;
+  pageHidden = true;
+  if (bg && !bg.paused) holdMusic = true;
+  if (holdMusic && bg) {
+    try { bg.pause(); } catch { /* element already stopped */ }
+  }
+  if (ctx && (ctx.state === 'running' || ctx.state === 'interrupted')) holdContext = true;
+  suspendHeldContext();
+}
+
+function resumeHeldContext() {
+  if (!holdContext || !ctx || typeof ctx.resume !== 'function' || ctx.state === 'closed') return;
+  if (ctx.state === 'running') {
+    holdContext = false;
+    return;
+  }
+  let pending;
+  try {
+    pending = ctx.resume();
+  } catch {
+    return;
+  }
+  const finish = () => {
+    if (pageHidden || !holdContext) {
+      suspendHeldContext();
+      return;
+    }
+    holdContext = false;
+  };
+  if (pending && typeof pending.then === 'function') pending.then(finish, () => {});
+  else finish();
+}
+
+function resumeHeldMusic() {
+  if (!holdMusic || !bg) return;
+  bg.volume = volume;
+  let pending;
+  try {
+    pending = bg.play();
+  } catch {
+    return;
+  }
+  const finish = () => {
+    if (pageHidden || !holdMusic) {
+      try { bg.pause(); } catch { /* ignore */ }
+      return;
+    }
+    holdMusic = false;
+  };
+  if (pending && typeof pending.then === 'function') pending.then(finish, () => {});
+  else finish();
+}
+
+function resumeAudioForVisiblePage() {
+  if (!pageHidden) return;
+  pageHidden = false;
+  resumeHeldContext();
+  resumeHeldMusic();
+}
+
+function onVisibilityChange() {
+  if (typeof document !== 'undefined' && document.hidden) suspendAudioForHiddenPage();
+  else resumeAudioForVisiblePage();
+}
+
+function onPageHide() {
+  suspendAudioForHiddenPage();
+}
+
+function onPageShow() {
+  // A load-time pageshow must not start audio; only undo a hide we already applied.
+  resumeAudioForVisiblePage();
+}
+
+function unbindPageVisibility() {
+  if (!visibilityBound) return;
+  visibilityDoc?.removeEventListener('visibilitychange', onVisibilityChange);
+  visibilityWin?.removeEventListener('pagehide', onPageHide);
+  visibilityWin?.removeEventListener('pageshow', onPageShow);
+  visibilityBound = false;
+  visibilityDoc = null;
+  visibilityWin = null;
+}
+
+/** Pause music and the shared AudioContext while the tab or app is backgrounded. */
+export function installPageVisibilityAudio() {
+  const doc = typeof document !== 'undefined' ? document : null;
+  const win = typeof window !== 'undefined' ? window : null;
+  if (!doc && !win) return;
+  if (visibilityBound && visibilityDoc === doc && visibilityWin === win) return;
+  unbindPageVisibility();
+  visibilityBound = true;
+  visibilityDoc = doc;
+  visibilityWin = win;
+  doc?.addEventListener('visibilitychange', onVisibilityChange);
+  win?.addEventListener('pagehide', onPageHide);
+  win?.addEventListener('pageshow', onPageShow);
+}
+
+installPageVisibilityAudio();
+
 /** Test-only: drop playlist/autoplay state between cases. */
 export function resetMusicForTests() {
+  unbindPageVisibility();
+  pageHidden = false;
+  holdMusic = false;
+  holdContext = false;
   autoplayArmed = false;
   autoplayCancelled = false;
   clearMusic();

@@ -9,8 +9,10 @@ import {
   addMusicUrl,
   getMusicTrackName,
   getMusicVolume,
+  installPageVisibilityAudio,
   isLooping,
   isMusicPlaying,
+  pauseMusic,
   resetMusicForTests,
   setLoop,
   startMusicOnLoad,
@@ -223,5 +225,180 @@ describe('startMusicOnLoad', () => {
     releaseResume();
     await pending;
     assert.equal(resumed, true);
+  });
+});
+
+describe('page visibility audio', () => {
+  const OriginalAudio = globalThis.Audio;
+  let playCalls = 0;
+  let rejectPlay = false;
+  let audioContext = null;
+  const docListeners = {};
+  const winListeners = {};
+
+  function installEnv() {
+    playCalls = 0;
+    rejectPlay = false;
+    audioContext = null;
+    for (const key of Object.keys(docListeners)) delete docListeners[key];
+    for (const key of Object.keys(winListeners)) delete winListeners[key];
+    class FakeAudio {
+      constructor(url) {
+        this.src = url;
+        this.paused = true;
+        this.volume = 1;
+        this.loop = false;
+        this.preload = '';
+        this.playsInline = false;
+        this.currentTime = 0;
+        this.onended = null;
+      }
+      setAttribute() {}
+      play() {
+        playCalls += 1;
+        if (rejectPlay) return Promise.reject(new Error('NotAllowedError'));
+        this.paused = false;
+        return Promise.resolve();
+      }
+      pause() {
+        this.paused = true;
+      }
+    }
+    class FakeAC {
+      constructor() {
+        audioContext = this;
+        this.state = 'suspended';
+        this.currentTime = 0;
+        this.suspends = 0;
+        this.resumes = 0;
+      }
+      suspend() {
+        this.suspends += 1;
+        this.state = 'suspended';
+        return Promise.resolve();
+      }
+      resume() {
+        this.resumes += 1;
+        this.state = 'running';
+        return Promise.resolve();
+      }
+    }
+    globalThis.Audio = FakeAudio;
+    globalThis.document = {
+      hidden: false,
+      addEventListener(type, fn) { docListeners[type] = fn; },
+      removeEventListener(type) { delete docListeners[type]; },
+    };
+    globalThis.window = {
+      AudioContext: FakeAC,
+      addEventListener(type, fn) { winListeners[type] = fn; },
+      removeEventListener(type) { delete winListeners[type]; },
+    };
+    installPageVisibilityAudio();
+  }
+
+  function hidePage() {
+    globalThis.document.hidden = true;
+    docListeners.visibilitychange();
+    winListeners.pagehide();
+  }
+
+  function showPage() {
+    globalThis.document.hidden = false;
+    winListeners.pageshow();
+    docListeners.visibilitychange();
+  }
+
+  afterEach(() => {
+    resetMusicForTests();
+    if (OriginalAudio) globalThis.Audio = OriginalAudio;
+    else delete globalThis.Audio;
+    delete globalThis.document;
+    delete globalThis.window;
+  });
+
+  it('does not start music on pageshow before the play gesture', async () => {
+    installEnv();
+    await addMusicUrl('newbie.ogg', 'Newbie Melody');
+    winListeners.pageshow();
+    hidePage();
+    showPage();
+    assert.equal(playCalls, 0);
+    assert.equal(isMusicPlaying(), false);
+    assert.equal(audioContext, null);
+  });
+
+  it('pauses playing music and the audio context while hidden, then resumes both', async () => {
+    installEnv();
+    await addMusicUrl('newbie.ogg', 'Newbie Melody');
+    unlockAudio();
+    const result = await startMusicOnLoad({ volume: 0.4 });
+    assert.equal(result.played, true);
+    const playsAfterStart = playCalls;
+    const resumesAfterUnlock = audioContext.resumes;
+    hidePage();
+    assert.equal(isMusicPlaying(), false);
+    assert.equal(audioContext.state, 'suspended');
+    assert.equal(audioContext.suspends, 1);
+    showPage();
+    assert.equal(isMusicPlaying(), true);
+    assert.equal(getMusicVolume(), 0.4);
+    assert.equal(getMusicTrackName(), 'Newbie Melody');
+    assert.equal(audioContext.state, 'running');
+    assert.equal(playCalls, playsAfterStart + 1);
+    assert.equal(audioContext.resumes, resumesAfterUnlock + 1);
+    assert.equal(audioContext.suspends, 1);
+  });
+
+  it('does not resume music that was paused or stopped before the page was shown', async () => {
+    installEnv();
+    await addMusicUrl('newbie.ogg', 'Newbie Melody');
+    await startMusicOnLoad({ volume: 0.75 });
+    pauseMusic();
+    const playsAfterPause = playCalls;
+    hidePage();
+    showPage();
+    assert.equal(isMusicPlaying(), false);
+    assert.equal(playCalls, playsAfterPause);
+
+    await startMusicOnLoad({ volume: 0.75 });
+    stopMusic();
+    const playsAfterStop = playCalls;
+    hidePage();
+    showPage();
+    assert.equal(isMusicPlaying(), false);
+    assert.equal(playCalls, playsAfterStop);
+  });
+
+  it('leaves a muted load silent and still suspends a running context', async () => {
+    installEnv();
+    await addMusicUrl('newbie.ogg', 'Newbie Melody');
+    unlockAudio();
+    const result = await startMusicOnLoad({ volume: 0, muted: true });
+    assert.equal(result.reason, 'muted');
+    assert.equal(audioContext.state, 'running');
+    hidePage();
+    assert.equal(audioContext.state, 'suspended');
+    showPage();
+    assert.equal(isMusicPlaying(), false);
+    assert.equal(playCalls, 0);
+    assert.equal(audioContext.state, 'running');
+    assert.equal(getMusicVolume(), 0);
+  });
+
+  it('swallows a rejected play() when resuming music', async () => {
+    installEnv();
+    await addMusicUrl('newbie.ogg', 'Newbie Melody');
+    await startMusicOnLoad({ volume: 0.75 });
+    hidePage();
+    rejectPlay = true;
+    const rejections = [];
+    const onReject = (err) => rejections.push(err);
+    process.on('unhandledRejection', onReject);
+    showPage();
+    await new Promise((resolve) => setImmediate(resolve));
+    process.off('unhandledRejection', onReject);
+    assert.equal(rejections.length, 0);
+    assert.equal(isMusicPlaying(), false);
   });
 });

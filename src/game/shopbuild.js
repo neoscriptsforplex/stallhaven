@@ -916,6 +916,99 @@ function addRoofGables(group, center, neigh, ridgeY) {
   }
 }
 
+/** Metres of awning slope covered by one awning board tile. */
+export const AWNING_TILE_M = 2;
+const AWNING_FILE = 'awning_512.png';
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function awningTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${AWNING_FILE}`,
+    `${envBase}public/textures/${AWNING_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${AWNING_FILE}`, `./public/textures/${AWNING_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let awningSource = null;
+
+function configureAwningTexture(tex) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.repeat.set(1, 1);
+  tex.offset.set(0, 0);
+  tex.userData.kind = 'awning';
+  return tex;
+}
+
+function applyAwningImage(loaded) {
+  if (!awningSource || !loaded?.image) return;
+  awningSource.image = loaded.image;
+  awningSource.needsUpdate = true;
+}
+
+function beginAwningLoad() {
+  const urls = awningTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyAwningImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Wrap and repeat still apply.
+    }
+  };
+  attempt(0);
+}
+
+function awningMap() {
+  if (!awningSource) {
+    awningSource = configureAwningTexture(new THREE.Texture());
+    beginAwningLoad();
+  }
+  return awningSource;
+}
+
+function awningMat() {
+  const mat = new THREE.MeshStandardMaterial({
+    map: awningMap(),
+    // White leaves the dark boards as painted. A lighter tint would brighten them.
+    color: 0xffffff,
+    roughness: 0.92,
+    metalness: 0,
+    side: THREE.DoubleSide,
+  });
+  mat.userData.awning = true;
+  return mat;
+}
+
+/**
+ * U runs along the length (local X), so the boards follow the awning.
+ * V is 0 at the outer lip — the bottom of the image — and increases
+ * toward the wall by distance along the slope (local Z), not by vertical
+ * rise. flipY stays at the default, so V is not flipped.
+ */
+function writeAwningUVs(geo) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  const lipZ = geo.parameters.depth / 2;
+  const scale = 1 / AWNING_TILE_M;
+  for (let i = 0; i < pos.count; i += 1) {
+    const alongSlope = lipZ - pos.getZ(i);
+    uv.setXY(i, pos.getX(i) * scale, alongSlope * scale);
+  }
+  uv.needsUpdate = true;
+}
+
 function addOriginFront(root, center) {
   const beam = wood(0x3c2616, 0.78);
   const doorHalf = 0.58;
@@ -961,10 +1054,10 @@ function addOriginFront(root, center) {
   const outerY = oldCenterY - oldHalf * awningSin;
   const wallOuterZ = center.z + ROOM_D / 2 + 0.08;
   const awningHalf = (outerZ - wallOuterZ) / (2 * awningCos);
-  const awning = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(8.1, 0.06, awningHalf * 2),
-    cloth(0x8b4336),
-  ));
+  const awningGeo = new THREE.BoxGeometry(8.1, 0.06, awningHalf * 2);
+  writeAwningUVs(awningGeo);
+  const awning = addShadow(new THREE.Mesh(awningGeo, awningMat()));
+  awning.name = 'awning';
   awning.position.set(center.x, outerY + awningHalf * awningSin, wallOuterZ + awningHalf * awningCos);
   awning.rotation.x = awningTilt;
   root.add(awning);

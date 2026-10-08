@@ -3,7 +3,7 @@ import { completeCrafts, createState, pushLog, tickMaterials } from './game/econ
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
 import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledRiggedGoblin, loadBundledRiggedRat, loadBundledRiggedBuyers, loadBundledLooks } from './game/upload.js';
-import { loadBundledMusic } from './game/audio.js';
+import { loadBundledMusic, unlockAudio } from './game/audio.js';
 import { createWorld } from './game/world.js';
 import { normalizeImported, setBundledLooks, setRiggedBuyers } from './game/models.js';
 
@@ -32,13 +32,89 @@ function setBootProgress(done, total) {
   if (bootLabel) bootLabel.textContent = 'Loading';
 }
 
-function hideBootCover() {
-  document.documentElement.classList.remove('is-booting');
+function hideBootCover({ immediate = false } = {}) {
+  document.documentElement.classList.remove('is-booting', 'is-scene-live');
   if (!bootCover) return;
+  if (immediate) {
+    bootCover.classList.remove('is-leaving');
+    bootCover.hidden = true;
+    return;
+  }
   bootCover.classList.add('is-leaving');
   window.setTimeout(() => {
     bootCover.hidden = true;
   }, 380);
+}
+
+function playPromptLabel() {
+  const coarse = window.matchMedia?.('(pointer: coarse)')?.matches;
+  return coarse ? 'Tap to play' : 'Click to play';
+}
+
+function showPlayPrompt() {
+  const label = playPromptLabel();
+  if (bootBar) {
+    bootBar.style.width = '100%';
+    bootBar.classList.add('is-progress', 'is-ready');
+  }
+  if (bootLabel) bootLabel.textContent = label;
+  if (!bootCover) return;
+  bootCover.classList.add('is-ready');
+  bootCover.tabIndex = 0;
+  bootCover.setAttribute('role', 'button');
+  bootCover.setAttribute('aria-label', label);
+}
+
+function isPlayKey(event) {
+  return event.key === 'Enter' || event.key === ' ' || event.code === 'Space';
+}
+
+function waitForPlayGesture(onGesture) {
+  if (!bootCover) {
+    onGesture();
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    let started = false;
+    const begin = (event) => {
+      if (event.type === 'keydown') {
+        if (event.repeat || !isPlayKey(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+      } else if (event.button != null && event.button > 0) {
+        return;
+      } else {
+        event.preventDefault?.();
+        event.stopPropagation?.();
+      }
+      if (started) return;
+      started = true;
+      detach();
+      onGesture();
+      resolve();
+    };
+    const onKey = (event) => begin(event);
+    function detach() {
+      bootCover.removeEventListener('touchend', begin, true);
+      bootCover.removeEventListener('click', begin, true);
+      window.removeEventListener('keydown', onKey, true);
+    }
+    bootCover.addEventListener('touchend', begin, { capture: true, passive: false });
+    bootCover.addEventListener('click', begin, true);
+    window.addEventListener('keydown', onKey, true);
+  });
+}
+
+async function paintLitScene(world) {
+  document.documentElement.classList.add('is-scene-live');
+  await Promise.race([
+    world.warmScene?.() ?? Promise.resolve(),
+    new Promise((resolve) => { window.setTimeout(resolve, 1500); }),
+  ]);
+  for (let i = 0; i < 2; i += 1) {
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    world.tick(0, performance.now() / 1000);
+  }
 }
 
 if (!hasWebGL()) {
@@ -123,9 +199,8 @@ async function bootGame() {
   world.tick(0, performance.now() / 1000);
   hud.render(performance.now() / 1000);
   setBootProgress(1, 1);
-  await new Promise((resolve) => requestAnimationFrame(() => resolve()));
-  hideBootCover();
-  await hud.tryStartMusic?.();
+  await paintLitScene(world);
+  showPlayPrompt();
 
   loadModels().then(async (records) => {
     for (const record of records) {
@@ -160,6 +235,16 @@ async function bootGame() {
   }).finally(() => {
     window.stallhaven.uploadsReady = true;
   });
+
+  await waitForPlayGesture(() => {
+    unlockAudio();
+    const music = hud.tryStartMusic?.();
+    if (music && typeof music.catch === 'function') music.catch(() => {});
+    world.tick(0, performance.now() / 1000);
+  });
+  await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  world.tick(0, performance.now() / 1000);
+  hideBootCover({ immediate: true });
 
   let last = performance.now();
   function frame(nowMs) {

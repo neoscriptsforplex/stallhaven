@@ -48,16 +48,15 @@ function makeAudioElement(url, { preload = 'auto' } = {}) {
   return audioEl;
 }
 
-async function resumeAudioContext() {
+function kickAudioContext() {
   const ac = audio();
-  if (ac?.state === 'suspended') {
-    try {
-      await ac.resume();
-    } catch {
-      // Autoplay policies can keep AudioContext suspended until a gesture.
-    }
-  }
+  if (ac?.state === 'suspended') ac.resume().catch(() => {});
   return ac;
+}
+
+/** Resume the shared context from a user gesture so music and UI sounds can start. */
+export function unlockAudio() {
+  kickAudioContext();
 }
 
 function audio() {
@@ -200,7 +199,7 @@ export async function playTrackAt(index) {
   if (!bg) return false;
   bg.playsInline = true;
   bg.volume = volume;
-  await resumeAudioContext();
+  kickAudioContext();
   try {
     await bg.play();
     return Boolean(bg && !bg.paused);
@@ -294,7 +293,7 @@ export async function playMusic() {
   if (!bg) return false;
   bg.playsInline = true;
   bg.volume = volume;
-  await resumeAudioContext();
+  kickAudioContext();
   try {
     await bg.play();
     return Boolean(bg && !bg.paused);
@@ -396,7 +395,7 @@ function armGestureAutoplay(index) {
     window.removeEventListener('keydown', resume);
     window.removeEventListener('touchstart', resume);
     if (autoplayCancelled) return;
-    await resumeAudioContext();
+    unlockAudio();
     await playTrackAt(index).catch(() => {});
     void event;
   };
@@ -438,4 +437,5 @@ export function resetMusicForTests() {
   volume = 0.75;
   shuffle = false;
   loopTrack = false;
+  ctx = null;
 }

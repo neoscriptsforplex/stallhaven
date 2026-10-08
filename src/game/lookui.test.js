@@ -25,27 +25,47 @@ describe('player look UI', () => {
     assert.match(help, /The Goal:/);
   });
 
-  it('covers the canvas with the RuneCraft loading art until models are ready', () => {
+  it('holds the RuneCraft loading art on a play prompt until the first gesture', () => {
     assert.match(html, /class="is-booting"/);
     assert.match(html, /id="boot-cover"/);
     assert.match(html, /data-boot-bar/);
     assert.match(html, /data-boot-label/);
     assert.match(html, /html.is-booting #view/);
+    assert.match(html, /html\.is-booting\.is-scene-live #view/);
     const boot = slice(html, 'id="boot-cover"', 'id="save-bar"');
     assert.match(boot, />Loading</);
     assert.match(html, /url\("\.\/public\/runecraft_loading_bg\.jpg"\) center center \/ cover no-repeat/);
     assert.equal(html.includes('#050403'), false);
     assert.match(css, /#boot-cover\.is-leaving/);
+    assert.match(css, /#boot-cover\.is-ready/);
+    assert.match(css, /html\.is-booting\.is-scene-live #view/);
+    assert.match(css, /#boot-cover\s*\{[^}]*100dvh/);
     assert.match(css, /@keyframes boot-slide/);
     assert.match(css, /url\("\.\.\/public\/runecraft_loading_bg\.jpg"\)/);
     assert.match(css, /background-position:\s*center center/);
     assert.match(css, /background-size:\s*cover/);
+    assert.match(css, /orientation: landscape\) and \(pointer: coarse\)/);
     assert.equal(/#boot-cover\s*\{[^}]*#050403/.test(css), false);
     assert.equal(readFileSync(join(root, '../../public/runecraft_loading_bg.jpg')).equals(
       readFileSync(join(root, '../../docs/runecraft_banner.jpg')),
     ), true);
-    assert.match(main, /classList.remove\('is-booting'\)/);
+    assert.match(main, /classList\.remove\('is-booting'/);
     assert.match(main, /bootLabel\.textContent = 'Loading'/);
+    assert.match(main, /Click to play/);
+    assert.match(main, /Tap to play/);
+    assert.match(main, /\(pointer: coarse\)/);
+    assert.match(main, /unlockAudio\(\)/);
+    assert.match(main, /tryStartMusic/);
+    assert.match(main, /is-scene-live/);
+    assert.match(main, /is-ready/);
+    assert.match(main, /event\.key === 'Enter'/);
+    assert.match(main, /event\.code === 'Space'/);
+    assert.match(main, /addEventListener\('click', begin, true\)/);
+    assert.match(main, /touchend/);
+    assert.match(main, /hideBootCover\(\{ immediate: true \}\)/);
+    assert.match(main, /warmScene/);
+    assert.match(main, /paintLitScene\(world\)[\s\S]*showPlayPrompt\(\)[\s\S]*waitForPlayGesture/);
+    assert.match(main, /unlockAudio\(\)[\s\S]*tryStartMusic[\s\S]*hideBootCover\(\{ immediate: true \}\)/);
     assert.match(main, /requestAnimationFrame/);
     assert.match(main, /setBundledLooks\(bundledLooks\)[\s\S]*createWorld\(canvas/);
     assert.match(main, /world\.tick\(0[\s\S]*hideBootCover\(\)/);

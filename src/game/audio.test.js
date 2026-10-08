@@ -16,6 +16,7 @@ import {
   startMusicOnLoad,
   stopMusic,
   toggleLoop,
+  unlockAudio,
 } from './audio.js';
 
 describe('bundled music', () => {
@@ -188,5 +189,39 @@ describe('startMusicOnLoad', () => {
     blockPlay = false;
     if (listeners.pointerdown) await listeners.pointerdown();
     assert.equal(isMusicPlaying(), false);
+  });
+
+  it('starts the track in the gesture turn before AudioContext.resume settles', async () => {
+    installFakeAudio();
+    let releaseResume = null;
+    let resumed = false;
+    class FakeAC {
+      constructor() {
+        this.state = 'suspended';
+        this.currentTime = 0;
+      }
+      resume() {
+        return new Promise((resolve) => {
+          releaseResume = () => {
+            resumed = true;
+            this.state = 'running';
+            resolve();
+          };
+        });
+      }
+    }
+    globalThis.window.AudioContext = FakeAC;
+    await addMusicUrl('newbie.ogg', 'Newbie Melody');
+    unlockAudio();
+    assert.equal(typeof releaseResume, 'function');
+    assert.equal(resumed, false);
+    const pending = startMusicOnLoad({ volume: 0.75 });
+    assert.equal(isMusicPlaying(), true);
+    assert.equal(resumed, false);
+    assert.equal(getMusicTrackName(), 'Newbie Melody');
+    assert.equal(getMusicVolume(), 0.75);
+    releaseResume();
+    await pending;
+    assert.equal(resumed, true);
   });
 });

@@ -23,13 +23,13 @@ function hasWebGL() {
   }
 }
 
-function setBootProgress(done, total, text) {
+function setBootProgress(done, total) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   if (bootBar) {
     bootBar.style.width = `${Math.max(8, pct)}%`;
     if (total > 0) bootBar.classList.add('is-progress');
   }
-  if (bootLabel) bootLabel.textContent = text ?? `Loading models… ${pct}%`;
+  if (bootLabel) bootLabel.textContent = 'Loading';
 }
 
 function hideBootCover() {
@@ -51,7 +51,7 @@ if (!hasWebGL()) {
 async function bootGame() {
   const state = createState();
   pushLog(state, 'Rune Craft is open. Craft into the chest, then trade at the counter.');
-  setBootProgress(0, 1, 'Loading models…');
+  setBootProgress(0, 1);
 
   let bundledPlayer = null;
   let riggedPlayer = null;
@@ -66,7 +66,7 @@ async function bootGame() {
         return null;
       }),
       loadBundledLooks((done, total) => {
-        setBootProgress(done, total, `Loading models… ${done} / ${total}`);
+        setBootProgress(done, total);
       }),
       loadBundledMusic().catch((err) => {
         console.warn('Bundled music skipped:', err?.message || err);
@@ -95,7 +95,7 @@ async function bootGame() {
     bundledLooks = looks ?? {};
     setBundledLooks(bundledLooks);
     setRiggedBuyers(riggedBuyers);
-    setBootProgress(1, 1, 'Building shop…');
+    setBootProgress(1, 1);
   } catch (err) {
     console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
   }
@@ -122,7 +122,7 @@ async function bootGame() {
   });
   world.tick(0, performance.now() / 1000);
   hud.render(performance.now() / 1000);
-  setBootProgress(1, 1, 'Ready.');
+  setBootProgress(1, 1);
   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
   hideBootCover();
   await hud.tryStartMusic?.();

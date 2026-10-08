@@ -2840,12 +2840,27 @@ describe('rigged buyer looks', () => {
   it('plays Walk and Idle on each rigged adventurer at the player scale', async () => {
     assert.equal(BUYER_MODEL_SCALE, 0.863);
     assert.equal(RIGGED_CLIP_FADE, 0.2);
-    assert.equal(RIGGED_BUYER_MODELS.length, 9);
+    assert.equal(RIGGED_BUYER_MODELS.length, 15);
+    const mageScales = Object.fromEntries(
+      RIGGED_BUYER_MODELS
+        .filter((spec) => spec.lookId.startsWith('buyer-wizard-'))
+        .map((spec) => [spec.lookId, spec.scale]),
+    );
+    assert.deepEqual(mageScales, {
+      'buyer-wizard-archmage-sedridor': 0.837,
+      'buyer-wizard-wizard-level-9': 0.837,
+      'buyer-wizard-wizard-grayzag': 0.837,
+      'buyer-wizard-wizard-jalarast': 0.844,
+      'buyer-wizard-wizard-mizgog': 0.837,
+      'buyer-wizard-wizard-traiborn': 0.837,
+    });
     try {
       for (const spec of RIGGED_BUYER_MODELS) {
         const typeId = spec.lookId.startsWith('buyer-guard-') ? 'mercenary'
           : spec.lookId.startsWith('buyer-ranger-') ? 'ranger'
-            : 'pilgrim';
+            : spec.lookId.startsWith('buyer-wizard-') ? 'hedgemage'
+              : 'pilgrim';
+        const scale = spec.scale ?? BUYER_MODEL_SCALE;
         const gltf = await loadBuyer(spec.file);
         const buyer = wrapRiggedBuyer(gltf, typeId, { lookId: spec.lookId });
         assert.equal(buyer.name, typeId);
@@ -2856,15 +2871,15 @@ describe('rigged buyer looks', () => {
         assert.ok(buyer.userData.hand);
         assert.equal(buyer.userData.pickaxe, undefined);
         assert.equal(buyer.userData.hatchet, undefined);
-        assert.ok(Math.abs(buyer.userData.modelScale - BUYER_MODEL_SCALE) < 1e-9);
+        assert.ok(Math.abs(buyer.userData.modelScale - scale) < 1e-9);
         const visual = buyer.getObjectByName('rigged-buyer');
         assert.ok(visual);
-        assert.ok(Math.abs(visual.scale.x - BUYER_MODEL_SCALE) < 1e-9);
+        assert.ok(Math.abs(visual.scale.x - scale) < 1e-9);
         assert.ok(Math.abs(visual.rotation.y) < 1e-9, 'buyer meshes face +Z like the dumps');
         const loco = buyer.userData.clipLocomotion;
         assert.ok(Math.abs(loco.walk.getClip().duration - 1) < 1e-3);
         assert.ok(Math.abs(loco.idle.getClip().duration - 3) < 1e-3);
-        assert.ok(Math.abs(loco.walkStride - spec.speed * BUYER_MODEL_SCALE) < 1e-9);
+        assert.ok(Math.abs(loco.walkStride - spec.speed * scale) < 1e-9);
         let skinned = 0;
         let bones = 0;
         buyer.traverse((child) => {
@@ -2896,13 +2911,13 @@ describe('rigged buyer looks', () => {
         loco.speed = moveSpeed;
         updateWalkPose(buyer, true, 0.05, 1);
         assert.equal(loco.mode, 'walk');
-        assert.ok(Math.abs(loco.walk.timeScale - (moveSpeed / (spec.speed * BUYER_MODEL_SCALE))) < 1e-6);
+        assert.ok(Math.abs(loco.walk.timeScale - (moveSpeed / (spec.speed * scale))) < 1e-6);
         updateWalkPose(buyer, false, 0.25, 1.3);
         assert.equal(loco.mode, 'idle');
         visual.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(visual);
         const height = box.max.y - box.min.y;
-        const expected = spec.height * BUYER_MODEL_SCALE;
+        const expected = spec.height * scale;
         assert.ok(Math.abs(box.min.y) < 0.03, `${spec.lookId} feet ${box.min.y}`);
         assert.ok(Math.abs(height - expected) < 0.08, `${spec.lookId} height ${height} expected ${expected}`);
         setRiggedBuyer(spec.lookId, gltf);
@@ -2919,6 +2934,7 @@ describe('rigged buyer looks', () => {
     setRiggedBuyer('buyer-adventurer-bob', { scene: new THREE.Group(), animations: [] });
     setRiggedBuyer('buyer-guard-barbarian-level-17', { scene: new THREE.Group(), animations: [] });
     setRiggedBuyer('buyer-ranger-armour-salesman', { scene: new THREE.Group(), animations: [] });
+    setRiggedBuyer('buyer-wizard-archmage-sedridor', { scene: new THREE.Group(), animations: [] });
     try {
       const fallback = buildAdventurer('pilgrim', { lookId: 'buyer-adventurer-bob', seed: 0.2 });
       assert.equal(fallback.userData.clipLocomotion, undefined);
@@ -2934,6 +2950,11 @@ describe('rigged buyer looks', () => {
       assert.equal(salesman.userData.clipLocomotion, undefined);
       assert.equal(salesman.userData.pick?.userData.kind, 'customer');
       assert.equal(getRiggedBuyer('buyer-ranger-armour-salesman'), null);
+      const sedridor = buildAdventurer('hedgemage', { lookId: 'buyer-wizard-archmage-sedridor', seed: 0.2 });
+      assert.equal(sedridor.name, 'hedgemage');
+      assert.equal(sedridor.userData.clipLocomotion, undefined);
+      assert.equal(sedridor.userData.pick?.userData.kind, 'customer');
+      assert.equal(getRiggedBuyer('buyer-wizard-archmage-sedridor'), null);
     } finally {
       clearRiggedBuyers();
     }

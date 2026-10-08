@@ -66,7 +66,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_FLOOR_TILE_M, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonFloorTextureUrls, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -373,15 +373,15 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(shopBrick >= 1, 'shop walls should use the stone-brick tile');
 
     const dungeon = buildDungeon().root;
-    let dungeonFloor = 0;
+    let dungeonFloors = 0;
     dungeon.traverse((child) => {
       const map = child.material?.map;
       if (!map?.repeat) return;
       assert.equal(Boolean(child.userData?.pathCobble), false);
       assert.notEqual(map.userData?.kind, 'fountain-cobble');
-      if (Math.abs(map.repeat.x - 6.5) < 1e-6 && Math.abs(map.repeat.y - 5.2) < 1e-6) dungeonFloor += 1;
+      if (child.userData?.dungeonFloor) dungeonFloors += 1;
     });
-    assert.ok(dungeonFloor >= 1, 'dungeon floor cobble scale should stay unchanged');
+    assert.equal(dungeonFloors, 1, 'dungeon floor should keep its own tile, not the path flagstone');
     dungeon.traverse((child) => {
       assert.notEqual(child.material?.map?.userData?.kind, 'shop-wall');
       assert.notEqual(child.userData?.shopWall, true);
@@ -417,8 +417,9 @@ describe('outdoor and dungeon extras', () => {
     assert.equal(walls.length, 4);
     assert.ok(floor, 'dungeon floor slab should stay');
     assert.ok(Math.abs(floor.position.y - (-0.04)) < 1e-6);
-    assert.ok(Math.abs(floor.material.map.repeat.x - 6.5) < 1e-6);
-    assert.ok(Math.abs(floor.material.map.repeat.y - 5.2) < 1e-6);
+    assert.equal(floor.material.map.userData?.kind, 'dungeon-floor');
+    assert.ok(Math.abs(floor.material.map.repeat.x - 1) < 1e-6);
+    assert.ok(Math.abs(floor.material.map.repeat.y - 1) < 1e-6);
     assert.notEqual(floor.material.map.userData?.kind, 'dungeon-wall');
 
     for (const mesh of walls) {
@@ -515,6 +516,103 @@ describe('outdoor and dungeon extras', () => {
         }
       }
     }
+  });
+
+  it('tiles the dungeon floor at 4 m in world space without moving the slab', () => {
+    assert.equal(DUNGEON_FLOOR_TILE_M, 4);
+    const urls = dungeonFloorTextureUrls();
+    assert.ok(urls.some((url) => url.endsWith('textures/dungeon_floor_1024.png')));
+    assert.ok(urls.some((url) => url.includes('public/textures/dungeon_floor_1024.png')));
+    const texDir = join(dirname(fileURLToPath(import.meta.url)), '../../public/textures');
+    assert.equal(existsSync(join(texDir, 'dungeon_floor_256.png')), true);
+    assert.equal(existsSync(join(texDir, 'dungeon_floor_512.png')), true);
+    assert.equal(existsSync(join(texDir, 'dungeon_floor_1024.png')), true);
+
+    const built = buildDungeon();
+    let floor = null;
+    let textured = 0;
+    built.root.traverse((child) => {
+      if (!child.isMesh) return;
+      if (child.material?.map?.userData?.kind === 'dungeon-floor') {
+        textured += 1;
+        floor = child;
+      }
+    });
+    assert.equal(textured, 1, 'only the floor slab uses the dungeon floor tile');
+    assert.equal(floor.userData.dungeonFloor, true);
+    assert.equal(floor.geometry.parameters.width, built.size.w);
+    assert.equal(floor.geometry.parameters.height, 0.12);
+    assert.equal(floor.geometry.parameters.depth, built.size.d);
+    assert.equal(floor.position.x, 0);
+    assert.equal(floor.position.z, 0);
+    assert.ok(Math.abs(floor.position.y - (-0.04)) < 1e-6);
+    assert.equal(floor.rotation.x, 0);
+    assert.equal(floor.rotation.y, 0);
+    assert.equal(floor.rotation.z, 0);
+    const top = floor.position.y + floor.geometry.parameters.height / 2;
+    assert.ok(Math.abs(top - DUNGEON_FLOOR_Y) < 1e-6, `floor top ${top}`);
+    assert.ok(Math.abs(dungeonFloorSurfaceY(built.root) - DUNGEON_FLOOR_Y) < 1e-4);
+
+    const map = floor.material.map;
+    assert.equal(map.wrapS, THREE.RepeatWrapping);
+    assert.equal(map.wrapT, THREE.RepeatWrapping);
+    assert.equal(map.colorSpace, THREE.SRGBColorSpace);
+    assert.equal(map.anisotropy, 4);
+    assert.equal(map.generateMipmaps, true);
+    assert.equal(map.minFilter, THREE.LinearMipmapLinearFilter);
+    assert.equal(map.magFilter, THREE.LinearFilter);
+    assert.equal(map.flipY, true);
+    assert.equal(map.rotation, 0);
+    assert.ok(Math.abs(map.repeat.x - 1) < 1e-6 && Math.abs(map.repeat.y - 1) < 1e-6);
+    assert.ok(Math.abs(map.offset.x) < 1e-6 && Math.abs(map.offset.y) < 1e-6);
+    assert.equal(floor.material.color.getHex(), 0xffffff);
+    assert.equal(floor.material.roughness, 0.94);
+    assert.equal(floor.material.metalness, 0.03);
+
+    const tile = DUNGEON_FLOOR_TILE_M;
+    const pos = floor.geometry.getAttribute('position');
+    const uv = floor.geometry.getAttribute('uv');
+    const index = floor.geometry.getIndex();
+    assert.ok(index, 'dungeon floor should stay an indexed box');
+    floor.updateWorldMatrix(true, false);
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    const n = new THREE.Vector3();
+    const p = new THREE.Vector3();
+    const at = (k, target) => target.fromBufferAttribute(pos, index.getX(k)).applyMatrix4(floor.matrixWorld);
+    for (let f = 0; f < index.count; f += 3) {
+      at(f, a);
+      at(f + 1, b);
+      at(f + 2, c);
+      n.subVectors(b, a).cross(c.clone().sub(a));
+      const ax = Math.abs(n.x);
+      const ay = Math.abs(n.y);
+      const az = Math.abs(n.z);
+      for (let k = 0; k < 3; k += 1) {
+        const vi = index.getX(f + k);
+        p.fromBufferAttribute(pos, vi).applyMatrix4(floor.matrixWorld);
+        const wantU = (ay >= ax && ay >= az ? p.x : ax >= az ? p.z : p.x) / tile;
+        const wantV = (ay >= ax && ay >= az ? p.z : p.y) / tile;
+        assert.ok(Math.abs(uv.getX(vi) - wantU) < 1e-4, `u ${uv.getX(vi)} vs ${wantU}`);
+        assert.ok(Math.abs(uv.getY(vi) - wantV) < 1e-4, `v ${uv.getY(vi)} vs ${wantV}`);
+      }
+    }
+
+    built.root.traverse((child) => {
+      if (child.userData?.dungeonWall) {
+        assert.equal(child.material?.map?.userData?.kind, 'dungeon-wall');
+      }
+      if (child.name?.startsWith('boulder-') || child.userData?.kind === 'boulder') {
+        assert.notEqual(child.material?.map?.userData?.kind, 'dungeon-floor');
+      }
+    });
+    built.grounds.traverse((child) => {
+      assert.notEqual(child.material?.map?.userData?.kind, 'dungeon-floor');
+    });
+    buildShop([]).root.traverse((child) => {
+      assert.notEqual(child.material?.map?.userData?.kind, 'dungeon-floor');
+    });
   });
 
   it('tiles shop walls and gables with the stone brick at one repeat per metre', () => {

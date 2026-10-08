@@ -1,0 +1,297 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib bronze-ore.mtl
+o Item Iron ore 2026-09-12_21-09-00
+v 16 0 -7
+v -9 0 -7
+v -7 20 -3
+v 9 15 -7
+v 9 0 9
+v -18 0 13
+v -9 15 9
+v -3 15 13
+v 1 20 5
+v -3 0 20
+v 14 0 1
+v 22 0 18
+v 24 20 15
+v 16 15 4
+v 26 0 -3
+v 37 0 1
+v 37 0 15
+v 31 15 11
+v 31 15 4
+v 26 20 4
+v 31 0 24
+v 7 0 22
+v 11 20 26
+v 26 15 24
+v 29 0 37
+v 18 0 42
+v 3 0 35
+v 11 15 31
+v 18 15 35
+v 20 20 33
+v -33 0 -36
+v -18 0 -12
+v -11 20 -18
+v -29 15 -32
+v -7 0 -42
+v 14 0 -18
+v 3 15 -23
+v 3 15 -32
+v -7 20 -32
+v 14 0 -36
+v -26 0 20
+v -18 0 33
+v -16 12 31
+v -24 10 24
+v -16 0 18
+v -7 0 31
+v -14 10 27
+v -14 10 24
+v -16 12 24
+v -7 0 20
+v -20 0 4
+v -29 0 -14
+v -31 20 -10
+v -22 15 1
+v -33 0 7
+v -44 0 -10
+v -37 15 -7
+v -37 15 1
+v -33 20 1
+v -44 0 4
+v 22 0 -18
+v 29 0 -7
+v 31 20 -8
+v 22 15 -14
+v 31 0 -19
+v 39 0 -8
+v 33 15 -10
+v 33 15 -14
+v 31 20 -14
+v 39 0 -18
+usemtl c0
+f 1 2 3
+usemtl c1
+f 1 3 4
+usemtl c2
+f 1 4 5
+usemtl c3
+f 1 5 2
+usemtl c4
+f 2 5 6
+usemtl c5
+f 2 6 7
+usemtl c6
+f 2 7 3
+usemtl c7
+f 3 7 4
+usemtl c8
+f 4 7 8
+usemtl c7
+f 4 8 9
+usemtl c9
+f 4 9 5
+usemtl c10
+f 5 9 10
+usemtl c11
+f 5 10 6
+usemtl c12
+f 6 10 8
+usemtl c13
+f 6 8 7
+usemtl c14
+f 10 9 8
+usemtl c12
+f 11 12 13
+usemtl c15
+f 11 13 14
+usemtl c16
+f 11 14 15
+usemtl c17
+f 11 15 16
+usemtl c7
+f 11 16 12
+usemtl c10
+f 12 16 17
+usemtl c18
+f 12 17 18
+usemtl c15
+f 12 18 13
+usemtl c6
+f 13 18 14
+usemtl c19
+f 14 18 19
+usemtl c3
+f 14 19 20
+usemtl c2
+f 14 20 15
+usemtl c20
+f 15 20 16
+usemtl c21
+f 16 20 19
+usemtl c22
+f 16 19 17
+usemtl c3
+f 17 19 18
+usemtl c23
+f 21 22 23
+usemtl c24
+f 21 23 24
+usemtl c25
+f 21 24 25
+usemtl c26
+f 21 25 22
+usemtl c27
+f 22 25 26
+usemtl c28
+f 22 26 27
+usemtl c29
+f 22 27 28
+usemtl c30
+f 22 28 23
+usemtl c31
+f 23 28 24
+usemtl c32
+f 24 28 29
+usemtl c33
+f 24 29 30
+usemtl c34
+f 24 30 25
+usemtl c35
+f 25 30 26
+usemtl c36
+f 26 30 29
+usemtl c37
+f 26 29 27
+usemtl c38
+f 27 29 28
+usemtl c39
+f 31 32 33
+usemtl c40
+f 31 33 34
+usemtl c41
+f 31 34 35
+usemtl c42
+f 31 35 32
+usemtl c43
+f 32 35 36
+usemtl c44
+f 32 36 37
+usemtl c45
+f 32 37 33
+usemtl c46
+f 33 37 34
+usemtl c47
+f 34 37 38
+usemtl c48
+f 34 38 39
+usemtl c49
+f 34 39 35
+usemtl c50
+f 35 39 40
+usemtl c51
+f 35 40 36
+usemtl c52
+f 36 40 38
+usemtl c53
+f 36 38 37
+usemtl c54
+f 40 39 38
+usemtl c5
+f 41 42 43
+usemtl c55
+f 41 43 44
+usemtl c56
+f 41 44 45
+usemtl c4
+f 41 45 42
+usemtl c57
+f 42 45 46
+usemtl c58
+f 42 46 47
+usemtl c59
+f 42 47 43
+usemtl c4
+f 43 47 44
+usemtl c10
+f 44 47 48
+usemtl c60
+f 44 48 49
+usemtl c17
+f 44 49 45
+usemtl c61
+f 45 49 50
+usemtl c62
+f 45 50 46
+usemtl c22
+f 46 50 48
+usemtl c17
+f 46 48 47
+usemtl c62
+f 50 49 48
+usemtl c63
+f 51 52 53
+usemtl c64
+f 51 53 54
+usemtl c65
+f 51 54 55
+usemtl c66
+f 51 55 52
+usemtl c67
+f 52 55 56
+usemtl c68
+f 52 56 57
+usemtl c69
+f 52 57 53
+usemtl c70
+f 53 57 54
+usemtl c71
+f 54 57 58
+usemtl c72
+f 54 58 59
+usemtl c73
+f 54 59 55
+usemtl c74
+f 55 59 60
+usemtl c75
+f 55 60 56
+usemtl c76
+f 56 60 58
+usemtl c46
+f 56 58 57
+usemtl c77
+f 60 59 58
+usemtl c78
+f 61 62 63
+usemtl c79
+f 61 63 64
+usemtl c68
+f 61 64 65
+usemtl c80
+f 61 65 62
+usemtl c81
+f 62 65 66
+usemtl c82
+f 62 66 67
+usemtl c83
+f 62 67 63
+usemtl c84
+f 63 67 64
+usemtl c85
+f 64 67 68
+usemtl c26
+f 64 68 69
+usemtl c86
+f 64 69 65
+usemtl c87
+f 65 69 70
+usemtl c88
+f 65 70 66
+usemtl c89
+f 66 70 68
+usemtl c90
+f 66 68 67
+usemtl c91
+f 70 69 68

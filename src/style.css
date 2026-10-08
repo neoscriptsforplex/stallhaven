@@ -1356,3 +1356,53 @@ html.is-booting #save-bar {
     overflow: auto;
   }
 }
+
+/* Phone portrait only. Desktop and landscape keep the top-right bar. */
+@media (orientation: portrait) and (pointer: coarse) {
+  :root {
+    --portrait-thumb: 64px;
+  }
+
+  #save-bar {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 4;
+    min-height: var(--portrait-thumb);
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(44px, 1fr);
+    align-items: stretch;
+    gap: 4px;
+    padding: 8px 4px;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+  }
+
+  #save-bar button {
+    min-width: 0;
+    min-height: 44px;
+    padding: 4px 2px;
+    font-size: 0.72rem;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  #save-bar #expand-btn,
+  #save-bar #music-btn,
+  #save-bar #settings-btn {
+    font-size: 1.15rem;
+  }
+
+  /* Docks open from the top and end above the bar, so their buttons stay clear. */
+  .expand-dock {
+    max-height: calc(100vh - 58px - var(--portrait-thumb) - 8px);
+  }
+
+  /* Sheets sit above the bar. Craft and cauldron keep the layout from PR #99. */
+  .modal:not(#craft-modal):not(#potion-modal) {
+    padding-bottom: var(--portrait-thumb);
+  }
+}

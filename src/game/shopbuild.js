@@ -504,28 +504,144 @@ function addWallTorch(root, x, y, z, rotY = 0, glowMul = 1) {
   return torch;
 }
 
-function makePlaque(text) {
+/** Artist panel. 1280×256 (5:1). The 640 file sits beside it, same as the extra cobble sizes. */
+const GENERAL_STORE_SIGN_FILE = 'sign_general_store_B.png';
+const GENERAL_STORE_SIGN_WIDTH = 2.35;
+const GENERAL_STORE_SIGN_DEPTH = 0.08;
+
+/** Vite public/ root, plus raw-repo / githack paths that still include public/. */
+export function generalStoreSignTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [
+    `${envBase}textures/${GENERAL_STORE_SIGN_FILE}`,
+    `${envBase}public/textures/${GENERAL_STORE_SIGN_FILE}`,
+  ];
+  if (envBase !== './') {
+    urls.push(`./textures/${GENERAL_STORE_SIGN_FILE}`, `./public/textures/${GENERAL_STORE_SIGN_FILE}`);
+  }
+  return [...new Set(urls)];
+}
+
+let generalStoreSignSource = null;
+
+function configureGeneralStoreSignTexture(tex) {
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.flipY = true;
+  if ('lodBias' in tex) tex.lodBias = 0;
+  tex.repeat.set(1, 1);
+  tex.offset.set(0, 0);
+  tex.userData.kind = 'general-store-sign';
+  return tex;
+}
+
+function applyGeneralStoreSignImage(loaded) {
+  if (!generalStoreSignSource || !loaded?.image) return;
+  generalStoreSignSource.image = loaded.image;
+  generalStoreSignSource.needsUpdate = true;
+}
+
+function beginGeneralStoreSignLoad() {
+  const urls = generalStoreSignTextureUrls();
+  const attempt = (index) => {
+    if (index >= urls.length) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      loader.load(urls[index], applyGeneralStoreSignImage, undefined, () => attempt(index + 1));
+    } catch {
+      // Node tests stub document without an image element. Clamp and colour space still apply.
+    }
+  };
+  attempt(0);
+}
+
+function generalStoreSignMap() {
+  if (!generalStoreSignSource) {
+    generalStoreSignSource = configureGeneralStoreSignTexture(new THREE.Texture());
+    beginGeneralStoreSignLoad();
+  }
+  return generalStoreSignSource;
+}
+
+function generalStoreSignMaterial() {
+  const map = generalStoreSignMap();
+  const mat = new THREE.MeshStandardMaterial({
+    map,
+    roughness: 0.94,
+    metalness: 0.03,
+    color: 0xffffff,
+  });
+  mat.userData.generalStoreSign = true;
+  return mat;
+}
+
+/** Street-facing (+Z) material group. Box faces do not share vertices. */
+function frontMaterialIndex(geo) {
+  const pos = geo.getAttribute('position');
+  const index = geo.getIndex();
+  let best = 0;
+  let bestZ = -Infinity;
+  for (const group of geo.groups) {
+    let z = 0;
+    for (let i = group.start; i < group.start + group.count; i += 1) {
+      z += pos.getZ(index.getX(i));
+    }
+    const avg = z / group.count;
+    if (avg > bestZ) {
+      bestZ = avg;
+      best = group.materialIndex;
+    }
+  }
+  return best;
+}
+
+/** One copy of the panel across the street face: u 0 at -X, v 0 at the bottom. */
+function writeGeneralStoreSignUVs(geo) {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  let maxZ = -Infinity;
+  for (let i = 0; i < pos.count; i += 1) maxZ = Math.max(maxZ, pos.getZ(i));
+  const front = [];
+  for (let i = 0; i < pos.count; i += 1) {
+    if (Math.abs(pos.getZ(i) - maxZ) < 1e-5) front.push(i);
+  }
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const i of front) {
+    minX = Math.min(minX, pos.getX(i));
+    maxX = Math.max(maxX, pos.getX(i));
+    minY = Math.min(minY, pos.getY(i));
+    maxY = Math.max(maxY, pos.getY(i));
+  }
+  const spanX = maxX - minX || 1;
+  const spanY = maxY - minY || 1;
+  for (const i of front) {
+    uv.setXY(i, (pos.getX(i) - minX) / spanX, (pos.getY(i) - minY) / spanY);
+  }
+  uv.needsUpdate = true;
+}
+
+function makePlaque() {
   const group = new THREE.Group();
-  const board = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.42, 0.08), wood(0x4e331f)));
+  group.name = 'general-store-plaque';
+  const width = GENERAL_STORE_SIGN_WIDTH;
+  const height = width / 5;
+  const geo = new THREE.BoxGeometry(width, height, GENERAL_STORE_SIGN_DEPTH);
+  writeGeneralStoreSignUVs(geo);
+  const edge = wood(0x4e331f);
+  const materials = [edge, edge, edge, edge, edge, edge];
+  materials[frontMaterialIndex(geo)] = generalStoreSignMaterial();
+  const board = addShadow(new THREE.Mesh(geo, materials));
+  board.name = 'general-store-sign';
   group.add(board);
-  const canvas = document.createElement('canvas');
-  canvas.width = 640;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#4e331f';
-  ctx.fillRect(0, 0, 640, 128);
-  ctx.fillStyle = '#f0d9a8';
-  ctx.font = '700 52px Georgia, serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 320, 64);
-  const tex = new THREE.CanvasTexture(canvas);
-  const label = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.2, 0.34),
-    new THREE.MeshBasicMaterial({ map: tex, transparent: true }),
-  );
-  label.position.z = 0.05;
-  group.add(label);
   const rail = addShadow(new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.05, 0.1), wood(0x3c2616)));
   rail.position.y = 0.24;
   group.add(rail);
@@ -839,7 +955,7 @@ function addOriginFront(root, center) {
   }
 
   const awningZ = center.z + ROOM_D / 2 + 0.47;
-  const plaque = makePlaque('General Store');
+  const plaque = makePlaque();
   plaque.position.set(center.x, 1.94, awningZ);
   root.add(plaque);
   const chainMat = metal(0x9a9aa2);

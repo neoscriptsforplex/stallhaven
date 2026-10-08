@@ -66,7 +66,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_WALL_H, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, generalStoreSignTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -515,6 +515,103 @@ describe('outdoor and dungeon extras', () => {
       assert.ok(walls > originWalls.length, `${ids.join('+')} should add expansion walls, got ${walls}`);
       assert.ok(rooms >= ids.length + 1, `${ids.join('+')} roofs ${rooms}`);
     }
+  });
+
+  it('maps the general store sign once across a 5:1 street face', () => {
+    const urls = generalStoreSignTextureUrls();
+    const texIndex = urls.findIndex((url) => url.endsWith('textures/sign_general_store_B.png') && !url.includes('public/'));
+    const publicIndex = urls.findIndex((url) => url.includes('public/textures/sign_general_store_B.png'));
+    assert.ok(texIndex >= 0, `textures/ path missing from ${urls.join(', ')}`);
+    assert.ok(publicIndex > texIndex, `public/textures/ should follow textures/: ${urls.join(', ')}`);
+    assert.equal(urls.some((url) => url.includes('sign_general_store_B_640')), false);
+    const texDir = join(dirname(fileURLToPath(import.meta.url)), '../../public/textures');
+    assert.equal(existsSync(join(texDir, 'sign_general_store_B.png')), true);
+    assert.equal(existsSync(join(texDir, 'sign_general_store_B_640.png')), true);
+
+    const center = roomCenter(0, 0);
+    const shop = buildShop([]).root;
+    const sign = shop.getObjectByName('general-store-sign');
+    assert.ok(sign, 'origin shop should hang the general store sign');
+    const { width, height, depth } = sign.geometry.parameters;
+    assert.equal(width, 2.35);
+    assert.ok(Math.abs(height - width / 5) < 1e-6, `sign face ${width}×${height} should be 5:1`);
+    assert.equal(depth, 0.08);
+    const plaque = sign.parent;
+    assert.equal(plaque.name, 'general-store-plaque');
+    assert.ok(Math.abs(plaque.position.x - center.x) < 1e-6);
+    assert.ok(Math.abs(plaque.position.y - 1.94) < 1e-6);
+    assert.ok(Math.abs(plaque.position.z - (center.z + ROOM_D / 2 + 0.47)) < 1e-6);
+    const rail = plaque.children.find((child) => child.geometry?.parameters?.height === 0.05);
+    assert.ok(rail, 'sign rail should stay');
+    assert.equal(rail.geometry.parameters.width, 2.45);
+    assert.equal(rail.geometry.parameters.depth, 0.1);
+    assert.equal(rail.position.y, 0.24);
+    assert.equal(plaque.children.some((child) => child.geometry?.type === 'PlaneGeometry'), false);
+
+    const mats = Array.isArray(sign.material) ? sign.material : [sign.material];
+    const pos = sign.geometry.getAttribute('position');
+    const uv = sign.geometry.getAttribute('uv');
+    const index = sign.geometry.getIndex();
+    assert.ok(index, 'sign board should stay an indexed box');
+    let mappedFaces = 0;
+    for (const group of sign.geometry.groups) {
+      let z = 0;
+      for (let i = group.start; i < group.start + group.count; i += 1) z += pos.getZ(index.getX(i));
+      const facingStreet = z / group.count > 0.01;
+      const mat = mats[group.materialIndex];
+      if (facingStreet) {
+        mappedFaces += 1;
+        const map = mat.map;
+        assert.equal(map?.userData?.kind, 'general-store-sign');
+        assert.equal(map.wrapS, THREE.ClampToEdgeWrapping);
+        assert.equal(map.wrapT, THREE.ClampToEdgeWrapping);
+        assert.equal(map.colorSpace, THREE.SRGBColorSpace);
+        assert.equal(map.anisotropy, 4);
+        assert.equal(map.generateMipmaps, true);
+        assert.equal(map.minFilter, THREE.LinearMipmapLinearFilter);
+        assert.equal(map.magFilter, THREE.LinearFilter);
+        assert.equal(map.flipY, true);
+        assert.equal(map.repeat.x, 1);
+        assert.equal(map.repeat.y, 1);
+        assert.equal(map.offset.x, 0);
+        assert.equal(map.offset.y, 0);
+        assert.ok(!(map.lodBias < 0), 'sign mipmaps should not use a negative LOD bias');
+        assert.equal(mat.color.getHex(), 0xffffff);
+      } else {
+        assert.equal(mat.map ?? null, null);
+      }
+    }
+    assert.equal(mappedFaces, 1);
+
+    let minU = Infinity;
+    let maxU = -Infinity;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    let leftU = null;
+    let rightU = null;
+    let bottomV = null;
+    let topV = null;
+    let maxZ = -Infinity;
+    for (let i = 0; i < pos.count; i += 1) maxZ = Math.max(maxZ, pos.getZ(i));
+    for (let i = 0; i < pos.count; i += 1) {
+      if (Math.abs(pos.getZ(i) - maxZ) > 1e-5) continue;
+      const u = uv.getX(i);
+      const v = uv.getY(i);
+      minU = Math.min(minU, u);
+      maxU = Math.max(maxU, u);
+      minV = Math.min(minV, v);
+      maxV = Math.max(maxV, v);
+      if (Math.abs(pos.getX(i) + width / 2) < 1e-5) leftU = u;
+      if (Math.abs(pos.getX(i) - width / 2) < 1e-5) rightU = u;
+      if (Math.abs(pos.getY(i) + height / 2) < 1e-5) bottomV = v;
+      if (Math.abs(pos.getY(i) - height / 2) < 1e-5) topV = v;
+    }
+    assert.ok(Math.abs(minU) < 1e-4 && Math.abs(maxU - 1) < 1e-4, `u span ${minU}..${maxU}`);
+    assert.ok(Math.abs(minV) < 1e-4 && Math.abs(maxV - 1) < 1e-4, `v span ${minV}..${maxV}`);
+    assert.equal(leftU, 0);
+    assert.equal(rightU, 1);
+    assert.equal(bottomV, 0);
+    assert.equal(topV, 1);
   });
 
   it('instances many grass blades and clears them inside a left expansion', () => {

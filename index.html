@@ -36,14 +36,15 @@
     </div>
 
     <aside id="save-bar" aria-label="Save and load">
-      <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
-        <span class="expand-icon" aria-hidden="true">⛶</span>
-      </button>
+      <button type="button" id="skills-btn" title="Skills" aria-label="Skills" aria-controls="skills-dock" aria-expanded="false">Skills</button>
       <button type="button" id="build-btn" title="Build" aria-label="Build">Build</button>
       <button type="button" id="help-btn" title="Help" aria-label="Help">Help</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
       <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
+      <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+        <span class="expand-icon" aria-hidden="true">⛶</span>
+      </button>
       <button type="button" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
       <input id="music-file" type="file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav" multiple hidden />
@@ -390,6 +391,8 @@ This will allow you to load it back again.
       <p data-cheat-note class="craft-note" hidden></p>
       <button type="button" class="ghost" data-settings-close>Close</button>
     </aside>
+
+    <aside id="skills-dock" class="expand-dock skills-dock" role="dialog" aria-label="Skills" hidden></aside>
 
     <aside id="music-dock" class="expand-dock" hidden>
       <h2>Music</h2>

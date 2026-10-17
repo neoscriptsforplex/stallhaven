@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Mining</title>
+  <g transform="rotate(35 16 16)">
+    <path d="M16 11v18" stroke="#1c120c" stroke-width="4.2" stroke-linecap="round"/>
+    <path d="M16 11v18" stroke="#a8743e" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M3 12c4-5 9-7 13-7s9 2 13 7c-4-2-8-3-13-3S7 10 3 12z" fill="#9aa3ad" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M7 9.5c3-2.4 6-3.3 9-3.3s6 .9 9 3.3" stroke="#dfe5ea" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+    <path d="M14 7.5h4v4h-4z" fill="#6f7680" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

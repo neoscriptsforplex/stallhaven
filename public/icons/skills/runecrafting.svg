@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Runecrafting</title>
+  <path d="M8 6c4-3 12-3 16 0 3 3 3 17 0 20-4 3-12 3-16 0-3-3-3-17 0-20z" fill="#8c8f9c" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M10 8c3-2 9-2 12 0" stroke="#c4c8d4" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M16 9v14M16 9l-5 6 5 4 5-4zM11 23l5-4 5 4" fill="none" stroke="#1c120c" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M16 9v14M16 9l-5 6 5 4 5-4zM11 23l5-4 5 4" fill="none" stroke="#f0c24a" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

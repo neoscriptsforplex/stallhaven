@@ -117,6 +117,8 @@ import { clampMapZoom, drawMinimap, mapToWorld, minimapBufferPixels, minimapFram
 import { boulderInspect, flaxInspect, treeInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
+import { createSkills } from './skills.js';
+import { bindSkillsPanel } from './skillsPanel.js';
 import {
   brightnessPercent,
   clampBrightness,
@@ -156,6 +158,8 @@ export function bindHud(root, state, world) {
   const musicDock = document.querySelector('#music-dock');
   const settingsDock = document.querySelector('#settings-dock');
   const settingsBtn = document.querySelector('#settings-btn');
+  let skillsPanel = null;
+  const skills = createSkills();
   const furnMenu = document.querySelector('#furn-menu');
   const inspectPop = document.querySelector('#inspect-pop');
   let inspectTarget = null;
@@ -614,6 +618,10 @@ export function bindHud(root, state, world) {
     if (settingsDock) settingsDock.hidden = true;
   }
 
+  function closeSkillsDock() {
+    skillsPanel?.close();
+  }
+
   function openCraft(station = 'anvil', options = {}) {
     closeChest();
     closeTrade();
@@ -621,6 +629,7 @@ export function bindHud(root, state, world) {
     closePotion();
     hideFurnMenu();
     closeMusicDock();
+    closeSkillsDock();
     closeSettingsDock();
     closeDisplayPicker();
     if (!helpModal.hidden) closeHelp();
@@ -879,6 +888,7 @@ export function bindHud(root, state, world) {
     closePotion();
     hideFurnMenu();
     closeMusicDock();
+    closeSkillsDock();
     if (!helpModal.hidden) closeHelp();
     displayTarget = target;
     state.selectedDisplay = target?.index ?? state.selectedDisplay;
@@ -1233,6 +1243,7 @@ export function bindHud(root, state, world) {
     closePotion();
     hideFurnMenu();
     closeMusicDock();
+    closeSkillsDock();
     closeSettingsDock();
     closeDisplayPicker();
     closeBuild();
@@ -1369,6 +1380,7 @@ export function bindHud(root, state, world) {
     closePotion();
     hideFurnMenu();
     closeMusicDock();
+    closeSkillsDock();
     closeSettingsDock();
     if (!helpModal.hidden) closeHelp();
     closeBuild();
@@ -1583,6 +1595,7 @@ export function bindHud(root, state, world) {
     closeDisplayPicker();
     hideFurnMenu();
     closeMusicDock();
+    closeSkillsDock();
     closeSettingsDock();
     if (!helpModal.hidden) closeHelp();
     closeExpand();
@@ -1939,6 +1952,7 @@ export function bindHud(root, state, world) {
   }
 
   function openMusic() {
+    closeSkillsDock();
     closeBuild();
     closeExpand();
     closeSettingsDock();
@@ -2087,6 +2101,7 @@ export function bindHud(root, state, world) {
     closeBuild();
     closeExpand();
     closeMusicDock();
+    closeSkillsDock();
     hideFurnMenu();
     paintSettings();
     if (settingsDock) settingsDock.hidden = false;
@@ -2283,6 +2298,17 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   });
 
+  skillsPanel = bindSkillsPanel({
+    skills,
+    onOpen: () => {
+      closeBuild();
+      closeExpand();
+      closeMusicDock();
+      closeSettingsDock();
+      hideFurnMenu();
+    },
+  });
+
   world.onPick((event) => {
     if (event.type !== 'furn-menu') hideFurnMenu();
     if (event.type === 'boulder-inspect') {
@@ -2344,6 +2370,7 @@ export function bindHud(root, state, world) {
     closePotion();
     hideFurnMenu();
     closeMusicDock();
+    closeSkillsDock();
     closeSettingsDock();
     closeDisplayPicker();
     closeBuild();

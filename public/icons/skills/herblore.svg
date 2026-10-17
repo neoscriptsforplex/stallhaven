@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Herblore</title>
+  <path d="M13 4h6v3h-6z" fill="#a8743e" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M13.5 7h5v6.2a9 9 0 1 1-5 0z" fill="#dfe9ec" fill-opacity="0.85" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M9.2 20.5a6.8 6.8 0 0 0 13.6 0z" fill="#4fae4a"/>
+  <path d="M7.6 20.5h16.8" stroke="#2f7a32" stroke-width="1.2"/>
+  <path d="M13.5 7h5v6.2a9 9 0 1 1-5 0z" fill="none" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="13" cy="23" r="1.2" fill="#c8f0a0"/>
+  <circle cx="18" cy="25" r="0.9" fill="#c8f0a0"/>
+  <path d="M11.2 15.5a7 7 0 0 0-1.6 3" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" stroke-opacity="0.8"/>
+</svg>

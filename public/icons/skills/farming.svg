@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Farming</title>
+  <path d="M6 29h20" fill="none" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M16 29V9" fill="none" stroke="#1c120c" stroke-width="3.6" stroke-linecap="round"/>
+  <path d="M16 29V9" fill="none" stroke="#7fae3e" stroke-width="2" stroke-linecap="round"/>
+  <path d="M16 22c-5 0-8-3-9-7 5 0 8 2 9 7z" fill="#5f9a35" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M16 18c5 0 8-3 9-7-5 0-8 2-9 7z" fill="#79b545" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="16" cy="7" r="3.4" fill="#5b7fd6" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="16" cy="7" r="1.1" fill="#f3e2a0"/>
+  <circle cx="9" cy="10" r="2.4" fill="#5b7fd6" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="23.5" cy="6.5" r="2.2" fill="#5b7fd6" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

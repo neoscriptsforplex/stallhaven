@@ -130,6 +130,7 @@ import {
   writeStoredPhotoMode,
   DEFAULT_DUNGEON_BRIGHTNESS,
 } from './lighting.js';
+import { fullscreenEnv, shouldOfferFullscreen } from './pwa.js';
 
 export function bindHud(root, state, world) {
   const goldEl = root.querySelector('#gold');
@@ -1445,8 +1446,12 @@ export function bindHud(root, state, world) {
     expandBtn.title = on ? 'Exit fullscreen' : 'Toggle fullscreen';
     expandBtn.setAttribute('aria-label', expandBtn.title);
   }
-  document.addEventListener('fullscreenchange', syncFullscreenBtn);
-  expandBtn?.addEventListener('click', toggleFullscreen);
+  if (expandBtn && !shouldOfferFullscreen(fullscreenEnv())) {
+    expandBtn.hidden = true;
+  } else {
+    document.addEventListener('fullscreenchange', syncFullscreenBtn);
+    expandBtn?.addEventListener('click', toggleFullscreen);
+  }
 
   expandModal.querySelector('[data-expand-close]').addEventListener('click', closeExpand);
   expandModal.querySelector('[data-expand-confirm]').addEventListener('click', () => {

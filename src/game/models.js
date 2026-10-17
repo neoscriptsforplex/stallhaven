@@ -1846,6 +1846,19 @@ export function wareDisplayYaw(id) {
   return 0;
 }
 
+/**
+ * Dragonfire shield faces the camera already, but the kite point is at the
+ * top. A half-turn in the plane of the shield puts the point at the bottom.
+ * The usual stand-up pitch would lay this one flat: the dragon head makes Z
+ * the long axis. Other shields keep dumpStandEuler.
+ */
+export function bundledWareEuler(recipeId, source, targetBox) {
+  if (recipeId === 'dragon_kiteshield') {
+    return { rotateX: 0, rotateY: 0, rotateZ: Math.PI };
+  }
+  return dumpStandEuler(source, targetBox);
+}
+
 /** Stand a flat dump upright when the procedural mesh is taller than it is wide. */
 export function dumpStandEuler(source, targetBox) {
   const none = { rotateX: 0, rotateY: 0, rotateZ: 0 };
@@ -1964,7 +1977,7 @@ function attachBundledWare(group, host, bundled, recipeId) {
     name: 'dump',
     fit: 'max',
     targetBox,
-    ...dumpStandEuler(bundled, targetBox),
+    ...bundledWareEuler(recipeId, bundled, targetBox),
   });
   const yaw = wareDisplayYaw(recipeId);
   if (yaw) bakeImportedEuler(mesh, 0, yaw, 0);

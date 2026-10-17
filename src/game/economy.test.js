@@ -712,6 +712,9 @@ describe('catalog', () => {
     assert.equal(recipeCost(RECIPES.chocolate_cake).materials.chocolate, 1);
     assert.equal(RECIPES.bronze_scimitar.name, 'Bronze Scimitar');
     assert.equal(RECIPES.iron_platebody.name, 'Iron Platebody');
+    assert.equal(RECIPES.dragon_kiteshield.id, 'dragon_kiteshield');
+    assert.equal(RECIPES.dragon_kiteshield.name, 'Dragonfire Shield');
+    assert.equal(RECIPES.runite_kiteshield.name, 'Rune Kiteshield');
     assert.equal(RECIPES.wizard_hat.name, 'Wizard Hat');
     assert.equal(RECIPES.mystic_robe_top.name, 'Mystic Robe Top');
     assert.equal(RECIPES.splitbark_gauntlets.name, 'Splitbark Gauntlets');

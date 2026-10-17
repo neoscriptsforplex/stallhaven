@@ -629,7 +629,7 @@ describe('catalog', () => {
     assert.equal(recipes.filter((r) => r.combatClass === 'melee' && r.category === 'armour').length, 55);
     assert.equal(recipes.filter((r) => r.shape?.startsWith('staff')).length, 14);
     assert.equal(recipes.filter((r) => r.combatClass === 'magic' && r.category === 'armour').length, 28);
-    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 26);
+    assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 27);
     assert.equal(recipes.filter((r) => r.category === 'ammo').length, 8);
     assert.equal(recipes.filter((r) => r.category === 'rune').length, 4);
     assert.equal(recipes.filter((r) => r.combatClass === 'tools').length, 14);

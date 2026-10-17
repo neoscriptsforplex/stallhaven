@@ -1839,15 +1839,11 @@ export function wareDisplayYaw(id) {
 }
 
 /**
- * Dragonfire shield faces the camera already, but the kite point is at the
- * top. A half-turn in the plane of the shield puts the point at the bottom.
- * The usual stand-up pitch would lay this one flat: the dragon head makes Z
- * the long axis. Other shields keep dumpStandEuler.
+ * Stand a dump the same way as the other wares. The dragonfire shield used to
+ * take an extra half-turn that left it facing down; it now uses dumpStandEuler
+ * with the bronze and rune kiteshields, so the long axis stands up.
  */
 export function bundledWareEuler(recipeId, source, targetBox) {
-  if (recipeId === 'dragon_kiteshield') {
-    return { rotateX: 0, rotateY: 0, rotateZ: Math.PI };
-  }
   return dumpStandEuler(source, targetBox);
 }
 
@@ -1921,6 +1917,7 @@ export function buildWare(recipeId) {
     pickaxe: () => addWarePickaxe(host, tint),
     arrows: () => addArrows(host, tint),
     cannonballs: () => addCannonballs(host, tint),
+    multicannon: () => addMulticannon(host, tint),
     rune: () => addRune(host, recipe?.runeMark ?? 'air', tint),
     dhide_coif: () => addDhideCoif(host, tint),
     dhide_body: () => addDhideBody(host, tint),
@@ -1959,9 +1956,28 @@ function addMaterialToken(host, tint) {
   host.add(lump);
 }
 
+/** Host box whose max side is the dump's max side times the OSRS unit scale. */
+function osrsScaleHost(bundled) {
+  const probe = bundled.clone(true);
+  probe.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(probe).getSize(new THREE.Vector3());
+  const host = new THREE.Group();
+  const sx = Math.max(size.x * OSRS_MODEL_SCALE, 0.0001);
+  const sy = Math.max(size.y * OSRS_MODEL_SCALE, 0.0001);
+  const sz = Math.max(size.z * OSRS_MODEL_SCALE, 0.0001);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz));
+  box.position.y = sy / 2;
+  host.add(box);
+  return host;
+}
+
 function attachBundledWare(group, host, bundled, recipeId) {
   if (!bundled) {
     group.add(host);
+    return;
+  }
+  if (recipeId === 'dwarven_multicannon') {
+    group.add(wrapBundledProp(bundled, osrsScaleHost(bundled), { name: 'dump', fit: 'max' }));
     return;
   }
   const targetBox = new THREE.Box3().setFromObject(host);
@@ -2429,6 +2445,23 @@ function addHeldBow(parent, tint, scale = 0.85) {
   bow.position.set(0.02, 0.08, 0.04);
   parent.add(bow);
   return bow;
+}
+
+function addMulticannon(group, tint) {
+  const steel = metal(tint);
+  const base = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.06, 0.46), steel));
+  base.position.y = 0.08;
+  group.add(base);
+  const barrel = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.42, 10), steel));
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(0, 0.22, 0.02);
+  group.add(barrel);
+  for (const x of [-0.2, 0.2]) {
+    const wheel = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.04, 10), steel));
+    wheel.rotation.z = Math.PI / 2;
+    wheel.position.set(x, 0.09, 0);
+    group.add(wheel);
+  }
 }
 
 function addCannonballs(group, tint) {

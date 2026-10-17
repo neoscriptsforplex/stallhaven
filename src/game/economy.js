@@ -1116,6 +1116,14 @@ export function grantPickedFlax(state, amount = FLAX_YIELD) {
   return grantMaterial(state, 'flax', amount);
 }
 
+/** Quest reward. Adds Dwarven Plans straight into materials (id `dwarven_plans`). */
+export function grantDwarvenPlans(state, amount = 1) {
+  const add = Math.max(0, Math.round(Number(amount) || 0));
+  if (!add || !state?.materials) return 0;
+  state.materials.dwarven_plans = (state.materials.dwarven_plans ?? 0) + add;
+  return add;
+}
+
 export function placeOnDisplay(state, recipeId, displayIndex = state.selectedDisplay, slotIndex = 0) {
   if (chestCount(state, recipeId) < 1) return false;
   const display = state.displays[displayIndex];
@@ -1477,6 +1485,7 @@ export function placeFromChest(state, recipeId, displayIndex = state.selectedDis
   if (!display) return false;
   if (!display.slots) display.slots = emptySlots();
   const recipe = RECIPES[recipeId];
+  if (displayKind(displayIndex, state) === 'stand' && recipe?.noMannequin) return false;
   if (displayKind(displayIndex, state) === 'stand' && recipe?.category === 'armour') {
     return fillStandFromRecipe(state, displayIndex, recipeId);
   }

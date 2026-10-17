@@ -8,8 +8,10 @@ import {
   MATERIALS_DRAWER_SIDE_QUERY,
   materialTint,
   materialsDrawerHtml,
+  materialsDrawerPointerPlan,
   materialsDrawerSideBox,
   ownedMaterials,
+  rectContains,
   tintHex,
 } from './materialsDrawer.js';
 
@@ -110,5 +112,100 @@ describe('materials drawer', () => {
     assert.match(hud, /syncOwnedMaterials\(\)/);
     assert.match(hud, /syncMaterialsDrawerPlace\(\)/);
     assert.match(hud, /setMaterialsOpen\(!materialsDrawer\.classList\.contains\('is-open'\)\)/);
+    assert.match(hud, /materialsDrawerPointerPlan/);
+    assert.match(hud, /addEventListener\('pointerdown', onMaterialsPointer, true\)/);
+    assert.match(hud, /addEventListener\('pointerup', onMaterialsPointer, true\)/);
+    assert.match(hud, /addEventListener\('pointercancel', onMaterialsPointer, true\)/);
+  });
+
+  it('hides Dwarven Plans until the player owns one', () => {
+    assert.equal(ownedMaterials({ dwarven_plans: 0 }).some((row) => row.id === 'dwarven_plans'), false);
+    const rows = ownedMaterials({ dwarven_plans: 1, logs: 2 });
+    assert.equal(rows.find((row) => row.id === 'dwarven_plans').name, 'Dwarven Plans');
+    assert.match(materialsDrawerHtml({ dwarven_plans: 1 }), /Dwarven Plans/);
+    assert.equal(materialsDrawerHtml({ dwarven_plans: 0 }).includes('Dwarven Plans'), false);
+  });
+});
+
+describe('materials drawer pointer', () => {
+  const toggle = { left: 100, right: 146, top: 400, bottom: 422, width: 46, height: 22 };
+  const panel = { left: 40, right: 400, top: 200, bottom: 400, width: 360, height: 200 };
+  const closed = { left: 40, right: 400, top: 420, bottom: 420, width: 360, height: 0 };
+
+  it('ignores rectangles with no area', () => {
+    assert.equal(rectContains(closed, 80, 420), false);
+    assert.equal(rectContains(toggle, 120, 410), true);
+    assert.equal(rectContains(toggle, 99, 410), false);
+  });
+
+  it('arms and toggles for a mouse click and a touch tap', () => {
+    for (const button of [0, null]) {
+      const down = materialsDrawerPointerPlan({
+        type: 'pointerdown', button, x: 120, y: 410, toggleRect: toggle, open: false,
+      });
+      assert.equal(down.arm, true, `button ${button}`);
+      assert.equal(down.toggle, false);
+      assert.equal(down.swallow, true);
+      const up = materialsDrawerPointerPlan({
+        type: 'pointerup', button, x: 120, y: 410, toggleRect: toggle, open: false, armed: true,
+      });
+      assert.equal(up.toggle, true, `button ${button}`);
+      assert.equal(up.swallow, true);
+      assert.equal(up.arm, false);
+    }
+    const lifted = materialsDrawerPointerPlan({
+      type: 'pointerup', button: -1, x: 120, y: 410, toggleRect: toggle, armed: true,
+    });
+    assert.equal(lifted.toggle, true);
+  });
+
+  it('does not toggle a press that slides off, a right click, or a scroll in the list', () => {
+    const dragged = materialsDrawerPointerPlan({
+      type: 'pointerup', button: 0, x: 10, y: 10, toggleRect: toggle, armed: true,
+    });
+    assert.equal(dragged.toggle, false);
+    assert.equal(dragged.swallow, true);
+
+    const rightDown = materialsDrawerPointerPlan({
+      type: 'pointerdown', button: 2, x: 120, y: 410, toggleRect: toggle,
+    });
+    assert.equal(rightDown.arm, false);
+    assert.equal(rightDown.swallow, true);
+    const rightUp = materialsDrawerPointerPlan({
+      type: 'pointerup', button: 2, x: 120, y: 410, toggleRect: toggle, armed: false,
+    });
+    assert.equal(rightUp.toggle, false);
+
+    const scrolling = materialsDrawerPointerPlan({
+      type: 'pointerdown',
+      button: 0,
+      x: 80,
+      y: 240,
+      toggleRect: toggle,
+      panelRect: panel,
+      open: true,
+      targetInDrawer: true,
+    });
+    assert.equal(scrolling.swallow, false);
+    assert.equal(scrolling.arm, false);
+    assert.equal(scrolling.toggle, false);
+
+    const throughPanel = materialsDrawerPointerPlan({
+      type: 'pointerdown',
+      button: 0,
+      x: 80,
+      y: 240,
+      toggleRect: toggle,
+      panelRect: panel,
+      open: true,
+      targetInDrawer: false,
+    });
+    assert.equal(throughPanel.swallow, true);
+    assert.equal(throughPanel.toggle, false);
+
+    const cancel = materialsDrawerPointerPlan({ type: 'pointercancel', armed: true });
+    assert.equal(cancel.toggle, false);
+    assert.equal(cancel.arm, false);
+    assert.equal(cancel.swallow, true);
   });
 });

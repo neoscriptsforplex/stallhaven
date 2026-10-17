@@ -134,6 +134,7 @@ import { fullscreenEnv, shouldOfferFullscreen } from './pwa.js';
 import {
   MATERIALS_DRAWER_SIDE_QUERY,
   materialsDrawerHtml,
+  materialsDrawerPointerPlan,
   materialsDrawerSideBox,
   ownedMaterialsKey,
 } from './materialsDrawer.js';
@@ -453,7 +454,9 @@ export function bindHud(root, state, world) {
             ? '<span class="mat-crafted">Mined</span>'
             : mat.gathered
               ? '<span class="mat-crafted">Picked</span>'
-              : `<button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>`}
+              : mat.quest
+                ? '<span class="mat-crafted">Quest</span>'
+                : `<button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>`}
       </div>
     `).join('');
     container.dataset.ready = '1';
@@ -2874,10 +2877,34 @@ export function bindHud(root, state, world) {
     materialsDrawer.style.bottom = box.bottom == null ? '' : `${box.bottom}px`;
   }
 
-  materialsToggle?.addEventListener('click', (event) => {
+  let materialsPointerArmed = false;
+  function onMaterialsPointer(event) {
+    if (!materialsDrawer || !materialsToggle) return;
+    const open = materialsDrawer.classList.contains('is-open');
+    const plan = materialsDrawerPointerPlan({
+      type: event.type,
+      button: event.button,
+      x: event.clientX,
+      y: event.clientY,
+      toggleRect: materialsToggle.getBoundingClientRect(),
+      panelRect: open ? materialsPanel?.getBoundingClientRect() : null,
+      open,
+      armed: materialsPointerArmed,
+      targetInDrawer: materialsDrawer.contains(event.target),
+    });
+    if (event.type === 'pointerdown') materialsPointerArmed = plan.arm;
+    else materialsPointerArmed = false;
+    if (plan.toggle) {
+      setMaterialsOpen(!materialsDrawer.classList.contains('is-open'));
+      playClick('ui');
+    }
+    if (!plan.swallow) return;
+    event.preventDefault();
     event.stopPropagation();
-    setMaterialsOpen(!materialsDrawer.classList.contains('is-open'));
-  });
+  }
+  document.addEventListener('pointerdown', onMaterialsPointer, true);
+  document.addEventListener('pointerup', onMaterialsPointer, true);
+  document.addEventListener('pointercancel', onMaterialsPointer, true);
   materialsSideMedia.addEventListener?.('change', syncMaterialsDrawerPlace);
   window.addEventListener('resize', syncMaterialsDrawerPlace);
   if (materialsPanel) materialsPanel.inert = true;

@@ -210,4 +210,40 @@ describe('player look UI', () => {
     assert.match(catalog, /ANVIL_TAB_IDS\.has\(prev\.tab\) \? prev\.tab : 'melee'/);
   });
 
+  it('keeps a crafting list in place when a recipe repaints', () => {
+    const paint = hud.slice(hud.indexOf('function paintCrafts'), hud.indexOf('function fillMats'));
+    assert.match(paint, /holdCraftScroll\(craftsEl, \{ reveal, focusId: craftFocusId \}\)/);
+    assert.match(paint, /paintRecipeButtons\(craftsEl, currentRecipes\(\)\)/);
+    assert.match(paint, /restoreCraftScrollNow\(\)/);
+    assert.equal(/requestAnimationFrame\(\(\) => \{\s*craftsEl\.querySelector/.test(paint), false);
+    assert.match(hud, /plan\.list\.scrollTop = plan\.top/);
+    assert.match(hud, /plan\.sheet\.scrollTop = plan\.sheetTop/);
+    assert.match(
+      hud,
+      /if \(plan\.focusId\) \{\s*plan\.list\.querySelector\(`\[data-craft-row="\$\{plan\.focusId\}"\]`\)\?\.scrollIntoView\(\{ block: 'center' \}\);/,
+    );
+    const open = hud.slice(hud.indexOf('function openCraft'), hud.indexOf('function closeCraft'));
+    assert.match(open, /revealCraftFocus = true/);
+    const queue = hud.slice(hud.indexOf('function queueCraft'), hud.indexOf('function onCraftClick'));
+    assert.match(queue, /revealCraftFocus = true/);
+  });
+
+  it('toggles Build closed and cancels a held placement', () => {
+    assert.match(html, /id="build-btn"[^>]*aria-controls="build-dock"/);
+    assert.match(html, /id="build-btn"[^>]*aria-expanded="false"/);
+    assert.match(css, /#build-btn\.is-on\s*\{[^}]*border-color:\s*var\(--gold\)/);
+    assert.match(css, /#build-btn\.is-on\s*\{[^}]*linear-gradient\(#8a5a30,\s*#5a3518\)/);
+    const handler = hud.slice(hud.indexOf('function toggleBuild'), hud.indexOf("buildBtn?.addEventListener('click', toggleBuild)"));
+    assert.ok(handler.includes('function toggleBuild'), 'toggleBuild should exist');
+    assert.match(handler, /if \(buildModal && !buildModal\.hidden\)/);
+    assert.match(handler, /closeBuild\(\)/);
+    assert.match(handler, /closePlace\(true\)/);
+    assert.match(handler, /openBuild\(\)/);
+    assert.equal(hud.includes("addEventListener('click', openBuild)"), false);
+    assert.match(hud, /buildBtn\?\.classList\.toggle\('is-on', open\)/);
+    assert.match(hud, /setAttribute\('aria-expanded', open \? 'true' : 'false'\)/);
+    assert.match(hud, /world\.isPlacingUnlock\?\.\(\) \|\| world\.isMovingFurniture\?\.\(\)/);
+    assert.match(hud, /world\.cancelMoveFurniture\(\)/);
+  });
+
 });

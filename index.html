@@ -9,7 +9,14 @@
     <style>
       html.is-booting,
       html.is-booting body {
-        background: url("./public/runecraft_loading_bg.jpg") center center / cover no-repeat;
+        background-image: url("./public/runecraft_loading_bg.jpg");
+        background-image: image-set(
+          url("./public/runecraft_loading_bg.webp") type("image/webp"),
+          url("./public/runecraft_loading_bg.jpg") type("image/jpeg")
+        );
+        background-repeat: no-repeat;
+        background-position: center center;
+        background-size: cover;
       }
       html.is-booting #view,
       html.is-booting #hud,

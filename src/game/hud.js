@@ -182,6 +182,7 @@ export function bindHud(root, state, world) {
   const activeCraftYield = activeCraft?.querySelector('[data-active-craft-yield]');
   const chestCapEl = document.querySelector('#chest-cap');
   const expandBtn = document.querySelector('#expand-btn');
+  const buildBtn = document.querySelector('#build-btn');
   const musicBtn = document.querySelector('#music-btn');
   const musicFile = document.querySelector('#music-file');
   const fillModal = document.querySelector('#fill-modal');
@@ -296,6 +297,49 @@ export function bindHud(root, state, world) {
   }
 
   let paintedTabStation = '';
+  let revealCraftFocus = false;
+  let craftScrollPlan = null;
+  let craftScrollFlushQueued = false;
+
+  function holdCraftScroll(list, { reveal = false, focusId = null } = {}) {
+    if (!list) return;
+    if (reveal && focusId) {
+      craftScrollPlan = { focusId, list };
+      return;
+    }
+    if (craftScrollPlan) return;
+    const sheet = list.closest('.craft-sheet') || list.closest('.sheet');
+    craftScrollPlan = {
+      top: list.scrollTop,
+      sheetTop: sheet?.scrollTop ?? 0,
+      sheet,
+      list,
+    };
+  }
+
+  function restoreCraftScrollNow() {
+    const plan = craftScrollPlan;
+    if (!plan || plan.focusId) return;
+    if (plan.list) plan.list.scrollTop = plan.top;
+    if (plan.sheet) plan.sheet.scrollTop = plan.sheetTop;
+  }
+
+  function queueCraftScrollFlush() {
+    if (craftScrollFlushQueued) return;
+    craftScrollFlushQueued = true;
+    requestAnimationFrame(() => {
+      craftScrollFlushQueued = false;
+      const plan = craftScrollPlan;
+      craftScrollPlan = null;
+      if (!plan?.list) return;
+      if (plan.focusId) {
+        plan.list.querySelector(`[data-craft-row="${plan.focusId}"]`)?.scrollIntoView({ block: 'center' });
+        return;
+      }
+      plan.list.scrollTop = plan.top;
+      if (plan.sheet) plan.sheet.scrollTop = plan.sheetTop;
+    });
+  }
 
   function ensureCraftTabs() {
     if (paintedTabStation === craftStation) return;
@@ -372,14 +416,14 @@ export function bindHud(root, state, world) {
     for (const btn of subtabsEl.querySelectorAll('[data-subtab]')) {
       btn.classList.toggle('is-on', btn.dataset.subtab === craftSubtab);
     }
+    const reveal = revealCraftFocus;
+    revealCraftFocus = false;
+    holdCraftScroll(craftsEl, { reveal, focusId: craftFocusId });
     paintRecipeButtons(craftsEl, currentRecipes());
+    restoreCraftScrollNow();
     syncQtyHint(craftFocusId);
-    if (craftFocusId) {
-      showPreview(craftFocusId);
-      requestAnimationFrame(() => {
-        craftsEl.querySelector(`[data-craft-row="${craftFocusId}"]`)?.scrollIntoView({ block: 'center' });
-      });
-    }
+    if (craftFocusId) showPreview(craftFocusId);
+    queueCraftScrollFlush();
   }
   paintCrafts();
 
@@ -464,6 +508,7 @@ export function bindHud(root, state, world) {
   }
 
   function queueCraft(recipeId, want) {
+    revealCraftFocus = true;
     craftFocusId = recipeId;
     showPreview(recipeId);
     const affordable = maxCraftActions(state, recipeId);
@@ -480,7 +525,10 @@ export function bindHud(root, state, world) {
       return;
     }
     const n = startCraftBatch(state, recipeId, want, performance.now() / 1000);
-    if (!n) return;
+    if (!n) {
+      revealCraftFocus = false;
+      return;
+    }
     playClick('craft');
     setCraftNote('');
     const potionNote = potionModal.querySelector('[data-potion-note]');
@@ -655,6 +703,7 @@ export function bindHud(root, state, world) {
     craftModal.hidden = false;
     const reason = craftFocusId ? craftBlockReason(state, craftFocusId) : '';
     setCraftNote(options.note || (options.autoStart ? reason : ''));
+    revealCraftFocus = true;
     paintCrafts();
     setModalOpen();
     if (options.autoStart && craftFocusId && canCraft(state, craftFocusId)) {
@@ -1600,9 +1649,15 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   }
 
+  function setBuildPressed(open) {
+    buildBtn?.classList.toggle('is-on', open);
+    buildBtn?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
   function closeBuild() {
     if (!buildModal) return;
     buildModal.hidden = true;
+    setBuildPressed(false);
   }
 
   function openBuild() {
@@ -1621,13 +1676,16 @@ export function bindHud(root, state, world) {
     closePlace(true);
     paintBuild();
     buildModal.hidden = false;
+    setBuildPressed(true);
   }
 
   function closePlace(cancelWorld = false) {
     if (!placeModal) return;
     placeModal.hidden = true;
     pendingPlace = null;
-    if (cancelWorld && world.isPlacingUnlock?.()) world.cancelMoveFurniture();
+    if (cancelWorld && (world.isPlacingUnlock?.() || world.isMovingFurniture?.())) {
+      world.cancelMoveFurniture();
+    }
     world.ignorePicks(280);
   }
 
@@ -1636,7 +1694,16 @@ export function bindHud(root, state, world) {
     placeModal.hidden = false;
   }
 
-  document.querySelector('#build-btn')?.addEventListener('click', openBuild);
+  function toggleBuild() {
+    if (buildModal && !buildModal.hidden) {
+      closeBuild();
+      closePlace(true);
+      return;
+    }
+    openBuild();
+  }
+
+  buildBtn?.addEventListener('click', toggleBuild);
   buildModal.querySelector('[data-build-close]').addEventListener('click', closeBuild);
   buildModal.querySelector('[data-expand-buy]')?.addEventListener('click', () => {
     closeBuild();

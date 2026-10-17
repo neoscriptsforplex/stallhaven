@@ -1025,6 +1025,11 @@ body.modal-open #view {
   min-width: 5.6rem;
 }
 
+#build-btn.is-on {
+  border-color: var(--gold);
+  background: linear-gradient(#8a5a30, #5a3518);
+}
+
 #help-btn {
   min-width: 4.4rem;
   font-weight: 700;

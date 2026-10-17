@@ -375,7 +375,7 @@ function metalLine({
     const previousId = index === 0 ? null : `${METALS[index - 1].id}_${piece.id}`;
     addRecipe({
       id,
-      name: `${metal.name} ${piece.name}`,
+      name: id === 'dragon_kiteshield' ? 'Dragonfire Shield' : `${metal.name} ${piece.name}`,
       category,
       combatClass,
       slot: piece.slot,

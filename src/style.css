@@ -1148,6 +1148,10 @@ html.is-booting.is-scene-live #view {
     max(16px, env(safe-area-inset-left, 0px));
   background-color: transparent;
   background-image: url("../public/runecraft_loading_bg.jpg");
+  background-image: image-set(
+    url("../public/runecraft_loading_bg.webp") type("image/webp"),
+    url("../public/runecraft_loading_bg.jpg") type("image/jpeg")
+  );
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -1819,5 +1823,451 @@ html.is-booting.is-scene-live #view {
   .furn-menu,
   .inspect-pop {
     touch-action: manipulation;
+  }
+}
+
+/*
+ * Stallhaven Skills panel.
+ * Append to src/style.css (or import after it). Uses the existing tokens:
+ * --panel, --line, --gold, --parchment and the .expand-dock / .xp-bar styles.
+ * Phone portrait rules are all inside @media (orientation: portrait) and (pointer: coarse),
+ * so desktop and landscape are unchanged by them.
+ */
+
+:root {
+  --skill-yellow: #ffd94a;
+  --skill-tile-top: #4e321d;
+  --skill-tile-bottom: #2c1b0f;
+}
+
+/* ---------- Top-bar button ---------- */
+
+#skills-btn {
+  min-width: 4.5rem;
+  font-weight: 700;
+}
+
+#skills-btn.is-on {
+  border-color: var(--gold);
+  background: linear-gradient(#8a5a30, #5a3518);
+}
+
+/* ---------- Dock (desktop / landscape) ---------- */
+
+.skills-dock {
+  width: min(300px, calc(100vw - 32px));
+  padding: 10px 12px 12px;
+  overflow: visible; /* lets the floating tooltip sit over the edge if it must */
+}
+
+.skills-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.skills-head h2 {
+  margin: 0;
+}
+
+.skills-grip {
+  display: none;
+}
+
+.skills-close {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.9rem;
+}
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #1c120c;
+  border-radius: 6px;
+  background: rgba(16, 10, 6, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.18);
+}
+
+.skill-tile {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  min-height: 46px;
+  padding: 4px 6px 4px 5px;
+  border: 1px solid #6e4b2a;
+  border-radius: 4px;
+  background: linear-gradient(var(--skill-tile-top), var(--skill-tile-bottom));
+  box-shadow: inset 0 1px 0 rgba(240, 217, 168, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  color: var(--parchment);
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) {
+  .skill-tile:hover:not(:disabled) {
+    background: linear-gradient(#5e3e24, #362214);
+    border-color: rgba(227, 179, 74, 0.7);
+  }
+}
+
+.skill-tile.is-on,
+.skill-tile[aria-pressed="true"] {
+  border-color: var(--gold);
+  background: linear-gradient(#6a4526, #3e2616);
+  box-shadow: 0 0 0 1px rgba(227, 179, 74, 0.55), inset 0 1px 0 rgba(240, 217, 168, 0.2);
+}
+
+.skill-tile:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.skill-icon {
+  display: block;
+  width: 32px;
+  height: 32px;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Just the level, big and yellow like the old skills tab. */
+.skill-lv {
+  justify-self: end;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--skill-yellow);
+  text-shadow: 1px 1px 0 #000;
+  font-variant-numeric: tabular-nums;
+}
+
+.skill-tile.is-max .skill-lv {
+  color: #fff3a0;
+}
+
+.skill-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skills-dock .skills-total {
+  grid-column: span 2;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  min-height: 46px;
+  padding: 4px 6px;
+  border: 1px solid #6e4b2a;
+  border-radius: 4px;
+  background: linear-gradient(#24160c, #1a0f08);
+  color: var(--skill-yellow);
+  font-weight: 700;
+  font-size: 0.86rem;
+  text-shadow: 1px 1px 0 #000;
+  white-space: nowrap;
+}
+
+/* ---------- Tooltip / detail ---------- */
+
+.skill-tip {
+  position: absolute;
+  z-index: 2;
+  width: 214px;
+  padding: 8px 10px 9px;
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  background: #1e120a;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.skills-dock:not(.has-tip) .skill-tip {
+  display: none;
+}
+
+.skill-tip p {
+  margin: 0;
+}
+
+.skill-tip-hint {
+  font-size: 0.82rem;
+  color: #d9c4a0;
+  text-align: center;
+}
+
+.skill-tip-name {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px !important;
+  font-weight: 700;
+  color: #f3e2c0;
+}
+
+.skill-tip-name img {
+  display: block;
+}
+
+.skill-tip-level {
+  color: var(--skill-yellow);
+  text-shadow: 1px 1px 0 #000;
+}
+
+.skill-tip-rows {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  margin: 0 0 7px;
+  font-size: 0.8rem;
+}
+
+.skill-tip-rows dt {
+  color: #d9c4a0;
+}
+
+.skill-tip-rows dd {
+  margin: 0;
+  text-align: right;
+  color: #f6e4c4;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.skill-tip-bar {
+  height: 9px;
+}
+
+.skill-tip-train {
+  margin-top: 7px !important;
+  font-size: 0.76rem;
+  line-height: 1.3;
+  color: #cbb48a;
+}
+
+/* ---------- Level-up flash and toast ---------- */
+
+.skill-tile.is-levelup {
+  animation: skill-levelup 0.9s ease-out;
+}
+
+@keyframes skill-levelup {
+  0% { box-shadow: 0 0 0 0 rgba(255, 217, 74, 0.95); border-color: var(--skill-yellow); }
+  100% { box-shadow: 0 0 0 10px rgba(255, 217, 74, 0); }
+}
+
+.skill-toast {
+  position: absolute;
+  left: 50%;
+  top: 72px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: 32px auto;
+  align-items: center;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 8px 14px 8px 10px;
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+  animation: skill-toast-in 0.25s ease-out;
+  pointer-events: none;
+}
+
+.skill-toast p {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+  color: #f3e2c0;
+  font-size: 0.86rem;
+}
+
+.skill-toast strong {
+  color: var(--skill-yellow);
+  text-shadow: 1px 1px 0 #000;
+}
+
+.skill-toast.is-leaving {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+@keyframes skill-toast-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-tile.is-levelup,
+  .skill-toast {
+    animation: none;
+  }
+}
+
+/* ---------- Phone portrait: slide-up sheet above the bottom bar ---------- */
+
+@media (orientation: portrait) and (pointer: coarse) {
+  /* Eight buttons now share the bottom bar. Let them shrink rather than overflow on 360px phones. */
+  #save-bar {
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+
+  #save-bar #skills-btn {
+    min-width: 0;
+  }
+
+  #skills-dock.skills-dock {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: var(--portrait-thumb, 64px);
+    left: 0;
+    z-index: 18;
+    width: auto;
+    max-height: calc(100vh - var(--portrait-thumb, 64px) - 16px);
+    max-height: calc(100dvh - var(--portrait-thumb, 64px) - env(safe-area-inset-top, 0px) - 16px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 6px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px));
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    background: rgba(36, 22, 12, 0.96);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.4);
+    animation: skills-sheet-up 0.22s ease-out;
+  }
+
+  .skills-head {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    margin-bottom: 8px;
+  }
+
+  .skills-grip {
+    display: block;
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: 44px;
+    height: 5px;
+    margin: 0 0 6px;
+    border-radius: 99px;
+    background: rgba(227, 179, 74, 0.55);
+  }
+
+  .skills-head h2 {
+    font-size: 1.1rem;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    color: #f3e2c0;
+  }
+
+  .skills-close {
+    width: 44px;
+    height: 44px;
+    font-size: 1.05rem;
+  }
+
+  .skills-grid {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .skill-tile {
+    grid-template-columns: 40px minmax(0, 1fr);
+    min-height: 58px;
+    padding: 6px 10px 6px 8px;
+  }
+
+  .skill-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .skill-lv {
+    font-size: 1.35rem;
+  }
+
+  .skills-dock .skills-total {
+    font-size: 1rem;
+  }
+
+  .skills-dock .skills-total {
+    min-height: 58px;
+  }
+
+  /* The detail card lives in the sheet, under the grid, so a tap never covers a tile. */
+  .skill-tip,
+  .skills-dock:not(.has-tip) .skill-tip {
+    position: static;
+    display: block;
+    width: auto;
+    min-height: 9.5rem; /* same height with or without a skill picked, so the sheet does not jump */
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-color: var(--line);
+    background: rgba(16, 10, 6, 0.55);
+    box-shadow: none;
+  }
+
+  .skills-dock.has-tip .skill-tip {
+    border-color: var(--gold);
+  }
+
+  .skill-tip-hint {
+    display: grid;
+    place-items: center;
+    min-height: 7.6rem;
+    font-size: 0.92rem;
+  }
+
+  .skill-tip-name {
+    font-size: 1.05rem;
+  }
+
+  .skill-tip-rows {
+    font-size: 0.92rem;
+    gap: 4px 12px;
+  }
+
+  .skill-tip-bar {
+    height: 11px;
+  }
+
+  .skill-tip-train {
+    font-size: 0.86rem;
+  }
+
+  .skill-toast {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+}
+
+@keyframes skills-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@media (orientation: portrait) and (pointer: coarse) and (prefers-reduced-motion: reduce) {
+  #skills-dock.skills-dock {
+    animation: none;
   }
 }

@@ -1665,7 +1665,7 @@ export function slotPose(slot) {
  */
 const MANNEQUIN_BLOCKS = {
   hips: { x: 0.34, y: 0.06, z: 0.14, at: 0.5 },
-  torso: { x: 0.3, y: 0.42, z: 0.14, at: 0.92 },
+  torso: { x: 0.2, y: 0.42, z: 0.12, at: 0.92 },
   shoulders: { x: 0.5, y: 0.06, z: 0.12, at: 1.16 },
 };
 
@@ -1676,10 +1676,9 @@ function standBlock(block, material) {
 }
 
 /**
- * Body and leg pieces worn on a mannequin. Scale stays at the mesh's own
- * scale: the size from before body and leg gear was grown to cover the old
- * wide torso and legs. Gloves, boots, helms, shields, and weapons are not
- * in this set. Rotation is left to the caller.
+ * Body and leg pieces worn on a mannequin. Gloves, boots, helms, shields,
+ * and weapons are not in this set. The fit runs only from fitMannequinWear,
+ * so tables, shelves, hands, and the craft preview stay at mount scale.
  */
 const MANNEQUIN_WORN_SECTION = {
   platebody: 'body',
@@ -1692,15 +1691,141 @@ const MANNEQUIN_WORN_SECTION = {
   dhide_chaps: 'legs',
 };
 
+/** Total extra width and depth past the wood, and the scale clamp. */
+export const MANNEQUIN_WEAR_LIMITS = {
+  margin: 0.02,
+  scaleMin: 0.5,
+  scaleMax: 3,
+};
+
 /**
- * Place one body or leg mesh on its pre-resize mannequin slot.
- * Does not change scale or rotation. Returns false for anything else.
+ * Depth thinner than this fraction of the wider axis is a sheet, not a
+ * torso. It keeps the uniform scale instead of stretching to the wood.
+ */
+const MANNEQUIN_THIN_DEPTH = 0.08;
+
+function wearBounds(mesh) {
+  mesh.updateMatrixWorld(true);
+  return new THREE.Box3().setFromObject(mesh);
+}
+
+/** Bake the mesh's current world transform into geometry and clear it. */
+function bakeWorldGeometry(root) {
+  root.updateMatrixWorld(true);
+  const world = new THREE.Matrix4();
+  root.traverse((child) => {
+    if (!child.isMesh || !child.geometry?.attributes?.position) return;
+    world.copy(child.matrixWorld);
+    child.geometry = child.geometry.clone();
+    child.geometry.applyMatrix4(world);
+    child.geometry.computeVertexNormals();
+  });
+  root.traverse((child) => {
+    child.position.set(0, 0, 0);
+    child.quaternion.identity();
+    child.scale.set(1, 1, 1);
+    child.updateMatrix();
+  });
+  root.updateMatrixWorld(true);
+}
+
+/**
+ * A dump that stood up edge-on is deeper than it is wide, so the sheet's
+ * thin edge runs across the shoulders. A quarter turn on the mannequin puts
+ * the broad face across the torso and leaves that thin axis as depth.
+ * Tables and the craft preview never call this.
+ */
+function faceMannequinFront(mesh) {
+  const box = wearBounds(mesh);
+  if (box.isEmpty()) return box;
+  const size = box.getSize(new THREE.Vector3());
+  if (size.x >= size.z) return box;
+  mesh.rotation.y += Math.PI / 2;
+  bakeWorldGeometry(mesh);
+  return wearBounds(mesh);
+}
+
+/** Wood a section has to hide, plus the margin, in stand space. */
+function sectionNeed(section) {
+  const { margin } = MANNEQUIN_WEAR_LIMITS;
+  const hips = MANNEQUIN_BLOCKS.hips;
+  const torso = MANNEQUIN_BLOCKS.torso;
+  const shoulders = MANNEQUIN_BLOCKS.shoulders;
+  if (section === 'body') {
+    const y0 = hips.at + hips.y / 2;
+    const y1 = shoulders.at + shoulders.y / 2;
+    const depth = Math.max(torso.z, shoulders.z);
+    return {
+      size: new THREE.Vector3(shoulders.x + margin, y1 - y0, depth + margin),
+      center: new THREE.Vector3(0, (y0 + y1) / 2, 0),
+      anchor: 'center',
+    };
+  }
+  return {
+    size: new THREE.Vector3(hips.x + margin, hips.y, hips.z + margin),
+    top: hips.at + hips.y / 2,
+    anchor: 'top',
+  };
+}
+
+function clampFitScale(value) {
+  const { scaleMin, scaleMax } = MANNEQUIN_WEAR_LIMITS;
+  if (!Number.isFinite(value)) return scaleMin;
+  return Math.min(scaleMax, Math.max(scaleMin, value));
+}
+
+/**
+ * One uniform scale: the most any non-thin axis needs in order to clear the
+ * wood. Paper-thin depth matches that scale. A clamped axis that is still
+ * inside the wood is lifted on its own, and still not past the clamp.
+ */
+function fitScaleForBox(box, section) {
+  const size = box.getSize(new THREE.Vector3());
+  const need = sectionNeed(section).size;
+  const raw = {
+    x: need.x / Math.max(size.x, 1e-4),
+    y: need.y / Math.max(size.y, 1e-4),
+    z: need.z / Math.max(size.z, 1e-4),
+  };
+  const thinDepth = size.z < Math.max(size.x, size.y) * MANNEQUIN_THIN_DEPTH;
+  let uniform = Math.max(raw.x, raw.y);
+  if (!thinDepth) uniform = Math.max(uniform, raw.z);
+  uniform = clampFitScale(uniform);
+  const scale = { x: uniform, y: uniform, z: uniform };
+  for (const axis of ['x', 'y', 'z']) {
+    if (axis === 'z' && thinDepth) continue;
+    if (size[axis] * scale[axis] >= need[axis] - 1e-4) continue;
+    scale[axis] = clampFitScale(raw[axis]);
+  }
+  return scale;
+}
+
+/**
+ * Scale one body or leg mesh so its bounding box covers that mannequin
+ * section. Tops are centred across the torso, from the hips up to the
+ * shoulders. Legs hang from the hips down the pole. Measures the mesh as it
+ * already stands. Returns false for anything else.
  */
 export function fitMannequinWear(mesh, recipeId) {
   const section = MANNEQUIN_WORN_SECTION[RECIPES[recipeId]?.shape];
   if (!mesh || !section) return false;
-  const pose = slotPose(section);
-  mesh.position.set(pose.x, pose.y, pose.z);
+  const box = faceMannequinFront(mesh);
+  if (box.isEmpty()) return false;
+  const size = box.getSize(new THREE.Vector3());
+  if (size.x < 1e-4 || size.y < 1e-4 || size.z < 1e-4) return false;
+  const scale = fitScaleForBox(box, section);
+  const need = sectionNeed(section);
+  const center = box.getCenter(new THREE.Vector3());
+  mesh.scale.set(scale.x, scale.y, scale.z);
+  if (need.anchor === 'top') {
+    mesh.position.set(-center.x * scale.x, need.top - box.max.y * scale.y, -center.z * scale.z);
+  } else {
+    mesh.position.set(
+      need.center.x - center.x * scale.x,
+      need.center.y - center.y * scale.y,
+      need.center.z - center.z * scale.z,
+    );
+  }
   return true;
 }
 

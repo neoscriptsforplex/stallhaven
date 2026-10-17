@@ -89,6 +89,7 @@ import {
   treeCanChop,
 } from './trees.js';
 import {
+  LADDER_STAND,
   STATION_ARRIVE,
   STATION_HIT,
   fletchFaceYaw,
@@ -1489,7 +1490,7 @@ export function createWorld(canvas, state, opts = {}) {
     const canStand = (x, z) => isWalkable(x, z, standBlocks, PLAYER_RADIUS, standFloors);
     const plan = resolveStationUse(from, pose, state, planSceneWalk, type, canStand);
     const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax';
-    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch' || gatherKind;
+    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch' || type === 'ladder' || gatherKind;
     const faceYaw = plan.face != null
       ? plan.face
       : type === 'range' ? rangeFaceYaw(pose)
@@ -1918,7 +1919,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (data.kind === 'ladder') {
-        queueUse('ladder', { x: -4.2, z: 0.4 });
+        queueUse('ladder', LADDER_STAND);
         return;
       }
       if (data.kind === 'boulder') {

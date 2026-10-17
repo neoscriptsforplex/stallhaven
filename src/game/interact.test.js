@@ -1,15 +1,19 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import './canvas-mock.js';
 import { SHOP } from './catalog.js';
 import { createState } from './economy.js';
-import { PLAYER_RADIUS, isWalkable, playerObstacles } from './nav.js';
+import { DUNGEON_BOULDERS } from './shopbuild.js';
+import { PLAYER_RADIUS, dungeonMoveObstacles, isWalkable, planWalk, playerObstacles } from './nav.js';
 import { furnitureHalfSize, playerWalkFloors } from './layout.js';
 import {
+  LADDER_STAND,
   STATION_ARRIVE,
   STATION_HIT,
   USE_KINDS,
   floorClickPoint,
   ignoredClickObject,
+  ladderFaceYaw,
   pickUseHit,
   fletchFaceYaw,
   fletchStandWorld,
@@ -326,6 +330,40 @@ describe('station walk-then-open', () => {
     assert.equal(plan.action, 'walk');
     assert.ok(plan.dest.x < chest.x - 0.4, 'stand in front of the latch, into the room');
     assert.ok(Math.abs(plan.dest.z - chest.z) < 0.35, 'not along the back wall');
+  });
+
+  it('stands on the cobbles in front of the dungeon ladder, centred on the rails', () => {
+    const floor = { minX: -5.2, maxX: 5.2, minZ: -4.2, maxZ: 4.2 };
+    const blocks = dungeonMoveObstacles(DUNGEON_BOULDERS);
+    const planWalkDungeon = (from, to) => planWalk(from, to, blocks, PLAYER_RADIUS, [floor]);
+    const from = { x: 1.2, z: -0.6 };
+    const plan = resolveStationUse(from, { x: -5.14, z: 0.4 }, {}, planWalkDungeon, 'ladder');
+    assert.equal(plan.action, 'walk');
+    assert.ok(Math.hypot(plan.dest.x - LADDER_STAND.x, plan.dest.z - LADDER_STAND.z) < 1e-6);
+    assert.ok(Math.abs(plan.dest.z - 0.4) < 1e-6, 'centred on the ladder');
+    assert.ok(plan.dest.x > -4.6, 'room side of the rails, not the west-wall corridor');
+    assert.ok(plan.dest.x < -3.7, 'still in front of the ladder');
+    const end = plan.path[plan.path.length - 1];
+    assert.ok(Math.hypot(end.x - plan.dest.x, end.z - plan.dest.z) < 0.05, 'circle and stand share the front spot');
+    assert.equal(isWalkable(plan.dest.x, plan.dest.z, blocks, PLAYER_RADIUS, [floor]), true);
+    assert.ok(Math.abs(plan.face - ladderFaceYaw()) < 1e-9);
+    assert.ok(Math.abs(ladderFaceYaw() + Math.PI / 2) < 1e-9, 'face the ladder, world −X');
+
+    const besideWall = resolveStationUse(
+      { x: -4.2, z: 1 },
+      LADDER_STAND,
+      {},
+      planWalkDungeon,
+      'ladder',
+    );
+    assert.equal(besideWall.action, 'walk');
+    assert.ok(Math.abs(besideWall.dest.z - 0.4) < 1e-6, 'leave the wall corridor for the rail centre');
+
+    const already = resolveStationUse(LADDER_STAND, LADDER_STAND, {}, planWalkDungeon, 'ladder');
+    assert.equal(already.action, 'open');
+
+    const away = planWalkDungeon(LADDER_STAND, { x: 2.2, z: -0.1 });
+    assert.ok(away.length >= 1, 'the front spot still reaches the rest of the dungeon');
   });
 
   it('treats dungeon boulders as walk-then-use rocks', () => {

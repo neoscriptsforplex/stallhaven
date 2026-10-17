@@ -51,6 +51,26 @@ const APPROACH_DIST = 0.85;
 const STAND_FRONT = new Set(['counter', 'chest']);
 
 /**
+ * Dungeon exit ladder on the west wall. Rails are centred at z = 0.4 and the
+ * climb face is about x = −5.05. One step into the room (+X) puts the feet on
+ * the cobbles in front of that face, not in the wall corridor beside the rails.
+ */
+export const LADDER_STAND = { x: -4.2, z: 0.4 };
+
+/** Face the west-wall ladder (world −X). */
+export function ladderFaceYaw() {
+  return -Math.PI / 2;
+}
+
+/** Same centre line, stepping further into the room only if the first spot is blocked. */
+function ladderStandCandidates() {
+  return [0, 0.28, 0.56].map((extra) => ({
+    x: LADDER_STAND.x + extra,
+    z: LADDER_STAND.z,
+  }));
+}
+
+/**
  * Cook stand in the range mesh's own XZ, in metres, so it yaws with the station.
  * Local +Z is the chimney end. The pan and the left red grill sit toward −Z
  * (about z = −0.40). Local −X is the front face the handle points out of;
@@ -437,6 +457,22 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
       if (isNearPoint(from, dest, 0.45)) return { action: 'open', dest, face };
     }
     for (const dest of spots) {
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      const end = path[path.length - 1];
+      if (end && Math.hypot(end.x - dest.x, end.z - dest.z) < 0.22) {
+        return { action: 'walk', path, dest, face };
+      }
+    }
+    return { action: 'blocked', dest: spots[0], face };
+  }
+  if (kind === 'ladder') {
+    const face = ladderFaceYaw();
+    const spots = ladderStandCandidates();
+    for (const dest of spots) {
+      if (isNearPoint(from, dest, 0.45)) return { action: 'open', dest, face };
+    }
+    for (const dest of spots) {
+      if (canStand && !canStand(dest.x, dest.z)) continue;
       const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
       const end = path[path.length - 1];
       if (end && Math.hypot(end.x - dest.x, end.z - dest.z) < 0.22) {

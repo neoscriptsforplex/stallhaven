@@ -973,9 +973,10 @@ export function runeAltarSpot(id) {
 
 /**
  * RuneLite altar dumps are about 373 × 154 × 363 OSRS units (X/Z swap by element).
- * 0.01125 m/unit leaves them upright, a little under 1.8 m tall and about 4.2 m across.
+ * Half of the usual 0.01125 m/unit scale: about 0.87 m tall and 2.1 m across,
+ * still upright on the same pads.
  */
-export const ALTAR_OSRS_SCALE = 0.01125;
+export const ALTAR_OSRS_SCALE = 0.005625;
 export const ALTAR_HEIGHT = 154 * ALTAR_OSRS_SCALE;
 export const ALTAR_SPAN_X = 373 * ALTAR_OSRS_SCALE;
 export const ALTAR_SPAN_Z = 363 * ALTAR_OSRS_SCALE;

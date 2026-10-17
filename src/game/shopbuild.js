@@ -25,6 +25,7 @@ import {
   RUNE_FIELD_PORTAL,
   ALTAR_FOOT,
   ALTAR_HEIGHT,
+  ALTAR_OSRS_SCALE,
   PORTAL_TARGET_HEIGHT,
   PORTAL_TARGET_WIDTH,
   PORTAL_TARGET_DEPTH,
@@ -1933,14 +1934,15 @@ function buildProceduralAltar(element) {
   return group;
 }
 
-/** RuneLite altar dump at ×0.01125, upright, sitting on the grass. */
+/** RuneLite altar dump at half the usual OSRS scale, upright, sitting on the grass. */
 export function buildAltar(element) {
   const id = `altar-${element}`;
   const bundled = getBundledLook(id);
   let visual = buildProceduralAltar(element);
   if (bundled) {
     visual = bundled.clone(true);
-    applyOsrsScale(visual);
+    visual.scale.multiplyScalar(ALTAR_OSRS_SCALE);
+    visual.updateMatrixWorld(true);
     sitVisibleOnY(visual, 0);
   }
   const root = new THREE.Group();

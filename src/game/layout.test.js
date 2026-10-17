@@ -708,7 +708,7 @@ describe('flax field', () => {
 describe('rune field', () => {
   it('keeps the centre portal and the four edge altars clear of trees and rocks', () => {
     assert.equal(PORTAL_COST, 500000);
-    assert.equal(ALTAR_OSRS_SCALE, 0.01125);
+    assert.equal(ALTAR_OSRS_SCALE, 0.005625);
     assert.equal(RUNE_FIELD_PORTAL.x, 0);
     assert.equal(RUNE_FIELD_PORTAL.z, 0);
     assert.equal(runeFieldClearOf(RUNE_FIELD_PORTAL), false);

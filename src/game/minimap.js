@@ -9,6 +9,7 @@ import {
   ROOM_W,
   TRAPDOOR,
   cobblePathSpan,
+  furnitureVisualYaw,
   gardenBox,
   gardenTrapdoorSpot,
   roomCenter,
@@ -332,6 +333,31 @@ function drawPlayerMarker(ctx, snap, toMap, yaw, scale = 1) {
   ctx.restore();
 }
 
+/** Long axis of the counter in world XZ. Local +X, after the counter's visual yaw. */
+function counterLongAxis(rot = 0) {
+  const yaw = furnitureVisualYaw('counter', rot);
+  return { x: Math.cos(yaw), z: -Math.sin(yaw) };
+}
+
+/**
+ * Brown counter bar. Same 14×4 icon, but turned with the shop so a camera yaw
+ * does not leave it stuck to the screen axes.
+ */
+function drawCounterMarker(ctx, pose, toMap, scale) {
+  const x = pose?.x ?? SHOP.counter.x;
+  const z = pose?.z ?? SHOP.counter.z;
+  const axis = counterLongAxis(pose?.rot ?? 0);
+  const origin = toMap(x, z);
+  const ahead = toMap(x + axis.x, z + axis.z);
+  const angle = Math.atan2(ahead.y - origin.y, ahead.x - origin.x);
+  ctx.save();
+  ctx.translate(origin.x, origin.y);
+  ctx.rotate(angle);
+  ctx.fillStyle = '#6a4220';
+  ctx.fillRect(-7 * scale, -2 * scale, 14 * scale, 4 * scale);
+  ctx.restore();
+}
+
 function drawMovePing(ctx, snap, toMap, scale = 1) {
   const ping = snap.ping;
   if (!ping || ping.age >= 1) return;
@@ -445,9 +471,7 @@ export function drawMinimap(ctx, snap) {
   const mark = dungeonEntranceMarkerWorld(hatch);
   drawTrapdoorMarker(ctx, toMap(mark.x, mark.z), scale);
 
-  const counter = toMap(SHOP.counter.x, SHOP.counter.z);
-  ctx.fillStyle = '#6a4220';
-  ctx.fillRect(counter.x - 7 * scale, counter.y - 2 * scale, 14 * scale, 4 * scale);
+  drawCounterMarker(ctx, snap.counter, toMap, scale);
 
   for (const piece of snap.furniture ?? []) {
     drawDot(ctx, toMap(piece.x, piece.z), 2.2, '#c4a05a', undefined, scale);

@@ -188,6 +188,7 @@ usemtl c6
 f 2 7 8
 usemtl c7
 f 2 8 3
+usemtl c7
 f 3 8 9
 usemtl c8
 f 3 9 10
@@ -239,6 +240,7 @@ usemtl c28
 f 9 26 10
 usemtl c29
 f 10 26 27
+usemtl c29
 f 10 27 28
 usemtl c30
 f 28 27 29
@@ -254,6 +256,7 @@ usemtl c33
 f 16 33 34
 usemtl c34
 f 16 34 17
+usemtl c34
 f 17 34 35
 usemtl c2
 f 17 35 18
@@ -329,6 +332,7 @@ usemtl c64
 f 64 66 67
 usemtl c65
 f 67 66 68
+usemtl c65
 f 67 68 69
 usemtl c41
 f 67 69 66
@@ -532,7 +536,9 @@ usemtl c3
 f 78 128 115
 usemtl c137
 f 115 128 129
+usemtl c137
 f 115 129 118
+usemtl c137
 f 115 118 117
 usemtl c23
 f 115 117 116
@@ -540,11 +546,13 @@ usemtl c31
 f 128 127 130
 usemtl c70
 f 128 130 25
+usemtl c70
 f 128 25 87
 usemtl c138
 f 128 87 129
 usemtl c39
 f 129 87 23
+usemtl c39
 f 129 23 118
 usemtl c139
 f 118 23 42
@@ -556,6 +564,7 @@ usemtl c66
 f 119 131 132
 usemtl c142
 f 119 132 120
+usemtl c142
 f 120 132 133
 usemtl c143
 f 120 133 122
@@ -661,6 +670,7 @@ usemtl c11
 f 137 154 155
 usemtl c9
 f 155 154 73
+usemtl c9
 f 155 73 156
 usemtl c168
 f 156 73 157
@@ -686,6 +696,7 @@ usemtl c129
 f 161 124 162
 usemtl c174
 f 162 124 123
+usemtl c174
 f 162 123 163
 usemtl c175
 f 163 123 122
@@ -743,3 +754,101 @@ usemtl c144
 f 132 148 133
 usemtl c92
 f 145 144 168
+usemtl c186
+f 93 10 91
+usemtl c186
+f 93 92 10
+usemtl c186
+f 93 94 92
+usemtl c186
+f 93 95 94
+usemtl c187
+f 131 42 151
+usemtl c187
+f 131 151 153
+usemtl c187
+f 131 153 152
+usemtl c187
+f 131 152 150
+usemtl c188
+f 42 23 44
+usemtl c188
+f 42 44 47
+usemtl c188
+f 42 47 49
+usemtl c188
+f 42 49 48
+usemtl c188
+f 42 48 46
+usemtl c188
+f 42 46 45
+usemtl c189
+f 89 25 90
+usemtl c189
+f 89 87 25
+usemtl c189
+f 89 23 87
+usemtl c189
+f 23 170 171
+usemtl c189
+f 23 88 170
+usemtl c189
+f 23 89 88
+usemtl c190
+f 10 28 30
+usemtl c190
+f 10 30 32
+usemtl c190
+f 10 32 31
+usemtl c190
+f 10 31 29
+usemtl c190
+f 10 29 27
+usemtl c190
+f 10 27 25
+usemtl c191
+f 50 59 64
+usemtl c191
+f 50 64 67
+usemtl c191
+f 67 66 96
+usemtl c191
+f 67 96 50
+usemtl c192
+f 85 99 107
+usemtl c192
+f 85 107 109
+usemtl c192
+f 85 109 110
+usemtl c192
+f 85 110 126
+usemtl c193
+f 141 140 137
+usemtl c193
+f 141 137 155
+usemtl c193
+f 155 156 157
+usemtl c193
+f 155 157 158
+usemtl c193
+f 155 158 159
+usemtl c193
+f 155 159 160
+usemtl c193
+f 155 160 161
+usemtl c193
+f 155 161 162
+usemtl c193
+f 155 162 163
+usemtl c193
+f 155 163 164
+usemtl c193
+f 155 164 165
+usemtl c193
+f 155 165 169
+usemtl c193
+f 155 169 143
+usemtl c193
+f 155 143 142
+usemtl c193
+f 155 142 141

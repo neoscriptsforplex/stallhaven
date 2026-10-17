@@ -1665,7 +1665,7 @@ export function slotPose(slot) {
  */
 const MANNEQUIN_BLOCKS = {
   hips: { x: 0.34, y: 0.06, z: 0.14, at: 0.5 },
-  torso: { x: 0.3, y: 0.42, z: 0.14, at: 0.92 },
+  torso: { x: 0.2, y: 0.42, z: 0.12, at: 0.92 },
   shoulders: { x: 0.5, y: 0.06, z: 0.12, at: 1.16 },
 };
 

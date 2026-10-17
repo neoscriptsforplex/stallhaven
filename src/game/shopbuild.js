@@ -25,7 +25,9 @@ import {
   RUNE_FIELD_PORTAL,
   ALTAR_FOOT,
   ALTAR_HEIGHT,
+  ALTAR_CLICK,
   ALTAR_OSRS_SCALE,
+  RUNE_PORTAL_GRASS_CLEAR,
   PORTAL_TARGET_HEIGHT,
   PORTAL_TARGET_WIDTH,
   PORTAL_TARGET_DEPTH,
@@ -2953,6 +2955,15 @@ function attachTreeStump(tree) {
   tree.add(stump);
 }
 
+function runeFieldGrassBlocked(x, z) {
+  if (Math.hypot(x - RUNE_FIELD_PORTAL.x, z - RUNE_FIELD_PORTAL.z) < RUNE_PORTAL_GRASS_CLEAR) return true;
+  for (const altar of RUNE_ALTAR_SPOTS) {
+    if (Math.hypot(x - altar.x, z - altar.z) < ALTAR_CLICK) return true;
+  }
+  return false;
+}
+
+/** Same blade clumps as the shop lawn, on a jittered grid over the whole field. */
 function addRuneFieldGrass(root, rand) {
   const rect = runeFieldRect();
   const bladeGeo = new THREE.ConeGeometry(0.016, 1, 4);
@@ -2964,34 +2975,34 @@ function addRuneFieldGrass(root, rand) {
   ];
   const dummy = new THREE.Object3D();
   const buckets = greens.map(() => []);
-  const rings = [
-    { x: -12.5, z: -12.2, n: 14 },
-    { x: 12.4, z: -12.3, n: 14 },
-    { x: 12.5, z: 12.2, n: 14 },
-    { x: -12.4, z: 12.3, n: 14 },
-    { x: -7.2, z: -14.0, n: 8 },
-    { x: 7.4, z: -13.9, n: 8 },
-    { x: 14.0, z: -7.0, n: 8 },
-    { x: 13.9, z: 7.2, n: 8 },
-    { x: -7.0, z: 14.0, n: 8 },
-    { x: 7.2, z: 13.9, n: 8 },
-    { x: -14.0, z: -6.8, n: 8 },
-    { x: -13.9, z: 7.0, n: 8 },
-  ];
-  for (const cluster of rings) {
-    for (let i = 0; i < cluster.n; i += 1) {
-      const x = cluster.x + (rand() - 0.5) * 1.4;
-      const z = cluster.z + (rand() - 0.5) * 1.4;
-      if (!runeFieldClearOf({ x, z })) continue;
-      const h = 0.16 + rand() * 0.42;
-      dummy.position.set(x, 0, z);
-      dummy.rotation.set((rand() - 0.5) * 0.35, rand() * Math.PI * 2, (rand() - 0.5) * 0.4);
-      dummy.scale.set(0.7 + rand() * 0.45, h, 0.7 + rand() * 0.45);
-      dummy.updateMatrix();
-      buckets[Math.floor(rand() * buckets.length)].push(dummy.matrix.clone());
+  const cell = 1.15;
+  const width = rect.maxX - rect.minX;
+  const depth = rect.maxZ - rect.minZ;
+  const cols = Math.max(1, Math.ceil(width / cell));
+  const rows = Math.max(1, Math.ceil(depth / cell));
+  const dx = width / cols;
+  const dz = depth / rows;
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      const cx = rect.minX + (c + 0.18 + rand() * 0.64) * dx;
+      const cz = rect.minZ + (r + 0.18 + rand() * 0.64) * dz;
+      if (runeFieldGrassBlocked(cx, cz)) continue;
+      const blades = 10 + Math.floor(rand() * 8);
+      const scale = 0.68 + rand() * 1.05;
+      for (let i = 0; i < blades; i += 1) {
+        const x = cx + (rand() - 0.5) * 0.4;
+        const z = cz + (rand() - 0.5) * 0.4;
+        if (x < rect.minX || x > rect.maxX || z < rect.minZ || z > rect.maxZ) continue;
+        if (runeFieldGrassBlocked(x, z)) continue;
+        const h = (0.14 + rand() * 0.46) * scale;
+        dummy.position.set(x, 0, z);
+        dummy.rotation.set((rand() - 0.5) * 0.38, rand() * Math.PI * 2, (rand() - 0.5) * 0.48);
+        dummy.scale.set(0.65 + rand() * 0.55, h, 0.65 + rand() * 0.55);
+        dummy.updateMatrix();
+        buckets[Math.floor(rand() * buckets.length)].push(dummy.matrix.clone());
+      }
     }
   }
-  void rect;
   for (let i = 0; i < buckets.length; i += 1) {
     const mats = buckets[i];
     if (!mats.length) continue;

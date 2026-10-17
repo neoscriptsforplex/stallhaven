@@ -66,9 +66,9 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { ALTAR_OSRS_SCALE, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
+import { ALTAR_CLICK, ALTAR_OSRS_SCALE, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, RUNE_ALTAR_SPOTS, RUNE_PORTAL_GRASS_CLEAR, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildAltar, buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_FLOOR_TILE_M, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonFloorTextureUrls, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, generalStoreSignTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildAltar, buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRat, buildRuneField, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_FLOOR_TILE_M, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonFloorTextureUrls, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, generalStoreSignTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -866,6 +866,43 @@ describe('outdoor and dungeon extras', () => {
     assert.ok(originCount > 800, `expected a lush lawn, got ${originCount} blades`);
     assert.ok(leftCount < originCount);
     assert.equal(leftInRoom, 0);
+  });
+
+  it('covers the rune field with lawn blades and keeps the altar and portal pads clear', () => {
+    const { root } = buildRuneField();
+    const scratch = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    const bins = new Map();
+    let count = 0;
+    root.traverse((child) => {
+      if (!child.isInstancedMesh || child.userData.kind !== 'grass') return;
+      count += child.count;
+      assert.equal(child.raycast.length, 0);
+      for (let i = 0; i < child.count; i += 1) {
+        child.getMatrixAt(i, scratch);
+        pos.setFromMatrixPosition(scratch);
+        assert.ok(
+          Math.hypot(pos.x, pos.z) >= RUNE_PORTAL_GRASS_CLEAR - 1e-6,
+          `grass covers the portal at ${pos.x},${pos.z}`,
+        );
+        for (const altar of RUNE_ALTAR_SPOTS) {
+          assert.ok(
+            Math.hypot(pos.x - altar.x, pos.z - altar.z) >= ALTAR_CLICK - 1e-6,
+            `grass covers the ${altar.id} altar`,
+          );
+        }
+        const key = `${Math.floor((pos.x + 16) / 4)},${Math.floor((pos.z + 16) / 4)}`;
+        bins.set(key, (bins.get(key) ?? 0) + 1);
+      }
+    });
+    assert.ok(count > 4000, `rune field grass ${count}`);
+    let occupied = 0;
+    for (let r = 0; r < 8; r += 1) {
+      for (let c = 0; c < 8; c += 1) {
+        if ((bins.get(`${c},${r}`) ?? 0) > 0) occupied += 1;
+      }
+    }
+    assert.ok(occupied >= 60, `bare patches remain, occupied bins ${occupied}/64`);
   });
 
   it('scatters instanced flowers on the grass without beds or click meshes', () => {

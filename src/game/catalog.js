@@ -859,10 +859,10 @@ LATER_MAGIC.forEach((set) => {
 
 /** Air → Earth → Water → Fire. Same 20 / 30 / +10 unlock ladder as weapon lines. */
 const RUNE_LINE = [
-  { id: 'air_rune', name: 'Air Rune', mark: 'air', tint: 0xf4f4f0 },
-  { id: 'earth_rune', name: 'Earth Rune', mark: 'earth', tint: 0x8a5a32 },
-  { id: 'water_rune', name: 'Water Rune', mark: 'water', tint: 0x3a7ec8 },
-  { id: 'fire_rune', name: 'Fire Rune', mark: 'fire', tint: 0xc42a22 },
+  { id: 'air_rune', name: 'Air Rune', mark: 'air', tint: 0xf4f4f0, essence: 10 },
+  { id: 'earth_rune', name: 'Earth Rune', mark: 'earth', tint: 0x8a5a32, essence: 30 },
+  { id: 'water_rune', name: 'Water Rune', mark: 'water', tint: 0x3a7ec8, essence: 50 },
+  { id: 'fire_rune', name: 'Fire Rune', mark: 'fire', tint: 0xc42a22, essence: 100 },
 ];
 
 const TOOL_PIECES = [
@@ -897,7 +897,7 @@ RUNE_LINE.forEach((rune, index) => {
     previousId,
     unlockNeed: unlockNeed(index),
     tier: index + 1,
-    cost: { materials: { essence: 1 }, gold: 0 },
+    cost: { materials: { essence: rune.essence }, gold: 0 },
     time: 3 + index,
     price: tierSellPrice(index, { count: RUNE_LINE.length, weight: 0.7 }),
     buyers: ['hedgemage'],

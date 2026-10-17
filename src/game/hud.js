@@ -131,6 +131,12 @@ import {
   DEFAULT_DUNGEON_BRIGHTNESS,
 } from './lighting.js';
 import { fullscreenEnv, shouldOfferFullscreen } from './pwa.js';
+import {
+  MATERIALS_DRAWER_SIDE_QUERY,
+  materialsDrawerHtml,
+  materialsDrawerSideBox,
+  ownedMaterialsKey,
+} from './materialsDrawer.js';
 
 export function bindHud(root, state, world) {
   const goldEl = root.querySelector('#gold');
@@ -174,6 +180,13 @@ export function bindHud(root, state, world) {
   const mapZoomIn = document.querySelector('[data-map-zoom="in"]');
   const mapZoomOut = document.querySelector('[data-map-zoom="out"]');
   const portraitTouchMedia = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
+  const materialsDrawer = document.querySelector('#materials-drawer');
+  const materialsToggle = document.querySelector('#materials-toggle');
+  const materialsPanel = document.querySelector('#materials-panel');
+  const ownedMaterialsEl = document.querySelector('#owned-materials');
+  const materialsSideMedia = window.matchMedia(MATERIALS_DRAWER_SIDE_QUERY);
+  let ownedKey = '';
+  let materialsPlaceKey = '';
   let mapZoom = 1;
   let mapPing = null;
   const shopFade = document.querySelector('#shop-fade');
@@ -634,6 +647,7 @@ export function bindHud(root, state, world) {
       || (fillModal && !fillModal.hidden)
       || (importModal && !importModal.hidden);
     document.body.classList.toggle('modal-open', open);
+    if (open) closeMaterialsDrawer();
   }
 
   function hideInspect() {
@@ -2657,6 +2671,7 @@ export function bindHud(root, state, world) {
     if (!craftModal.hidden) craftPreview?.tick(dt);
     if (!potionModal.hidden) potionPreview?.tick(dt);
     goldEl.textContent = `Coins: ${formatGold(state.gold)}`;
+    syncOwnedMaterials();
     const xp = shopProgress(state.shopXp ?? 0);
     const levelEl = document.querySelector('#shop-level');
     const xpBar = document.querySelector('[data-shop-xp-bar]');
@@ -2719,6 +2734,7 @@ export function bindHud(root, state, world) {
         if (activeCraftYield) activeCraftYield.hidden = true;
       }
     }
+    syncMaterialsDrawerPlace();
     const chestKey = chestList(state).map((item) => `${item.recipeId}:${item.count}`).join('|');
     if (chestKey !== lastChestKey) {
       lastChestKey = chestKey;
@@ -2788,6 +2804,85 @@ export function bindHud(root, state, world) {
     paintMusic();
     return result;
   }
+
+  function setMaterialsOpen(open) {
+    if (!materialsDrawer) return;
+    materialsDrawer.classList.toggle('is-open', open);
+    materialsToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    materialsToggle?.setAttribute('aria-label', open ? 'Hide materials' : 'Show materials');
+    if (materialsPanel) {
+      materialsPanel.setAttribute('aria-hidden', open ? 'false' : 'true');
+      materialsPanel.inert = !open;
+    }
+  }
+
+  function closeMaterialsDrawer() {
+    if (!materialsDrawer?.classList.contains('is-open')) return;
+    setMaterialsOpen(false);
+  }
+
+  function syncOwnedMaterials() {
+    if (!ownedMaterialsEl) return;
+    const key = ownedMaterialsKey(state.materials);
+    if (key === ownedKey) return;
+    ownedKey = key;
+    ownedMaterialsEl.innerHTML = materialsDrawerHtml(state.materials);
+  }
+
+  function materialsObstacles() {
+    const nodes = [
+      document.querySelector('#hud .ledger'),
+      minimapWrap,
+      activeCraft,
+      document.querySelector('#save-bar'),
+    ];
+    const obstacles = [];
+    for (const el of nodes) {
+      if (!el || el.hidden) continue;
+      const rect = el.getBoundingClientRect();
+      obstacles.push({
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      });
+    }
+    return obstacles;
+  }
+
+  function syncMaterialsDrawerPlace() {
+    if (!materialsDrawer) return;
+    if (!materialsSideMedia.matches) {
+      if (materialsPlaceKey !== 'desk') {
+        materialsPlaceKey = 'desk';
+        materialsDrawer.style.top = '';
+        materialsDrawer.style.bottom = '';
+      }
+      return;
+    }
+    const box = materialsDrawerSideBox({
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      obstacles: materialsObstacles(),
+    });
+    const key = `${box.top ?? ''}|${box.bottom ?? ''}`;
+    if (key === materialsPlaceKey) return;
+    materialsPlaceKey = key;
+    materialsDrawer.style.top = box.top == null ? '' : `${box.top}px`;
+    materialsDrawer.style.bottom = box.bottom == null ? '' : `${box.bottom}px`;
+  }
+
+  materialsToggle?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setMaterialsOpen(!materialsDrawer.classList.contains('is-open'));
+  });
+  materialsSideMedia.addEventListener?.('change', syncMaterialsDrawerPlace);
+  window.addEventListener('resize', syncMaterialsDrawerPlace);
+  if (materialsPanel) materialsPanel.inert = true;
+  syncOwnedMaterials();
+  syncMaterialsDrawerPlace();
 
   return { render, openChest, openTrade, openCraft, openOfferPicker, selectOfferItem, tryStartMusic };
 }

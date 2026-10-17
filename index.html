@@ -27,7 +27,8 @@
       }
       html.is-booting #view,
       html.is-booting #hud,
-      html.is-booting #save-bar { visibility: hidden !important; }
+      html.is-booting #save-bar,
+      html.is-booting .materials-drawer { visibility: hidden !important; }
       html.is-booting.is-scene-live #view { visibility: visible !important; }
     </style>
     <link rel="stylesheet" href="./src/style.css" />
@@ -94,6 +95,20 @@
       </header>
 
     </aside>
+
+    <div id="materials-drawer" class="materials-drawer">
+      <button type="button" id="materials-toggle" aria-expanded="false" aria-controls="materials-panel" aria-label="Show materials" title="Materials">
+        <span class="materials-arrow materials-arrow-up" aria-hidden="true">↑</span>
+        <span class="materials-arrow materials-arrow-down" aria-hidden="true">↓</span>
+        <span class="materials-arrow materials-arrow-right" aria-hidden="true">→</span>
+        <span class="materials-arrow materials-arrow-left" aria-hidden="true">←</span>
+      </button>
+      <div id="materials-panel" class="materials-clip" aria-hidden="true">
+        <div class="materials-sheet" role="region" aria-label="Materials">
+          <div id="owned-materials" class="materials-grid" role="list"></div>
+        </div>
+      </div>
+    </div>
 
     <div id="help-modal" class="modal" hidden>
       <div class="sheet">

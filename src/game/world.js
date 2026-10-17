@@ -3162,6 +3162,23 @@ export function createWorld(canvas, state, opts = {}) {
     renderer.render(scene, camera);
   }
 
+  function counterMarkerPose() {
+    const mesh = fixtureMeshes.counter?.mesh;
+    const pose = state.furniture?.counter;
+    if (mesh?.visible) {
+      return {
+        x: mesh.position.x,
+        z: mesh.position.z,
+        rot: mesh.rotation.y - furnitureStartYaw('counter'),
+      };
+    }
+    return {
+      x: pose?.x ?? SHOP.counter.x,
+      z: pose?.z ?? SHOP.counter.z,
+      rot: pose?.rot ?? 0,
+    };
+  }
+
   return {
     tick,
     warmScene,
@@ -3636,6 +3653,7 @@ export function createWorld(canvas, state, opts = {}) {
           const pose = state.furniture.displays[i] ?? slot.spot;
           return { x: pose.x, z: pose.z, kind: slot.spot.kind };
         }),
+        counter: counterMarkerPose(),
       };
     },
     walkTo(x, z) {

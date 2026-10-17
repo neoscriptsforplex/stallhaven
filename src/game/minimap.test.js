@@ -23,7 +23,7 @@ import {
   worldToMap,
 } from './minimap.js';
 import { SHOP } from './catalog.js';
-import { FOUNTAIN, PATH_HALF_W, TRAPDOOR } from './layout.js';
+import { FOUNTAIN, PATH_HALF_W, TRAPDOOR, furnitureVisualYaw } from './layout.js';
 import { DUNGEON_BOULDERS } from './shopbuild.js';
 import { PLAYER_RADIUS, dungeonMoveObstacles, isWalkable, planWalk } from './nav.js';
 
@@ -349,6 +349,47 @@ describe('minimap', () => {
     assert.equal(hatchStroke.lineWidth, 2);
   });
 
+  it('keeps the counter marker on the shop when the camera yaws', () => {
+    const bounds = shopMapBounds([]);
+    const size = 196;
+    const player = { x: 0, z: 4, facing: 0 };
+    const angleDelta = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+    const poses = [null, { x: 1.4, z: -0.2, rot: Math.PI / 2 }];
+    for (const yaw of [0, 0.85, -1.2]) {
+      for (const pose of poses) {
+        const { ctx, ops } = mockMapCtx(size);
+        drawMinimap(ctx, {
+          sceneMode: 'shop',
+          yaw,
+          zoom: 1.4,
+          expansions: [],
+          player,
+          customers: [],
+          furniture: [],
+          ...(pose ? { counter: pose } : {}),
+        });
+        const mark = ops.find((op) => op.op === 'fillRect' && op.fill === '#6a4220');
+        assert.ok(mark, `counter mark yaw ${yaw}`);
+        assert.equal(mark.w, 14);
+        assert.equal(mark.h, 4);
+        const cx = mark.points.reduce((sum, pt) => sum + pt.x, 0) / 4;
+        const cy = mark.points.reduce((sum, pt) => sum + pt.y, 0) / 4;
+        const world = pose ?? { x: SHOP.counter.x, z: SHOP.counter.z, rot: 0 };
+        const expected = worldToMap(world.x, world.z, bounds, size, yaw, 1.4, player);
+        assert.ok(Math.abs(cx - expected.x) < 1e-6, `center x yaw ${yaw}`);
+        assert.ok(Math.abs(cy - expected.y) < 1e-6, `center y yaw ${yaw}`);
+        const dx = mark.points[1].x - mark.points[0].x;
+        const dy = mark.points[1].y - mark.points[0].y;
+        const visual = furnitureVisualYaw('counter', world.rot);
+        const axis = { x: Math.cos(visual), z: -Math.sin(visual) };
+        const tip = worldToMap(world.x + axis.x, world.z + axis.z, bounds, size, yaw, 1.4, player);
+        const edge = Math.atan2(dy, dx);
+        const worldAngle = Math.atan2(tip.y - expected.y, tip.x - expected.x);
+        assert.ok(Math.abs(angleDelta(edge, worldAngle)) < 1e-6, `align yaw ${yaw} rot ${world.rot}`);
+      }
+    }
+  });
+
   it('keeps the slim portrait strip and collapsible map on touch portrait only', () => {
     const root = dirname(fileURLToPath(import.meta.url));
     const css = readFileSync(join(root, '../style.css'), 'utf8');
@@ -381,6 +422,8 @@ describe('minimap', () => {
 
 function mockMapCtx(size = 196) {
   const ops = [];
+  const stack = [{ tx: 0, ty: 0, rot: 0 }];
+  const current = () => stack[stack.length - 1];
   const ctx = {
     canvas: { width: size, height: size, dataset: {} },
     fillStyle: '',
@@ -388,12 +431,32 @@ function mockMapCtx(size = 196) {
     lineWidth: 1,
     lineCap: 'butt',
     _arcRadius: undefined,
-    save() {},
-    restore() {},
-    translate() {},
-    rotate() {},
+    save() { stack.push({ ...current() }); },
+    restore() { if (stack.length > 1) stack.pop(); },
+    translate(x, y) {
+      const t = current();
+      const c = Math.cos(t.rot);
+      const s = Math.sin(t.rot);
+      t.tx += x * c - y * s;
+      t.ty += x * s + y * c;
+    },
+    rotate(angle) { current().rot += angle; },
     clearRect() { ops.push({ op: 'clear' }); },
-    fillRect() { ops.push({ op: 'fillRect', fill: this.fillStyle }); },
+    fillRect(x, y, w, h) {
+      const t = current();
+      const c = Math.cos(t.rot);
+      const s = Math.sin(t.rot);
+      const points = [
+        [x, y],
+        [x + w, y],
+        [x + w, y + h],
+        [x, y + h],
+      ].map(([px, py]) => ({
+        x: t.tx + px * c - py * s,
+        y: t.ty + px * s + py * c,
+      }));
+      ops.push({ op: 'fillRect', fill: this.fillStyle, x, y, w, h, points });
+    },
     beginPath() { this._arcRadius = undefined; },
     moveTo() {},
     lineTo() {},

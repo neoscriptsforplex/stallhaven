@@ -72,6 +72,19 @@ export const FLETCH_COST = 50000;
 export const POTTER_COST = 50000;
 export const FURNACE_COST = 0;
 export const RANGE_COST = 0;
+/** One portal. Opens the outdoor rune field. */
+export const PORTAL_COST = 500000;
+/**
+ * RuneLite dump of Object Portal, in OSRS units: X 642, Y 318, Z 249.
+ * 0.01125 m/unit makes it about 3.6 m tall and 7.2 m wide. The placed mesh
+ * keeps that shape and is fit to a player-height doorway.
+ */
+export const PORTAL_DUMP = Object.freeze({ x: 642, y: 318, z: 249 });
+export const PORTAL_TARGET_HEIGHT = 2.2;
+export const PORTAL_TARGET_WIDTH = PORTAL_TARGET_HEIGHT * (PORTAL_DUMP.x / PORTAL_DUMP.y);
+export const PORTAL_TARGET_DEPTH = PORTAL_TARGET_HEIGHT * (PORTAL_DUMP.z / PORTAL_DUMP.y);
+/** Default preview on the left lawn, off the path and the shop walls. */
+export const PORTAL_HOME = Object.freeze({ x: -11.2, z: 4.2, rot: FURNITURE_FORWARD });
 export const STATION_UNLOCKS = [
   { id: 'furnace', label: 'Furnace', cost: FURNACE_COST },
   { id: 'range', label: 'Cooking Range', cost: RANGE_COST },
@@ -80,6 +93,7 @@ export const STATION_UNLOCKS = [
   { id: 'potter', label: 'Potter Wheel', cost: POTTER_COST },
   { id: 'wheel', label: 'Spinning Wheel', cost: WHEEL_COST },
   { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
+  { id: 'portal', label: 'Portal', cost: PORTAL_COST },
 ];
 
 /** Place a missing furnace on the starter back-wall spot. */
@@ -550,6 +564,7 @@ export function furnitureHalfSize(kind) {
   if (kind === 'loom') return { hw: 0.48, hd: 0.36 };
   if (kind === 'fletch') return { hw: 0.55, hd: 0.4 };
   if (kind === 'potter') return { hw: 0.4, hd: 0.4 };
+  if (kind === 'portal') return { hw: PORTAL_TARGET_WIDTH / 2, hd: PORTAL_TARGET_DEPTH / 2 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
   if (kind === 'stand') return { hw: 0.36, hd: 0.36 };
@@ -612,6 +627,7 @@ export function defaultFurniture() {
     loom: null,
     fletch: null,
     potter: null,
+    portal: null,
     rug: { x: shopRugPose().x, z: shopRugPose().z, rot: FURNITURE_FORWARD },
     displays: SHOP.displays.map((spot) => (
       (spot.kind ?? 'table') === 'shelf'
@@ -638,6 +654,7 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     loom: clonePose(furniture.loom),
     fletch: clonePose(furniture.fletch),
     potter: clonePose(furniture.potter),
+    portal: clonePose(furniture.portal),
     rug: { ...(furniture.rug ?? defaults.rug) },
     displays: (furniture.displays ?? defaults.displays).map((pose) => ({ ...pose })),
   };
@@ -653,6 +670,15 @@ export function gardenBox(expansionIds = []) {
     cx: (box.minX + box.maxX) / 2,
     cz: (box.minZ + box.maxZ) / 2,
   };
+}
+
+/** Indoor floor rects plus the lawn, so a portal can sit on the grass. */
+export function portalPlaceFloors(expansionIds = []) {
+  const grass = gardenBox(expansionIds);
+  return [
+    ...placeFloors(expansionIds),
+    { minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: grass.maxZ },
+  ];
 }
 
 export function cobblePathSpan(expansionIds = []) {
@@ -906,6 +932,117 @@ export function gardenRockRadius(scale = 1) {
   return 0.32 * scale + 0.35;
 }
 
+/**
+ * Open lawn reached through a placed portal. North is −Z (top of the minimap).
+ * The return portal sits in the centre. Altars take the four edge midpoints:
+ * Air north, Earth east, Water south, Fire west. Trees and rocks stay in the
+ * corners and along the edges between those pads.
+ */
+export const RUNE_FIELD_HALF = 16;
+export const RUNE_ALTAR_INSET = 4.2;
+export const RUNE_PORTAL_CLEAR = 3.5;
+export const RUNE_ALTAR_CLEAR = 2.8;
+
+export function runeFieldRect() {
+  return {
+    minX: -RUNE_FIELD_HALF,
+    maxX: RUNE_FIELD_HALF,
+    minZ: -RUNE_FIELD_HALF,
+    maxZ: RUNE_FIELD_HALF,
+  };
+}
+
+export const RUNE_FIELD_PORTAL = Object.freeze({ x: 0, z: 0, rot: FURNITURE_FORWARD });
+
+/** One step south of the centre portal, on the grass in front of the arch. */
+export const RUNE_FIELD_ARRIVE = Object.freeze({
+  x: 0,
+  z: PORTAL_TARGET_DEPTH / 2 + 1.25,
+});
+
+export const RUNE_ALTAR_SPOTS = Object.freeze([
+  { id: 'air', element: 'air', edge: 'north', x: 0, z: -(RUNE_FIELD_HALF - RUNE_ALTAR_INSET) },
+  { id: 'earth', element: 'earth', edge: 'east', x: RUNE_FIELD_HALF - RUNE_ALTAR_INSET, z: 0 },
+  { id: 'water', element: 'water', edge: 'south', x: 0, z: RUNE_FIELD_HALF - RUNE_ALTAR_INSET },
+  { id: 'fire', element: 'fire', edge: 'west', x: -(RUNE_FIELD_HALF - RUNE_ALTAR_INSET), z: 0 },
+]);
+
+export function runeAltarSpot(id) {
+  return RUNE_ALTAR_SPOTS.find((spot) => spot.id === id) ?? null;
+}
+
+/**
+ * RuneLite altar dumps are about 373 × 154 × 363 OSRS units (X/Z swap by element).
+ * 0.01125 m/unit leaves them upright, a little under 1.8 m tall and about 4.2 m across.
+ */
+export const ALTAR_OSRS_SCALE = 0.01125;
+export const ALTAR_HEIGHT = 154 * ALTAR_OSRS_SCALE;
+export const ALTAR_SPAN_X = 373 * ALTAR_OSRS_SCALE;
+export const ALTAR_SPAN_Z = 363 * ALTAR_OSRS_SCALE;
+/** Square footprint that covers every altar, since X and Z swap between elements. */
+export const ALTAR_FOOT = Math.max(ALTAR_SPAN_X, ALTAR_SPAN_Z);
+export const ALTAR_CLICK = ALTAR_FOOT / 2 + 0.35;
+
+/** Decor must stay off the centre portal, the four altar pads, and the open middle. */
+export function runeFieldClearOf(spot) {
+  if (!spot) return false;
+  if (Math.hypot(spot.x, spot.z) < RUNE_PORTAL_CLEAR) return false;
+  for (const altar of RUNE_ALTAR_SPOTS) {
+    if (Math.hypot(spot.x - altar.x, spot.z - altar.z) < RUNE_ALTAR_CLEAR) return false;
+  }
+  const pad = 1.15;
+  if (Math.abs(spot.x) > RUNE_FIELD_HALF - pad) return false;
+  if (Math.abs(spot.z) > RUNE_FIELD_HALF - pad) return false;
+  if (Math.max(Math.abs(spot.x), Math.abs(spot.z)) < RUNE_FIELD_HALF - 6.5) return false;
+  return true;
+}
+
+const RUNE_FIELD_TREES = [
+  { x: -13.4, z: -13.4, band: 'corner' },
+  { x: -11.2, z: -14.3, band: 'corner' },
+  { x: 13.4, z: -13.4, band: 'corner' },
+  { x: 11.2, z: -14.3, band: 'corner' },
+  { x: 13.4, z: 13.4, band: 'corner' },
+  { x: 11.2, z: 14.3, band: 'corner' },
+  { x: -13.4, z: 13.4, band: 'corner' },
+  { x: -11.2, z: 14.3, band: 'corner' },
+  { x: -6.8, z: -14.3, band: 'edge' },
+  { x: 7.0, z: -14.2, band: 'edge' },
+  { x: 14.3, z: -6.7, band: 'edge' },
+  { x: 14.2, z: 6.8, band: 'edge' },
+  { x: -6.6, z: 14.3, band: 'edge' },
+  { x: 6.9, z: 14.2, band: 'edge' },
+  { x: -14.3, z: -6.5, band: 'edge' },
+  { x: -14.2, z: 6.9, band: 'edge' },
+];
+
+const RUNE_FIELD_ROCKS = [
+  { x: -14.6, z: -9.4, scale: 1.1, band: 'corner' },
+  { x: -9.2, z: -14.6, scale: 0.85, band: 'corner' },
+  { x: 14.6, z: -9.2, scale: 1.0, band: 'corner' },
+  { x: 9.4, z: -14.6, scale: 0.8, band: 'corner' },
+  { x: 14.6, z: 9.3, scale: 1.15, band: 'corner' },
+  { x: 9.2, z: 14.6, scale: 0.75, band: 'corner' },
+  { x: -14.6, z: 9.4, scale: 1.05, band: 'corner' },
+  { x: -9.3, z: 14.6, scale: 0.9, band: 'corner' },
+  { x: -4.2, z: -14.8, scale: 0.7, band: 'edge' },
+  { x: 4.4, z: -14.7, scale: 0.85, band: 'edge' },
+  { x: 14.8, z: -4.1, scale: 0.75, band: 'edge' },
+  { x: 14.7, z: 4.2, scale: 0.9, band: 'edge' },
+  { x: -4.0, z: 14.8, scale: 0.8, band: 'edge' },
+  { x: 4.3, z: 14.7, scale: 0.7, band: 'edge' },
+  { x: -14.8, z: -4.0, scale: 0.8, band: 'edge' },
+  { x: -14.7, z: 4.3, scale: 0.7, band: 'edge' },
+];
+
+export function runeFieldTreeSpots() {
+  return RUNE_FIELD_TREES.filter(runeFieldClearOf);
+}
+
+export function runeFieldRockSpots() {
+  return RUNE_FIELD_ROCKS.filter(runeFieldClearOf);
+}
+
 function gardenRockOnGrass(spot, expansionIds = []) {
   const grass = gardenBox(expansionIds);
   const pad = gardenRockRadius(spot.scale ?? 1);
@@ -928,7 +1065,7 @@ const FLAX_FLOWER_CLEAR = 0.34;
 const FLAX_STATION_CLEAR = 1.45;
 const FLAX_DISPLAY_CLEAR = 1.2;
 const FLAX_TRAP_CLEAR = 1.25;
-const FLAX_STATION_IDS = ['counter', 'anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter'];
+const FLAX_STATION_IDS = ['counter', 'anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'portal'];
 
 export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furniture = null } = {}) {
   const grass = gardenBox(expansionIds);
@@ -951,7 +1088,10 @@ export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furnit
   for (const id of FLAX_STATION_IDS) {
     const pose = furn[id];
     if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) continue;
-    if (Math.hypot(x - pose.x, z - pose.z) < FLAX_STATION_CLEAR) return true;
+    const clear = id === 'portal'
+      ? Math.hypot(furnitureHalfSize('portal').hw, furnitureHalfSize('portal').hd) + 0.4
+      : FLAX_STATION_CLEAR;
+    if (Math.hypot(x - pose.x, z - pose.z) < clear) return true;
   }
   for (const pose of furn.displays ?? []) {
     if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) continue;

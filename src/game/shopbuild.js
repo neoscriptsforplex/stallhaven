@@ -17,6 +17,17 @@ import {
   gardenRockSpots,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  runeFieldRect,
+  runeFieldTreeSpots,
+  runeFieldRockSpots,
+  runeFieldClearOf,
+  RUNE_ALTAR_SPOTS,
+  RUNE_FIELD_PORTAL,
+  ALTAR_FOOT,
+  ALTAR_HEIGHT,
+  PORTAL_TARGET_HEIGHT,
+  PORTAL_TARGET_WIDTH,
+  PORTAL_TARGET_DEPTH,
   notePlantedTrunk,
   OUTDOOR_GROUND_Y,
   OUTDOOR_TREE_SCALE,
@@ -39,7 +50,7 @@ import { METALS } from './catalog.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
-import { getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
+import { applyOsrsScale, getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
 import { prepareDungeonRockMaterials } from './upload.js';
 
 export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
@@ -1827,6 +1838,122 @@ function makeNameSprite(text) {
   return sprite;
 }
 
+function portalFitTarget() {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(
+    PORTAL_TARGET_WIDTH,
+    PORTAL_TARGET_HEIGHT,
+    PORTAL_TARGET_DEPTH,
+  ));
+  mesh.position.y = PORTAL_TARGET_HEIGHT / 2;
+  return mesh;
+}
+
+function buildProceduralPortal() {
+  const group = new THREE.Group();
+  group.name = 'portal';
+  const stone = new THREE.MeshStandardMaterial({ color: 0x3a2458, roughness: 0.72, metalness: 0.08 });
+  const glow = new THREE.MeshStandardMaterial({
+    color: 0x6a3ad4,
+    emissive: 0x3a1488,
+    emissiveIntensity: 0.65,
+    roughness: 0.35,
+  });
+  const h = PORTAL_TARGET_HEIGHT;
+  const w = PORTAL_TARGET_WIDTH;
+  const d = PORTAL_TARGET_DEPTH;
+  const jambW = w * 0.16;
+  const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(jambW, h * 0.86, d), stone));
+  left.position.set(-w / 2 + jambW / 2, h * 0.43, 0);
+  group.add(left);
+  const right = left.clone();
+  right.position.x = w / 2 - jambW / 2;
+  group.add(right);
+  const lintel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w, h * 0.16, d), stone));
+  lintel.position.y = h - h * 0.08;
+  group.add(lintel);
+  const inner = new THREE.Mesh(new THREE.CircleGeometry(Math.min(w, h) * 0.22, 20), glow);
+  inner.position.y = h * 0.46;
+  group.add(inner);
+  return group;
+}
+
+/** RuneLite portal dump, OSRS-scaled, then fit to a doorway the player can stand in. */
+export function buildPortal() {
+  const bundled = getBundledLook('portal');
+  let visual = buildProceduralPortal();
+  if (bundled) {
+    const scaled = bundled.clone(true);
+    applyOsrsScale(scaled);
+    const fitted = wrapBundledProp(scaled, portalFitTarget(), { name: 'portal', fit: 'height' });
+    if (fitted) {
+      sitVisibleOnY(fitted, 0);
+      visual = fitted;
+    }
+  }
+  const root = new THREE.Group();
+  root.name = 'portal';
+  visual.name = 'portal-visual';
+  root.add(visual);
+  const label = makeNameSprite('Portal');
+  const box = measureVisibleBox(visual);
+  label.position.y = (Number.isFinite(box.max.y) ? box.max.y : PORTAL_TARGET_HEIGHT) + 0.18;
+  root.add(label);
+  return root;
+}
+
+const ALTAR_TINT = {
+  air: 0xd8d4cc,
+  earth: 0x8a5a32,
+  water: 0x3a7ec8,
+  fire: 0xc42a22,
+};
+
+const ALTAR_LABEL = {
+  air: 'Air Altar',
+  earth: 'Earth Altar',
+  water: 'Water Altar',
+  fire: 'Fire Altar',
+};
+
+function buildProceduralAltar(element) {
+  const group = new THREE.Group();
+  const stone = new THREE.MeshStandardMaterial({ color: 0x6a6258, roughness: 0.82 });
+  const mark = new THREE.MeshStandardMaterial({
+    color: ALTAR_TINT[element] ?? 0xffffff,
+    emissive: ALTAR_TINT[element] ?? 0x000000,
+    emissiveIntensity: 0.25,
+    roughness: 0.45,
+  });
+  const slab = addShadow(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.42, 1.6), stone));
+  slab.position.y = 0.21;
+  group.add(slab);
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), mark);
+  orb.position.y = 0.72;
+  group.add(orb);
+  return group;
+}
+
+/** RuneLite altar dump at ×0.01125, upright, sitting on the grass. */
+export function buildAltar(element) {
+  const id = `altar-${element}`;
+  const bundled = getBundledLook(id);
+  let visual = buildProceduralAltar(element);
+  if (bundled) {
+    visual = bundled.clone(true);
+    applyOsrsScale(visual);
+    sitVisibleOnY(visual, 0);
+  }
+  const root = new THREE.Group();
+  root.name = id;
+  visual.name = 'altar-visual';
+  root.add(visual);
+  const label = makeNameSprite(ALTAR_LABEL[element] ?? 'Altar');
+  const box = measureVisibleBox(visual);
+  label.position.y = (Number.isFinite(box.max.y) ? box.max.y : ALTAR_HEIGHT) + 0.18;
+  root.add(label);
+  return root;
+}
+
 export function buildTree(scale = 1) {
   const target = buildProceduralTree(scale * OUTDOOR_TREE_SCALE);
   const bundled = getBundledLook('tree');
@@ -2822,6 +2949,150 @@ function attachTreeStump(tree) {
   stump.add(face);
   stump.visible = false;
   tree.add(stump);
+}
+
+function addRuneFieldGrass(root, rand) {
+  const rect = runeFieldRect();
+  const bladeGeo = new THREE.ConeGeometry(0.016, 1, 4);
+  bladeGeo.translate(0, 0.5, 0);
+  const greens = [
+    new THREE.MeshStandardMaterial({ color: 0x3a7a30, roughness: 0.92, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: 0x4a8a38, roughness: 0.9, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: 0x2e6828, roughness: 0.94, side: THREE.DoubleSide }),
+  ];
+  const dummy = new THREE.Object3D();
+  const buckets = greens.map(() => []);
+  const rings = [
+    { x: -12.5, z: -12.2, n: 14 },
+    { x: 12.4, z: -12.3, n: 14 },
+    { x: 12.5, z: 12.2, n: 14 },
+    { x: -12.4, z: 12.3, n: 14 },
+    { x: -7.2, z: -14.0, n: 8 },
+    { x: 7.4, z: -13.9, n: 8 },
+    { x: 14.0, z: -7.0, n: 8 },
+    { x: 13.9, z: 7.2, n: 8 },
+    { x: -7.0, z: 14.0, n: 8 },
+    { x: 7.2, z: 13.9, n: 8 },
+    { x: -14.0, z: -6.8, n: 8 },
+    { x: -13.9, z: 7.0, n: 8 },
+  ];
+  for (const cluster of rings) {
+    for (let i = 0; i < cluster.n; i += 1) {
+      const x = cluster.x + (rand() - 0.5) * 1.4;
+      const z = cluster.z + (rand() - 0.5) * 1.4;
+      if (!runeFieldClearOf({ x, z })) continue;
+      const h = 0.16 + rand() * 0.42;
+      dummy.position.set(x, 0, z);
+      dummy.rotation.set((rand() - 0.5) * 0.35, rand() * Math.PI * 2, (rand() - 0.5) * 0.4);
+      dummy.scale.set(0.7 + rand() * 0.45, h, 0.7 + rand() * 0.45);
+      dummy.updateMatrix();
+      buckets[Math.floor(rand() * buckets.length)].push(dummy.matrix.clone());
+    }
+  }
+  void rect;
+  for (let i = 0; i < buckets.length; i += 1) {
+    const mats = buckets[i];
+    if (!mats.length) continue;
+    const mesh = new THREE.InstancedMesh(bladeGeo, greens[i], mats.length);
+    mesh.name = 'grass';
+    mesh.userData.kind = 'grass';
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    mesh.raycast = () => {};
+    for (let j = 0; j < mats.length; j += 1) mesh.setMatrixAt(j, mats[j]);
+    mesh.instanceMatrix.needsUpdate = true;
+    root.add(mesh);
+  }
+}
+
+/** Open grass field: centre return portal, one altar at each edge, trees and rocks between them. */
+export function buildRuneField() {
+  const root = new THREE.Group();
+  root.name = 'rune-field';
+  const grounds = new THREE.Group();
+  grounds.name = 'rune-field-grounds';
+  const rect = runeFieldRect();
+  const grass = addShadow(new THREE.Mesh(
+    new THREE.PlaneGeometry(rect.maxX - rect.minX, rect.maxZ - rect.minZ),
+    new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 }),
+  ));
+  grass.name = 'grass-ground';
+  grass.rotation.x = -Math.PI / 2;
+  grass.position.set(0, -0.02, 0);
+  grass.userData.kind = 'ground';
+  grounds.add(grass);
+
+  const rand = randAt(90210);
+  for (const spot of runeFieldTreeSpots()) {
+    const vary = 1 + (rand() * 2 - 1) * TREE_SCALE_SPREAD;
+    const tree = buildTree(vary);
+    tree.position.set(spot.x, OUTDOOR_GROUND_Y, spot.z);
+    tree.rotation.y = rand() * Math.PI * 2;
+    seatTreeOnGround(tree);
+    const trunkRadius = measureTrunkRadius(tree);
+    tree.userData.gardenSide = 'rune';
+    tree.userData.band = spot.band;
+    tree.userData.uniformScale = vary;
+    tree.userData.trunkRadius = trunkRadius;
+    notePlantedTrunk(spot.x, spot.z, trunkRadius);
+    attachTreePick(tree, spot);
+    attachTreeStump(tree);
+    root.add(tree);
+  }
+  for (const spot of runeFieldRockSpots()) {
+    const rock = buildBoulder(spot.scale ?? 1);
+    rock.position.set(spot.x, 0, spot.z);
+    rock.rotation.y = rand() * Math.PI * 2;
+    sitVisibleOnY(rock, 0);
+    rock.raycast = () => {};
+    root.add(rock);
+  }
+  for (let i = 0; i < 8; i += 1) {
+    const cluster = buildProceduralFlowerCluster(rand);
+    const x = (i < 4 ? -1 : 1) * (12.2 + (i % 2) * 1.4);
+    const z = (i % 4 < 2 ? -1 : 1) * (11.6 + (i % 3) * 0.8);
+    if (!runeFieldClearOf({ x, z })) continue;
+    cluster.position.set(x, 0, z);
+    cluster.traverse((child) => {
+      child.raycast = () => {};
+    });
+    root.add(cluster);
+  }
+  addRuneFieldGrass(root, rand);
+
+  const portal = buildPortal();
+  portal.position.set(RUNE_FIELD_PORTAL.x, OUTDOOR_GROUND_Y, RUNE_FIELD_PORTAL.z);
+  root.add(portal);
+  const { hw, hd } = { hw: PORTAL_TARGET_WIDTH / 2, hd: PORTAL_TARGET_DEPTH / 2 };
+  const pick = new THREE.Mesh(
+    new THREE.BoxGeometry(hw * 2 + 0.2, PORTAL_TARGET_HEIGHT, hd * 2 + 0.2),
+    pickMat(),
+  );
+  pick.position.set(RUNE_FIELD_PORTAL.x, PORTAL_TARGET_HEIGHT / 2, RUNE_FIELD_PORTAL.z);
+  pick.userData.kind = 'rune-portal';
+  pick.userData.x = RUNE_FIELD_PORTAL.x;
+  pick.userData.z = RUNE_FIELD_PORTAL.z;
+  root.add(pick);
+
+  for (const spot of RUNE_ALTAR_SPOTS) {
+    const altar = buildAltar(spot.element);
+    altar.position.set(spot.x, OUTDOOR_GROUND_Y, spot.z);
+    altar.rotation.y = Math.atan2(-spot.x, -spot.z);
+    root.add(altar);
+    const altarPick = new THREE.Mesh(
+      new THREE.BoxGeometry(ALTAR_FOOT, ALTAR_HEIGHT, ALTAR_FOOT),
+      pickMat(),
+    );
+    altarPick.position.set(spot.x, ALTAR_HEIGHT / 2, spot.z);
+    altarPick.userData.kind = 'altar';
+    altarPick.userData.element = spot.element;
+    altarPick.userData.x = spot.x;
+    altarPick.userData.z = spot.z;
+    root.add(altarPick);
+  }
+
+  return { root, grounds, portal };
 }
 
 function attachBoulderPick(group, spot) {

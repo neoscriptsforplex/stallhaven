@@ -10,7 +10,13 @@ import {
   furnitureVisualYaw,
   gardenTreeSpots,
   gardenRockSpots,
+  runeFieldTreeSpots,
+  runeFieldRockSpots,
+  RUNE_ALTAR_SPOTS,
+  RUNE_FIELD_PORTAL,
+  ALTAR_FOOT,
   plantedTrunkRadius,
+  TREE_TRUNK_RADIUS,
   treeWalkBlock,
   keepFountain,
   neighborsOf,
@@ -90,7 +96,7 @@ export function shopObstacles(shop = SHOP, furniture = null) {
       furnitureHalfSize('wheel').hd,
     ));
   }
-  for (const id of ['loom', 'fletch', 'potter']) {
+  for (const id of ['loom', 'fletch', 'potter', 'portal']) {
     if (!poses[id]) continue;
     const { hw, hd } = furnitureHalfSize(id);
     blocks.push(blockFromPose(yaw(id, poses[id]), hw, hd));
@@ -132,6 +138,7 @@ export function liveObstacles(state, shop = SHOP, skip = null) {
   if (skip?.id === 'loom') furniture.loom = null;
   if (skip?.id === 'fletch') furniture.fletch = null;
   if (skip?.id === 'potter') furniture.potter = null;
+  if (skip?.id === 'portal') furniture.portal = null;
   if (skip?.id === 'anvil') furniture.anvil = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'chest') furniture.chest = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'counter') furniture.counter = { x: 999, z: 999, rot: 0 };
@@ -303,6 +310,26 @@ export function dungeonBoulderObstacles(spots = []) {
 
 export function dungeonMoveObstacles(spots = []) {
   return [...dungeonWallObstacles(), ...dungeonBoulderObstacles(spots)];
+}
+
+/** Centre portal, the four altars, edge trees, and edge rocks on the rune field. */
+export function runeFieldMoveObstacles() {
+  const blocks = [];
+  const { hw, hd } = furnitureHalfSize('portal');
+  blocks.push(rectFromCenter(RUNE_FIELD_PORTAL.x, RUNE_FIELD_PORTAL.z, hw * 2, hd * 2));
+  for (const altar of RUNE_ALTAR_SPOTS) {
+    blocks.push(rectFromCenter(altar.x, altar.z, ALTAR_FOOT, ALTAR_FOOT));
+  }
+  for (const tree of runeFieldTreeSpots()) {
+    if (isTreeStump(tree.x, tree.z)) continue;
+    const block = treeWalkBlock(TREE_TRUNK_RADIUS);
+    blocks.push(rectFromCenter(tree.x, tree.z, block, block));
+  }
+  for (const rock of runeFieldRockSpots()) {
+    const s = 0.45 * (rock.scale ?? 1);
+    blocks.push(rectFromCenter(rock.x, rock.z, s, s));
+  }
+  return blocks;
 }
 
 export function playerObstacles(state, shop = SHOP) {

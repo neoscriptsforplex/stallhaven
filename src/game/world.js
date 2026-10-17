@@ -48,6 +48,14 @@ import {
   buyerCobbleRoute,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  runeFieldTreeSpots,
+  runeFieldRect,
+  RUNE_ALTAR_SPOTS,
+  RUNE_FIELD_ARRIVE,
+  RUNE_FIELD_PORTAL,
+  ALTAR_CLICK,
+  PORTAL_HOME,
+  portalPlaceFloors,
   plantedTrunkRadius,
   TREE_CLICK_RADIUS,
   pickFlaxNode,
@@ -68,6 +76,7 @@ import {
 import {
   PLAYER_RADIUS,
   dungeonMoveObstacles,
+  runeFieldMoveObstacles,
   floorsForState,
   isWalkable,
   liveObstacles,
@@ -133,7 +142,7 @@ import {
   defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPotterWheel, buildRange, buildRug, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -311,6 +320,7 @@ export function createWorld(canvas, state, opts = {}) {
   shopFill.position.set(0, 2.55, -0.35);
   scene.add(shopFill);
   let dungeon = null;
+  let runeField = null;
 
   function syncLighting(mode = sceneMode) {
     applySceneLighting({
@@ -492,6 +502,9 @@ export function createWorld(canvas, state, opts = {}) {
     if (sceneMode === 'dungeon') {
       return planWalk(from, to, DUNGEON_BLOCKS, PLAYER_RADIUS, [DUNGEON_FLOOR], to?.releaseTree ?? null);
     }
+    if (sceneMode === 'runefield') {
+      return planWalk(from, to, runeFieldMoveObstacles(), PLAYER_RADIUS, [runeFieldRect()], to?.releaseTree ?? null);
+    }
     return planPlayerWalk(from, to, state, PLAYER_RADIUS);
   }
 
@@ -499,6 +512,9 @@ export function createWorld(canvas, state, opts = {}) {
     const release = pendingUse?.releaseTree ?? null;
     if (sceneMode === 'dungeon') {
       return { obstacles: DUNGEON_BLOCKS, floors: [DUNGEON_FLOOR], release };
+    }
+    if (sceneMode === 'runefield') {
+      return { obstacles: runeFieldMoveObstacles(), floors: [runeFieldRect()], release };
     }
     return { obstacles: collideObstacles, floors: playerFloors, release };
   }
@@ -588,7 +604,11 @@ export function createWorld(canvas, state, opts = {}) {
   scene.add(potterMesh);
   const potterPick = makePick(STATION_HIT.potter.w, STATION_HIT.potter.h, STATION_HIT.potter.d, 'potter');
 
-  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel', 'loom', 'fletch', 'potter'];
+  const portalMesh = buildPortal();
+  scene.add(portalMesh);
+  const portalPick = makePick(STATION_HIT.portal.w, STATION_HIT.portal.h, STATION_HIT.portal.d, 'portal');
+
+  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel', 'loom', 'fletch', 'potter', 'portal'];
 
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
@@ -601,6 +621,7 @@ export function createWorld(canvas, state, opts = {}) {
     loom: { mesh: loomMesh, pick: loomPick, glow: null, pickY: STATION_HIT.loom.pickY },
     fletch: { mesh: fletchMesh, pick: fletchPick, glow: null, pickY: STATION_HIT.fletch.pickY },
     potter: { mesh: potterMesh, pick: potterPick, glow: null, pickY: STATION_HIT.potter.pickY },
+    portal: { mesh: portalMesh, pick: portalPick, glow: null, pickY: STATION_HIT.portal.pickY },
     rug: { mesh: rugMesh, pick: rugPick, glow: null, pickY: 0.18 },
   };
 
@@ -614,7 +635,10 @@ export function createWorld(canvas, state, opts = {}) {
     slot.pick.visible = owned && !draft;
     if (slot.glow) slot.glow.visible = owned;
     if (!pose) return;
-    slot.mesh.position.set(pose.x, slot.mesh.userData.floorY ?? 0, pose.z);
+    const groundY = id === 'portal'
+      ? characterGroundY(pose.x, pose.z, state.expansions ?? [])
+      : (slot.mesh.userData.floorY ?? 0);
+    slot.mesh.position.set(pose.x, groundY, pose.z);
     const yaw = furnitureVisualYaw(id, pose.rot);
     // Yaw only (same axis as furniture Rotate). Never pitch/roll stations onto a side.
     slot.mesh.rotation.set(0, yaw, 0);
@@ -719,7 +743,10 @@ export function createWorld(canvas, state, opts = {}) {
     });
     const positions = [];
     const y = 0.108;
-    for (const rect of interiorFloors(state.expansions ?? [])) {
+    const gridRects = moveTarget && placeKindOf(moveTarget) === 'portal'
+      ? portalPlaceFloors(state.expansions ?? [])
+      : interiorFloors(state.expansions ?? []);
+    for (const rect of gridRects) {
       const { xs, zs } = snapGridLines(rect);
       for (const gx of xs) {
         positions.push(gx, y, rect.minZ, gx, y, rect.maxZ);
@@ -769,7 +796,7 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = placeKindOf(moveTarget);
     const snapped = kind === 'shelf'
       ? snapToWallGrid(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
-      : snapToFloor(x, z, placeRects);
+      : snapToFloor(x, z, activePlaceRects());
     const pose = poseOf(moveTarget);
     if (!pose) return snapped;
     pose.x = snapped.x;
@@ -791,11 +818,13 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function clearMoveMode() {
+    const wasPortal = moveTarget && placeKindOf(moveTarget) === 'portal';
     moveTarget = null;
     moveOrigin = null;
     placeNeedsConfirm = false;
     placeDraft = null;
     setSnapGridVisible(false);
+    if (wasPortal) rebuildSnapGrid();
   }
 
   function discardPlaceDisplay() {
@@ -1077,8 +1106,20 @@ export function createWorld(canvas, state, opts = {}) {
     return found;
   }
 
+  function runeFieldUsePicks() {
+    const found = [];
+    runeField?.root?.traverse((child) => {
+      if (child.userData?.kind === 'rune-portal' || child.userData?.kind === 'altar') found.push(child);
+      if (child.userData?.kind === 'tree' && !child.userData.depleted && !isTreeStump(child.userData.x, child.userData.z)) {
+        found.push(child);
+      }
+    });
+    return found;
+  }
+
   function allPicks() {
     if (sceneMode === 'dungeon') return dungeonUsePicks();
+    if (sceneMode === 'runefield') return runeFieldUsePicks();
     const extra = expandMode && padGroup
       ? padGroup.children.filter((child) => child.userData.kind === 'expand-pad')
       : [];
@@ -1101,6 +1142,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function groundMeshes() {
     if (sceneMode === 'dungeon') return dungeon?.grounds?.children ?? [];
+    if (sceneMode === 'runefield') return runeField?.grounds?.children ?? [];
     const list = [];
     const add = (obj) => {
       if (obj?.isMesh && (obj.userData?.kind === 'ground' || obj.userData?.kind === 'rug')) list.push(obj);
@@ -1262,11 +1304,15 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function syncTreeVisuals() {
-    architecture?.traverse((child) => {
-      if (child.name !== 'pine' || child.userData?.gardenSide == null) return;
-      const node = ensureTreeNode(child.position.x, child.position.z);
-      setTreeFallen(child, !node.alive);
-    });
+    const visit = (root) => {
+      root?.traverse((child) => {
+        if (child.name !== 'pine' || child.userData?.gardenSide == null) return;
+        const node = ensureTreeNode(child.position.x, child.position.z);
+        setTreeFallen(child, !node.alive);
+      });
+    };
+    visit(architecture);
+    visit(runeField?.root);
   }
 
   function fellChoppedTree(x, z, now) {
@@ -1485,8 +1531,16 @@ export function createWorld(canvas, state, opts = {}) {
     if (type !== 'counter') servingAtCounter = false;
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
     const arrive = type === 'flax' ? FLAX_ARRIVE : type === 'trapdoor' || type === 'ladder' ? 1.35 : STATION_ARRIVE;
-    const standFloors = sceneMode === 'dungeon' ? [DUNGEON_FLOOR] : playerFloors;
-    const standBlocks = sceneMode === 'dungeon' ? DUNGEON_BLOCKS : playerObstacles(state);
+    const standFloors = sceneMode === 'dungeon'
+      ? [DUNGEON_FLOOR]
+      : sceneMode === 'runefield'
+        ? [runeFieldRect()]
+        : playerFloors;
+    const standBlocks = sceneMode === 'dungeon'
+      ? DUNGEON_BLOCKS
+      : sceneMode === 'runefield'
+        ? runeFieldMoveObstacles()
+        : playerObstacles(state);
     const canStand = (x, z) => isWalkable(x, z, standBlocks, PLAYER_RADIUS, standFloors);
     const plan = resolveStationUse(from, pose, state, planSceneWalk, type, canStand);
     const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax';
@@ -1510,6 +1564,7 @@ export function createWorld(canvas, state, opts = {}) {
         openOnArrive,
         materialId: pose.materialId,
         plantId: pose.plantId,
+        element: pose.element,
         faceYaw,
         nodeX: pose.x,
         nodeZ: pose.z,
@@ -1543,7 +1598,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       stopMining();
-      pickHandler?.({ type });
+      pickHandler?.({ type, element: pose.element });
       playClick('ui');
       return;
     }
@@ -1566,7 +1621,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function finishPendingUse() {
     if (!pendingUse) return;
-    const { type, materialId, x, z, plantId, faceYaw, nodeX, nodeZ } = pendingUse;
+    const { type, materialId, x, z, plantId, faceYaw, nodeX, nodeZ, element } = pendingUse;
     pendingUse = null;
     if (type === 'counter') {
       servingAtCounter = true;
@@ -1582,7 +1637,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (type === 'boulder') startMining(materialId, pose);
     else if (type === 'tree') startChopping(pose);
     else if (type === 'flax') startPicking(pose);
-    else pickHandler?.({ type });
+    else pickHandler?.({ type, element });
   }
 
   function updatePlayer(dt, now) {
@@ -1657,7 +1712,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function updateRoofFade() {
     if (!roofGroup) return;
-    if (sceneMode === 'dungeon') {
+    if (sceneMode === 'dungeon' || sceneMode === 'runefield') {
       roofGroup.visible = false;
       return;
     }
@@ -1762,14 +1817,24 @@ export function createWorld(canvas, state, opts = {}) {
     return target.id;
   }
 
+  function activePlaceRects(target = moveTarget) {
+    if (target && placeKindOf(target) === 'portal') return portalPlaceFloors(state.expansions ?? []);
+    return placeRects;
+  }
+
   function blockedPlaceReason(pose, target = moveTarget) {
     if (!pose || !target) return 'That spot is off the shop floor.';
     const kind = placeKindOf(target);
     const skip = target.id === 'display' ? { id: 'display', index: target.index } : { id: target.id };
     const blocks = liveObstacles(state, SHOP, skip);
-    return placementBlocked(pose, kind, blocks, placeRects, {
+    const floors = activePlaceRects(target);
+    const off = kind === 'portal' ? 'That spot is off the grass.' : 'That spot is off the shop floor.';
+    if (!pose) return off;
+    const reason = placementBlocked(pose, kind, blocks, floors, {
       checkAisle: kind !== 'counter' && kind !== 'rug',
     });
+    if (reason === 'That spot is off the shop floor.' && kind === 'portal') return off;
+    return reason;
   }
 
   function visualPlacePose() {
@@ -1922,6 +1987,14 @@ export function createWorld(canvas, state, opts = {}) {
         queueUse('ladder', LADDER_STAND);
         return;
       }
+      if (data.kind === 'rune-portal') {
+        queueUse('rune-portal', { x: data.x ?? RUNE_FIELD_PORTAL.x, z: data.z ?? RUNE_FIELD_PORTAL.z });
+        return;
+      }
+      if (data.kind === 'altar') {
+        queueUse('altar', { x: data.x, z: data.z, element: data.element });
+        return;
+      }
       if (data.kind === 'boulder') {
         queueUse('boulder', { x: data.x, z: data.z, materialId: data.materialId });
         return;
@@ -1975,17 +2048,17 @@ export function createWorld(canvas, state, opts = {}) {
     }
     const point = floorClickPoint(hits);
     if (point) {
-      const station = stationAtFloor(point.x, point.z, state.furniture);
-      if (station) {
-        queueUse(station.type, station.pose);
-        return;
-      }
-      const hatch = gardenTrapdoorSpot(state.expansions ?? []);
-      if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 1.7) {
-        queueUse('trapdoor', hatch);
-        return;
-      }
       if (sceneMode === 'shop') {
+        const station = stationAtFloor(point.x, point.z, state.furniture);
+        if (station) {
+          queueUse(station.type, station.pose);
+          return;
+        }
+        const hatch = gardenTrapdoorSpot(state.expansions ?? []);
+        if (hatch && Math.hypot(point.x - hatch.x, point.z - hatch.z) < 1.7) {
+          queueUse('trapdoor', hatch);
+          return;
+        }
         const tree = gardenTreeSpots(state.expansions ?? []).find((spot) => (
           treeCanChop(spot.x, spot.z)
           && Math.hypot(point.x - spot.x, point.z - spot.z) <= TREE_CLICK_RADIUS
@@ -2013,6 +2086,32 @@ export function createWorld(canvas, state, opts = {}) {
         ));
         if (spot) {
           queueUse('boulder', { x: spot.x, z: spot.z, materialId: spot.materialId });
+          return;
+        }
+      }
+      if (sceneMode === 'runefield') {
+        if (Math.hypot(point.x - RUNE_FIELD_PORTAL.x, point.z - RUNE_FIELD_PORTAL.z) <= (STATION_HIT.portal.floorR ?? 2.4)) {
+          queueUse('rune-portal', { x: RUNE_FIELD_PORTAL.x, z: RUNE_FIELD_PORTAL.z });
+          return;
+        }
+        const altar = RUNE_ALTAR_SPOTS.find((spot) => (
+          Math.hypot(point.x - spot.x, point.z - spot.z) <= ALTAR_CLICK
+        ));
+        if (altar) {
+          queueUse('altar', { x: altar.x, z: altar.z, element: altar.element });
+          return;
+        }
+        const tree = runeFieldTreeSpots().find((spot) => (
+          treeCanChop(spot.x, spot.z)
+          && Math.hypot(point.x - spot.x, point.z - spot.z) <= TREE_CLICK_RADIUS
+        ));
+        if (tree) {
+          queueUse('tree', {
+            x: tree.x,
+            z: tree.z,
+            materialId: 'logs',
+            trunkRadius: plantedTrunkRadius(tree.x, tree.z),
+          });
           return;
         }
       }
@@ -2972,6 +3071,86 @@ export function createWorld(canvas, state, opts = {}) {
     shopkeeper.rotation.y = Math.PI;
   }
 
+  function ensureRuneField() {
+    if (runeField) return runeField;
+    runeField = buildRuneField();
+    runeField.root.visible = false;
+    runeField.grounds.visible = false;
+    scene.add(runeField.root);
+    scene.add(runeField.grounds);
+    return runeField;
+  }
+
+  function standBesidePortal(pose) {
+    if (!pose) return { x: SHOP.keeper.x, z: SHOP.keeper.z };
+    const { hw, hd } = furnitureHalfSize('portal');
+    const dist = Math.max(hw, hd) + 0.95;
+    const yaw = pose.rot ?? 0;
+    const offsets = [
+      [Math.sin(yaw) * dist, Math.cos(yaw) * dist],
+      [-Math.sin(yaw) * dist, -Math.cos(yaw) * dist],
+      [Math.cos(yaw) * dist, -Math.sin(yaw) * dist],
+      [-Math.cos(yaw) * dist, Math.sin(yaw) * dist],
+    ];
+    const blocks = playerObstacles(state);
+    const floors = playerWalkFloors(state.expansions ?? []);
+    for (const [dx, dz] of offsets) {
+      const x = pose.x + dx;
+      const z = pose.z + dz;
+      if (isWalkable(x, z, blocks, PLAYER_RADIUS, floors)) return { x, z };
+    }
+    return { x: pose.x + offsets[0][0], z: pose.z + offsets[0][1] };
+  }
+
+  function enterRuneFieldNow() {
+    if (sceneMode === 'runefield') return;
+    if (!state.furniture?.portal) return;
+    if (sceneMode === 'dungeon') exitDungeonNow();
+    const stand = standBesidePortal(state.furniture.portal);
+    shopReturnPos.x = stand.x;
+    shopReturnPos.z = stand.z;
+    ensureRuneField();
+    sceneMode = 'runefield';
+    playerPath.length = 0;
+    pendingUse = null;
+    servingAtCounter = false;
+    stopMining();
+    moveMarker.visible = false;
+    setShopLayerVisible(false);
+    clouds.visible = true;
+    runeField.root.visible = true;
+    runeField.grounds.visible = true;
+    applySkyColor(scene, skyIdForScene('runefield', state.skybox));
+    syncLighting('runefield');
+    shopkeeper.userData.groundY = OUTDOOR_GROUND_Y;
+    shopkeeper.position.set(RUNE_FIELD_ARRIVE.x, OUTDOOR_GROUND_Y, RUNE_FIELD_ARRIVE.z);
+    shopkeeper.rotation.y = Math.PI;
+  }
+
+  function exitRuneFieldNow() {
+    if (sceneMode !== 'runefield') return;
+    sceneMode = 'shop';
+    playerPath.length = 0;
+    pendingUse = null;
+    servingAtCounter = false;
+    stopMining();
+    moveMarker.visible = false;
+    if (runeField) {
+      runeField.root.visible = false;
+      runeField.grounds.visible = false;
+    }
+    setShopLayerVisible(true);
+    applySkyColor(scene, skyIdForScene('shop', state.skybox));
+    syncLighting('shop');
+    const portal = state.furniture?.portal;
+    const stand = portal ? standBesidePortal(portal) : { x: shopReturnPos.x, z: shopReturnPos.z };
+    shopkeeper.userData.groundY = characterGroundY(stand.x, stand.z, state.expansions ?? []);
+    shopkeeper.position.set(stand.x, shopkeeper.userData.groundY, stand.z);
+    if (portal) {
+      shopkeeper.rotation.y = Math.atan2(portal.x - stand.x, portal.z - stand.z);
+    }
+  }
+
   async function warmScene() {
     syncLighting(sceneMode);
     try {
@@ -2997,6 +3176,7 @@ export function createWorld(canvas, state, opts = {}) {
     ),
     applyLayout() {
       if (sceneMode === 'dungeon') exitDungeonNow();
+      if (sceneMode === 'runefield') exitRuneFieldNow();
       syncDisplaySlots();
       applyAllPoses();
       rebuildArchitecture();
@@ -3147,8 +3327,9 @@ export function createWorld(canvas, state, opts = {}) {
       pickHandler?.({ type: 'furniture-move-start', furniture: target });
     },
     beginPlaceUnlock(id) {
-      const home = SHOP[id] ?? SHOP.cauldron;
-      const start = snapToFloor(home.x, home.z, placeRects);
+      const home = id === 'portal' ? PORTAL_HOME : (SHOP[id] ?? SHOP.cauldron);
+      const rects = id === 'portal' ? portalPlaceFloors(state.expansions ?? []) : placeRects;
+      const start = snapToFloor(home.x, home.z, rects);
       placeDraft = { id, x: start.x, z: start.z, rot: FURNITURE_FORWARD };
       moveTarget = { id };
       placeNeedsConfirm = true;
@@ -3156,6 +3337,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (padGroup) padGroup.visible = false;
       moveOrigin = null;
       applyFixturePose(id);
+      rebuildSnapGrid();
       setSnapGridVisible(true);
       highlightSnapCell(start.x, start.z);
       pickHandler?.({ type: 'furniture-place-start', furniture: { id } });
@@ -3375,8 +3557,22 @@ export function createWorld(canvas, state, opts = {}) {
     exitDungeon() {
       exitDungeonNow();
     },
+    enterRuneField() {
+      enterRuneFieldNow();
+    },
+    exitRuneField() {
+      exitRuneFieldNow();
+    },
+    useFixture(id) {
+      const pose = state.furniture?.[id];
+      if (!pose) return;
+      queueUse(id, pose);
+    },
     isInDungeon() {
       return sceneMode === 'dungeon';
+    },
+    isInRuneField() {
+      return sceneMode === 'runefield';
     },
     getMining(now = performance.now() / 1000) {
       if (!mining) return null;

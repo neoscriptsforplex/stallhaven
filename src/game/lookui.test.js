@@ -88,7 +88,7 @@ describe('player look UI', () => {
 
   it('lists Build cards furnace-first and names the extra room Shop Expansion', () => {
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
-    const order = ['Furnace', 'Cooking Range', 'Loom', 'Fletching Bench', 'Potter Wheel', 'Spinning Wheel', 'Cauldron', 'Table', 'Shelf', 'Mannequin', 'Shop Expansion'];
+    const order = ['Furnace', 'Cooking Range', 'Loom', 'Fletching Bench', 'Potter Wheel', 'Spinning Wheel', 'Cauldron', 'Portal', 'Table', 'Shelf', 'Mannequin', 'Shop Expansion'];
     let last = -1;
     for (const label of order) {
       const at = build.indexOf(`<h3>${label}</h3>`);
@@ -114,11 +114,18 @@ describe('player look UI', () => {
     assert.equal(hud.includes(": 'Free.'"), false);
     assert.match(hud, /itemStatus\.hidden = !paid/);
     const wheel = build.slice(build.indexOf('Spinning Wheel'), build.indexOf('Cauldron'));
-    const cauldron = build.slice(build.indexOf('Cauldron'), build.indexOf('Table'));
+    const cauldron = build.slice(build.indexOf('Cauldron'), build.indexOf('Portal'));
     assert.equal((wheel.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.equal((cauldron.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.match(wheel, /data-wheel-status class="meta">Costs 100,000 gp\.</);
     assert.match(cauldron, /data-cauldron-status class="meta">Costs 1,000,000 gp\.</);
+    const portal = build.slice(build.indexOf('<h3>Portal</h3>'), build.indexOf('<h3>Table</h3>'));
+    assert.match(portal, /data-portal-status class="meta">Costs 500,000 gp\./);
+    assert.match(portal, /data-portal-buy>Buy · 500,000 gp</);
+    assert.match(hud, /You need rune essence\./);
+    assert.match(hud, /openCraft\(`altar-\$\{element\}`\)/);
+    assert.match(hud, /world\.enterRuneField/);
+    assert.match(hud, /world\.exitRuneField/);
   });
 
   it('does not show old buyer class names in Help', () => {

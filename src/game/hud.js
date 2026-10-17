@@ -20,6 +20,7 @@ import {
   offerClassLabel,
   offerClassOf,
   recipeMatsLabel,
+  recipesForAltar,
   recipesForTab,
   SHELF_SLOT_LABELS,
   stationForRecipe,
@@ -232,6 +233,9 @@ export function bindHud(root, state, world) {
     if (craftStation === 'fletch') {
       return recipesForTab('ranged', craftTab === 'ammo' ? 'ammo' : 'weapon');
     }
+    if (typeof craftStation === 'string' && craftStation.startsWith('altar-')) {
+      return recipesForAltar(craftStation.slice('altar-'.length));
+    }
     return recipesForTab(craftTab, craftSubtab).filter((recipe) => stationForRecipe(recipe) === 'anvil');
   }
 
@@ -310,7 +314,9 @@ export function bindHud(root, state, world) {
     const loomMode = craftStation === 'loom';
     const fletchMode = craftStation === 'fletch';
     const potterMode = craftStation === 'potter';
-    const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode || potterMode;
+    const altarMode = typeof craftStation === 'string' && craftStation.startsWith('altar-');
+    const altarMark = altarMode ? craftStation.slice('altar-'.length) : '';
+    const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode || potterMode || altarMode;
     ensureCraftTabs();
     tabsEl.hidden = simpleStation;
     subtabsEl.hidden = simpleStation || loomMode || fletchMode;
@@ -331,7 +337,9 @@ export function bindHud(root, state, world) {
                   ? 'Fletching Bench'
                   : potterMode
                     ? 'Potter Wheel'
-                    : 'Anvil';
+                    : altarMode
+                      ? `${altarMark.charAt(0).toUpperCase()}${altarMark.slice(1)} Altar`
+                      : 'Anvil';
     }
     if (blurb) {
       blurb.textContent = rangeMode
@@ -348,7 +356,9 @@ export function bindHud(root, state, world) {
                   ? 'Fletch ranged weapons and ammo. Arrows still make 20 per craft action.'
                   : potterMode
                     ? 'Turn soft clay into clay. This wheel does not make ranged gear.'
-                    : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons and runes stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
+                    : altarMode
+                      ? 'Bind rune essence into this element. Finished runes land in the chest.'
+                      : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
     }
     if (!simpleStation) paintSubtabs();
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
@@ -1259,6 +1269,7 @@ export function bindHud(root, state, world) {
                   : target.id === 'loom' ? 'Loom'
                   : target.id === 'fletch' ? 'Fletching Bench'
                   : target.id === 'potter' ? 'Potter Wheel'
+                  : target.id === 'portal' ? 'Portal'
                   : target.id === 'rug' ? 'Rug'
                   : target.id === 'counter' ? 'Counter'
                     : target.id === 'display' && displayKind(target.index, state) === 'stand' ? 'Mannequin'
@@ -1268,7 +1279,7 @@ export function bindHud(root, state, world) {
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
     const upgradeBtn = furnMenu.querySelector('[data-furn-upgrade]');
-    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel' || target.id === 'loom' || target.id === 'fletch' || target.id === 'potter') {
+    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel' || target.id === 'loom' || target.id === 'fletch' || target.id === 'potter' || target.id === 'portal') {
       useBtn.hidden = false;
       useBtn.textContent = target.id === 'chest' ? 'Open Chest'
         : target.id === 'range' ? 'Cook'
@@ -1278,7 +1289,8 @@ export function bindHud(root, state, world) {
                 : target.id === 'loom' ? 'Weave'
                   : target.id === 'fletch' ? 'Fletch'
                     : target.id === 'potter' ? 'Shape'
-                      : 'Craft';
+                      : target.id === 'portal' ? 'Enter'
+                        : 'Craft';
     } else {
       useBtn.hidden = true;
     }
@@ -1536,7 +1548,9 @@ export function bindHud(root, state, world) {
     const label = stationLabel(pendingPlace.type);
     if (title) title.textContent = `Place ${label}`;
     if (blurb) {
-      blurb.textContent = STATION_UNLOCKS.some((item) => item.id === pendingPlace.type)
+      blurb.textContent = pendingPlace.type === 'portal'
+        ? 'Move it on the grass or the floor snap grid, then confirm. Gold is spent only when you confirm placement. Double-click a highlighted cell to confirm.'
+        : STATION_UNLOCKS.some((item) => item.id === pendingPlace.type)
         ? 'Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Double-click a highlighted cell to confirm.'
         : pendingPlace.type === 'shelf'
           ? 'Move the shelf on the wall grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.'
@@ -1772,6 +1786,7 @@ export function bindHud(root, state, world) {
     if (target?.id === 'loom') openCraft('loom');
     if (target?.id === 'fletch') openCraft('fletch');
     if (target?.id === 'potter') openCraft('potter');
+    if (target?.id === 'portal') world.useFixture?.('portal');
   });
 
   function closeFillPicker() {
@@ -2309,6 +2324,21 @@ export function bindHud(root, state, world) {
     if (event.type === 'loom') openCraft('loom');
     if (event.type === 'fletch') openCraft('fletch');
     if (event.type === 'potter') openCraft('potter');
+    if (event.type === 'portal') {
+      fadeShop(() => world.enterRuneField?.());
+    }
+    if (event.type === 'rune-portal') {
+      fadeShop(() => world.exitRuneField?.());
+    }
+    if (event.type === 'altar') {
+      const element = event.element;
+      if ((state.materials.essence ?? 0) < 1) {
+        pushLog(state, 'You need rune essence.');
+        render(performance.now() / 1000);
+      } else {
+        openCraft(`altar-${element}`);
+      }
+    }
     if (event.type === 'display-select') render(performance.now() / 1000);
     if (event.type === 'chest-upgrade') openUpgrade();
     if (event.type === 'furn-menu') showFurnMenu(event.furniture, event.clientX, event.clientY);

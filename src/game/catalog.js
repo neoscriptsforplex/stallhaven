@@ -127,7 +127,6 @@ export const ANVIL_SUBTABS = [
   { id: 'weapon', label: 'Weapons' },
   { id: 'armour', label: 'Armour' },
   { id: 'ammo', label: 'Ammo' },
-  { id: 'rune', label: 'Runes' },
   { id: 'hatchet', label: 'Hatchet' },
   { id: 'pickaxe', label: 'Pickaxe' },
 ];
@@ -1497,6 +1496,7 @@ export function stationForRecipe(recipe) {
   if (recipe.category === 'weave') return 'loom';
   if (recipe.category === 'potter') return 'potter';
   if (recipe.category === 'ammo') return 'fletch';
+  if (recipe.category === 'rune') return `altar-${recipe.runeMark}`;
   if (recipe.combatClass === 'range' && recipe.category === 'weapon') return 'fletch';
   if (recipe.combatClass === 'range' && recipe.category === 'armour') return 'loom';
   if (recipe.combatClass === 'magic' && recipe.category === 'armour') return 'loom';
@@ -1526,18 +1526,25 @@ export function anvilSubtabForRecipe(recipe) {
 export function anvilSubtabsForTab(tabId) {
   if (tabId === 'tools') return TOOL_SUBTABS;
   return ANVIL_SUBTABS.filter((tab) => {
-    if (tab.id === 'hatchet' || tab.id === 'pickaxe' || tab.id === 'ammo') return false;
-    if (tab.id === 'rune') return tabId === 'magic';
+    if (tab.id === 'hatchet' || tab.id === 'pickaxe' || tab.id === 'ammo' || tab.id === 'rune') return false;
     if (tab.id === 'armour') return tabId === 'melee';
     return tab.id === 'weapon';
   });
 }
 
+/** Runes for one altar. Costs, XP, and outputs stay on the recipe. */
+export function recipesForAltar(mark) {
+  return recipesForTab('magic', 'rune').filter((recipe) => recipe.runeMark === mark);
+}
+
 const ANVIL_TAB_IDS = new Set(ANVIL_TABS.map((tab) => tab.id));
-const ANVIL_SUBTAB_IDS = new Set(['armour', 'ammo', 'rune', 'hatchet', 'pickaxe']);
+const ANVIL_SUBTAB_IDS = new Set(['armour', 'ammo', 'hatchet', 'pickaxe']);
 
 /** Reset shared craft-panel tab state so furnace/range/anvil never leak into each other. */
 export function craftUiForStation(station, prev = {}, recipe = null) {
+  if (typeof station === 'string' && station.startsWith('altar-')) {
+    return { tab: 'magic', subtab: 'rune' };
+  }
   if (station === 'range') return { tab: 'food', subtab: prev.subtab ?? 'weapon' };
   if (station === 'cauldron') return { tab: 'potion', subtab: prev.subtab ?? 'weapon' };
   if (station === 'furnace') return { tab: 'smelt', subtab: prev.subtab ?? 'weapon' };
@@ -1561,7 +1568,7 @@ export function craftUiForStation(station, prev = {}, recipe = null) {
     ? anvilSubtabForRecipe(recipe)
     : (ANVIL_SUBTAB_IDS.has(prev.subtab) ? prev.subtab : 'weapon');
   if (tab !== 'ranged' && subtab === 'ammo') subtab = 'weapon';
-  if (tab !== 'magic' && subtab === 'rune') subtab = 'weapon';
+  if (subtab === 'rune') subtab = 'weapon';
   if (tab !== 'tools' && (subtab === 'hatchet' || subtab === 'pickaxe')) subtab = 'weapon';
   if (tab === 'tools' && subtab !== 'hatchet' && subtab !== 'pickaxe') subtab = 'hatchet';
   return { tab, subtab };

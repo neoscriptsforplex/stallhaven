@@ -41,6 +41,7 @@ import {
   WHEEL_COST,
   FURNACE_COST,
   RANGE_COST,
+  PORTAL_COST,
   STATION_UNLOCKS,
   CHEST_MAX_LEVEL,
   FURNITURE_FORWARD,
@@ -78,6 +79,7 @@ export {
   WHEEL_COST,
   FURNACE_COST,
   RANGE_COST,
+  PORTAL_COST,
   STATION_UNLOCKS,
   furnitureBuyCost,
   masteryNeed,
@@ -1372,6 +1374,9 @@ export function applyState(state, data) {
         : null,
       potter: data.furniture.potter
         ? readPose(data.furniture.potter, { ...SHOP.potter, rot: FURNITURE_FORWARD })
+        : null,
+      portal: data.furniture.portal
+        ? readPose(data.furniture.portal, { x: 0, z: 0, rot: FURNITURE_FORWARD })
         : null,
       rug: readPose(data.furniture.rug, defaults.rug),
       displays: next.displays.map((display, index) => {

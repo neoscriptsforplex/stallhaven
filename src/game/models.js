@@ -4470,6 +4470,16 @@ export function measureVisibleBox(root) {
   return any && !box.isEmpty() ? box : new THREE.Box3();
 }
 
+/** RuneLite OBJ units to metres. 128 units is one tile, about 1.44 m. */
+export const OSRS_MODEL_SCALE = 0.01125;
+
+export function applyOsrsScale(root) {
+  if (!root) return root;
+  root.scale.multiplyScalar(OSRS_MODEL_SCALE);
+  root.updateMatrixWorld(true);
+  return root;
+}
+
 /** Uniform-scale an imported mesh to a target bbox; sit on the floor; no stretch. */
 export function wrapBundledProp(source, target, opts = {}) {
   if (!source) return null;

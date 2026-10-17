@@ -8,11 +8,17 @@ import {
   gardenTrapdoorSpot,
   gardenTreeSpots,
   playerWalkFloors,
+  portalPlaceFloors,
+  PORTAL_HOME,
   rollFlaxSpots,
   roomCenter,
   shopRugPose,
   shopRugRect,
   walkFloors,
+  runeFieldRect,
+  RUNE_FIELD_ARRIVE,
+  RUNE_ALTAR_SPOTS,
+  ALTAR_FOOT,
 } from './layout.js';
 import { boulderFaceRadius, gatherStandCandidates } from './interact.js';
 import {
@@ -31,6 +37,7 @@ import {
   planPlayerWalk,
   planWalk,
   playerObstacles,
+  runeFieldMoveObstacles,
   queueSlot,
   rebuildShopWalls,
   shopObstacles,
@@ -518,5 +525,29 @@ describe('shop navigation', () => {
       assert.ok(path.length >= 1, `${spot.materialId} stand should be reachable from the ladder`);
     }
     assert.equal(dungeonBoulderObstacles(spots).length, spots.length);
+  });
+});
+
+describe('rune field walks', () => {
+  it('places the portal on the lawn and walks from the centre portal to each altar', () => {
+    const state = createState();
+    assert.equal(
+      placementBlocked(PORTAL_HOME, 'portal', liveObstacles(state), portalPlaceFloors([])),
+      null,
+    );
+    const blocks = runeFieldMoveObstacles();
+    const floors = [runeFieldRect()];
+    assert.equal(isWalkable(RUNE_FIELD_ARRIVE.x, RUNE_FIELD_ARRIVE.z, blocks, PLAYER_RADIUS, floors), true);
+    for (const altar of RUNE_ALTAR_SPOTS) {
+      const inward = ALTAR_FOOT / 2 + PLAYER_RADIUS + 0.45;
+      const len = Math.hypot(altar.x, altar.z) || 1;
+      const stand = {
+        x: altar.x - (altar.x / len) * inward,
+        z: altar.z - (altar.z / len) * inward,
+      };
+      assert.equal(isWalkable(stand.x, stand.z, blocks, PLAYER_RADIUS, floors), true, altar.id);
+      const path = planWalk(RUNE_FIELD_ARRIVE, stand, blocks, PLAYER_RADIUS, floors);
+      assert.ok(path.length > 0, altar.id);
+    }
   });
 });

@@ -18,6 +18,8 @@ import {
   recipeList,
   recipesForTab,
   stationForRecipe,
+  anvilSubtabsForTab,
+  recipesForAltar,
   unlockNeed,
   CRAFT_TABS,
   ANVIL_SUBTABS,
@@ -57,6 +59,9 @@ import {
   applyState,
   applyCheat,
   buyCauldron,
+  buyStation,
+  canBuyStation,
+  ownsStation,
   buyExpansion,
   buyFromCustomer,
   buyFurniture,
@@ -71,6 +76,7 @@ import {
   canBuyFurniture,
   canCraft,
   CAULDRON_COST,
+  PORTAL_COST,
   WHEEL_COST,
   chestCapacity,
   chestCount,
@@ -796,7 +802,9 @@ describe('catalog', () => {
     assert.equal(RECIPES.weave_cloth.outputMaterial, 'cloth');
     assert.equal(recipeCost(RECIPES.fire_clay).materials.soft_clay, 1);
     assert.equal(RECIPES.fire_clay.outputMaterial, 'hard_clay');
-    assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Runes', 'Hatchet', 'Pickaxe']);
+    assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Hatchet', 'Pickaxe']);
+    assert.equal(anvilSubtabsForTab('magic').some((tab) => tab.id === 'rune'), false);
+    assert.equal(recipesForTab('magic', 'rune').some((recipe) => stationForRecipe(recipe) === 'anvil'), false);
     const melee = recipesForTab('melee');
     const meleeWeapons = recipesForTab('melee', 'weapon');
     const meleeArmour = recipesForTab('melee', 'armour');
@@ -1830,6 +1838,23 @@ describe('magic runes', () => {
     const runes = recipesForTab('magic', 'rune');
     assert.deepEqual(runes.map((r) => r.id), ['air_rune', 'earth_rune', 'water_rune', 'fire_rune']);
     assert.equal(anvilSubtabForRecipe(RECIPES.air_rune), 'rune');
+    assert.equal(stationForRecipe(RECIPES.air_rune), 'altar-air');
+    assert.equal(stationForRecipe(RECIPES.earth_rune), 'altar-earth');
+    assert.equal(stationForRecipe(RECIPES.water_rune), 'altar-water');
+    assert.equal(stationForRecipe(RECIPES.fire_rune), 'altar-fire');
+    assert.deepEqual(recipesForAltar('air').map((recipe) => recipe.id), ['air_rune']);
+    assert.deepEqual(recipesForAltar('earth').map((recipe) => recipe.id), ['earth_rune']);
+    assert.deepEqual(recipesForAltar('water').map((recipe) => recipe.id), ['water_rune']);
+    assert.deepEqual(recipesForAltar('fire').map((recipe) => recipe.id), ['fire_rune']);
+    assert.equal(recipeCost(RECIPES.air_rune).materials.essence, 1);
+    assert.equal(recipeCost(RECIPES.fire_rune).materials.essence, 1);
+    assert.equal(RECIPES.air_rune.time, 3);
+    assert.equal(RECIPES.fire_rune.time, 6);
+    assert.equal(craftXp(RECIPES.air_rune), 16);
+    assert.equal(craftXp(RECIPES.earth_rune), 26);
+    assert.equal(craftXp(RECIPES.water_rune), 36);
+    assert.equal(craftXp(RECIPES.fire_rune), 46);
+    assert.equal(RECIPES.air_rune.outputCount ?? 1, 1);
     const state = createState();
     assert.equal(isUnlocked(state, 'air_rune'), true);
     assert.equal(isUnlocked(state, 'earth_rune'), false);
@@ -2128,6 +2153,38 @@ describe('craft station UI', () => {
     assert.equal(furnace.tab, 'smelt');
     const range = craftUiForStation('range');
     assert.equal(range.tab, 'food');
+    const altar = craftUiForStation('altar-air', { tab: 'melee', subtab: 'armour' });
+    assert.equal(altar.tab, 'magic');
+    assert.equal(altar.subtab, 'rune');
+    const backToAnvil = craftUiForStation('anvil', { tab: 'magic', subtab: 'rune' });
+    assert.equal(backToAnvil.tab, 'magic');
+    assert.equal(backToAnvil.subtab, 'weapon');
+  });
+});
+
+describe('portal unlock', () => {
+  it('sells one portal for 500000 gp and keeps the pose in a save', () => {
+    const state = createState();
+    assert.equal(PORTAL_COST, 500000);
+    assert.equal(ownsStation(state, 'portal'), false);
+    assert.equal(canBuyStation(state, 'portal'), false);
+    state.gold = PORTAL_COST - 1;
+    assert.equal(buyStation(state, 'portal', { x: -11.2, z: 4.2, rot: 0 }), false);
+    assert.equal(ownsStation(state, 'portal'), false);
+    state.gold = PORTAL_COST;
+    assert.equal(canBuyStation(state, 'portal'), true);
+    assert.equal(buyStation(state, 'portal', { x: -11.2, z: 4.2, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(ownsStation(state, 'portal'), true);
+    assert.equal(state.furniture.portal.x, -11.2);
+    assert.equal(state.furniture.portal.z, 4.2);
+    assert.equal(canBuyStation(state, 'portal'), false);
+    assert.equal(buyStation(state, 'portal', { x: 0, z: 0, rot: 0 }), false);
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(ownsStation(next, 'portal'), true);
+    assert.equal(next.furniture.portal.z, 4.2);
   });
 });
 

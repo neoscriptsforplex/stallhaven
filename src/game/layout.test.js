@@ -88,6 +88,14 @@ import {
   shopFloorTopY,
   shopFloorFootprint,
   characterGroundY,
+  PORTAL_COST,
+  RUNE_FIELD_PORTAL,
+  RUNE_ALTAR_SPOTS,
+  runeAltarSpot,
+  runeFieldClearOf,
+  runeFieldTreeSpots,
+  runeFieldRockSpots,
+  ALTAR_OSRS_SCALE,
 } from './layout.js';
 import { FLOOR, gardenObstacles, isWalkable, shopObstacles } from './nav.js';
 import { SHOP } from './catalog.js';
@@ -179,6 +187,7 @@ describe('layout numbers', () => {
     assert.equal(furniture.loom, null);
     assert.equal(furniture.fletch, null);
     assert.equal(furniture.potter, null);
+    assert.equal(furniture.portal, null);
     assert.equal(furniture.rug.rot, FURNITURE_FORWARD);
     assert.equal(furniture.rug.x, shopRugPose().x);
     assert.equal(furniture.rug.z, shopRugPose().z);
@@ -693,5 +702,32 @@ describe('flax field', () => {
     assert.equal(nodes.filter((node) => node.alive).length, FLAX_COUNT);
     assert.equal(nodes[0].x, next.x);
     assert.equal(nodes[0].z, next.z);
+  });
+});
+
+describe('rune field', () => {
+  it('keeps the centre portal and the four edge altars clear of trees and rocks', () => {
+    assert.equal(PORTAL_COST, 500000);
+    assert.equal(ALTAR_OSRS_SCALE, 0.01125);
+    assert.equal(RUNE_FIELD_PORTAL.x, 0);
+    assert.equal(RUNE_FIELD_PORTAL.z, 0);
+    assert.equal(runeFieldClearOf(RUNE_FIELD_PORTAL), false);
+    const air = runeAltarSpot('air');
+    const earth = runeAltarSpot('earth');
+    const water = runeAltarSpot('water');
+    const fire = runeAltarSpot('fire');
+    assert.ok(air.z < -10 && air.x === 0);
+    assert.ok(earth.x > 10 && earth.z === 0);
+    assert.ok(water.z > 10 && water.x === 0);
+    assert.ok(fire.x < -10 && fire.z === 0);
+    assert.deepEqual(RUNE_ALTAR_SPOTS.map((spot) => spot.element), ['air', 'earth', 'water', 'fire']);
+    for (const altar of RUNE_ALTAR_SPOTS) assert.equal(runeFieldClearOf(altar), false);
+    const trees = runeFieldTreeSpots();
+    const rocks = runeFieldRockSpots();
+    assert.ok(trees.length >= 12);
+    assert.ok(rocks.length >= 12);
+    for (const spot of [...trees, ...rocks]) {
+      assert.equal(runeFieldClearOf(spot), true);
+    }
   });
 });

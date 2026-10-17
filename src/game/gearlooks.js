@@ -65,6 +65,7 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'dragon_scimitar', folder: 'gear/dragon-scimitar' },
   { id: 'dragon_spear', folder: 'gear/dragon-spear' },
   { id: 'dragon_sword', folder: 'gear/dragon-sword' },
+  { id: 'dwarven_multicannon', folder: 'gear/dwarven-multicannon' },
   { id: 'earth_battlestaff', folder: 'gear/earth-battlestaff' },
   { id: 'energy_potion', folder: 'gear/energy-potion' },
   { id: 'fire_battlestaff', folder: 'gear/mystic-fire-staff' },

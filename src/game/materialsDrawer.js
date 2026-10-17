@@ -25,6 +25,7 @@ const EXTRA_TINT = {
   herbs: 0x3a8a45,
   water: 0x3a7ec8,
   essence: 0xb7e3f5,
+  dwarven_plans: 0xc4a05a,
 };
 
 export function materialTint(mat) {
@@ -115,4 +116,71 @@ export function materialsDrawerSideBox({
     maxWidth: width * 0.25,
     maxHeight: Math.max(0, maxHeight),
   };
+}
+
+/** True when a point lies in a rectangle that actually has area. */
+export function rectContains(rect, x, y) {
+  if (!rect || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const width = Number.isFinite(rect.width) ? rect.width : rect.right - rect.left;
+  const height = Number.isFinite(rect.height) ? rect.height : rect.bottom - rect.top;
+  if (!(width > 0) || !(height > 0)) return false;
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+function primaryPointer(type, button) {
+  if (button == null || button === 0) return true;
+  return type !== 'pointerdown' && button === -1;
+}
+
+/**
+ * Mouse and touch share one plan. Arm on a primary press over the tab, and
+ * toggle on release only if that press is still on the tab. Swallow the
+ * gesture when it is on the tab, or over the open list while the event target
+ * is outside the drawer, so the click never reaches the world. Events that
+ * already target the open list are left alone so it can scroll.
+ */
+export function materialsDrawerPointerPlan({
+  type,
+  button = 0,
+  x = 0,
+  y = 0,
+  toggleRect = null,
+  panelRect = null,
+  open = false,
+  armed = false,
+  targetInDrawer = false,
+} = {}) {
+  const primary = primaryPointer(type, button);
+  const onToggle = rectContains(toggleRect, x, y);
+  const onPanel = Boolean(open) && rectContains(panelRect, x, y);
+  const passThrough = onToggle || (onPanel && !targetInDrawer);
+  if (type === 'pointercancel') {
+    const swallow = Boolean(armed);
+    return { swallow, toggle: false, arm: false, prevent: swallow };
+  }
+  if (type === 'pointerdown') {
+    return {
+      swallow: passThrough,
+      toggle: false,
+      arm: Boolean(primary && onToggle),
+      prevent: passThrough,
+    };
+  }
+  if (type === 'pointerup') {
+    const toggle = Boolean(primary && armed && onToggle);
+    const swallow = toggle || passThrough || Boolean(armed);
+    return { swallow, toggle, arm: false, prevent: swallow };
+  }
+  return { swallow: false, toggle: false, arm: Boolean(armed), prevent: false };
+}
+
+/** Backup hit test for the world canvas, using the tab and the open list. */
+export function materialsDrawerBlocksPoint(x, y, doc = globalThis.document) {
+  const drawer = doc?.querySelector?.('#materials-drawer');
+  const toggle = doc?.querySelector?.('#materials-toggle');
+  if (!drawer || !toggle) return false;
+  const open = drawer.classList.contains('is-open');
+  const panel = doc.querySelector('#materials-panel');
+  return rectContains(toggle.getBoundingClientRect(), x, y)
+    || (open && rectContains(panel?.getBoundingClientRect(), x, y));
 }

@@ -31,6 +31,7 @@ import {
   shelfSlotPoses,
   SHELF_SLOT_COUNT,
 } from './catalog.js';
+import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
 import { grantChoppedLogs, grantMinedMaterial, grantPickedFlax, hasStock, pushLog } from './economy.js';
 import {
   FURNITURE_FORWARD,
@@ -1762,6 +1763,7 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   renderer.domElement.addEventListener('pointerdown', (event) => {
+    if (materialsDrawerBlocksPoint(event.clientX, event.clientY)) return;
     if (event.pointerType === 'touch') {
       canvasTouches.add(event.pointerId);
       touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -2127,6 +2129,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   renderer.domElement.addEventListener('pointerup', (event) => {
     try {
+    if (materialsDrawerBlocksPoint(event.clientX, event.clientY)) return;
     if (touchHold?.fired) return;
     if (event.button !== 0) return;
     if (performance.now() < ignorePicksUntil) return;
@@ -2504,6 +2507,10 @@ export function createWorld(canvas, state, opts = {}) {
     const slot = displays[index];
     const want = { ...emptySlots(), ...slots };
     const hasSet = ARMOUR_SLOTS.some((name) => want[name]);
+    if (!hasSet && fallbackId && RECIPES[fallbackId]?.noMannequin) {
+      clearSlotMeshes(slot);
+      return;
+    }
     if (!hasSet && fallbackId && RECIPES[fallbackId]?.category !== 'armour') {
       if (slot.wareMesh?.userData.recipeId === fallbackId) return;
       clearSlotMeshes(slot);

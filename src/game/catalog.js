@@ -314,6 +314,15 @@ export const MATERIALS = {
   herbs: { id: 'herbs', name: 'Herbs', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   water: { id: 'water', name: 'Water', restock: 2, start: 12, tier: 1, regenEvery: regenEvery(1) },
   essence: { id: 'essence', name: 'Essence', restock: 0, start: 10, tier: 1, regenEvery: 0 },
+  dwarven_plans: {
+    id: 'dwarven_plans',
+    name: 'Dwarven Plans',
+    restock: 0,
+    start: 0,
+    tier: 8,
+    regenEvery: 0,
+    quest: true,
+  },
 };
 
 METALS.forEach((metal, index) => {
@@ -476,6 +485,34 @@ for (const piece of RANGE_WEAPONS) {
     buyers: ['ranger'],
     extraMats: piece.extra ?? {},
   });
+  if (piece.id === 'crossbow') {
+    // Sits directly after the crossbow line. Plans have no source yet; quests grant them later.
+    addRecipe({
+      id: 'dwarven_multicannon',
+      name: 'Dwarven Multicannon',
+      category: 'weapon',
+      combatClass: 'range',
+      slot: null,
+      shape: 'multicannon',
+      setKey: 'dwarven-multicannon',
+      lineId: 'range-dwarven-multicannon',
+      lineName: 'Dwarven Multicannon',
+      lineIndex: 0,
+      previousId: null,
+      unlockNeed: 0,
+      tier: 8,
+      cost: {
+        materials: { steel_bar: 50000, dwarven_plans: 1 },
+        items: { cannonballs: 5000 },
+        gold: 0,
+      },
+      time: 12,
+      price: 750000,
+      buyers: ['ranger'],
+      tint: 0x8a9098,
+      noMannequin: true,
+    });
+  }
 }
 
 // Ammo uses Rune naming to match Rune Bar / Rune gear. One craft is 20 units.
@@ -1476,7 +1513,7 @@ export function isHandOrFootWare(recipeOrId) {
 export function canDisplayOn(kind, recipe) {
   if (!recipe || recipe.outputMaterial) return false;
   if (kind === 'stand') {
-    if (isHandOrFootWare(recipe)) return false;
+    if (recipe.noMannequin || isHandOrFootWare(recipe)) return false;
     return recipe.category === 'armour' || recipe.category === 'weapon';
   }
   const gear = recipe.category === 'weapon' || recipe.category === 'armour' || isToolRecipe(recipe);

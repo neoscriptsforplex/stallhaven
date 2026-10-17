@@ -58,17 +58,23 @@ function bandWidth(pts, from, to) {
   return Math.max(...xs) - Math.min(...xs);
 }
 
+function assertUpright(view, label) {
+  const size = new THREE.Box3().setFromPoints(worldPoints(view)).getSize(new THREE.Vector3());
+  assert.ok(
+    size.y > size.x && size.y > size.z,
+    `${label} should stand up, y=${size.y} x=${size.x} z=${size.z}`,
+  );
+}
+
 describe('dragonfire shield', () => {
-  it('rotates only the dragonfire shield a half-turn so the kite point is down', async () => {
+  it('stands upright like the other kiteshields', async () => {
     const dragon = await loadShield('dragon_kiteshield');
     const bronze = await loadShield('bronze_kiteshield');
     const host = buildWare('dragon_kiteshield');
     const box = new THREE.Box3().setFromObject(host);
-    assert.deepEqual(bundledWareEuler('dragon_kiteshield', dragon, box), {
-      rotateX: 0,
-      rotateY: 0,
-      rotateZ: Math.PI,
-    });
+    const dragonEuler = bundledWareEuler('dragon_kiteshield', dragon, box);
+    assert.deepEqual(dragonEuler, dumpStandEuler(dragon, box));
+    assert.notEqual(dragonEuler.rotateZ, Math.PI);
     assert.deepEqual(
       bundledWareEuler('bronze_kiteshield', bronze, box),
       dumpStandEuler(bronze, box),
@@ -78,20 +84,17 @@ describe('dragonfire shield', () => {
     setBundledLook('dragon_kiteshield', dragon);
     setBundledLook('bronze_kiteshield', bronze);
     try {
-      for (const view of [
-        buildWare('dragon_kiteshield'),
-        wrapCraftPreviewSpin(buildWare('dragon_kiteshield'), 'dragon_kiteshield'),
-        mountDisplayBasePose(buildWare('dragon_kiteshield'), 'dragon_kiteshield'),
-        mountDisplayBasePose(buildWare('dragon_kiteshield'), 'dragon_kiteshield', { mannequin: true }),
-      ]) {
-        const pts = worldPoints(view);
-        const tip = bandWidth(pts, 0, 0.12);
-        const top = bandWidth(pts, 0.82, 1.01);
-        assert.ok(tip < top * 0.25, `point width ${tip} vs top ${top}`);
-      }
+      const views = [
+        ['craft', buildWare('dragon_kiteshield')],
+        ['preview', wrapCraftPreviewSpin(buildWare('dragon_kiteshield'), 'dragon_kiteshield')],
+        ['table', mountDisplayBasePose(buildWare('dragon_kiteshield'), 'dragon_kiteshield')],
+        ['mannequin', mountDisplayBasePose(buildWare('dragon_kiteshield'), 'dragon_kiteshield', { mannequin: true })],
+      ];
+      for (const [label, view] of views) assertUpright(view, label);
       const bronzePts = worldPoints(buildWare('bronze_kiteshield'));
       const bronzeSize = new THREE.Box3().setFromPoints(bronzePts).getSize(new THREE.Vector3());
       assert.ok(bronzeSize.y > bronzeSize.x, 'bronze kiteshield stays upright');
+      assert.ok(bronzeSize.y > bronzeSize.z, 'bronze kiteshield stays upright');
       assert.ok(bandWidth(bronzePts, 0, 0.18) < bandWidth(bronzePts, 0.45, 0.85));
     } finally {
       setBundledLook('dragon_kiteshield', null);

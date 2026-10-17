@@ -66,7 +66,7 @@ import {
 import { BUYER_PACKS, BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, RECIPES, craftOreFolder, craftOreLookId } from './catalog.js';
 import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundledPlayerBuffers, parseModelBuffer, prepareDungeonRockMaterials } from './upload.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
-import { characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
+import { ALTAR_OSRS_SCALE, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
 import { buildAltar, buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRat, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_FLOOR_TILE_M, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonFloorTextureUrls, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, generalStoreSignTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
@@ -1860,13 +1860,16 @@ describe('bundled prop swaps', () => {
         const altar = buildAltar(mark);
         const box = measureVisibleBox(altar);
         const size = box.getSize(new THREE.Vector3());
-        assert.ok(size.y > 1.5 && size.y < 2.0, `${mark} height ${size.y}`);
-        assert.ok(Math.max(size.x, size.z) > 3.8 && Math.max(size.x, size.z) < 4.5, `${mark} span ${size.x}x${size.z}`);
+        assert.ok(size.y > 0.75 && size.y < 1.0, `${mark} height ${size.y}`);
+        assert.ok(Math.max(size.x, size.z) > 1.9 && Math.max(size.x, size.z) < 2.25, `${mark} span ${size.x}x${size.z}`);
+        assert.ok(Math.abs(box.getCenter(new THREE.Vector3()).x) < 0.02, `${mark} should stay centred`);
+        assert.ok(Math.abs(box.getCenter(new THREE.Vector3()).z) < 0.02, `${mark} should stay centred`);
         assert.ok(box.min.y > -0.05 && box.min.y < 0.08, `${mark} minY ${box.min.y}`);
         const visual = altar.getObjectByName('altar-visual');
         assert.ok(Math.abs(visual.scale.x - visual.scale.y) < 1e-6);
         assert.ok(Math.abs(visual.scale.y - visual.scale.z) < 1e-6);
-        assert.ok(Math.abs(visual.scale.y - OSRS_MODEL_SCALE) < 1e-6, `${mark} scale ${visual.scale.y}`);
+        assert.ok(Math.abs(visual.scale.y - ALTAR_OSRS_SCALE) < 1e-6, `${mark} scale ${visual.scale.y}`);
+        assert.ok(Math.abs(ALTAR_OSRS_SCALE - OSRS_MODEL_SCALE / 2) < 1e-9);
       }
     } finally {
       setBundledLook('portal', null);

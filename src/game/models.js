@@ -1617,15 +1617,7 @@ export function buildArmourStand() {
   group.add(base);
   const hips = standBlock(MANNEQUIN_BLOCKS.hips, oak);
   group.add(hips);
-  const torso = standBlock(MANNEQUIN_BLOCKS.torso, oak);
-  group.add(torso);
   group.add(standBlock(MANNEQUIN_BLOCKS.shoulders, oak));
-  const armL = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.38, 8), post));
-  armL.position.set(-0.24, 0.92, 0);
-  group.add(armL);
-  const armR = armL.clone();
-  armR.position.x = 0.24;
-  group.add(armR);
   const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), post));
   neck.position.y = 1.28;
   group.add(neck);
@@ -1662,10 +1654,11 @@ export function slotPose(slot) {
 /**
  * The wooden boxes on the stand. BoxGeometry is centered on its position,
  * so a block's bottom face is `at` plus the geometry's min Y.
+ * There is no torso block or arm poles: between the hips and the shoulders
+ * only the central pole stands, so worn tops have nothing to poke through.
  */
 const MANNEQUIN_BLOCKS = {
   hips: { x: 0.34, y: 0.06, z: 0.14, at: 0.5 },
-  torso: { x: 0.2, y: 0.42, z: 0.12, at: 0.92 },
   shoulders: { x: 0.5, y: 0.06, z: 0.12, at: 1.16 },
 };
 
@@ -1749,12 +1742,11 @@ function faceMannequinFront(mesh) {
 function sectionNeed(section) {
   const { margin } = MANNEQUIN_WEAR_LIMITS;
   const hips = MANNEQUIN_BLOCKS.hips;
-  const torso = MANNEQUIN_BLOCKS.torso;
   const shoulders = MANNEQUIN_BLOCKS.shoulders;
   if (section === 'body') {
     const y0 = hips.at + hips.y / 2;
     const y1 = shoulders.at + shoulders.y / 2;
-    const depth = Math.max(torso.z, shoulders.z);
+    const depth = shoulders.z;
     return {
       size: new THREE.Vector3(shoulders.x + margin, y1 - y0, depth + margin),
       center: new THREE.Vector3(0, (y0 + y1) / 2, 0),

@@ -34,14 +34,21 @@ describe('player look UI', () => {
     assert.match(html, /html\.is-booting\.is-scene-live #view/);
     const boot = slice(html, 'id="boot-cover"', 'id="save-bar"');
     assert.match(boot, />Loading</);
-    assert.match(html, /url\("\.\/public\/runecraft_loading_bg\.jpg"\) center center \/ cover no-repeat/);
+    assert.match(html, /image-set\(/);
+    assert.match(html, /url\("\.\/public\/runecraft_loading_bg\.webp"\) type\("image\/webp"\)/);
+    assert.match(html, /url\("\.\/public\/runecraft_loading_bg\.jpg"\) type\("image\/jpeg"\)/);
+    assert.match(html, /background-repeat:\s*no-repeat/);
+    assert.match(html, /background-position:\s*center center/);
+    assert.match(html, /background-size:\s*cover/);
     assert.equal(html.includes('#050403'), false);
     assert.match(css, /#boot-cover\.is-leaving/);
     assert.match(css, /#boot-cover\.is-ready/);
     assert.match(css, /html\.is-booting\.is-scene-live #view/);
     assert.match(css, /#boot-cover\s*\{[^}]*100dvh/);
     assert.match(css, /@keyframes boot-slide/);
-    assert.match(css, /url\("\.\.\/public\/runecraft_loading_bg\.jpg"\)/);
+    assert.match(css, /image-set\(/);
+    assert.match(css, /url\("\.\.\/public\/runecraft_loading_bg\.webp"\) type\("image\/webp"\)/);
+    assert.match(css, /url\("\.\.\/public\/runecraft_loading_bg\.jpg"\) type\("image\/jpeg"\)/);
     assert.match(css, /background-position:\s*center center/);
     assert.match(css, /background-size:\s*cover/);
     assert.match(css, /orientation: landscape\) and \(pointer: coarse\)/);
@@ -49,6 +56,7 @@ describe('player look UI', () => {
     assert.equal(readFileSync(join(root, '../../public/runecraft_loading_bg.jpg')).equals(
       readFileSync(join(root, '../../docs/runecraft_banner.jpg')),
     ), true);
+    assert.ok(readFileSync(join(root, '../../public/runecraft_loading_bg.webp')).byteLength > 0);
     assert.match(main, /classList\.remove\('is-booting'/);
     assert.match(main, /bootLabel\.textContent = 'Loading'/);
     assert.match(main, /Click to play/);

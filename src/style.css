@@ -1148,6 +1148,10 @@ html.is-booting.is-scene-live #view {
     max(16px, env(safe-area-inset-left, 0px));
   background-color: transparent;
   background-image: url("../public/runecraft_loading_bg.jpg");
+  background-image: image-set(
+    url("../public/runecraft_loading_bg.webp") type("image/webp"),
+    url("../public/runecraft_loading_bg.jpg") type("image/jpeg")
+  );
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;

@@ -28,12 +28,14 @@ import {
   craftBlockReason,
   createState,
   grantDwarvenPlans,
+  maxCraftActions,
   offerChoices,
   placeFromChest,
   reducedSalePrice,
   serializeState,
 } from './economy.js';
 import { OSRS_MODEL_SCALE, buildWare, setBundledLook } from './models.js';
+import { xpForLevel } from './skills.js';
 import { parseModelBuffer } from './upload.js';
 
 const modelsRoot = join(dirname(fileURLToPath(import.meta.url)), '../../public/models');
@@ -55,9 +57,10 @@ describe('dwarven multicannon', () => {
     assert.equal(ammo.some((item) => item.id === 'dwarven_multicannon'), false);
   });
 
-  it('costs steel bars, cannonballs, and one Dwarven Plans, and offers at the usual reduction', () => {
+  it('costs 5000 steel bars, cannonballs, and one Dwarven Plans, and needs Smithing 99', () => {
     const cost = recipeCost(RECIPES.dwarven_multicannon);
-    assert.equal(cost.materials.steel_bar, 50000);
+    assert.deepEqual(RECIPES.dwarven_multicannon.requires, { skill: 'smithing', level: 99 });
+    assert.equal(cost.materials.steel_bar, 5000);
     assert.equal(cost.materials.dwarven_plans, 1);
     assert.equal(cost.items.cannonballs, 5000);
     assert.equal(RECIPES.dwarven_multicannon.price, 750000);
@@ -67,15 +70,25 @@ describe('dwarven multicannon', () => {
     assert.equal(CUSTOMERS.ranger.prefers.includes('dwarven_multicannon'), true);
     assert.equal(CUSTOMERS.mercenary.prefers.includes('dwarven_multicannon'), false);
     const label = costLabel(RECIPES.dwarven_multicannon);
-    assert.match(label, /Steel Bar ×50000/);
+    assert.match(label, /Steel Bar ×5000/);
     assert.match(label, /Dwarven Plans ×1/);
     assert.match(label, /Cannonballs ×5000/);
     assert.match(label, /sells 750,000g/);
 
     const state = createState();
     state.furniture.fletch = { x: 0, z: 0, rot: 0 };
+    state.materials.steel_bar = 5000;
+    state.materials.dwarven_plans = 1;
+    addToChest(state, 'cannonballs', 5000);
+    assert.equal(craftBlockReason(state, 'dwarven_multicannon'), 'Requires level 99 Smithing');
+    assert.equal(maxCraftActions(state, 'dwarven_multicannon'), 0);
+    state.skills.addXp('smithing', xpForLevel(99));
+    assert.equal(state.skills.getLevel('smithing'), 99);
+    state.materials.steel_bar = 0;
+    state.materials.dwarven_plans = 0;
+    state.chest.cannonballs = 0;
     assert.match(craftBlockReason(state, 'dwarven_multicannon'), /Steel Bar/);
-    state.materials.steel_bar = 50000;
+    state.materials.steel_bar = 5000;
     assert.match(craftBlockReason(state, 'dwarven_multicannon'), /Dwarven Plans/);
     state.materials.dwarven_plans = 1;
     assert.match(craftBlockReason(state, 'dwarven_multicannon'), /Cannonballs/);

@@ -1871,9 +1871,15 @@ export function buildWare(recipeId) {
     group.userData.recipeId = recipeId;
     return group;
   }
-  if (!recipe && (recipeId === 'flax' || recipeId === 'orb')) {
+  const materialTokenTint = {
+    flax: 0x3a8a45,
+    orb: 0xc8d8ee,
+    egg: 0xf2e2b0,
+    water: 0x3a7ec8,
+  };
+  if (!recipe && materialTokenTint[recipeId] != null) {
     const host = new THREE.Group();
-    addMaterialToken(host, recipeId === 'flax' ? 0x3a8a45 : 0xc8d8ee);
+    addMaterialToken(host, materialTokenTint[recipeId]);
     attachBundledWare(group, host, getBundledLook(recipeId));
     group.userData.recipeId = recipeId;
     return group;

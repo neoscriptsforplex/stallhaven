@@ -125,6 +125,17 @@ describe('materials drawer', () => {
     assert.match(materialsDrawerHtml({ dwarven_plans: 1 }), /Dwarven Plans/);
     assert.equal(materialsDrawerHtml({ dwarven_plans: 0 }).includes('Dwarven Plans'), false);
   });
+
+  it('hides Ancient Plans and Wheat until the player owns some', () => {
+    assert.equal(ownedMaterials({ ancient_plans: 0, wheat: 0 }).some((row) => row.id === 'ancient_plans' || row.id === 'wheat'), false);
+    const rows = ownedMaterials({ ancient_plans: 1, wheat: 3 });
+    assert.equal(rows.find((row) => row.id === 'ancient_plans').name, 'Ancient Plans');
+    assert.equal(rows.find((row) => row.id === 'wheat').name, 'Wheat');
+    assert.equal(rows.find((row) => row.id === 'wheat').count, 3);
+    assert.match(materialsDrawerHtml({ ancient_plans: 1 }), /Ancient Plans/);
+    assert.equal(materialsDrawerHtml({ ancient_plans: 0, wheat: 0 }).includes('Ancient Plans'), false);
+    assert.equal(materialsDrawerHtml({ wheat: 0 }).includes('Wheat'), false);
+  });
 });
 
 describe('materials drawer pointer', () => {

@@ -21,6 +21,10 @@ import {
   FLAX_ARRIVE,
   FLAX_DURATION,
   FLAX_YIELD,
+  FOUNTAIN_WATER_YIELD,
+  WHEAT_ARRIVE,
+  WHEAT_DURATION,
+  WHEAT_YIELD,
   mineYield,
   mineTiming,
   emptySlots,
@@ -32,7 +36,7 @@ import {
   SHELF_SLOT_COUNT,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
-import { grantChoppedLogs, grantMinedMaterial, grantPickedFlax, hasStock, pushLog } from './economy.js';
+import { grantChoppedLogs, grantFountainWater, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, pushLog } from './economy.js';
 import {
   FURNITURE_FORWARD,
   FURNITURE_SNAP,
@@ -45,6 +49,8 @@ import {
   furnitureVisualYaw,
   FLAX_CLICK_RADIUS,
   FLAX_COUNT,
+  FOUNTAIN,
+  keepFountain,
   gardenBox,
   buyerCobbleRoute,
   gardenTrapdoorSpot,
@@ -61,7 +67,11 @@ import {
   TREE_CLICK_RADIUS,
   pickFlaxNode,
   rollFlaxSpots,
+  rollWheatSpots,
   sproutDueFlax,
+  WHEAT_CLICK_RADIUS,
+  WHEAT_COUNT,
+  WHEAT_SPACING,
   characterGroundY,
   interiorFloors,
   OUTDOOR_GROUND_Y,
@@ -143,7 +153,7 @@ import {
   defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildShop, buildSpinningWheel, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -361,6 +371,11 @@ export function createWorld(canvas, state, opts = {}) {
   let flaxSerial = 1;
   const flaxMeshes = new Map();
   let flaxReady = false;
+  let wheatGroup = null;
+  let wheatNodes = [];
+  let wheatSerial = 1;
+  const wheatMeshes = new Map();
+  let wheatReady = false;
 
   function disposeGroup(group) {
     if (!group) return;
@@ -392,6 +407,7 @@ export function createWorld(canvas, state, opts = {}) {
     rebuildNav();
     rebuildSnapGrid();
     if (flaxReady) refillFlaxField();
+    if (wheatReady) refillWheatField();
   }
 
   let collideObstacles = [];
@@ -495,6 +511,11 @@ export function createWorld(canvas, state, opts = {}) {
   scene.add(flaxGroup);
   flaxReady = true;
   refillFlaxField();
+  wheatGroup = new THREE.Group();
+  wheatGroup.name = 'wheat-field';
+  scene.add(wheatGroup);
+  wheatReady = true;
+  refillWheatField();
   let lastPlaceClickAt = 0;
   const DUNGEON_FLOOR = { minX: -5.2, maxX: 5.2, minZ: -4.2, maxZ: 4.2 };
   const DUNGEON_BLOCKS = dungeonMoveObstacles(DUNGEON_BOULDERS);
@@ -979,11 +1000,18 @@ export function createWorld(canvas, state, opts = {}) {
     }
   }
 
+  function livingCropSpots(nodes, spacing) {
+    return nodes.filter((node) => node.alive).map((node) => ({ x: node.x, z: node.z, spacing }));
+  }
+
   function refillFlaxField() {
     if (mining?.mode === 'pick') stopMining();
     for (const mesh of flaxMeshes.values()) releaseFlaxMesh(mesh);
     flaxMeshes.clear();
-    const spots = rollFlaxSpots(state.expansions ?? [], { furniture: state.furniture });
+    const spots = rollFlaxSpots(state.expansions ?? [], {
+      furniture: state.furniture,
+      occupied: livingCropSpots(wheatNodes, WHEAT_SPACING),
+    });
     flaxNodes = spots.map((spot) => ({
       id: flaxSerial++,
       x: spot.x,
@@ -1003,10 +1031,134 @@ export function createWorld(canvas, state, opts = {}) {
       rollFlaxSpots(state.expansions ?? [], {
         count: 1,
         furniture: state.furniture,
-        occupied,
+        occupied: [...occupied, ...livingCropSpots(wheatNodes, WHEAT_SPACING)],
       })[0] ?? null
     ));
     if (changed) syncFlaxMeshes();
+  }
+
+  function releaseWheatMesh(mesh) {
+    wheatGroup?.remove(mesh);
+    const procedural = Boolean(mesh?.userData?.wheatProcedural);
+    mesh?.traverse((child) => {
+      if (!child.isMesh) return;
+      if (procedural || child.userData?.kind === 'wheat') child.geometry?.dispose();
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of mats) mat?.dispose?.();
+    });
+  }
+
+  function attachWheatPick(mesh, node) {
+    const pick = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, 0.9, 0.9),
+      new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    pick.position.y = 0.4;
+    pick.userData.kind = 'wheat';
+    pick.userData.materialId = 'wheat';
+    pick.userData.name = 'Wheat';
+    pick.userData.plantId = node.id;
+    pick.userData.x = node.x;
+    pick.userData.z = node.z;
+    mesh.add(pick);
+  }
+
+  function syncWheatMeshes() {
+    if (!wheatGroup) return;
+    const alive = new Set();
+    for (const node of wheatNodes) {
+      if (!node.alive) continue;
+      alive.add(node.id);
+      let mesh = wheatMeshes.get(node.id);
+      if (!mesh) {
+        mesh = buildWheatPlant();
+        mesh.rotation.y = node.yaw ?? 0;
+        attachWheatPick(mesh, node);
+        wheatGroup.add(mesh);
+        wheatMeshes.set(node.id, mesh);
+      }
+      mesh.position.set(node.x, 0, node.z);
+      const pick = mesh.children.find((child) => child.userData?.kind === 'wheat');
+      if (pick) {
+        pick.userData.x = node.x;
+        pick.userData.z = node.z;
+        pick.userData.plantId = node.id;
+      }
+    }
+    for (const [id, mesh] of wheatMeshes) {
+      if (alive.has(id)) continue;
+      releaseWheatMesh(mesh);
+      wheatMeshes.delete(id);
+    }
+  }
+
+  function refillWheatField() {
+    if (mining?.mode === 'pick' && mining.crop === 'wheat') stopMining();
+    for (const mesh of wheatMeshes.values()) releaseWheatMesh(mesh);
+    wheatMeshes.clear();
+    const spots = rollWheatSpots(state.expansions ?? [], {
+      furniture: state.furniture,
+      occupied: livingCropSpots(flaxNodes, WHEAT_SPACING),
+    });
+    wheatNodes = spots.map((spot) => ({
+      id: wheatSerial++,
+      x: spot.x,
+      z: spot.z,
+      alive: true,
+      respawnAt: 0,
+      yaw: Math.random() * Math.PI * 2,
+    }));
+    if (spots.length < WHEAT_COUNT) {
+      console.warn(`Wheat field placed ${spots.length} of ${WHEAT_COUNT} clumps.`);
+    }
+    syncWheatMeshes();
+  }
+
+  function tickWheat(now) {
+    const changed = sproutDueFlax(wheatNodes, now, (occupied) => (
+      rollWheatSpots(state.expansions ?? [], {
+        count: 1,
+        furniture: state.furniture,
+        occupied: [...occupied, ...livingCropSpots(flaxNodes, WHEAT_SPACING)],
+      })[0] ?? null
+    ));
+    if (changed) syncWheatMeshes();
+  }
+
+  function pickCrop(crop) {
+    if (crop === 'wheat') {
+      return {
+        crop: 'wheat',
+        nodes: wheatNodes,
+        meshes: wheatMeshes,
+        group: wheatGroup,
+        kind: 'wheat',
+        name: 'Wheat',
+        materialId: 'wheat',
+        yield: WHEAT_YIELD,
+        duration: WHEAT_DURATION,
+        grant: grantPickedWheat,
+        sync: syncWheatMeshes,
+      };
+    }
+    return {
+      crop: 'flax',
+      nodes: flaxNodes,
+      meshes: flaxMeshes,
+      group: flaxGroup,
+      kind: 'flax',
+      name: 'Flax',
+      materialId: 'flax',
+      yield: FLAX_YIELD,
+      duration: FLAX_DURATION,
+      grant: grantPickedFlax,
+      sync: syncFlaxMeshes,
+    };
   }
 
   function makeGoblinMesh() {
@@ -1089,12 +1241,16 @@ export function createWorld(canvas, state, opts = {}) {
     const found = [];
     architecture?.traverse((child) => {
       if (child.userData?.kind === 'trapdoor') found.push(child);
+      if (child.userData?.kind === 'fountain') found.push(child);
       if (child.userData?.kind === 'tree' && !child.userData.depleted && !isTreeStump(child.userData.x, child.userData.z)) {
         found.push(child);
       }
     });
     flaxGroup?.traverse((child) => {
       if (child.userData?.kind === 'flax') found.push(child);
+    });
+    wheatGroup?.traverse((child) => {
+      if (child.userData?.kind === 'wheat') found.push(child);
     });
     return found;
   }
@@ -1194,24 +1350,26 @@ export function createWorld(canvas, state, opts = {}) {
       mining.heldFlax = null;
     }
     if (!restoreGround || mining?.plantId == null) return;
-    const node = flaxNodes.find((item) => item.id === mining.plantId && item.alive);
-    const mesh = flaxMeshes.get(mining.plantId);
+    const field = pickCrop(mining.crop);
+    const node = field.nodes.find((item) => item.id === mining.plantId && item.alive);
+    const mesh = field.meshes.get(mining.plantId);
     if (node && mesh) mesh.visible = true;
   }
 
   function holdFlaxVisual() {
     if (!mining || mining.mode !== 'pick' || mining.heldFlax) return;
-    const node = flaxNodes.find((item) => item.id === mining.plantId && item.alive);
-    const mesh = flaxMeshes.get(mining.plantId);
+    const field = pickCrop(mining.crop);
+    const node = field.nodes.find((item) => item.id === mining.plantId && item.alive);
+    const mesh = field.meshes.get(mining.plantId);
     const hand = shopkeeper.getObjectByName('Hand_R') || shopkeeper.userData.hand;
     if (!node || !mesh || !hand) return;
     mesh.visible = false;
     const visual = mesh.clone(true);
     visual.visible = true;
     visual.traverse((child) => {
-      if (child.userData?.kind === 'flax') child.visible = false;
+      if (child.userData?.kind === field.kind) child.visible = false;
     });
-    flaxGroup.add(visual);
+    field.group.add(visual);
     visual.position.copy(mesh.position);
     visual.quaternion.copy(mesh.quaternion);
     visual.scale.copy(mesh.scale);
@@ -1260,7 +1418,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function barYield(session) {
     if (session?.mode === 'chop') return CHOP_YIELD;
-    if (session?.mode === 'pick') return FLAX_YIELD;
+    if (session?.mode === 'pick') return session.yield ?? FLAX_YIELD;
     if (session?.yield != null) return session.yield;
     return mineYield(session?.materialId);
   }
@@ -1341,17 +1499,27 @@ export function createWorld(canvas, state, opts = {}) {
     rebuildNav();
   }
 
+  function fillFromFountain() {
+    stopMining();
+    const got = grantFountainWater(state, FOUNTAIN_WATER_YIELD);
+    if (got > 0) pushLog(state, `Filled ${got} Buckets of water.`);
+    else pushLog(state, 'Buckets of water are full.');
+    pickHandler?.({ type: 'drew-water', amount: got });
+  }
+
   function startPicking(pose) {
-    const node = flaxNodes.find((item) => item.id === pose?.plantId && item.alive);
+    const field = pickCrop(pose?.materialId === 'wheat' ? 'wheat' : 'flax');
+    const node = field.nodes.find((item) => item.id === pose?.plantId && item.alive);
     if (!node) return;
     mining = {
-      materialId: 'flax',
-      name: 'Flax',
+      materialId: field.materialId,
+      name: field.name,
       mode: 'pick',
+      crop: field.crop,
       plantId: node.id,
       startedAt: performance.now() / 1000,
-      duration: FLAX_DURATION,
-      yield: FLAX_YIELD,
+      duration: field.duration,
+      yield: field.yield,
       x: node.x,
       z: node.z,
       faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : null,
@@ -1366,18 +1534,19 @@ export function createWorld(canvas, state, opts = {}) {
     if (now - mining.startedAt < mining.duration) return;
     if (mining.mode === 'pick') {
       releaseHeldFlax(false);
-      const got = grantPickedFlax(state, FLAX_YIELD);
+      const field = pickCrop(mining.crop);
+      const got = field.grant(state, field.yield);
       if (got > 0) {
-        pushLog(state, `Picked ${got} Flax.`);
+        pushLog(state, `Picked ${got} ${field.name}.`);
         pickHandler?.({
           type: 'picked',
-          materialId: 'flax',
+          materialId: field.materialId,
           amount: got,
         });
-        pickFlaxNode(flaxNodes, mining.plantId, now);
-        syncFlaxMeshes();
+        pickFlaxNode(field.nodes, mining.plantId, now);
+        field.sync();
       } else {
-        pushLog(state, 'Flax is full.');
+        pushLog(state, `${field.name} is full.`);
       }
       stopMining();
       return;
@@ -1531,7 +1700,15 @@ export function createWorld(canvas, state, opts = {}) {
     if (type === 'tree' && !treeCanChop(pose.x, pose.z)) return;
     if (type !== 'counter') servingAtCounter = false;
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
-    const arrive = type === 'flax' ? FLAX_ARRIVE : type === 'trapdoor' || type === 'ladder' ? 1.35 : STATION_ARRIVE;
+    const arrive = type === 'wheat'
+      ? WHEAT_ARRIVE
+      : type === 'flax'
+        ? FLAX_ARRIVE
+        : type === 'fountain'
+          ? 0.45
+          : type === 'trapdoor' || type === 'ladder'
+            ? 1.35
+            : STATION_ARRIVE;
     const standFloors = sceneMode === 'dungeon'
       ? [DUNGEON_FLOOR]
       : sceneMode === 'runefield'
@@ -1544,14 +1721,18 @@ export function createWorld(canvas, state, opts = {}) {
         : playerObstacles(state);
     const canStand = (x, z) => isWalkable(x, z, standBlocks, PLAYER_RADIUS, standFloors);
     const plan = resolveStationUse(from, pose, state, planSceneWalk, type, canStand);
-    const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax';
-    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch' || type === 'ladder' || gatherKind;
+    const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax' || type === 'wheat';
+    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch' || type === 'ladder' || gatherKind || type === 'fountain';
     const faceYaw = plan.face != null
       ? plan.face
       : type === 'range' ? rangeFaceYaw(pose)
         : type === 'fletch' ? fletchFaceYaw(pose)
           : null;
-    const standArrive = gatherKind ? (type === 'flax' ? 0.22 : 0.32) : 0.55;
+    const standArrive = type === 'fountain'
+      ? 0.45
+      : gatherKind
+        ? (type === 'flax' || type === 'wheat' ? 0.22 : 0.32)
+        : 0.55;
     const atStation = standFront
       ? plan.action === 'open'
       : (plan.action === 'open' || isNearPose(pose, arrive));
@@ -1593,8 +1774,13 @@ export function createWorld(canvas, state, opts = {}) {
         playClick('ui');
         return;
       }
-      if (type === 'flax') {
+      if (type === 'flax' || type === 'wheat') {
         startPicking(aimed);
+        playClick('ui');
+        return;
+      }
+      if (type === 'fountain') {
+        fillFromFountain();
         playClick('ui');
         return;
       }
@@ -1637,7 +1823,8 @@ export function createWorld(canvas, state, opts = {}) {
     };
     if (type === 'boulder') startMining(materialId, pose);
     else if (type === 'tree') startChopping(pose);
-    else if (type === 'flax') startPicking(pose);
+    else if (type === 'flax' || type === 'wheat') startPicking(pose);
+    else if (type === 'fountain') fillFromFountain();
     else pickHandler?.({ type, element });
   }
 
@@ -2015,6 +2202,14 @@ export function createWorld(canvas, state, opts = {}) {
         queueUse('flax', { x: data.x, z: data.z, materialId: 'flax', plantId: data.plantId });
         return;
       }
+      if (data.kind === 'wheat') {
+        queueUse('wheat', { x: data.x, z: data.z, materialId: 'wheat', plantId: data.plantId });
+        return;
+      }
+      if (data.kind === 'fountain') {
+        queueUse('fountain', { x: data.x ?? FOUNTAIN.x, z: data.z ?? FOUNTAIN.z });
+        return;
+      }
       if (data.kind === 'chest' && held >= 500) {
         playClick('ui');
         pickHandler?.({ type: 'chest-upgrade' });
@@ -2074,11 +2269,22 @@ export function createWorld(canvas, state, opts = {}) {
           });
           return;
         }
+        if (keepFountain(state.expansions ?? []) && Math.hypot(point.x - FOUNTAIN.x, point.z - FOUNTAIN.z) <= 1.05) {
+          queueUse('fountain', { x: FOUNTAIN.x, z: FOUNTAIN.z });
+          return;
+        }
         const plant = flaxNodes.find((node) => (
           node.alive && Math.hypot(point.x - node.x, point.z - node.z) <= FLAX_CLICK_RADIUS
         ));
         if (plant) {
           queueUse('flax', { x: plant.x, z: plant.z, materialId: 'flax', plantId: plant.id });
+          return;
+        }
+        const wheat = wheatNodes.find((node) => (
+          node.alive && Math.hypot(point.x - node.x, point.z - node.z) <= WHEAT_CLICK_RADIUS
+        ));
+        if (wheat) {
+          queueUse('wheat', { x: wheat.x, z: wheat.z, materialId: 'wheat', plantId: wheat.id });
           return;
         }
       }
@@ -2275,6 +2481,20 @@ export function createWorld(canvas, state, opts = {}) {
         type: 'flax-inspect',
         materialId: 'flax',
         name: 'Flax',
+        plantId: data.plantId,
+        x: data.x,
+        z: data.z,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      return;
+    }
+    if (data.kind === 'wheat') {
+      playClick('ui');
+      pickHandler?.({
+        type: 'wheat-inspect',
+        materialId: 'wheat',
+        name: 'Wheat',
         plantId: data.plantId,
         x: data.x,
         z: data.z,
@@ -2935,6 +3155,7 @@ export function createWorld(canvas, state, opts = {}) {
       updateCustomers(dt, now);
       updateGoblins(dt, now);
       tickFlax(now);
+      tickWheat(now);
       tickFountainWater(architecture, now);
     } else if (dungeon?.rats) {
       dungeon.rats.forEach((rat) => {
@@ -3006,6 +3227,7 @@ export function createWorld(canvas, state, opts = {}) {
     dust.visible = on;
     clouds.visible = on;
     if (flaxGroup) flaxGroup.visible = on;
+    if (wheatGroup) wheatGroup.visible = on;
     if (on) applyAllPoses();
     else {
       for (const id of Object.keys(fixtureMeshes)) {
@@ -3244,6 +3466,10 @@ export function createWorld(canvas, state, opts = {}) {
       }
       if (pose.kind === 'flax') {
         queueUse('flax', { x: pose.x, z: pose.z, materialId: 'flax', plantId: pose.plantId });
+        return;
+      }
+      if (pose.kind === 'wheat') {
+        queueUse('wheat', { x: pose.x, z: pose.z, materialId: 'wheat', plantId: pose.plantId });
         return;
       }
       if (!pose.materialId) return;

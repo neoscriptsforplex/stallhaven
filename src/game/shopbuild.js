@@ -53,7 +53,7 @@ import { METALS } from './catalog.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
-import { applyOsrsScale, getBundledLook, measureVisibleBox, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
+import { applyOsrsScale, getBundledLook, measureVisibleBox, OSRS_MODEL_SCALE, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
 import { prepareDungeonRockMaterials } from './upload.js';
 
 export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
@@ -2100,6 +2100,74 @@ export function buildFlaxPlant() {
   }
 }
 
+function buildProceduralWheat() {
+  const group = new THREE.Group();
+  group.name = 'wheat-plant';
+  group.userData.wheatProcedural = true;
+  const stalkMat = new THREE.MeshStandardMaterial({ color: 0xd6b64a, roughness: 0.82 });
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xe6c85a, roughness: 0.7 });
+  const stalks = [
+    { x: 0, z: 0, h: 0.72, lean: 0.04 },
+    { x: 0.1, z: 0.04, h: 0.64, lean: -0.12 },
+    { x: -0.08, z: 0.06, h: 0.68, lean: 0.1 },
+    { x: 0.02, z: -0.1, h: 0.58, lean: -0.06 },
+    { x: -0.12, z: -0.04, h: 0.6, lean: 0.14 },
+  ];
+  for (const stalk of stalks) {
+    const mesh = addShadow(new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.018, stalk.h, 5),
+      stalkMat,
+    ));
+    mesh.position.set(stalk.x, stalk.h / 2, stalk.z);
+    mesh.rotation.z = stalk.lean;
+    group.add(mesh);
+    const head = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), headMat));
+    head.scale.set(0.7, 1.4, 0.7);
+    head.position.set(
+      stalk.x + Math.sin(stalk.lean) * stalk.h * 0.35,
+      stalk.h + 0.04,
+      stalk.z,
+    );
+    group.add(head);
+  }
+  return group;
+}
+
+function wheatScaleHost(bundled) {
+  const probe = bundled.clone(true);
+  probe.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(probe).getSize(new THREE.Vector3());
+  const host = new THREE.Group();
+  const sx = Math.max(size.x * OSRS_MODEL_SCALE, 0.0001);
+  const sy = Math.max(size.y * OSRS_MODEL_SCALE, 0.0001);
+  const sz = Math.max(size.z * OSRS_MODEL_SCALE, 0.0001);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz));
+  box.position.y = sy / 2;
+  host.add(box);
+  return host;
+}
+
+/** Uploaded wheat dump at the OSRS unit scale. Procedural golden stalks if the dump is missing. */
+export function buildWheatPlant() {
+  const target = buildProceduralWheat();
+  const bundled = getBundledLook('wheat-plant');
+  if (!bundled) return target;
+  try {
+    const fitted = wrapBundledProp(bundled, wheatScaleHost(bundled), {
+      name: 'wheat-plant',
+      fit: 'max',
+    });
+    if (!fitted) return target;
+    fitted.userData.wheatProcedural = false;
+    flaxDoubleSide(fitted);
+    sitVisibleOnY(fitted, 0);
+    return fitted;
+  } catch (err) {
+    console.warn('Wheat plant model skipped:', err?.message || err);
+    return target;
+  }
+}
+
 function buildProceduralTree(scale = 1) {
   const group = new THREE.Group();
   group.name = 'pine';
@@ -2302,6 +2370,20 @@ function buildProceduralFountain() {
 function addFountain(root, x, z) {
   const group = buildFountain();
   group.position.set(x, 0, z);
+  const pick = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.85, 0.95, 1.2, 12),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    }),
+  );
+  pick.position.y = 0.55;
+  pick.userData.kind = 'fountain';
+  pick.userData.name = 'Fountain';
+  pick.userData.x = x;
+  pick.userData.z = z;
+  group.add(pick);
   root.add(group);
   return group;
 }
@@ -2890,6 +2972,10 @@ export function treeInspect() {
 
 export function flaxInspect() {
   return { name: 'Flax', blurb: 'A knee-high flax plant. Left-click to walk over and pick it. You get 1 flax.' };
+}
+
+export function wheatInspect() {
+  return { name: 'Wheat', blurb: 'A clump of wheat. Left-click to walk over and pick it. You get 1 wheat.' };
 }
 
 export function boulderInspect(materialId) {

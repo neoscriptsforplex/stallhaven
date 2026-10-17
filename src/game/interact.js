@@ -1,9 +1,9 @@
 import { FLAX_ARRIVE } from './catalog.js';
 import { PLAYER_RADIUS, isWalkable, planPlayerWalk, playerObstacles } from './nav.js';
-import { furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, PORTAL_TARGET_HEIGHT, TREE_TRUNK_RADIUS } from './layout.js';
+import { FOUNTAIN, furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, PORTAL_TARGET_HEIGHT, TREE_TRUNK_RADIUS } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'portal'];
-export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder']);
+export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder', 'fountain']);
 
 function stationHit(kind, height, pickY) {
   const { hw, hd } = furnitureHalfSize(kind);
@@ -276,7 +276,7 @@ export function gatherStandCandidates(kind, pose, scale = GATHER_MODEL_SCALE) {
 }
 
 function gatherArrive(kind) {
-  return kind === 'flax' ? 0.22 : 0.32;
+  return kind === 'flax' || kind === 'wheat' ? 0.22 : 0.32;
 }
 
 function defaultCanStand(x, z, state, release = null) {
@@ -482,11 +482,35 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
     }
     return { action: 'blocked', dest: spots[0], face };
   }
-  if (kind === 'tree' || kind === 'boulder' || kind === 'flax') {
+  if (kind === 'fountain') {
+    const reach = (FOUNTAIN.radius ?? 0.7) + 0.65;
+    const offsets = [
+      [0, reach],
+      [0, -reach],
+      [reach, 0],
+      [-reach, 0],
+      [reach * 0.72, reach * 0.72],
+      [-reach * 0.72, reach * 0.72],
+      [reach * 0.72, -reach * 0.72],
+      [-reach * 0.72, -reach * 0.72],
+    ];
+    const spots = offsets
+      .map(([dx, dz]) => ({ x: pose.x + dx, z: pose.z + dz }))
+      .filter((dest) => !canStand || canStand(dest.x, dest.z));
+    for (const dest of spots) {
+      if (isNearPoint(from, dest, 0.45)) return { action: 'open', dest };
+    }
+    for (const dest of spots) {
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      if (path.length) return { action: 'walk', path, dest };
+    }
+    return { action: 'blocked', dest: spots[0] ?? { x: pose.x, z: pose.z + reach } };
+  }
+  if (kind === 'tree' || kind === 'boulder' || kind === 'flax' || kind === 'wheat') {
     const aligned = resolveGatherStand(from, pose, state, planFn, kind, canStand);
     if (aligned) return aligned;
   }
-  if (kind === 'flax') {
+  if (kind === 'flax' || kind === 'wheat') {
     if (isNearPoint(from, pose, FLAX_ARRIVE)) return { action: 'open' };
     const offsets = [
       [0, 0.55],

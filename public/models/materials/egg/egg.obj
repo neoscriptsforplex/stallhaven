@@ -1,0 +1,155 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib egg.mtl
+o Item Egg 2026-10-08_16-49-26
+v -3 25 1
+v -2 23 3
+v 0 23 0
+v -3 23 -2
+v -6 23 1
+v -4 23 3
+v -1 21 5
+v 2 21 -1
+v -3 21 -3
+v -7 21 1
+v -5 21 5
+v 3 15 8
+v 5 15 -2
+v -3 15 -6
+v -10 15 1
+v -7 15 8
+v 3 10 9
+v 6 10 -2
+v -3 10 -7
+v -11 10 1
+v -8 10 9
+v 2 5 8
+v 5 5 -2
+v -3 5 -6
+v -10 5 1
+v -7 5 8
+v 1 1 5
+v 3 1 0
+v -3 1 -3
+v -6 1 1
+v -4 1 5
+v -1 -1 2
+usemtl c0
+f 1 2 3
+usemtl c1
+f 1 3 4
+usemtl c2
+f 1 4 5
+usemtl c3
+f 1 5 6
+usemtl c4
+f 1 6 2
+usemtl c5
+f 2 6 7
+usemtl c6
+f 2 7 3
+usemtl c1
+f 3 7 8
+usemtl c7
+f 3 8 4
+usemtl c8
+f 4 8 9
+usemtl c9
+f 4 9 5
+usemtl c10
+f 5 9 10
+usemtl c11
+f 5 10 6
+usemtl c12
+f 6 10 11
+usemtl c13
+f 6 11 7
+usemtl c14
+f 7 11 12
+usemtl c15
+f 7 12 8
+usemtl c16
+f 8 12 13
+usemtl c17
+f 8 13 9
+usemtl c18
+f 9 13 14
+usemtl c19
+f 9 14 10
+usemtl c20
+f 10 14 15
+usemtl c21
+f 10 15 11
+usemtl c22
+f 11 15 16
+usemtl c23
+f 11 16 12
+usemtl c24
+f 12 16 17
+usemtl c25
+f 12 17 13
+usemtl c26
+f 13 17 18
+usemtl c27
+f 13 18 14
+usemtl c28
+f 14 18 19
+usemtl c29
+f 14 19 15
+usemtl c30
+f 15 19 20
+usemtl c31
+f 15 20 16
+usemtl c32
+f 16 20 21
+usemtl c33
+f 16 21 17
+usemtl c34
+f 17 21 22
+usemtl c35
+f 17 22 18
+usemtl c36
+f 18 22 23
+usemtl c37
+f 18 23 19
+usemtl c38
+f 19 23 24
+usemtl c39
+f 19 24 20
+usemtl c40
+f 20 24 25
+usemtl c11
+f 20 25 21
+usemtl c41
+f 21 25 26
+usemtl c42
+f 21 26 22
+usemtl c43
+f 22 26 27
+usemtl c44
+f 22 27 23
+usemtl c45
+f 23 27 28
+usemtl c46
+f 23 28 24
+usemtl c47
+f 24 28 29
+usemtl c9
+f 24 29 25
+usemtl c48
+f 25 29 30
+usemtl c49
+f 25 30 26
+usemtl c50
+f 26 30 31
+usemtl c51
+f 26 31 27
+usemtl c52
+f 27 31 32
+usemtl c53
+f 27 32 28
+usemtl c54
+f 28 32 29
+usemtl c55
+f 29 32 30
+usemtl c56
+f 30 32 31

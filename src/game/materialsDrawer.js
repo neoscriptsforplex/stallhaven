@@ -11,6 +11,7 @@ export const MATERIALS_DRAWER_SIDE_QUERY =
 const EXTRA_TINT = {
   logs: 0x8a5a32,
   flax: 0x6a9a3a,
+  wheat: 0xd6b64a,
   bow_string: 0xe6d2a8,
   cloth: 0xd7c4a0,
   soft_clay: 0xc4845a,
@@ -26,6 +27,7 @@ const EXTRA_TINT = {
   water: 0x3a7ec8,
   essence: 0xb7e3f5,
   dwarven_plans: 0xc4a05a,
+  ancient_plans: 0xc4a05a,
 };
 
 export function materialTint(mat) {

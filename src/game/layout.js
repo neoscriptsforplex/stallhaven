@@ -1070,7 +1070,7 @@ const FLAX_DISPLAY_CLEAR = 1.2;
 const FLAX_TRAP_CLEAR = 1.25;
 const FLAX_STATION_IDS = ['counter', 'anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'portal'];
 
-export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furniture = null } = {}) {
+export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furniture = null, spacing = FLAX_SPACING } = {}) {
   const grass = gardenBox(expansionIds);
   if (x < grass.minX + FLAX_EDGE || x > grass.maxX - FLAX_EDGE) return true;
   if (z < grass.minZ + FLAX_EDGE || z > grass.maxZ - FLAX_EDGE) return true;
@@ -1100,8 +1100,13 @@ export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furnit
     if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) continue;
     if (Math.hypot(x - pose.x, z - pose.z) < FLAX_DISPLAY_CLEAR) return true;
   }
+  if (keepFountain(expansionIds)) {
+    const clear = FOUNTAIN.apron + 0.2;
+    if (Math.hypot(x - FOUNTAIN.x, z - FOUNTAIN.z) < clear) return true;
+  }
   for (const other of occupied) {
-    if (Math.hypot(x - other.x, z - other.z) < FLAX_SPACING) return true;
+    const gap = Math.max(spacing, other.spacing ?? 0);
+    if (Math.hypot(x - other.x, z - other.z) < gap) return true;
   }
   return false;
 }
@@ -1112,6 +1117,7 @@ export function rollFlaxSpots(expansionIds = [], opts = {}) {
   const rng = opts.rng ?? Math.random;
   const furniture = opts.furniture ?? null;
   const occupied = opts.occupied ?? [];
+  const spacing = opts.spacing ?? FLAX_SPACING;
   const grass = gardenBox(expansionIds);
   const spanX = Math.max(0.1, grass.maxX - grass.minX - FLAX_EDGE * 2);
   const spanZ = Math.max(0.1, grass.maxZ - grass.minZ - FLAX_EDGE * 2);
@@ -1120,10 +1126,23 @@ export function rollFlaxSpots(expansionIds = [], opts = {}) {
   for (let i = 0; i < maxTries && spots.length < count; i += 1) {
     const x = grass.minX + FLAX_EDGE + rng() * spanX;
     const z = grass.minZ + FLAX_EDGE + rng() * spanZ;
-    if (flaxSpotBlocked(x, z, expansionIds, { occupied: [...occupied, ...spots], furniture })) continue;
+    if (flaxSpotBlocked(x, z, expansionIds, { occupied: [...occupied, ...spots], furniture, spacing })) continue;
     spots.push({ x, z });
   }
   return spots;
+}
+
+/** Outdoor wheat clumps. Same pick/respawn rules as flax, wider so the stalks do not overlap. */
+export const WHEAT_COUNT = 8;
+export const WHEAT_SPACING = 1.85;
+export const WHEAT_CLICK_RADIUS = 0.8;
+
+export function rollWheatSpots(expansionIds = [], opts = {}) {
+  return rollFlaxSpots(expansionIds, {
+    ...opts,
+    count: opts.count ?? WHEAT_COUNT,
+    spacing: opts.spacing ?? WHEAT_SPACING,
+  });
 }
 
 export function pickFlaxNode(nodes, id, now, delay = FLAX_RESPAWN_SEC) {

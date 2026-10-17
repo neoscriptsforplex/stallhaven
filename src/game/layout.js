@@ -983,6 +983,8 @@ export const ALTAR_SPAN_Z = 363 * ALTAR_OSRS_SCALE;
 /** Square footprint that covers every altar, since X and Z swap between elements. */
 export const ALTAR_FOOT = Math.max(ALTAR_SPAN_X, ALTAR_SPAN_Z);
 export const ALTAR_CLICK = ALTAR_FOOT / 2 + 0.35;
+/** Arch footprint plus a little, so grass does not cover the return portal. */
+export const RUNE_PORTAL_GRASS_CLEAR = Math.hypot(PORTAL_TARGET_WIDTH, PORTAL_TARGET_DEPTH) / 2 + 0.2;
 
 /** Decor must stay off the centre portal, the four altar pads, and the open middle. */
 export function runeFieldClearOf(spot) {

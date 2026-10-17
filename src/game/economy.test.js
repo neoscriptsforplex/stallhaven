@@ -1849,8 +1849,14 @@ describe('magic runes', () => {
     assert.deepEqual(recipesForAltar('earth').map((recipe) => recipe.id), ['earth_rune']);
     assert.deepEqual(recipesForAltar('water').map((recipe) => recipe.id), ['water_rune']);
     assert.deepEqual(recipesForAltar('fire').map((recipe) => recipe.id), ['fire_rune']);
-    assert.equal(recipeCost(RECIPES.air_rune).materials.essence, 1);
-    assert.equal(recipeCost(RECIPES.fire_rune).materials.essence, 1);
+    assert.equal(recipeCost(RECIPES.air_rune).materials.essence, 10);
+    assert.equal(recipeCost(RECIPES.earth_rune).materials.essence, 30);
+    assert.equal(recipeCost(RECIPES.water_rune).materials.essence, 50);
+    assert.equal(recipeCost(RECIPES.fire_rune).materials.essence, 100);
+    assert.match(costLabel(RECIPES.air_rune), /Essence ×10/);
+    assert.match(costLabel(RECIPES.earth_rune), /Essence ×30/);
+    assert.match(costLabel(RECIPES.water_rune), /Essence ×50/);
+    assert.match(costLabel(RECIPES.fire_rune), /Essence ×100/);
     assert.equal(RECIPES.air_rune.time, 3);
     assert.equal(RECIPES.fire_rune.time, 6);
     assert.equal(craftXp(RECIPES.air_rune), 16);
@@ -1862,10 +1868,11 @@ describe('magic runes', () => {
     assert.equal(isUnlocked(state, 'air_rune'), true);
     assert.equal(isUnlocked(state, 'earth_rune'), false);
     assert.equal(unlockRemaining(state, 'earth_rune'), 20);
-    state.materials.essence = 80;
+    state.materials.essence = 200;
     for (let i = 0; i < 19; i += 1) finishCraft(state, 'air_rune', i);
     assert.equal(isUnlocked(state, 'earth_rune'), false);
     finishCraft(state, 'air_rune', 20);
+    assert.equal(state.materials.essence, 0);
     assert.equal(state.chest.air_rune, 20);
     assert.equal(state.craftCounts.air_rune, 20);
     assert.equal(isUnlocked(state, 'earth_rune'), true);
@@ -1893,6 +1900,18 @@ describe('magic runes', () => {
     assert.ok(RECIPES.water_rune.price < RECIPES.fire_rune.price);
     assert.equal(RECIPES.fire_rune.price, 42000);
     assert.match(costLabel(RECIPES.air_rune), /sells 3,500g/);
+    assert.match(costLabel(RECIPES.fire_rune), /sells 42,000g/);
+    const state = createState();
+    state.craftCounts.air_rune = 20;
+    state.craftCounts.earth_rune = 30;
+    state.craftCounts.water_rune = 40;
+    state.materials.essence = 100;
+    assert.equal(maxCraftActions(state, 'air_rune'), 10);
+    assert.equal(maxCraftActions(state, 'earth_rune'), 3);
+    assert.equal(maxCraftActions(state, 'water_rune'), 2);
+    assert.equal(maxCraftActions(state, 'fire_rune'), 1);
+    state.materials.essence = 9;
+    assert.equal(maxCraftActions(state, 'air_rune'), 0);
   });
 });
 

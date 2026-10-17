@@ -23,7 +23,6 @@ const LEG_SHAPES = new Set(['platelegs', 'plateskirt', 'robe_bottom', 'dhide_cha
 /** Wood sizes the stand is built from. Margin is added on width and depth. */
 const BLOCKS = {
   hips: { x: 0.34, y: 0.06, z: 0.14, at: 0.5 },
-  torso: { x: 0.2, y: 0.42, z: 0.12, at: 0.92 },
   shoulders: { x: 0.5, y: 0.06, z: 0.12, at: 1.16 },
 };
 
@@ -38,7 +37,7 @@ function covers(outer, inner, eps = 1e-3) {
 
 function bodyTarget() {
   const { margin } = MANNEQUIN_WEAR_LIMITS;
-  const depth = Math.max(BLOCKS.torso.z, BLOCKS.shoulders.z);
+  const depth = BLOCKS.shoulders.z;
   const y0 = BLOCKS.hips.at + BLOCKS.hips.y / 2;
   const y1 = BLOCKS.shoulders.at + BLOCKS.shoulders.y / 2;
   const hx = (BLOCKS.shoulders.x + margin) / 2;

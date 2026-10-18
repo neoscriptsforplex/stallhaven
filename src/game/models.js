@@ -1829,7 +1829,9 @@ export function fitMannequinWear(mesh, recipeId) {
  * puts the chest toward +Z. Splitbark tops and dragon masks already face
  * along Z, but the outer surface points -Z (away from the customer).
  * Bronze through rune chainbodies present the flat sealed back to +Z.
- * A half-turn shows the chain. The dragon chainbody already faces +Z.
+ * A half-turn shows the chain. The dragon chainbody does not use this yaw:
+ * its dump is wider than it is tall, so it gets its own stand-up in
+ * bundledWareEuler instead of this shared turn.
  * Plateskirts and the mystic and splitbark robe bottoms already show their
  * patterned side to the front, so they are left alone.
  * Baked into the ware mesh. Displays apply previewBasePose on a parent and
@@ -1848,8 +1850,17 @@ export function wareDisplayYaw(id) {
  * Stand a dump the same way as the other wares. The dragonfire shield used to
  * take an extra half-turn that left it facing down; it now uses dumpStandEuler
  * with the bronze and rune kiteshields, so the long axis stands up.
+ *
+ * The dragon chainbody is a separate export and is wider across the shoulders
+ * than it is tall. dumpStandEuler would stand that shoulder axis up and leave
+ * the torso pointing forward. A +90° pitch stands the body up and leaves the
+ * chain toward +Z, matching the bronze-to-rune chainbodies. Other items keep
+ * the shared stand.
  */
 export function bundledWareEuler(recipeId, source, targetBox) {
+  if (recipeId === 'dragon_chainbody') {
+    return { rotateX: Math.PI / 2, rotateY: 0, rotateZ: 0 };
+  }
   return dumpStandEuler(source, targetBox);
 }
 

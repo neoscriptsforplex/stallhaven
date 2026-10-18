@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
 import * as THREE from 'three';
 import { RECIPES } from './catalog.js';
-import { mountDisplayBasePose } from './craftpreview.js';
+import { mountDisplayBasePose, wrapCraftPreviewSpin } from './craftpreview.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import {
   MANNEQUIN_WEAR_LIMITS,
@@ -154,9 +154,9 @@ describe('mannequin body and leg fit', () => {
       try {
         const mounted = mountDisplayBasePose(buildWare(id), id, { mannequin: true });
         assert.equal(mounted.scale.x, 1, `${id} mount scale`);
-        if (id === 'dragon_chainbody') {
-          const edge = new THREE.Box3().setFromObject(mounted).getSize(new THREE.Vector3());
-          assert.ok(edge.x < edge.z, `dragon chainbody is edge-on before the mannequin fit (${edge.x}, ${edge.z})`);
+        if (id === 'dragon_chainbody' || id === 'bronze_chainbody') {
+          const face = new THREE.Box3().setFromObject(mounted).getSize(new THREE.Vector3());
+          assert.ok(face.z < face.x && face.z < face.y, `${id} faces front before the mannequin fit (${face.x}, ${face.y}, ${face.z})`);
         }
         assert.equal(fitMannequinWear(mounted, id), true, id);
         for (const axis of ['x', 'y', 'z']) {
@@ -178,11 +178,17 @@ describe('mannequin body and leg fit', () => {
     }
   });
 
-  it('faces chain mail toward +Z and leaves the dragon chainbody as dumped', async () => {
+  it('faces every chainbody, including dragon, toward +Z on the mannequin and the preview', async () => {
     const ids = ['bronze_chainbody', 'runite_chainbody', 'dragon_chainbody'];
     for (const id of ids) {
       setBundledLook(id, await loadFolder(`gear/${id.replaceAll('_', '-')}`));
       try {
+        const ware = buildWare(id);
+        const wareSize = new THREE.Box3().setFromObject(ware).getSize(new THREE.Vector3());
+        assert.ok(wareSize.z < wareSize.x && wareSize.z < wareSize.y, `${id} ware faces front`);
+        const preview = wrapCraftPreviewSpin(buildWare(id), id);
+        const previewSize = new THREE.Box3().setFromObject(preview).getSize(new THREE.Vector3());
+        assert.ok(previewSize.z < previewSize.x && previewSize.z < previewSize.y, `${id} preview faces front`);
         const mounted = mountDisplayBasePose(buildWare(id), id, { mannequin: true });
         assert.equal(fitMannequinWear(mounted, id), true, id);
         const { front, back } = sideCounts(mounted);

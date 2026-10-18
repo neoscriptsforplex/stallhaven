@@ -904,6 +904,8 @@ export function nextFurnitureCost(state, type) {
 
 export function canBuyFurniture(state, type) {
   if (!FURNITURE_SHOP.some((item) => item.type === type)) return false;
+  // Tables, mannequins, and shelves have no count cap. Price is
+  // furnitureBuyCost(n) = 500·3^n. Farming patches stay capped at four.
   if (type === 'farming_patch' && boughtFurnitureCount(state, type) >= FARMING_PATCH_CAP) return false;
   const cost = nextFurnitureCost(state, type);
   if ((state.gold ?? 0) < cost) return false;

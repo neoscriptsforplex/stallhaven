@@ -1673,19 +1673,19 @@ export function bindHud(root, state, world) {
             return `${live} of ${included} included shelves are placed. Replacement is free.`;
           }
           return bought === 0
-            ? `First ${included} shelves are included. The next costs ${formatGold(cost)}g.`
-            : `Next shelf costs ${formatGold(cost)}g (${bought} bought).`;
+            ? `No maximum. First ${included} shelves are included. The next costs ${formatGold(cost)}g.`
+            : `No maximum. Next shelf costs ${formatGold(cost)}g (${bought} bought).`;
         })()
         : (() => {
           const free = state.freeFurnitureReplace?.[type] ?? 0;
           if (free > 0 || cost === 0) {
             return free > 0
               ? `${free} free replacement${free === 1 ? '' : 's'} left after deleting.`
-              : `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`;
+              : `No maximum. First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`;
           }
           return bought === 0
-            ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
-            : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
+            ? `No maximum. First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
+            : `No maximum. Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
         })();
       const mats = cost > 0 ? buildMaterialLabel(type) : '';
       const missing = cost > 0 ? buildMaterialBlock(state, type) : '';

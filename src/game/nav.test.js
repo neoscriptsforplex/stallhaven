@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHOP } from './catalog.js';
-import { clearBackWallShelf, createState, removePlacedFurniture } from './economy.js';
+import { buyFurniture, canBuyFurniture, clearBackWallShelf, createState, removePlacedFurniture } from './economy.js';
 import {
   defaultFurniture,
   gardenBedSpots,
@@ -18,6 +18,7 @@ import {
   roomCenter,
   shopRugPose,
   shopRugRect,
+  placeFloors,
   walkFloors,
   runeFieldRect,
   RUNE_FIELD_ARRIVE,
@@ -37,6 +38,7 @@ import {
   liveObstacles,
   moveWithCollision,
   nearestWalkable,
+  firstOpenFurniturePose,
   placementBlocked,
   planPlayerWalk,
   planWalk,
@@ -159,6 +161,39 @@ describe('shop navigation', () => {
     assert.equal(removePlacedFurniture(state, shelfIndex), true);
     const free = placementBlocked(pose, 'shelf', liveObstacles(state), floors, { checkAisle: false });
     assert.equal(free, null);
+  });
+
+  it('starts the next table, mannequin, and shelf on open space with no count cap', () => {
+    const state = createState();
+    state.gold = 1e16;
+    state.materials.bronze_nails = 100000;
+    state.materials.plank = 100000;
+    state.materials.steel_nails = 100000;
+    state.materials.willow_plank = 100000;
+    state.materials.iron_nails = 100000;
+    state.materials.oak_plank = 100000;
+    const floors = placeFloors([]);
+    const center = SHOP.displays.findIndex((d) => d.id === 'shelf-center');
+    const shelf = firstOpenFurniturePose(state, 'shelf');
+    assert.equal(shelf.open, true);
+    assert.equal(placementBlocked(shelf, 'shelf', liveObstacles(state), floors, { checkAisle: false }), null);
+    assert.ok(Math.hypot(shelf.x - state.furniture.displays[center].x, shelf.z - state.furniture.displays[center].z) > 0.4);
+    const table = firstOpenFurniturePose(state, 'table');
+    const stand = firstOpenFurniturePose(state, 'stand');
+    assert.equal(table.open, true);
+    assert.equal(stand.open, true);
+    assert.equal(placementBlocked(table, 'table', liveObstacles(state), floors), null);
+    assert.equal(placementBlocked(stand, 'stand', liveObstacles(state), floors), null);
+    let placed = 0;
+    for (let i = 0; i < 40; i += 1) {
+      const spot = firstOpenFurniturePose(state, 'table');
+      if (!spot.open) break;
+      assert.equal(buyFurniture(state, 'table', spot), true);
+      placed += 1;
+    }
+    assert.ok(placed >= 8, `expected open floor for several tables, placed ${placed}`);
+    assert.equal(firstOpenFurniturePose(state, 'table').open, false);
+    assert.equal(canBuyFurniture(state, 'table'), true);
   });
 
   it('walks from behind the counter onto the outdoor path and to the trapdoor', () => {

@@ -26,6 +26,11 @@ import {
   roomCenter,
   rotatedFootprint,
   walkFloors,
+  placeFloors,
+  snapToFloor,
+  snapToWallGrid,
+  wallShelfMounts,
+  FURNITURE_SNAP,
   FLOOR_SNAP_MARGIN,
 } from './layout.js';
 
@@ -352,6 +357,56 @@ function rectsOverlap(a, b, pad = 0) {
     || a.maxZ + pad < b.minZ
     || a.minZ - pad > b.maxZ
   );
+}
+
+function furniturePoseKey(pose) {
+  return `${pose.x.toFixed(3)},${pose.z.toFixed(3)},${(pose.rot ?? 0).toFixed(3)}`;
+}
+
+/**
+ * Where the next table, mannequin, or shelf should start.
+ * Nothing caps how many of those you can own. This walks the floor snap
+ * grid (wall grid for a shelf) and returns the first cell that is still
+ * open. When the room is full, open is false and pose is only a fallback.
+ */
+export function firstOpenFurniturePose(state, kind) {
+  const expansions = state?.expansions ?? [];
+  const floors = placeFloors(expansions);
+  const blocks = liveObstacles(state);
+  const seen = new Set();
+  const accept = (pose, checkAisle) => {
+    if (!pose) return false;
+    const key = furniturePoseKey(pose);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return placementBlocked(pose, kind, blocks, floors, { checkAisle }) == null;
+  };
+  if (kind === 'shelf') {
+    for (const mount of wallShelfMounts(expansions)) {
+      for (let along = mount.minAlong; along <= mount.maxAlong + 1e-6; along += FURNITURE_SNAP) {
+        const x = mount.axis === 'x' ? along : mount.x;
+        const z = mount.axis === 'z' ? along : mount.z;
+        const pose = snapToWallGrid(x, z, expansions, mount.rot);
+        if (accept(pose, false)) return { ...pose, open: true };
+      }
+    }
+    return { ...snapToWallGrid(0, -3.11, expansions), open: false };
+  }
+  for (const rect of floors) {
+    const loX = Math.ceil(rect.minX / FURNITURE_SNAP - 1e-9) * FURNITURE_SNAP;
+    const hiX = Math.floor(rect.maxX / FURNITURE_SNAP + 1e-9) * FURNITURE_SNAP;
+    const loZ = Math.ceil(rect.minZ / FURNITURE_SNAP - 1e-9) * FURNITURE_SNAP;
+    const hiZ = Math.floor(rect.maxZ / FURNITURE_SNAP + 1e-9) * FURNITURE_SNAP;
+    for (let x = loX; x <= hiX + 1e-6; x += FURNITURE_SNAP) {
+      for (let z = loZ; z <= hiZ + 1e-6; z += FURNITURE_SNAP) {
+        const snapped = snapToFloor(x, z, floors);
+        const pose = { x: snapped.x, z: snapped.z, rot: 0 };
+        if (accept(pose, true)) return { ...pose, open: true };
+      }
+    }
+  }
+  const home = snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, floors);
+  return { x: home.x, z: home.z, rot: 0, open: false };
 }
 
 export function placementBlocked(pose, kind, obstacles, floors, { checkAisle = true } = {}) {

@@ -134,7 +134,7 @@ import {
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
-import { defaultFurniture, furnitureBuildParts, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
+import { defaultFurniture, furnitureBuildParts, furnitureBuyCost, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
 
 function giveBuildMats(state, id, times = 1) {
   const n = Math.max(1, times);
@@ -1583,6 +1583,66 @@ describe('build furniture', () => {
     assert.equal(state.freeFurnitureReplace.mannequin, 1);
     assert.equal(nextFurnitureCost(state, 'mannequin'), 0);
     assert.equal(removePlacedFurniture(state, standIndex), false);
+  });
+
+  it('sells fifteen tables, mannequins, and shelves with no count cap and keeps an old layout', () => {
+    const curve = Array.from({ length: 15 }, (_, n) => furnitureBuyCost(n));
+    assert.equal(curve[0], 500);
+    assert.equal(curve[1], 1500);
+    assert.equal(curve[14], 500 * (3 ** 14));
+    const state = createState();
+    const starterTables = SHOP.displays.filter((d) => d.kind === 'table').length;
+    const starterStands = SHOP.displays.filter((d) => d.kind === 'stand').length;
+    const starterShelves = SHOP.displays.filter((d) => d.kind === 'shelf').length;
+    const moved = { x: -1.2, z: 0.4, rot: 0.25 };
+    state.furniture.displays[0] = { ...moved };
+    state.gold = 1e16;
+    giveBuildMats(state, 'table', 16);
+    giveBuildMats(state, 'mannequin', 15);
+    giveBuildMats(state, 'shelf', 15);
+    const paid = { table: [], mannequin: [], shelf: [] };
+    for (let i = 0; i < 15; i += 1) {
+      for (const type of ['table', 'mannequin', 'shelf']) {
+        paid[type].push(nextFurnitureCost(state, type));
+        assert.equal(
+          buyFurniture(state, type, { x: -40 - i, z: type === 'shelf' ? -3.11 : 0.2, rot: 0 }),
+          true,
+          `${type} ${i}`,
+        );
+      }
+    }
+    assert.deepEqual(paid.table, curve);
+    assert.deepEqual(paid.mannequin, curve);
+    assert.deepEqual(paid.shelf, curve);
+    assert.equal(state.displays.filter((d) => d.kind === 'table').length, starterTables + 15);
+    assert.equal(state.displays.filter((d) => d.kind === 'stand').length, starterStands + 15);
+    assert.equal(state.displays.filter((d) => d.kind === 'shelf').length, starterShelves + 15);
+    assert.equal(canBuyFurniture(state, 'table'), true);
+    assert.equal(nextFurnitureCost(state, 'table'), furnitureBuyCost(15));
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.boughtFurniture.table, 15);
+    assert.equal(next.boughtFurniture.mannequin, 15);
+    assert.equal(next.boughtFurniture.shelf, 15);
+    assert.equal(next.displays.length, state.displays.length);
+    assert.equal(next.furniture.displays[0].x, moved.x);
+    assert.equal(next.furniture.displays[0].z, moved.z);
+    assert.equal(next.furniture.displays[0].rot, moved.rot);
+    const lastTable = next.displays.findLastIndex((display) => display.kind === 'table' && display.bought);
+    assert.equal(next.furniture.displays[lastTable].x, -40 - 14);
+    assert.equal(next.displays.filter((display) => display.kind === 'shelf').length, starterShelves + 15);
+    const old = createState();
+    const blob = serializeState(old);
+    blob.furniture.displays[0] = { ...moved };
+    const restored = createState();
+    assert.equal(applyState(restored, blob), true);
+    assert.equal(restored.displays.length, SHOP.displays.length);
+    assert.equal(restored.boughtFurniture.table, 0);
+    assert.equal(restored.boughtFurniture.mannequin, 0);
+    assert.equal(restored.boughtFurniture.shelf, 0);
+    assert.equal(restored.furniture.displays[0].x, moved.x);
+    assert.equal(restored.furniture.displays[0].rot, moved.rot);
   });
 
   it('does not count starter tables or mannequins as paid extras in an old save', () => {

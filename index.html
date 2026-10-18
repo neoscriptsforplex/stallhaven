@@ -54,13 +54,12 @@
     <aside id="save-bar" aria-label="Save and load">
       <button type="button" id="skills-btn" title="Skills" aria-label="Skills" aria-controls="skills-dock" aria-expanded="false">Skills</button>
       <button type="button" id="build-btn" title="Build" aria-label="Build" aria-controls="build-dock" aria-expanded="false">Build</button>
+      <button type="button" id="heroes-btn" title="Heroes" aria-label="Heroes" aria-controls="heroes-dock" aria-expanded="false"><svg class="hq-btn-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2.5l7.5 2.8v6.2c0 4.6-3.1 7.8-7.5 9.5-4.4-1.7-7.5-4.9-7.5-9.5V5.3z"/></svg><span class="hq-btn-label">Heroes</span></button>
+      <button type="button" id="quests-btn" title="Quests" aria-label="Quests" aria-controls="quests-dock" aria-expanded="false"><svg class="hq-btn-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6 3h8.2L19 7.8V21H6z"/><path d="M14 3.5V8h4.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span class="hq-btn-label">Quests</span><span class="hq-badge" data-quest-badge hidden>0</span></button>
       <button type="button" id="help-btn" title="Help" aria-label="Help">Help</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
       <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
-      <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
-        <span class="expand-icon" aria-hidden="true">⛶</span>
-      </button>
       <button type="button" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
       <input id="music-file" type="file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav" multiple hidden />
@@ -74,7 +73,7 @@
           <button type="button" class="minimap-toggle" data-map-toggle aria-expanded="false">Map</button>
           <button type="button" class="minimap-close" data-map-close aria-label="Close map">Close</button>
           <div class="minimap-compass">
-            <button type="button" data-map-north aria-label="Reset camera">N</button>
+            <button type="button" data-map-north aria-label="Look North" title="Look North"><span class="minimap-needle"></span></button>
           </div>
           <div class="minimap-zoom">
             <button type="button" data-map-zoom="out" aria-label="Zoom map out">−</button>
@@ -166,12 +165,19 @@ This will allow you to load it back again.
 
     <div id="craft-modal" class="modal" hidden>
       <div class="sheet craft-sheet">
-        <h2 data-craft-title>Anvil</h2>
-        <p data-craft-blurb>Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
-        <div id="craft-tabs" class="tabs"></div>
-        <div id="craft-subtabs" class="tabs subtabs" hidden></div>
+        <div class="craft-head">
+          <h2 data-craft-title>Anvil</h2>
+          <button type="button" class="craft-info" aria-label="About this station" title="About this station">i</button>
+          <p data-craft-blurb class="craft-info-tip" role="tooltip">Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
+          <button type="button" class="ghost craft-x" data-craft-close aria-label="Close">✕</button>
+        </div>
+        <div class="tabbar">
+          <div id="craft-tabs" class="tabs" role="tablist"></div>
+          <div id="craft-subtabs" class="tabs subtabs" role="tablist" hidden></div>
+        </div>
         <p data-craft-note class="craft-note" hidden></p>
-        <div class="craft-body">
+        <div class="craft-body no-side">
+          <nav id="craft-sidetabs" class="craft-sidetabs" role="tablist" aria-label="Recipe types" hidden></nav>
           <div id="crafts"></div>
           <aside class="craft-preview-pane">
             <canvas data-craft-preview width="220" height="220" aria-label="Item preview"></canvas>
@@ -182,7 +188,6 @@ This will allow you to load it back again.
           </aside>
         </div>
         <div id="materials" class="craft-mats" aria-label="Materials"></div>
-        <button type="button" class="ghost" data-craft-close>Close</button>
       </div>
     </div>
 
@@ -274,7 +279,7 @@ This will allow you to load it back again.
 
     <aside id="build-dock" class="expand-dock" hidden>
       <h2>Build</h2>
-      <p>Unlockables for the shop. Rooms use the same gold pads as before. A furnace and cooking range are free to place. Bow string needs a spinning wheel. Potion brewing needs a cauldron. Extra tables, mannequins, and shelves use the same 500g then ×3 curve; the first three shelves are included. New furniture and the bought stations also spend nails and planks. The furnace, range, and sawmill stay gold-only.</p>
+      <p>Unlockables for the shop. Rooms use the same gold pads as before. A furnace and cooking range are free to place. Bow string needs a spinning wheel. Potion brewing needs a cauldron. Tables, mannequins, and shelves have no maximum: each extra uses the 500g then ×3 curve, and the first three shelves are included. They only need open floor, or open wall for a shelf. New furniture and the bought stations also spend nails and planks. The furnace, range, and sawmill stay gold-only.</p>
       <article class="build-item">
         <h3>Furnace</h3>
         <p>Smelt ores into metal bars. Place it on the floor snap grid, then confirm. Free.</p>
@@ -332,25 +337,27 @@ This will allow you to load it back again.
       <article class="build-item">
         <h3>Farming Patch</h3>
         <p>An outdoor 2×2 plot. You can own four. Place it on open grass, clear of the path and flower beds, then confirm. Click a placed patch to grow herbs.</p>
-        <p data-farming_patch-status class="meta">First patch costs 1,000,000 gp. Iron Nails ×6 · Oak Plank ×2.</p>
+        <p data-farming_patch-status class="meta">You can own six farming patches.
+Cost: 1,000,000 gp
+Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
         <button type="button" data-farming_patch-buy>Buy · 1,000,000 gp</button>
       </article>
       <article class="build-item">
         <h3>Table</h3>
-        <p>Buy another display table. The first extra costs 500g; each further table costs three times the last. Starting tables do not count. Delete up to two tables to replace them for free.</p>
-        <p data-table-status class="meta">First extra table costs 500g. Bronze Nails ×8 · Plank ×4.</p>
+        <p>Buy another display table. There is no maximum. The first extra costs 500g; each further table costs three times the last. Starting tables do not count. Delete up to two tables to replace them for free.</p>
+        <p data-table-status class="meta">No maximum. First extra table costs 500g. Bronze Nails ×8 · Plank ×4.</p>
         <button type="button" data-table-buy>Buy · 500 gp</button>
       </article>
       <article class="build-item">
         <h3>Shelf</h3>
-        <p>Buy another wall shelf. Place it on the wall grid. The starting three shelves are included; extras cost 500g, then ×3. Delete a shelf from its right-click menu — a deleted included shelf can be replaced for free until three are placed.</p>
-        <p data-shelf-status class="meta">First 3 shelves are included. The next costs 500g. Iron Nails ×10 · Oak Plank ×3.</p>
+        <p>Buy another wall shelf. There is no maximum. Place it on open wall. The starting three shelves are included; extras cost 500g, then ×3. Delete a shelf from its right-click menu — a deleted included shelf can be replaced for free until three are placed.</p>
+        <p data-shelf-status class="meta">No maximum. First 3 shelves are included. The next costs 500g. Iron Nails ×10 · Oak Plank ×3.</p>
         <button type="button" data-shelf-buy>Buy · 500 gp</button>
       </article>
       <article class="build-item">
         <h3>Mannequin</h3>
-        <p>Buy another armour mannequin. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count. Delete up to two mannequins to replace them for free.</p>
-        <p data-mannequin-status class="meta">First extra mannequin costs 500g. Steel Nails ×12 · Willow Plank ×2.</p>
+        <p>Buy another armour mannequin. There is no maximum. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count. Delete up to two mannequins to replace them for free.</p>
+        <p data-mannequin-status class="meta">No maximum. First extra mannequin costs 500g. Steel Nails ×12 · Willow Plank ×2.</p>
         <button type="button" data-mannequin-buy>Buy · 500 gp</button>
       </article>
       <article class="build-item">
@@ -393,6 +400,12 @@ This will allow you to load it back again.
     </div>
 
     <aside id="settings-dock" class="expand-dock" hidden>
+      <div class="more-quick">
+        <button type="button" data-more="help">Help</button>
+        <button type="button" data-more="save">Save</button>
+        <button type="button" data-more="load">Load</button>
+        <button type="button" data-more="fullscreen">Fullscreen</button>
+      </div>
       <h2>Settings</h2>
       <h3>Skybox colour</h3>
       <p class="meta">Fake white clouds sit in every sky. Default is Blue.</p>
@@ -416,6 +429,10 @@ This will allow you to load it back again.
         <span data-dungeon-brightness-label>150%</span>
       </label>
       <p class="meta">Cave lighting only. 100% is the dungeon baseline; new shops and a saved 100% start at 150% (slider max). Other saved levels stay. Does not change the shop.</p>
+      <label class="settings-check" data-fullscreen-row>
+        <input type="checkbox" data-fullscreen />
+        Fullscreen
+      </label>
       <label class="settings-check">
         <input type="checkbox" data-photo-mode />
         Photo mode
@@ -442,6 +459,27 @@ This will allow you to load it back again.
     </aside>
 
     <aside id="skills-dock" class="expand-dock skills-dock" role="dialog" aria-label="Skills" hidden></aside>
+
+    <aside id="heroes-dock" class="expand-dock hq-dock" role="dialog" aria-label="Heroes" hidden>
+      <div class="skills-head"><span class="skills-grip" aria-hidden="true"></span><h2>Heroes</h2><button type="button" class="skills-close" data-heroes-close aria-label="Close heroes">✕</button></div>
+      <p class="hq-sub">Hire one hero of each class, in order. Send them to fight on <b>Quests</b> for materials.</p>
+      <div class="hero-grid" data-hero-grid></div>
+      <p class="hq-foot" data-hero-foot></p>
+    </aside>
+
+    <aside id="quests-dock" class="expand-dock hq-dock" role="dialog" aria-label="Quests" hidden>
+      <div class="skills-head"><span class="skills-grip" aria-hidden="true"></span><h2>Quests</h2><button type="button" class="skills-close" data-quests-close aria-label="Close quests">✕</button></div>
+      <div class="quest-list" data-quest-list></div>
+    </aside>
+
+    <div id="hero-picker" class="modal" hidden>
+      <div class="sheet hero-picker-sheet" role="dialog" aria-labelledby="hero-picker-title">
+        <div class="hero-picker-head"><h2 id="hero-picker-title" data-picker-title>Hire an Adventurer</h2><button type="button" class="skills-close" data-picker-close aria-label="Close hire picker">✕</button></div>
+        <p class="meta" data-picker-sub>Pick how your hero looks. They get a random hero name when hired.</p>
+        <div class="npc-grid" role="radiogroup" aria-label="Hero look" data-picker-grid></div>
+        <div class="hero-picker-foot"><p class="meta" data-picker-note></p><button type="button" class="hq-gold-btn" data-picker-hire>Hire</button></div>
+      </div>
+    </div>
 
     <aside id="music-dock" class="expand-dock" hidden>
       <h2>Music</h2>

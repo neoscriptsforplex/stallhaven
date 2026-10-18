@@ -22,7 +22,11 @@ test('solo craft intent matches the direct economy call', () => {
   const direct = startCraftBatch(b, 'air_rune', 1, 5);
   assert.equal(viaIntent.value, direct);
   assert.deepEqual(a.crafts, b.crafts);
-  const strip = (st) => ({ ...serializeState(st), kingRoaldAt: 0 });
+  const strip = (st) => {
+    const data = { ...serializeState(st), kingRoaldAt: 0 };
+    if (data.hq) data.hq = { ...data.hq, lastSeenAt: 0 };
+    return data;
+  };
   assert.deepEqual(strip(a), strip(b));
 });
 

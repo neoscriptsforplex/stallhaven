@@ -37,6 +37,7 @@ import {
   CHOP_DURATION,
   FLAX_DURATION,
   FLAX_YIELD,
+  FOUNTAIN_DURATION,
   FOUNTAIN_WATER_YIELD,
   MATERIALS,
   RECIPES,
@@ -46,6 +47,7 @@ import {
   mineTiming,
 } from './catalog.js';
 import { meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
+import { emptyHeroQuestState, hireHero } from './heroesQuests.js';
 
 export const INTENT_TYPES = Object.freeze([
   'craft',
@@ -66,12 +68,14 @@ export const INTENT_TYPES = Object.freeze([
   'buyStation',
   'buyFurniture',
   'gather',
+  'hireHero',
   'cheat',
 ]);
 
 /** Gathering: how long one bar takes, in seconds (rooms allow 85% of it between grants). */
 export const GATHER_COOLDOWN_SHARE = 0.85;
-export const FOUNTAIN_COOLDOWN = 1;
+/** Fountain fills run on a gathering bar (same length as mining). */
+export const FOUNTAIN_COOLDOWN = FOUNTAIN_DURATION;
 
 export function gatherDuration(mode, materialId) {
   if (mode === 'mine') return mineTiming(materialId).duration;
@@ -145,6 +149,8 @@ export function checkIntentShape(intent) {
       if (!['mine', 'chop', 'pick', 'water'].includes(intent.mode)) return 'bad-mode';
       if (intent.mode !== 'water' && (!okId(intent.materialId) || !has(MATERIALS, intent.materialId))) return 'bad-material';
       return null;
+    case 'hireHero':
+      return okId(intent.classId) && okId(intent.npcId) ? null : 'bad-hero';
     case 'cheat':
       return typeof intent.code === 'string' && intent.code.length <= 40 ? null : 'bad-code';
     default:
@@ -273,6 +279,9 @@ export function applyIntent(state, intent, ctx = {}) {
       if (got > 0) gatherXp(state, intent);
       return { ok: true, value: got, reason: null };
     }
+    case 'hireHero':
+      if (!state.hq) state.hq = emptyHeroQuestState();
+      return done(hireHero(state, state.hq, intent.classId, intent.npcId, ctx.rng ?? Math.random));
     case 'cheat':
       if (coop) return fail('cheats-off');
       return done(applyCheat(state, intent.code));

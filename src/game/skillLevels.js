@@ -58,6 +58,9 @@ const NAIL_LEVELS = [
 /** Melee smithing unlocks by metal, not by piece. XP stays on the old curve. */
 export const MELEE_SMITH_LEVELS = [1, 5, 10, 20, 30, 40, 60];
 
+/** Altar output doubles once Runecrafting reaches this multiple of the rune's level. */
+export const RUNE_DOUBLE_LEVEL_MULT = 2;
+
 const MELEE_SMITH_PIECES = [
   'dagger', 'mace', 'med_helm', 'sword', 'scimitar', 'full_helm', 'spear',
   'boots', 'chainbody', 'kiteshield', '2h_sword', 'plateskirt', 'platelegs', 'platebody',
@@ -169,7 +172,8 @@ const LEVELS = {
   summer_pie: row('cooking', 95, 820),
 
   weave_cloth: row('crafting', 1, 5),
-  fire_clay: row('crafting', 1, 5),
+  unpowered_orb: row('smithing', 1, 8),
+  soft_clay: row('crafting', 1, 5),
   wizard_boots: row('crafting', 3, 5),
   wizard_hat: row('crafting', 5, 6),
   wizard_robe: row('crafting', 8, 7),
@@ -283,6 +287,20 @@ export function applyRecipeLevels(recipes) {
       kind: 'gather',
     });
   }
+}
+
+/** Unique unlock levels per skill, after melee metals share one level. Includes gather nodes. */
+export function unlockLevelsBySkill() {
+  const bySkill = {};
+  for (const [skill, level] of Object.values(LEVELS)) {
+    (bySkill[skill] ??= new Set()).add(level);
+  }
+  for (const node of GATHER_NODES) {
+    (bySkill[node.skill] ??= new Set()).add(node.level);
+  }
+  return Object.fromEntries(
+    Object.entries(bySkill).map(([skill, levels]) => [skill, [...levels].sort((a, b) => a - b)]),
+  );
 }
 
 function visible(row, isHidden) {

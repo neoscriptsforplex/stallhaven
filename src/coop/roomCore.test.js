@@ -257,3 +257,21 @@ test('gather activity is relayed to the others and cleared by a move', () => {
   t.say('g', { t: 'move', x: 1, z: 1 });
   assert.equal(t.room._players().get(t.last('g', 'join_ok').you.id).act, null);
 });
+
+test('hero hires are validated by the room and shared; fountain fills are rate limited', () => {
+  const t = setup();
+  hostAndGuest(t);
+  t.room._state().gold = 100000;
+  t.say('g', { t: 'intent', n: 7, intent: { type: 'hireHero', classId: 'nope', npcId: 'x' } });
+  assert.equal(t.last('g', 'ack').ok, false);
+  t.say('g', { t: 'intent', n: 10, intent: { type: 'hireHero', classId: 'adventurer', npcId: 'buyer-adventurer-bob' } });
+  assert.equal(t.last('g', 'ack').ok, true);
+  const patch = t.last('h', 'patch');
+  assert.equal(patch.set.gold, 50000);
+  assert.equal(patch.set.hq.heroes.adventurer.npcId, 'buyer-adventurer-bob');
+  assert.equal('lastSeenAt' in patch.set.hq, false);
+  t.say('g', { t: 'intent', n: 8, intent: { type: 'gather', mode: 'water' } });
+  assert.equal(t.last('g', 'ack').ok, true);
+  t.say('g', { t: 'intent', n: 9, intent: { type: 'gather', mode: 'water' } });
+  assert.equal(t.last('g', 'ack').reason, 'too-fast');
+});

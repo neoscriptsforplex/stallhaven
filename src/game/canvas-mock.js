@@ -74,5 +74,7 @@ if (!globalThis.document?.createElement) {
       if (tag === 'canvas') return new FakeCanvas();
       return { style: {}, width: 0, height: 0 };
     },
+    addEventListener() {},
+    removeEventListener() {},
   };
 }

@@ -78,8 +78,8 @@ import {
   DEFAULT_MUSIC_VOLUME,
   discardFromChest,
   fillStandFromRecipe,
-  buildMaterialBlock,
   buildMaterialLabel,
+  buildMaterialNeedLine,
   furniturePlaceBlock,
   stationPlaceBlock,
   hasStock,
@@ -122,13 +122,15 @@ import {
   stationLabel,
   STATION_UNLOCKS,
 } from './layout.js';
-import { clampMapZoom, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
+import { clampMapZoom, compassNeedleDegrees, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
 import { boulderInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { intentBus } from './intents.js';
 import { createCraftPreview } from './craftpreview.js';
 import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
 import { bindSkillsPanel, showLevelUpToast } from './skillsPanel.js';
+import { bindSkillGuide } from './skillGuide.js';
+import { bindHeroesPanel } from './heroesPanel.js';
 import { nextUnlockLabel, unlockNamesBetween } from './skillLevels.js';
 import {
   brightnessPercent,
@@ -179,6 +181,8 @@ export function bindHud(root, state, world) {
   const settingsDock = document.querySelector('#settings-dock');
   const settingsBtn = document.querySelector('#settings-btn');
   let skillsPanel = null;
+  let skillGuide = null;
+  let heroesPanel = null;
   const skills = state.skills?.getLevel ? state.skills : createSkills();
   if (!state.skills) state.skills = skills;
   const furnMenu = document.querySelector('#furn-menu');
@@ -186,6 +190,12 @@ export function bindHud(root, state, world) {
   let inspectTarget = null;
   const minimap = document.querySelector('#minimap');
   const minimapWrap = document.querySelector('.minimap-wrap');
+  let compassBase = './public/';
+  try {
+    const raw = import.meta.env.BASE_URL;
+    if (raw) compassBase = raw.endsWith('/') ? raw : `${raw}/`;
+  } catch { /* GitHub Pages serves this file unbuilt, where import.meta.env is missing. */ }
+  document.documentElement.style.setProperty('--compass-url', `url("${compassBase}minimap/compass.svg")`);
   const mapToggle = document.querySelector('[data-map-toggle]');
   const mapClose = document.querySelector('[data-map-close]');
   const mapDismiss = document.querySelector('[data-map-dismiss]');
@@ -207,7 +217,8 @@ export function bindHud(root, state, world) {
   const activeCraftName = activeCraft?.querySelector('[data-active-craft-name]');
   const activeCraftYield = activeCraft?.querySelector('[data-active-craft-yield]');
   const chestCapEl = document.querySelector('#chest-cap');
-  const expandBtn = document.querySelector('#expand-btn');
+  const fullscreenBox = document.querySelector('[data-fullscreen]');
+  const fullscreenRow = document.querySelector('[data-fullscreen-row]');
   const buildBtn = document.querySelector('#build-btn');
   const musicBtn = document.querySelector('#music-btn');
   const musicFile = document.querySelector('#music-file');
@@ -223,6 +234,7 @@ export function bindHud(root, state, world) {
 
   let craftTab = 'melee';
   let craftSubtab = 'weapon';
+  let craftSide = '';
   let craftStation = 'anvil';
   let craftFocusId = null;
   let tradeActor = null;
@@ -280,7 +292,90 @@ export function bindHud(root, state, world) {
     note.textContent = text || '';
   }
 
-  function paintRecipeButtons(container, recipes) {
+  function escCraft(value) {
+    return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+
+  function recipeGroups(recipes) {
+    const groups = new Map();
+    for (const recipe of recipes) {
+      const name = recipe.lineName || recipe.name || recipe.id;
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(recipe);
+    }
+    for (const list of groups.values()) list.sort((a, b) => a.lineIndex - b.lineIndex);
+    return groups;
+  }
+
+  function craftSideStorageKey() {
+    return `craftSide:${craftStation}:${craftTab}:${craftSubtab}`;
+  }
+
+  function savedCraftSide() {
+    try {
+      return localStorage.getItem(craftSideStorageKey()) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function rememberCraftSide(name) {
+    if (!name) return;
+    try {
+      localStorage.setItem(craftSideStorageKey(), name);
+    } catch {
+      /* private mode */
+    }
+  }
+
+  function recipeOpen(recipe) {
+    return isUnlocked(state, recipe.id)
+      && meetsLevelRequirement(recipe, (skillId) => skillLevelOf(state, skillId));
+  }
+
+  function chooseCraftSide(groups) {
+    const names = [...groups.keys()];
+    if (craftFocusId) {
+      const recipe = RECIPES[craftFocusId];
+      const name = recipe?.lineName || recipe?.name;
+      if (name && groups.has(name)) {
+        craftSide = name;
+        rememberCraftSide(name);
+        return;
+      }
+    }
+    const saved = savedCraftSide();
+    if (saved && groups.has(saved)) {
+      craftSide = saved;
+      return;
+    }
+    if (groups.has(craftSide)) return;
+    const unlocked = names.find((name) => groups.get(name).some(recipeOpen));
+    craftSide = unlocked || names[0] || '';
+  }
+
+  function paintSideTabs(groups) {
+    const nav = document.querySelector('#craft-sidetabs');
+    const body = craftModal.querySelector('.craft-body');
+    if (!nav || !body) return;
+    const show = groups.size >= 2;
+    nav.hidden = !show;
+    body.classList.toggle('no-side', !show);
+    if (!show) {
+      nav.innerHTML = '';
+      return;
+    }
+    nav.innerHTML = [...groups.entries()].map(([name, list]) => {
+      const open = list.filter(recipeOpen).length;
+      const on = name === craftSide;
+      return `<button type="button" class="sidetab${on ? ' is-on' : ''}" role="tab" aria-selected="${on ? 'true' : 'false'}" data-side="${escCraft(name)}">${escCraft(name)}<span class="sidetab-count">${open}/${list.length}</span></button>`;
+    }).join('');
+    if (window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches) {
+      nav.querySelector('.sidetab.is-on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }
+  }
+
+  function paintRecipeButtons(container, recipes, { headings = true } = {}) {
     if (!container) return;
     if (craftStation === 'farming_patch' && recipes.length === 0) {
       container.innerHTML = '<p class="empty">Nothing to grow yet.</p>';
@@ -294,7 +389,7 @@ export function bindHud(root, state, world) {
     }
     container.innerHTML = [...lines.values()].map((list) => {
       list.sort((a, b) => a.lineIndex - b.lineIndex);
-      const lineTitle = list[0]?.lineName ? `<h4 class="line">${list[0].lineName}</h4>` : '';
+      const lineTitle = headings && list[0]?.lineName ? `<h4 class="line">${escCraft(list[0].lineName)}</h4>` : '';
       return lineTitle + list.map((recipe) => {
         const levelText = levelRequirementText(recipe);
         const levelLocked = Boolean(levelText)
@@ -352,12 +447,18 @@ export function bindHud(root, state, world) {
       sheetTop: sheet?.scrollTop ?? 0,
       sheet,
       list,
+      key: `${craftStation}:${craftTab}:${craftSubtab}:${craftSide}`,
     };
   }
 
   function restoreCraftScrollNow() {
     const plan = craftScrollPlan;
     if (!plan || plan.focusId) return;
+    const key = `${craftStation}:${craftTab}:${craftSubtab}:${craftSide}`;
+    if (plan.key && plan.key !== key) {
+      if (plan.list) plan.list.scrollTop = 0;
+      return;
+    }
     if (plan.list) plan.list.scrollTop = plan.top;
     if (plan.sheet) plan.sheet.scrollTop = plan.sheetTop;
   }
@@ -448,7 +549,7 @@ export function bindHud(root, state, world) {
                 : fletchMode
                   ? 'Fletch ranged weapons and ammo. Arrows still make 20 per craft action.'
                     : potterMode
-                    ? 'Turn soft clay into clay. This wheel does not make ranged gear.'
+                    ? 'Soften hard clay with a bucket of water. Finished soft clay stays in your materials.'
                     : sawmillMode
                       ? 'Saw logs into planks. Finished planks stay in your materials.'
                       : patchMode
@@ -458,6 +559,9 @@ export function bindHud(root, state, world) {
                       : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
     }
     if (!simpleStation) paintSubtabs();
+    if (simpleStation || loomMode || fletchMode || !subtabsEl.querySelector('[data-subtab]')) {
+      subtabsEl.hidden = true;
+    }
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
       btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
     }
@@ -466,8 +570,14 @@ export function bindHud(root, state, world) {
     }
     const reveal = revealCraftFocus;
     revealCraftFocus = false;
+    const groups = recipeGroups(currentRecipes());
+    const sideBefore = craftSide;
+    chooseCraftSide(groups);
+    paintSideTabs(groups);
+    const sideList = groups.size >= 2 ? (groups.get(craftSide) ?? []) : [...groups.values()].flat();
     holdCraftScroll(craftsEl, { reveal, focusId: craftFocusId });
-    paintRecipeButtons(craftsEl, currentRecipes());
+    if (sideBefore !== craftSide && craftScrollPlan && !craftScrollPlan.focusId) craftScrollPlan.top = 0;
+    paintRecipeButtons(craftsEl, sideList, { headings: groups.size < 2 });
     restoreCraftScrollNow();
     syncQtyHint(craftFocusId);
     if (craftFocusId) showPreview(craftFocusId);
@@ -529,6 +639,34 @@ export function bindHud(root, state, world) {
     setCraftNote('');
     paintCrafts();
     render(performance.now() / 1000);
+  });
+
+  document.querySelector('#craft-sidetabs')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-side]');
+    if (!btn) return;
+    craftSide = btn.dataset.side;
+    rememberCraftSide(craftSide);
+    craftFocusId = null;
+    if (craftsEl) craftsEl.scrollTop = 0;
+    setCraftNote('');
+    paintCrafts();
+    render(performance.now() / 1000);
+  });
+  document.querySelector('#craft-sidetabs')?.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    if (window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches) return;
+    const buttons = [...event.currentTarget.querySelectorAll('[data-side]')];
+    const index = buttons.indexOf(document.activeElement);
+    if (index < 0) return;
+    event.preventDefault();
+    const next = buttons[index + (event.key === 'ArrowDown' ? 1 : -1)];
+    if (!next) return;
+    next.focus();
+    next.click();
+  });
+  craftModal.querySelector('.craft-info')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    craftModal.querySelector('.craft-head')?.classList.toggle('is-info');
   });
 
   subtabsEl.addEventListener('click', (event) => {
@@ -757,7 +895,12 @@ export function bindHud(root, state, world) {
   }
 
   function closeSkillsDock() {
+    skillGuide?.close();
     skillsPanel?.close();
+  }
+
+  function closeHeroesDock() {
+    heroesPanel?.close();
   }
 
   function openCraft(station = 'anvil', options = {}) {
@@ -768,6 +911,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     closeDisplayPicker();
     if (!helpModal.hidden) closeHelp();
@@ -1028,6 +1172,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     if (!helpModal.hidden) closeHelp();
     displayTarget = target;
     state.selectedDisplay = target?.index ?? state.selectedDisplay;
@@ -1389,6 +1534,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     closeDisplayPicker();
     closeBuild();
@@ -1530,6 +1676,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     if (!helpModal.hidden) closeHelp();
     closeBuild();
@@ -1577,16 +1724,16 @@ export function bindHud(root, state, world) {
   function syncFullscreenBtn() {
     const on = Boolean(document.fullscreenElement);
     state.fullscreen = on;
-    if (!expandBtn) return;
-    expandBtn.classList.toggle('is-on', on);
-    expandBtn.title = on ? 'Exit fullscreen' : 'Toggle fullscreen';
-    expandBtn.setAttribute('aria-label', expandBtn.title);
+    if (fullscreenBox) fullscreenBox.checked = on;
   }
-  if (expandBtn && !shouldOfferFullscreen(fullscreenEnv())) {
-    expandBtn.hidden = true;
+  if (fullscreenRow && !shouldOfferFullscreen(fullscreenEnv())) {
+    fullscreenRow.hidden = true;
   } else {
     document.addEventListener('fullscreenchange', syncFullscreenBtn);
-    expandBtn?.addEventListener('click', toggleFullscreen);
+    fullscreenBox?.addEventListener('change', () => {
+      if (Boolean(document.fullscreenElement) === fullscreenBox.checked) return;
+      toggleFullscreen();
+    });
   }
 
   expandModal.querySelector('[data-expand-close]').addEventListener('click', closeExpand);
@@ -1616,9 +1763,8 @@ export function bindHud(root, state, world) {
       buyBtn.disabled = true;
       buyBtn.textContent = 'Owned';
     } else {
-      const mats = buildMaterialLabel('cauldron');
-      const missing = buildMaterialBlock(state, 'cauldron');
-      status.textContent = `Costs ${formatGold(CAULDRON_COST)} gp.${mats ? ` ${mats}.` : ''}${missing ? ` ${missing}` : ''}`;
+      const needs = buildMaterialNeedLine(state, 'cauldron');
+      status.textContent = [`Cost: ${formatGold(CAULDRON_COST)} gp`, needs].filter(Boolean).join('\n');
       buyBtn.disabled = !canBuyCauldron(state);
       buyBtn.textContent = `Buy · ${formatGold(CAULDRON_COST)} gp`;
     }
@@ -1634,11 +1780,10 @@ export function bindHud(root, state, world) {
         itemBuy.textContent = 'Owned';
       } else {
         const paid = station.cost > 0;
-        const mats = buildMaterialLabel(station.id);
-        const missing = mats ? buildMaterialBlock(state, station.id) : '';
+        const needs = paid ? buildMaterialNeedLine(state, station.id) : '';
         itemStatus.hidden = !paid;
         itemStatus.textContent = paid
-          ? `Costs ${formatGold(station.cost)} gp.${mats ? ` ${mats}.` : ''}${missing ? ` ${missing}` : ''}`
+          ? [`Cost: ${formatGold(station.cost)} gp`, needs].filter(Boolean).join('\n')
           : '';
         itemStatus.classList.remove('craft-note');
         itemBuy.disabled = !canBuyStation(state, station.id);
@@ -1671,10 +1816,19 @@ export function bindHud(root, state, world) {
       const label = furnitureLabelForType(type);
       const bought = state.boughtFurniture?.[type] ?? 0;
       if (type === 'farming_patch' && bought >= FARMING_PATCH_CAP) {
-        itemStatus.textContent = 'You can only own 4 farming patches.';
+        itemStatus.textContent = 'You can own six farming patches.';
         itemStatus.classList.remove('craft-note');
         itemBuy.disabled = true;
         itemBuy.textContent = 'Owned';
+        continue;
+      }
+      if (type === 'farming_patch') {
+        const needs = cost > 0 ? buildMaterialNeedLine(state, type) : '';
+        const costLine = cost === 0 ? 'Cost: Free' : `Cost: ${formatGold(cost)} gp`;
+        itemStatus.textContent = ['You can own six farming patches.', costLine, needs].filter(Boolean).join('\n');
+        itemStatus.classList.remove('craft-note');
+        itemBuy.disabled = !canBuyFurniture(state, type);
+        itemBuy.textContent = cost === 0 ? 'Place · Free' : `Buy · ${formatGold(cost)} gp`;
         continue;
       }
       const extra = type === 'shelf'
@@ -1685,23 +1839,23 @@ export function bindHud(root, state, world) {
             return `${live} of ${included} included shelves are placed. Replacement is free.`;
           }
           return bought === 0
-            ? `First ${included} shelves are included. The next costs ${formatGold(cost)}g.`
-            : `Next shelf costs ${formatGold(cost)}g (${bought} bought).`;
+            ? `No maximum. First ${included} shelves are included. The next costs ${formatGold(cost)}g.`
+            : `No maximum. Next shelf costs ${formatGold(cost)}g (${bought} bought).`;
         })()
         : (() => {
           const free = state.freeFurnitureReplace?.[type] ?? 0;
           if (free > 0 || cost === 0) {
             return free > 0
               ? `${free} free replacement${free === 1 ? '' : 's'} left after deleting.`
-              : `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`;
+              : `No maximum. First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`;
           }
           return bought === 0
-            ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
-            : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
+            ? `No maximum. First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
+            : `No maximum. Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
         })();
-      const mats = cost > 0 ? buildMaterialLabel(type) : '';
-      const missing = cost > 0 ? buildMaterialBlock(state, type) : '';
-      itemStatus.textContent = mats ? `${extra} ${mats}.${missing ? ` ${missing}` : ''}` : extra;
+      const needs = cost > 0 ? buildMaterialNeedLine(state, type) : '';
+      const costLine = cost === 0 ? 'Cost: Free' : `Cost: ${formatGold(cost)} gp`;
+      itemStatus.textContent = [extra, costLine, needs].filter(Boolean).join('\n');
       itemStatus.classList.remove('craft-note');
       itemBuy.disabled = !canBuyFurniture(state, type);
       itemBuy.textContent = cost === 0 ? 'Place · Free' : `Buy · ${formatGold(cost)} gp`;
@@ -1728,9 +1882,9 @@ export function bindHud(root, state, world) {
           : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
     }
     if (costEl) {
-      const mats = pendingPlace.cost > 0 ? buildMaterialLabel(pendingPlace.type) : '';
+      const needs = pendingPlace.cost > 0 ? buildMaterialNeedLine(state, pendingPlace.type) : '';
       const goldText = pendingPlace.cost > 0 ? `${formatGold(pendingPlace.cost)} gp` : 'Free';
-      costEl.textContent = mats ? `Cost: ${goldText} · ${mats}.` : `Cost: ${goldText}.`;
+      costEl.textContent = [`Cost: ${goldText}`, needs].filter(Boolean).join('\n');
     }
     if (note) {
       note.hidden = !pendingPlace.note;
@@ -1780,6 +1934,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     if (!helpModal.hidden) closeHelp();
     closeExpand();
@@ -1889,6 +2044,8 @@ export function bindHud(root, state, world) {
       return;
     }
     const cost = nextFurnitureCost(state, pending.type);
+    const patchIndex = pending.type === 'farming_patch' ? (state.boughtFurniture?.farming_patch ?? 0) : 0;
+    const mats = cost > 0 ? buildMaterialLabel(pending.type, patchIndex) : '';
     const need = furniturePlaceBlock(state, pending.type);
     if (need) {
       pendingPlace.note = need;
@@ -1906,7 +2063,6 @@ export function bindHud(root, state, world) {
     world.refreshSelection(true);
     closePlace();
     const label = furnitureLabelForType(pending.type);
-    const mats = cost > 0 ? buildMaterialLabel(pending.type) : '';
     pushLog(state, cost > 0
       ? `Placed a ${label.toLowerCase()} for ${formatGold(cost)} gp${mats ? ` (${mats})` : ''}.`
       : `Placed a ${label.toLowerCase()}.`);
@@ -2158,6 +2314,7 @@ export function bindHud(root, state, world) {
 
   function openMusic() {
     closeSkillsDock();
+    closeHeroesDock();
     closeBuild();
     closeExpand();
     closeSettingsDock();
@@ -2307,6 +2464,7 @@ export function bindHud(root, state, world) {
     closeExpand();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     hideFurnMenu();
     paintSettings();
     if (settingsDock) settingsDock.hidden = false;
@@ -2507,6 +2665,8 @@ export function bindHud(root, state, world) {
   skillsPanel = bindSkillsPanel({
     skills,
     nextUnlock: (skillId, level) => nextUnlockLabel(skillId, level, hiddenCraft),
+    onSkillClick: (id) => skillGuide?.open(id),
+    onClose: () => skillGuide?.close(),
     onOpen: () => {
       closeBuild();
       closeExpand();
@@ -2514,6 +2674,29 @@ export function bindHud(root, state, world) {
       closeSettingsDock();
       hideFurnMenu();
     },
+  });
+  skillGuide = bindSkillGuide({ skills, panel: skillsPanel });
+  heroesPanel = bindHeroesPanel({
+    state,
+    offerFullscreen: shouldOfferFullscreen(fullscreenEnv()),
+    onFullscreen: () => toggleFullscreen(),
+    onOpen: () => {
+      closeBuild();
+      closeExpand();
+      closeMusicDock();
+      closeSkillsDock();
+      closeSettingsDock();
+      hideFurnMenu();
+      if (!helpModal.hidden) closeHelp();
+      closeCraft();
+      closeTrade();
+      closeChest();
+      closeUpgrade();
+      closePotion();
+    },
+    log: (line) => pushLog(state, line),
+    toast: (line) => showGameToast(line),
+    render: () => render(performance.now() / 1000),
   });
   skills.onLevelUp((event) => {
     const unlocked = unlockNamesBetween(event.skillId, event.from, event.level, hiddenCraft);
@@ -2610,6 +2793,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     closeDisplayPicker();
     closeBuild();
@@ -2717,6 +2901,7 @@ export function bindHud(root, state, world) {
     const size = minimap.width;
     const px = (event.clientX - rect.left) * (size / rect.width);
     const py = (event.clientY - rect.top) * (size / rect.height);
+    if (Math.hypot(px - size / 2, py - size / 2) > size / 2) return;
     const frame = minimapFrame(snap);
     const dest = mapToWorld(px, py, frame.bounds, size, frame.yaw, mapZoom, frame.focus);
     mapPing = { x: dest.x, z: dest.z, at: performance.now() / 1000 };
@@ -2939,6 +3124,13 @@ export function bindHud(root, state, world) {
             else mapPing = null;
           }
           drawMinimap(ctx, mapSnap);
+          if (minimapWrap) {
+            const deg = compassNeedleDegrees(frame.yaw);
+            const next = `${deg}deg`;
+            if (minimapWrap.style.getPropertyValue('--map-yaw') !== next) {
+              minimapWrap.style.setProperty('--map-yaw', next);
+            }
+          }
         }
       }
     }

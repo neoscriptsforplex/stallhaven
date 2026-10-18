@@ -58,6 +58,11 @@ import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
 import { applyOsrsScale, getBundledLook, measureVisibleBox, OSRS_MODEL_SCALE, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
 import { prepareDungeonRockMaterials } from './upload.js';
 import { attachSpinner } from './stationSpin.js';
+import { attachFountainWater } from './fountainWater.js';
+import { attachPortalJelly } from './portalJelly.js';
+import { attachFurnaceFx } from './furnaceFx.js';
+import { attachRangeFx } from './rangeFx.js';
+import { attachLoomFx } from './loomFx.js';
 
 export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
 
@@ -1264,8 +1269,6 @@ function addRoomTorches(root, center, neigh) {
 }
 
 function addOriginDecor(root, center) {
-  addWallVines(root, center);
-
   addWallTorch(root, center.x - ROOM_W / 2 + 0.18, 1.62, center.z - 1.85, Math.PI / 2);
   addWallTorch(root, center.x - ROOM_W / 2 + 0.18, 1.62, center.z + 1.85, Math.PI / 2);
   addWallTorch(root, center.x + ROOM_W / 2 - 0.18, 1.62, center.z - 1.85, -Math.PI / 2);
@@ -1500,12 +1503,16 @@ export function buildRange() {
   const bundled = getBundledLook('range');
   const target = applyRangeWorldScale(buildProceduralRange());
   if (bundled) {
-    return sinkRangePlate(wrapBundledProp(bundled, target, {
+    const range = sinkRangePlate(wrapBundledProp(bundled, target, {
       name: 'range',
       fit: 'height',
       label: 'Range',
       wareY: 'top',
     }));
+    // Stew, bobbing food and steam in the pot while cooking.
+    const fx = attachRangeFx(range);
+    if (fx) range.userData.rangeFx = fx;
+    return range;
   }
   return target;
 }
@@ -1618,6 +1625,9 @@ export function buildFurnace() {
     root.name = 'furnace';
     root.add(fitted);
     root.userData.wareY = fitted.userData.wareY;
+    // Bars slide into the oven mouth and the chamber glows while smelting.
+    const fx = attachFurnaceFx(fitted);
+    if (fx) root.userData.furnaceFx = fx;
     return root;
   }
   return buildProceduralFurnace();
@@ -1722,7 +1732,11 @@ function buildProceduralLoom() {
 }
 
 export function buildLoom() {
-  return fitBundledStation('loom', buildProceduralLoom());
+  const loom = fitBundledStation('loom', buildProceduralLoom());
+  // The bundled OBJ carries loom_beater / loom_shuttle / loom_heddle_a|b / loom_cloth_roll.
+  const fx = attachLoomFx(loom);
+  if (fx) loom.userData.loomFx = fx;
+  return loom;
 }
 
 function buildProceduralFletchingBench() {
@@ -1762,7 +1776,12 @@ function buildProceduralPotterWheel() {
 }
 
 export function buildPotterWheel() {
-  return fitBundledStation('potter', buildProceduralPotterWheel());
+  const wheel = fitBundledStation('potter', buildProceduralPotterWheel());
+  // The bundled OBJ carries the wheel head, clay, shaft and kick wheel as `o pottery_plate`
+  // (vertical axle); spin it while pottery is crafting.
+  const spinner = attachSpinner(wheel, { partName: 'pottery_plate' });
+  if (spinner) wheel.userData.spinner = spinner;
+  return wheel;
 }
 
 function buildProceduralSawmill() {
@@ -1797,36 +1816,41 @@ function buildProceduralSawmill() {
 }
 
 /**
- * Luke's sawmill dump at the true OSRS unit scale (256×128 → 2.88×1.44 m).
- * The procedural bench is only the fallback when the dump is missing.
+ * Luke's sawmill dump, then half the length and depth (X and Z) with the
+ * height left alone. The procedural bench is only the fallback when the dump
+ * is missing. dumpStandEuler must not lay this bench on its side.
  */
 export function buildSawmill() {
   const bundled = getBundledLook('sawmill');
-  const bench = bundled
-    ? wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'sawmill', fit: 'max' })
-    : buildProceduralSawmill();
-  if (bundled) sitVisibleOnY(bench, 0);
+  let bench;
+  if (bundled) {
+    const source = bundled.clone(true);
+    source.userData.exemptDumpStand = true;
+    bench = wrapBundledProp(source, osrsFitHost(bundled), { name: 'sawmill', fit: 'max' });
+    bench.scale.x *= 0.5;
+    bench.scale.z *= 0.5;
+    bench.updateMatrixWorld(true);
+    sitVisibleOnY(bench, 0);
+  } else {
+    bench = buildProceduralSawmill();
+  }
   // Bundled OBJ splits the blade into `o saw_blade`. Spin it on the Z axle while sawing.
   const spinner = attachSpinner(bench, { partName: 'saw_blade' });
   if (spinner) bench.userData.spinner = spinner;
   return bench;
 }
 
-/** 2×2 outdoor soil. Origin at the centre, y = 0 on the grass. */
-export function buildFarmingPatch() {
-  const bundled = getBundledLook('farming-patch');
-  if (bundled) {
-    const fitted = wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'farming-patch', fit: 'max' });
-    sitVisibleOnY(fitted, 0);
-    return fitted;
-  }
+/** Brown 2×2-tile soil used when the dump is missing, tiny, or buried. */
+function buildProceduralFarmingPatch() {
   const group = new THREE.Group();
   group.name = 'farming-patch';
+  group.userData.farmingPatchFallback = true;
   const soil = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(2.88, 0.08, 2.88),
+    new THREE.BoxGeometry(2.88, 0.1, 2.88),
     new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.95 }),
   ));
-  soil.position.y = 0.04;
+  soil.name = 'farming-patch-soil';
+  soil.position.y = 0.05;
   group.add(soil);
   const rim = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(2.88, 0.1, 0.08),
@@ -1835,6 +1859,42 @@ export function buildFarmingPatch() {
   rim.position.set(0, 0.08, 1.4);
   group.add(rim);
   return group;
+}
+
+/** A plot you can see on the grass: about two tiles across, sitting on y = 0. */
+export function farmingPatchVisible(mesh) {
+  if (!mesh) return false;
+  const box = measureVisibleBox(mesh);
+  if (!box || box.isEmpty()) return false;
+  const size = box.getSize(new THREE.Vector3());
+  if (size.x < 1.6 || size.z < 1.6) return false;
+  if (size.x > 6 || size.z > 6) return false;
+  if (!(box.max.y > 0.04)) return false;
+  if (box.min.y < -0.05) return false;
+  return true;
+}
+
+/** Put the plot on the confirmed ground point. groundY is the lawn plane. */
+export function placeFarmingPatchMesh(mesh, pose, groundY = 0) {
+  if (!mesh || !pose) return mesh;
+  mesh.position.set(pose.x, groundY, pose.z);
+  if (pose.rot != null) mesh.rotation.y = pose.rot;
+  return mesh;
+}
+
+/** 2×2 outdoor soil. Origin at the centre, y = 0 on the grass. */
+export function buildFarmingPatch() {
+  const bundled = getBundledLook('farming-patch');
+  if (bundled) {
+    try {
+      const fitted = wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'farming-patch', fit: 'max' });
+      sitVisibleOnY(fitted, 0);
+      if (farmingPatchVisible(fitted)) return fitted;
+    } catch (err) {
+      console.warn('Farming patch model skipped:', err?.message || err);
+    }
+  }
+  return buildProceduralFarmingPatch();
 }
 
 export function buildSpinningWheel() {
@@ -1848,10 +1908,17 @@ export function buildSpinningWheel() {
       wareY: 'top',
     });
     sitVisibleOnY(fitted, 0);
-    const spinner = new THREE.Group();
-    spinner.name = 'spin-wheel';
-    fitted.add(spinner);
-    fitted.userData.spinWheel = spinner;
+    // The bundled OBJ carries the wheel as `o spin_wheel` (axle along X).
+    const spinner = attachSpinner(fitted, { partName: 'spin_wheel' });
+    if (spinner) {
+      fitted.userData.spinner = spinner;
+      fitted.userData.spinWheel = spinner.pivot;
+    } else {
+      const empty = new THREE.Group();
+      empty.name = 'spin-wheel';
+      fitted.add(empty);
+      fitted.userData.spinWheel = empty;
+    }
     return fitted;
   }
   return applyWheelWorldScale(buildProceduralSpinningWheel());
@@ -1942,15 +2009,19 @@ function buildProceduralPortal() {
   const jambW = w * 0.16;
   const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(jambW, h * 0.86, d), stone));
   left.position.set(-w / 2 + jambW / 2, h * 0.43, 0);
+  left.userData.skipPortalJelly = true;
   group.add(left);
   const right = left.clone();
   right.position.x = w / 2 - jambW / 2;
+  right.userData.skipPortalJelly = true;
   group.add(right);
   const lintel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w, h * 0.16, d), stone));
   lintel.position.y = h - h * 0.08;
+  lintel.userData.skipPortalJelly = true;
   group.add(lintel);
   const inner = new THREE.Mesh(new THREE.CircleGeometry(Math.min(w, h) * 0.22, 20), glow);
   inner.position.y = h * 0.46;
+  inner.userData.portalSurface = true;
   group.add(inner);
   return group;
 }
@@ -1976,6 +2047,7 @@ export function buildPortal() {
   const box = measureVisibleBox(visual);
   label.position.y = (Number.isFinite(box.max.y) ? box.max.y : PORTAL_TARGET_HEIGHT) + 0.18;
   root.add(label);
+  root.userData.portalJelly = attachPortalJelly(root);
   return root;
 }
 
@@ -2434,6 +2506,12 @@ export function tickFountainWater(root, now) {
   root.traverse((child) => {
     const fx = child.userData?.fountainWater;
     if (fx) stepFountainWater(fx, now);
+    const flow = child.userData?.fountainFlow;
+    if (flow) {
+      const dt = flow.lastNow == null ? 0 : now - flow.lastNow;
+      flow.lastNow = now;
+      flow.fx.update(dt);
+    }
   });
 }
 
@@ -2451,6 +2529,8 @@ export function buildFountain() {
     }
   }
   mountFountainWater(group);
+  // Jets from the finial, overflow streams between the bowls, ripples and bobbing pools.
+  group.userData.fountainFlow = { fx: attachFountainWater(group), lastNow: null };
   return group;
 }
 
@@ -2575,8 +2655,8 @@ function flowerGeometry(rand) {
   return merged;
 }
 
-function addGrassFlowers(root, expansionIds) {
-  const spots = gardenFlowerSpots(expansionIds);
+function addGrassFlowers(root, expansionIds, furniture = null) {
+  const spots = gardenFlowerSpots(expansionIds, furniture);
   const geometry = flowerGeometry(randAt(8801));
   if (!spots.length || !geometry) return;
   const material = new THREE.MeshStandardMaterial({
@@ -2683,8 +2763,8 @@ function addGarden(root, cells, expansionIds = [], furniture = null) {
     door.position.set(hatch.x, 0, hatch.z);
     root.add(door);
   }
-  addLushGrass(root, grass, expansionIds, rand);
-  addGrassFlowers(root, expansionIds);
+  addLushGrass(root, grass, expansionIds, rand, furniture);
+  addGrassFlowers(root, expansionIds, furniture);
 }
 
 /** Metres of ground covered by one seamless fountain_cobble tile. */
@@ -2907,8 +2987,8 @@ function buildProceduralTrapdoor() {
   return group;
 }
 
-function addLushGrass(root, grass, expansionIds, rand) {
-  const clusters = gardenGrassClusters(expansionIds);
+function addLushGrass(root, grass, expansionIds, rand, furniture = null) {
+  const clusters = gardenGrassClusters(expansionIds, furniture);
   const bladeGeo = new THREE.ConeGeometry(0.016, 1, 4);
   bladeGeo.translate(0, 0.5, 0);
   const greens = [

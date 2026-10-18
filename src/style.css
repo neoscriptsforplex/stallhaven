@@ -378,7 +378,9 @@ body {
 }
 
 /* Materials drawer. Desktop: tab at the bottom centre, list slides up (max 25vh).
-   Phones and narrow portrait: tab on the left edge, list slides out (max 25vw). */
+   Phones and narrow portrait: tab on the left edge, list slides out (max 25vw).
+   Coarse pointers (portrait and landscape) open that side list at double width,
+   capped at 90vw so the tab stays on screen. */
 .materials-drawer {
   position: fixed;
   left: 50%;
@@ -593,6 +595,34 @@ body {
   .materials-drawer.is-open {
     top: calc(env(safe-area-inset-top, 0px) + 165px);
     bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 8px);
+  }
+}
+
+/* Phones: the open side list is twice the 25vw panel, and never wider than 90vw.
+   The 26px tab stays in the row so it can still be tapped. Desktop is untouched. */
+@media (pointer: coarse) {
+  .materials-drawer.is-open {
+    max-width: min(
+      calc(2 * (25vw - env(safe-area-inset-left, 0px))),
+      calc(90vw - env(safe-area-inset-left, 0px))
+    );
+  }
+
+  .materials-drawer.is-open .materials-clip {
+    width: min(
+      calc(2 * (25vw - env(safe-area-inset-left, 0px)) - 26px),
+      calc(90vw - env(safe-area-inset-left, 0px) - 26px)
+    );
+    max-width: min(
+      calc(2 * (25vw - env(safe-area-inset-left, 0px)) - 26px),
+      calc(90vw - env(safe-area-inset-left, 0px) - 26px)
+    );
+  }
+
+  .materials-drawer.is-open .materials-toggle {
+    pointer-events: auto;
+    flex: none;
+    width: 26px;
   }
 }
 
@@ -1086,6 +1116,11 @@ body.modal-open #view {
 
 .craft-sheet > .craft-body {
   flex-shrink: 1;
+}
+
+.build-item .meta,
+[data-place-cost] {
+  white-space: pre-line;
 }
 
 .craft-note {
@@ -2544,4 +2579,1124 @@ html.is-booting.is-scene-live #view {
   #skills-dock.skills-dock {
     animation: none;
   }
+}
+
+/* HUD panel width matches the minimap. Phones keep a two-line log under the gathering bar. */
+:root { --hud-map: 196px; }
+
+#hud {
+  width: max-content;
+  max-width: calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+}
+#hud .ledger {
+  box-sizing: content-box;
+  width: var(--hud-map);
+}
+#hud .minimap-wrap { width: var(--hud-map); }
+#hud .shop-xp {
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+#hud .ledger-row { min-width: 0; }
+#hud .gold {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#hud .game-log {
+  width: 100%;
+  max-height: calc(3 * 1.3em);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 1.3em), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 1.3em), transparent);
+}
+#hud .game-log li {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+}
+#hud .game-log li:nth-child(2) { opacity: 0.75; }
+#hud .game-log li:nth-child(n+3) { opacity: 0.5; }
+#hud .active-craft { width: 100%; }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #hud { width: auto; max-width: none; }
+  #hud .ledger { box-sizing: border-box; width: 100%; }
+  #hud .minimap-wrap { width: var(--portrait-map); }
+  #hud .shop-xp { width: auto; }
+  #hud .gold { max-width: 46vw; }
+  #hud .active-craft {
+    left: calc(max(8px, env(safe-area-inset-left, 0px)) + 32px);
+    width: min(200px, calc(100vw - 56px));
+  }
+  #hud .game-log {
+    position: absolute;
+    top: calc(100% + 8px + var(--portrait-map) + 8px + 58px);
+    left: calc(max(8px, env(safe-area-inset-left, 0px)) + 32px);
+    width: var(--portrait-map);
+    max-width: var(--portrait-map);
+    max-height: calc(2 * 1.3em);
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.3;
+    overflow: hidden;
+    pointer-events: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+  #hud.is-map-open .game-log {
+    top: calc(100% + 16px + var(--portrait-map-open) + 58px);
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 720px) {
+  #hud { width: auto; max-width: none; max-height: none; }
+}
+
+/* ---- Round OSRS-style minimap ---- */
+.minimap-wrap {
+  --ring: 7px;
+  --map-yaw: 0deg;
+  aspect-ratio: 1;
+  isolation: isolate;
+  margin: 9px 9px 16px;
+  max-width: calc(196px - 18px);
+}
+
+.minimap {
+  border-radius: 50%;
+  border: 0;
+  background: #2a4a28;
+  max-width: 100%;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 0 10px rgba(0, 0, 0, 0.45),
+    0 0 0 2px #2a1a0c,
+    0 0 0 calc(var(--ring) - 2px) #6b4a1e,
+    0 0 0 var(--ring) #c9a14a,
+    0 0 0 calc(var(--ring) + 2px) #2a1a0c,
+    0 4px 14px calc(var(--ring) + 2px) rgba(0, 0, 0, 0.35);
+}
+
+.minimap-wrap::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--ring) + 1px);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 230, 170, 0.35), transparent 45%),
+    radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.35), transparent 50%);
+  -webkit-mask: radial-gradient(circle, transparent calc(50% - var(--ring) + 1px), #000 calc(50% - var(--ring) + 2px));
+  mask: radial-gradient(circle, transparent calc(50% - var(--ring) + 1px), #000 calc(50% - var(--ring) + 2px));
+}
+
+.minimap-compass {
+  left: -9px;
+  top: -9px;
+  z-index: 2;
+}
+
+.minimap-compass button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid #2a1a0c;
+  background: #3a2612;
+  box-shadow: 0 0 0 2px #c9a14a, 0 2px 6px rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.minimap-needle {
+  width: 100%;
+  height: 100%;
+  background: var(--compass-url, url("./public/minimap/compass.svg")) center / contain no-repeat;
+  transform: rotate(var(--map-yaw));
+  transition: transform 120ms linear;
+}
+
+.minimap-zoom {
+  right: -8px;
+  bottom: -8px;
+  z-index: 2;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.minimap-zoom button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #2a1a0c;
+  background: radial-gradient(circle at 35% 30%, #7a5a2a, #3a2612 70%);
+  box-shadow: 0 0 0 1.5px #c9a14a, 0 2px 5px rgba(0, 0, 0, 0.5);
+  font-weight: 700;
+}
+
+@media (hover: hover) {
+  .minimap-compass button:hover,
+  .minimap-zoom button:hover {
+    background: radial-gradient(circle at 35% 30%, #9a7438, #4a3016 70%);
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #hud .minimap-wrap {
+    --ring: 4px;
+    top: calc(100% + 12px);
+    left: calc(max(8px, env(safe-area-inset-left, 0px)) + 4px);
+    width: calc(var(--portrait-map) - 8px);
+    max-width: calc(var(--portrait-map) - 8px);
+    margin: 0;
+  }
+  #hud .minimap-wrap.is-expanded {
+    --ring: 7px;
+    width: calc(var(--portrait-map-open) - 14px);
+    max-width: calc(var(--portrait-map-open) - 14px);
+  }
+  #hud .minimap-compass { left: -6px; top: -6px; }
+  #hud .minimap-compass button { width: 24px; height: 24px; }
+  #hud .minimap-zoom { display: none; }
+  #hud .minimap-wrap.is-expanded .minimap-zoom { display: flex; }
+  #hud .minimap-toggle,
+  #hud .minimap-close {
+    top: auto;
+    bottom: -8px;
+    right: -6px;
+    height: 22px;
+    min-width: 0;
+    border-radius: 11px;
+    border: 2px solid #2a1a0c;
+    background: #3a2612;
+    box-shadow: 0 0 0 1.5px #c9a14a;
+  }
+  #hud.is-map-open .minimap-close { bottom: auto; top: -6px; right: -6px; }
+}
+
+/* Crafting screen: header, one tab row, and type side tabs. */
+.craft-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.craft-head h2 { margin: 0; flex: 1 1 auto; }
+.craft-info,
+.craft-x {
+  flex: none;
+  min-width: 1.8rem;
+  min-height: 1.8rem;
+  padding: 0 8px;
+}
+.craft-info-tip {
+  display: none;
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #2a1a10;
+  border: 1px solid var(--line);
+  color: #f0d9a8;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.craft-info:hover + .craft-info-tip,
+.craft-info:focus + .craft-info-tip,
+.craft-head.is-info .craft-info-tip {
+  display: block;
+}
+.craft-sheet .tabbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+.craft-sheet .tabbar .tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: auto;
+  margin: 0;
+  grid-template-columns: none;
+}
+.craft-sheet .tab {
+  min-height: 1.8rem;
+  width: auto;
+}
+.craft-sheet .tabbar .subtabs:not([hidden]) {
+  border-left: 1px solid var(--line);
+  padding-left: 8px;
+}
+.craft-body {
+  grid-template-columns: 118px minmax(0, 1fr) 220px;
+}
+.craft-body.no-side {
+  grid-template-columns: minmax(0, 1fr) 220px;
+}
+.craft-sidetabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow: auto;
+}
+.sidetab {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  text-align: left;
+  min-height: 2rem;
+  padding: 4px 8px;
+}
+.sidetab.is-on { outline: 1px solid var(--gold); }
+.sidetab-count { opacity: 0.75; font-variant-numeric: tabular-nums; }
+.craft-row { align-items: center; }
+.craft-qty { flex-direction: row; gap: 4px; }
+.craft { padding: 5px 9px; }
+.craft-mats-line { display: block; grid-column: 1 / -1; }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .craft-body,
+  .craft-body.no-side {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+  }
+  .craft-sidetabs {
+    flex-direction: row;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+  .sidetab { flex: none; border-radius: 16px; scroll-snap-align: start; }
+  .craft-preview-pane { flex-direction: row; align-items: center; }
+  .craft-preview-pane canvas { width: 64px; height: 64px; flex: none; }
+  .craft-qty button { min-width: 40px; min-height: 32px; }
+}
+
+/*
+ * Stallhaven skill guide. Load after style.css (uses --panel, --line, --gold, --parchment,
+ * .panel, .xp-bar, .skills-close, .skill-sr and --skill-yellow from the Skills panel CSS).
+ * Phone portrait rules sit inside @media (orientation: portrait) and (pointer: coarse).
+ */
+
+:root {
+  --guide-row-open: rgba(64, 40, 22, 0.55);
+  --guide-row-alt: rgba(52, 32, 18, 0.55);
+  --guide-check: #7fcf6a;
+  --guide-perk: #c9a2ff;
+}
+
+/* ---------- Window (desktop / landscape) ---------- */
+
+.guide-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  background: rgba(8, 5, 3, 0.45);
+}
+
+.guide-backdrop[hidden],
+.skill-guide[hidden] {
+  display: none;
+}
+
+.skill-guide {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 42;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 32px));
+  height: min(620px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  padding: 12px 14px 12px;
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  background: rgba(36, 22, 12, 0.97);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(227, 179, 74, 0.12);
+  color: var(--parchment);
+}
+
+.guide-head { grid-row: 1; }
+.guide-tabs { grid-row: 2; }
+.guide-list { grid-row: 3; }
+.guide-foot { grid-row: 4; }
+
+.guide-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(227, 179, 74, 0.28);
+}
+
+.guide-back {
+  display: none;
+}
+
+.guide-icon {
+  grid-column: 2;
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid #1c120c;
+  border-radius: 6px;
+  background: linear-gradient(var(--skill-tile-top, #4e321d), var(--skill-tile-bottom, #2c1b0f));
+  box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.18);
+}
+
+.guide-title-wrap {
+  grid-column: 3;
+  min-width: 0;
+}
+
+.skill-guide h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #f3e2c0;
+}
+
+.guide-sub {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: #cbb48a;
+}
+
+.guide-level {
+  grid-column: 4;
+  margin: 0;
+  display: grid;
+  justify-items: end;
+  line-height: 1;
+}
+
+.guide-level span {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #cbb48a;
+}
+
+.guide-level b {
+  font-size: 1.7rem;
+  color: var(--skill-yellow, #ffd94a);
+  text-shadow: 1px 1px 0 #000;
+  font-variant-numeric: tabular-nums;
+}
+
+.guide-close {
+  grid-column: 5;
+  align-self: start;
+}
+
+.guide-xp {
+  grid-column: 1 / -1;
+}
+
+.guide-bar {
+  height: 10px;
+}
+
+.guide-xp-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: #d9c4a0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Tabs ---------- */
+
+.guide-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 0 0;
+  border-bottom: 1px solid rgba(227, 179, 74, 0.35);
+}
+
+.guide-tabs[hidden] {
+  display: none;
+}
+
+.guide-tab {
+  flex: 0 1 auto;
+  min-height: 32px;
+  margin-bottom: -1px;
+  padding: 5px 12px;
+  border-radius: 6px 6px 0 0;
+  border-color: rgba(227, 179, 74, 0.35);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #d9c4a0;
+  background: linear-gradient(#4a2e1a, #2e1c10);
+}
+
+.guide-tab.is-on {
+  color: #fff3d6;
+  border-color: var(--gold);
+  border-bottom-color: rgba(36, 22, 12, 0.97);
+  background: linear-gradient(#8a5a30, #5a3518);
+}
+
+/* ---------- Rows ---------- */
+
+.guide-list {
+  margin: 8px 0 0;
+  padding: 3px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #1c120c;
+  border-radius: 6px;
+  background: rgba(16, 10, 6, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.14);
+  scroll-behavior: smooth;
+}
+
+.guide-row {
+  display: grid;
+  grid-template-columns: 2.6rem 34px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 5px 10px 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--guide-row-open);
+}
+
+.guide-row:nth-child(even) {
+  background: var(--guide-row-alt);
+}
+
+.guide-row + .guide-row {
+  margin-top: 3px;
+}
+
+.guide-lv {
+  justify-self: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--skill-yellow, #ffd94a);
+  text-shadow: 1px 1px 0 #000;
+  font-variant-numeric: tabular-nums;
+}
+
+.guide-item {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 5px;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 240, 210, 0.12), rgba(0, 0, 0, 0.25));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.guide-glyph {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6));
+}
+
+.guide-text {
+  display: grid;
+  min-width: 0;
+}
+
+.guide-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f3e2c0;
+}
+
+.guide-desc {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: #cbb48a;
+}
+
+.guide-state {
+  width: 20px;
+  height: 20px;
+}
+
+.guide-state.is-check {
+  fill: var(--guide-check);
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6));
+}
+
+.guide-state.is-lock {
+  fill: #b39a74;
+}
+
+/* Locked: dim but readable. */
+.guide-row.is-locked .guide-lv,
+.guide-row.is-locked .guide-item,
+.guide-row.is-locked .guide-text {
+  opacity: 0.55;
+}
+
+.guide-row.is-locked .guide-lv {
+  color: #c9b48c;
+}
+
+.guide-row.is-locked .guide-item {
+  filter: grayscale(0.7);
+}
+
+/* Next unlock: the one to aim for. */
+.guide-row.is-next {
+  border-color: var(--gold);
+  background: linear-gradient(90deg, rgba(227, 179, 74, 0.26), rgba(227, 179, 74, 0.08));
+  box-shadow: 0 0 0 1px rgba(227, 179, 74, 0.25);
+}
+
+.guide-row.is-next .guide-lv,
+.guide-row.is-next .guide-item,
+.guide-row.is-next .guide-text {
+  opacity: 1;
+}
+
+.guide-row.is-next .guide-lv {
+  color: var(--skill-yellow, #ffd94a);
+}
+
+.guide-row.is-next .guide-item {
+  filter: none;
+}
+
+/* Perk rows: a special band, not a recipe. */
+.guide-row.is-perk {
+  background: linear-gradient(90deg, rgba(120, 80, 170, 0.32), rgba(64, 40, 22, 0.55));
+  border-color: rgba(201, 162, 255, 0.35);
+}
+
+.guide-row.is-perk .guide-item {
+  color: var(--guide-perk) !important;
+}
+
+.guide-badge {
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.guide-badge.is-next {
+  color: #2a1a0c;
+  background: var(--gold);
+}
+
+.guide-badge.is-perk {
+  color: #1e1230;
+  background: var(--guide-perk);
+}
+
+.guide-badge.is-soon {
+  color: #f3e2c0;
+  background: rgba(120, 96, 64, 0.85);
+  border: 1px solid rgba(236, 214, 176, 0.35);
+}
+
+.guide-row.is-soon .guide-text {
+  font-style: italic;
+}
+
+.guide-foot {
+  margin: 8px 2px 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: #cbb48a;
+}
+
+.guide-foot[hidden] {
+  display: none;
+}
+
+/* Desktop hover on rows only (no layout change). */
+@media (hover: hover) {
+  .guide-row:hover {
+    border-color: rgba(227, 179, 74, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-list {
+    scroll-behavior: auto;
+  }
+  .skill-guide.is-sheet {
+    animation: none !important;
+  }
+}
+
+/* ---------- Phone portrait: full-height bottom sheet ---------- */
+
+@media (orientation: portrait) and (pointer: coarse) {
+  /* Guide mode: tapping a tile opens the guide, so the empty detail card shrinks to a one-line hint. */
+  .skills-dock.has-guide .skill-tip,
+  .skills-dock.has-guide:not(.has-tip) .skill-tip {
+    min-height: 0;
+    padding: 8px 12px;
+  }
+
+  .skills-dock.has-guide .skill-tip-hint {
+    min-height: 0;
+    font-size: 0.86rem;
+  }
+
+  .guide-backdrop {
+    background: rgba(8, 5, 3, 0.35);
+  }
+
+  .skill-guide {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: auto;
+    height: calc(100vh - 8px);
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - 8px);
+    padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    animation: guide-sheet-up 0.22s ease-out;
+  }
+
+  .guide-head {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+
+  .guide-back {
+    display: block;
+    grid-column: 1 / -1;
+    justify-self: start;
+    min-height: 44px;
+    padding: 6px 14px 6px 10px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .guide-close {
+    display: none;
+  }
+
+  .guide-icon {
+    grid-column: 1;
+    width: 48px;
+    height: 48px;
+  }
+
+  .guide-title-wrap {
+    grid-column: 2 / 4;
+  }
+
+  .skill-guide h2 {
+    font-size: 1.25rem;
+  }
+
+  .guide-sub {
+    font-size: 0.86rem;
+  }
+
+  .guide-level {
+    grid-column: 4;
+  }
+
+  .guide-level b {
+    font-size: 2rem;
+  }
+
+  .guide-bar {
+    height: 12px;
+  }
+
+  .guide-xp-text {
+    font-size: 0.88rem;
+  }
+
+  .guide-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .guide-tab {
+    flex: 1 0 auto;
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
+
+  .guide-row {
+    grid-template-columns: 2.6rem 40px minmax(0, 1fr) 24px;
+    min-height: 56px;
+    padding: 6px 10px 6px 6px;
+  }
+
+  .guide-item {
+    width: 40px;
+    height: 40px;
+  }
+
+  .guide-glyph {
+    width: 28px;
+    height: 28px;
+  }
+
+  .guide-lv {
+    font-size: 1.3rem;
+  }
+
+  .guide-name {
+    font-size: 1.02rem;
+  }
+
+  .guide-desc {
+    font-size: 0.86rem;
+  }
+
+  .guide-badge {
+    font-size: 0.7rem;
+  }
+
+  .guide-foot {
+    font-size: 0.86rem;
+  }
+}
+
+@keyframes guide-sheet-up {
+  from { transform: translateY(24px); opacity: 0.6; }
+  to { transform: none; opacity: 1; }
+}
+
+/* Level-up toasts (z-index 30 in the Skills CSS) must stay above the guide. */
+.guide-open .skill-toast {
+  z-index: 44;
+}
+
+/*
+ * Heroes + Quests UI (draft). Load after src/style.css.
+ * Tokens come from the game: --panel, --line, --gold, --parchment, --skill-yellow.
+ * Phone rules live only inside @media (orientation: portrait) and (pointer: coarse).
+ */
+:root {
+  --hq-green: #7fd46a;
+  --hq-amber: #ffd94a;
+  --hq-red: #f0a07a;
+  --hq-card-top: #4e321d;
+  --hq-card-bottom: #2c1b0f;
+}
+
+/* ---------- Top bar ---------- */
+/* Icon buttons were stretched to 4.5rem by `#save-bar button`. Narrowing them pays for Heroes + Quests. */
+#save-bar #music-btn,
+#save-bar #coop-btn,
+#save-bar #expand-btn,
+#save-bar #settings-btn { min-width: 2.6rem; }
+#save-bar #coop-btn svg { width: 1.15rem; height: 1.15rem; vertical-align: -3px; }
+#heroes-btn, #quests-btn { position: relative; min-width: 4.5rem; }
+#heroes-btn.is-on, #quests-btn.is-on { border-color: var(--gold); background: linear-gradient(#8a5a30, #5a3518); }
+.hq-btn-icon { display: none; width: 1.2rem; height: 1.2rem; }
+.hq-badge {
+  position: absolute; top: -7px; right: -7px; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 99px; border: 1px solid #3a240e; background: radial-gradient(circle at 30% 30%, #ffe58a, #c8902a);
+  color: #2a1a08; font: 700 0.72rem/18px Palatino, Georgia, serif; text-align: center;
+  box-shadow: 0 0 0 2px rgba(255, 217, 74, 0.35), 0 2px 6px rgba(0, 0, 0, 0.5);
+  animation: hq-badge-pulse 1.6s ease-in-out infinite;
+}
+@keyframes hq-badge-pulse { 50% { box-shadow: 0 0 0 5px rgba(255, 217, 74, 0.12), 0 2px 6px rgba(0, 0, 0, 0.5); } }
+/* Narrow desktop windows: Heroes + Quests drop to icons before the bar can reach the ledger. */
+@media (max-width: 1040px) and (pointer: fine) {
+  #save-bar #heroes-btn, #save-bar #quests-btn { min-width: 2.6rem; }
+  #heroes-btn .hq-btn-label, #quests-btn .hq-btn-label { display: none; }
+  #heroes-btn .hq-btn-icon, #quests-btn .hq-btn-icon { display: inline-block; vertical-align: -3px; }
+}
+
+/* ---------- Shared dock shell (same head as #skills-dock) ---------- */
+.hq-dock { padding: 10px 12px 12px; }
+.hq-dock .skills-head { margin-bottom: 6px; }
+.hq-sub { margin: 0 0 8px; font-size: 0.8rem; color: #e6d3b2; }
+.hq-sub b { color: var(--hq-amber); }
+
+/* ---------- Heroes ---------- */
+#heroes-dock { width: min(470px, calc(100vw - 32px)); }
+.hero-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 6px;
+  border: 1px solid #1c120c; border-radius: 6px; background: rgba(16, 10, 6, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.18);
+}
+.hero-card {
+  display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 4px 10px; align-items: start;
+  padding: 8px; border: 1px solid #6a4a2a; border-radius: 6px;
+  background: linear-gradient(var(--hq-card-top), var(--hq-card-bottom));
+}
+.hero-card.is-next { border-color: var(--gold); box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.35); }
+.hero-card.is-locked { opacity: 0.78; }
+.hero-portrait {
+  grid-row: span 4; width: 76px; height: 92px; border-radius: 6px; overflow: hidden; position: relative;
+  border: 1px solid rgba(227, 179, 74, 0.5);
+  background: radial-gradient(circle at 50% 35%, #6b4a2c, #24160c 75%);
+}
+.hero-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; }
+.hero-portrait.is-empty::after {
+  content: "?"; position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 2.2rem; font-weight: 700; color: rgba(227, 179, 74, 0.55);
+}
+.hero-portrait.is-locked::after { content: "🔒︎"; font-size: 1.4rem; color: rgba(240, 217, 168, 0.6); }
+.hero-card .hero-class { margin: 0; font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: #cbb48a; }
+.hero-card .hero-name { margin: 0; font-size: 0.98rem; font-weight: 700; color: #f3e2c0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hero-card .hero-look { margin: -2px 0 2px; font-size: 0.68rem; color: #bfa57c; }
+.hero-card .hero-name.is-empty { color: #bfa57c; font-weight: 400; font-style: italic; }
+.hq-pill {
+  justify-self: start; display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px;
+  border-radius: 99px; font-size: 0.72rem; font-weight: 700; border: 1px solid currentColor; white-space: nowrap;
+}
+.hq-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.hq-pill.is-idle { color: var(--hq-green); }
+.hq-pill.is-busy { color: var(--hq-amber); }
+.hq-pill.is-ready { color: #2a1a08; background: var(--hq-amber); border-color: var(--hq-amber); }
+.hq-pill.is-ready::before { background: #2a1a08; }
+.hq-pill.is-locked { color: #a8957a; }
+.hq-pill.is-hire { color: var(--gold); }
+.hero-actions { display: grid; gap: 4px; align-self: end; }
+.hero-actions button { padding: 4px 8px; font-size: 0.78rem; }
+.hero-card .hero-price { margin: 0; font-size: 0.8rem; color: var(--gold); font-weight: 700; }
+.hero-card .hero-lock-note { margin: 0; font-size: 0.72rem; color: var(--hq-red); }
+.hq-gold-btn {
+  border-color: #f0d27a; color: #2a1a08; font-weight: 700;
+  background: linear-gradient(#f0d27a, #b8862f);
+}
+@media (hover: hover) { .hq-gold-btn:hover:not(:disabled) { background: linear-gradient(#ffe58a, #c8902a); } }
+.hq-foot { margin: 8px 0 0; font-size: 0.74rem; color: #cbb48a; }
+
+/* ---------- Hero picker (sheet over the dock; no dim, like crafting screens after Luke's change) ---------- */
+#hero-picker.modal { background: transparent; z-index: 24; }
+.hero-picker-sheet { width: min(560px, calc(100vw - 24px)); padding: 16px 18px 14px; }
+.hero-picker-head { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
+.hero-picker-head h2 { margin: 0; }
+.npc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin: 10px 0; }
+.npc-card {
+  display: grid; justify-items: center; gap: 2px; padding: 6px 4px 6px; text-align: center;
+  background: linear-gradient(var(--hq-card-top), var(--hq-card-bottom)); border-color: #6a4a2a;
+}
+.npc-card img { width: 84px; height: 110px; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0,0,0,.45)); }
+.npc-card span { font-size: 0.76rem; line-height: 1.15; min-height: 2.3em; display: grid; place-items: center; }
+.npc-card.is-on { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold), 0 0 12px rgba(227,179,74,.35); background: linear-gradient(#7a5030, #3e2616); }
+.npc-card.is-on span { color: var(--hq-amber); font-weight: 700; }
+.hero-picker-foot { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+.hero-picker-foot .meta { margin: 0; }
+.hero-picker-foot .hq-gold-btn { padding: 8px 16px; }
+
+/* ---------- Quests ---------- */
+#quests-dock { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
+#quests-dock .skills-head { grid-template-columns: 1fr auto auto; gap: 8px; }
+.quest-summary { font-size: 0.78rem; color: #e6d3b2; white-space: nowrap; }
+.quest-summary b { color: var(--hq-amber); }
+.quest-heroes { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 0 0 8px; font-size: 0.74rem; color: #cbb48a; }
+.quest-heroes .hq-pill { font-weight: 400; }
+.quest-body { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 8px; min-height: 0; flex: 1; }
+/* Side tabs: same look as the crafting side tabs (stallhaven-craft-tabs). */
+.craft-sidetabs { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; padding-right: 2px; }
+.sidetab { display: flex; justify-content: space-between; align-items: center; text-align: left; padding: 6px 8px; font-size: 0.8rem; border-left: 3px solid transparent; gap: 4px; }
+.sidetab small { font-size: 0.66rem; color: #cbb48a; }
+.sidetab.is-on { background: linear-gradient(90deg, #8a5a30, #5a3518); border-color: var(--gold); border-left-color: var(--gold); }
+.sidetab .tab-dot { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px; font-size: 0.64rem; line-height: 16px; text-align: center; font-weight: 700; }
+.tab-dot.is-ready { background: var(--hq-amber); color: #2a1a08; }
+.tab-dot.is-busy { border: 1px solid var(--hq-amber); color: var(--hq-amber); line-height: 14px; }
+.quest-list { overflow-y: auto; padding-right: 4px; display: grid; gap: 6px; align-content: start; min-height: 0; max-height: 560px; }
+.quest-card {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center;
+  padding: 8px 10px; border: 1px solid #6a4a2a; border-radius: 6px;
+  background: linear-gradient(var(--hq-card-top), var(--hq-card-bottom));
+}
+.quest-card.is-running { border-color: rgba(255, 217, 74, 0.55); }
+.quest-card.is-ready { border-color: var(--hq-amber); box-shadow: 0 0 0 1px rgba(255, 217, 74, 0.4), 0 0 16px rgba(255, 217, 74, 0.28); background: linear-gradient(#5e3e20, #2c1b0f); }
+.quest-icon {
+  grid-row: span 2; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  border: 2px solid #c4a05a; background: radial-gradient(circle at 35% 30%, var(--tint), #1a100a 85%);
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,.45), 0 2px 5px rgba(0,0,0,.4);
+}
+.quest-icon svg { width: 28px; height: 28px; fill: #f3e2c0; stroke: #2a1a10; stroke-width: 0.8; filter: drop-shadow(0 1px 0 rgba(0,0,0,.6)); }
+.quest-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.quest-title strong { font-size: 0.95rem; color: #f3e2c0; white-space: nowrap; }
+.quest-title .meta { font-size: 0.72rem; color: #cbb48a; white-space: nowrap; }
+.quest-rewards { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.quest-rewards .mat { padding: 1px 7px; font-size: 0.72rem; border-radius: 99px; gap: 5px; }
+.quest-rewards .mat-count { font-weight: 700; color: var(--hq-amber); }
+.mat.is-new { border-style: dashed; border-color: rgba(240, 160, 122, 0.7); }
+.mat-new-tag { font-size: 0.58rem; letter-spacing: 0.08em; color: var(--hq-red); font-weight: 700; }
+.quest-side { grid-row: span 2; display: grid; gap: 5px; justify-items: end; align-self: center; }
+.quest-assign { display: flex; gap: 4px; }
+.hero-chip {
+  position: relative; width: 34px; height: 34px; padding: 0; border-radius: 50%; overflow: hidden;
+  border: 2px solid #6a4a2a; background: radial-gradient(circle at 50% 35%, #6b4a2c, #24160c 75%);
+}
+.hero-chip img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+.hero-chip.is-on { border-color: var(--hq-amber); box-shadow: 0 0 0 2px rgba(255,217,74,.35); }
+.hero-chip:disabled { opacity: 0.4; filter: grayscale(0.8); }
+.hero-chip:disabled::after { content: "⏳︎"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.8rem; background: rgba(0,0,0,.35); }
+.quest-side .hq-start { min-width: 6.5rem; padding: 5px 10px; font-weight: 700; }
+.quest-side .hq-collect { min-width: 6.5rem; padding: 6px 12px; font-size: 0.9rem; }
+.quest-hint { font-size: 0.7rem; color: #bfa57c; text-align: right; max-width: 11rem; }
+/* Assign: face + hero name pills (radio group) */
+.hero-pick { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 2px; border-radius: 99px; border: 2px solid #6a4a2a; font-size: 0.74rem; white-space: nowrap; }
+.hero-pick img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; object-position: 50% 30%; background: radial-gradient(circle at 50% 35%, #6b4a2c, #24160c 75%); }
+.hero-pick.is-on { border-color: var(--hq-amber); color: var(--hq-amber); font-weight: 700; box-shadow: 0 0 0 2px rgba(255,217,74,.3); }
+.hero-pick:disabled { opacity: 0.45; text-decoration: line-through; }
+.quest-who { font-weight: 700; color: #f3e2c0; white-space: nowrap; }
+/* Running + ready rows */
+.quest-run { grid-column: 2 / 3; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 0.76rem; color: #e6d3b2; }
+.quest-run .hero-chip { width: 26px; height: 26px; border-width: 1px; pointer-events: none; }
+.quest-bar { display: block; height: 9px; border-radius: 99px; background: rgba(16, 10, 6, 0.6); border: 1px solid rgba(227, 179, 74, 0.35); overflow: hidden; }
+.quest-bar i { display: block; height: 100%; width: calc(var(--t, 0) * 100%); background: linear-gradient(90deg, #b8862f, #ffd94a); transition: width 1s linear; }
+.quest-left { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--hq-amber); white-space: nowrap; }
+.quest-card.is-ready .quest-bar i { background: linear-gradient(90deg, #7fd46a, #ffd94a); }
+.quest-recall { padding: 2px 8px; font-size: 0.7rem; width: auto; }
+.quest-empty { padding: 18px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; color: #e6d3b2; font-size: 0.86rem; }
+.quest-collect-all { margin-left: auto; padding: 4px 10px; font-size: 0.78rem; }
+
+/* ---------- While you were away ---------- */
+#away-modal.modal { background: rgba(16, 10, 6, 0.35); }
+.away-sheet { width: min(440px, calc(100vw - 24px)); }
+.away-sheet h2 { margin-bottom: 2px; }
+.away-list { display: grid; gap: 6px; margin: 10px 0 12px; max-height: 48vh; overflow: auto; }
+.away-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 4px 10px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: rgba(16, 10, 6, 0.45); }
+.away-row .hero-chip { width: 36px; height: 36px; grid-row: span 2; }
+.away-row p { margin: 0; font-size: 0.84rem; }
+.away-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.away-actions .hq-gold-btn { padding: 8px; }
+
+/* ---------- Toast on completion (reuses .game-toast) ---------- */
+.game-toast.hq-toast { border-color: var(--hq-amber); }
+.game-toast.hq-toast b { color: var(--hq-amber); }
+
+/* ---------- Storage full (materials at or over the cap) ---------- */
+.sf-full {
+  display: inline-block; padding: 0 5px; border: 1px solid #ff8a6a; border-radius: 4px; width: auto; min-width: 0;
+  background: linear-gradient(#b8321e, #7a1c10); color: #fff1e0; font: 700 0.6rem/1.5 Palatino, Georgia, serif; letter-spacing: 0.08em;
+  vertical-align: 1px; cursor: pointer;
+}
+.materials-row.is-full { border-color: rgba(255, 138, 106, 0.7); background: rgba(120, 28, 16, 0.35); }
+.materials-row.is-full .mat-count { color: #ffb49a; font-weight: 700; }
+.materials-row .sf-full { margin-left: auto; flex: none; }
+.craft-row.is-full .craft { border-color: rgba(255, 138, 106, 0.6); }
+.craft-row.is-full .meta { color: #ffb49a; }
+.sf-link { color: var(--hq-amber); font-weight: 700; }
+.sf-pop {
+  position: fixed; z-index: 45; width: 270px; padding: 10px 12px; border: 1px solid #ff8a6a; border-radius: 8px;
+  background: rgba(36, 22, 12, 0.97); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45); color: #e6d3b2; font-size: 0.8rem;
+}
+.sf-pop::after { content: ""; position: absolute; left: var(--arrow-x, 50%); bottom: -7px; width: 12px; height: 12px; margin-left: -6px; transform: rotate(45deg); background: inherit; border: solid #ff8a6a; border-width: 0 1px 1px 0; }
+.sf-pop p { margin: 0 0 6px; line-height: 1.35; }
+.sf-pop-title b { color: #f3e2c0; }
+.sf-pop-title span:last-child { color: #ffb49a; font-weight: 700; }
+.sf-upgrade { width: 100%; padding: 6px; }
+.sf-pop .sf-pop-meta { margin: 5px 0 0; font-size: 0.7rem; color: #cbb48a; text-align: center; }
+.sf-toast { display: block; top: 64px; white-space: nowrap; border-color: #ff8a6a; }
+.sf-toast b { color: var(--hq-amber); }
+/* Preview only: keep the Furnace sheet clear of the open drawer. */
+.sf-craft.modal { background: transparent; place-items: start center; padding-top: 112px; }
+.sf-craft .sheet.craft-sheet { width: min(560px, calc(100vw - 24px)); }
+
+/* ---------- Phone portrait: bottom sheets ---------- */
+@media (orientation: portrait) and (pointer: coarse) {
+  /* 7 slots on the bar: Skills, Build, Heroes, Quests, Music, Co-op, More. Help/Save/Load/Fullscreen move into More. */
+  #save-bar #help-btn, #save-bar #save-btn, #save-bar #load-btn, #save-bar #expand-btn { display: none; }
+  #save-bar #heroes-btn, #save-bar #quests-btn, #save-bar #coop-btn { min-width: 0; }
+  #save-bar #heroes-btn .hq-btn-icon, #save-bar #quests-btn .hq-btn-icon { display: block; margin: 0 auto 1px; width: 1.1rem; height: 1.1rem; }
+  #save-bar #heroes-btn, #save-bar #quests-btn { font-size: 0.66rem; display: grid; place-content: center; }
+  .hq-badge { top: -4px; right: 2px; }
+  .more-quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0 0 10px; }
+  .more-quick button { min-height: 44px; font-size: 0.8rem; }
+
+  #heroes-dock.hq-dock, #quests-dock.hq-dock {
+    position: fixed; top: auto; right: 0; bottom: var(--portrait-thumb, 64px); left: 0; z-index: 18; width: auto;
+    max-height: calc(100dvh - var(--portrait-thumb, 64px) - env(safe-area-inset-top, 0px) - 16px);
+    overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+    padding: 6px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px));
+    border-width: 1px 0 0; border-radius: 16px 16px 0 0; background: rgba(36, 22, 12, 0.96);
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.4); animation: skills-sheet-up 0.22s ease-out;
+  }
+  #quests-dock.hq-dock { display: flex; height: calc(100dvh - var(--portrait-thumb, 64px) - env(safe-area-inset-top, 0px) - 96px); }
+  #quests-dock .skills-head { grid-template-columns: 1fr auto; }
+  #quests-dock .skills-head .skills-grip { grid-column: 1 / -1; }
+  .quest-summary { grid-column: 1 / -1; grid-row: 3; }
+  .hq-sub { font-size: 0.86rem; }
+
+  .hero-grid { gap: 6px; }
+  .hero-card { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; padding: 8px 6px; }
+  .hero-portrait { grid-row: auto; width: 84px; height: 96px; }
+  .hq-pill, .hero-actions { justify-self: stretch; justify-content: center; }
+  .hero-actions button { min-height: 40px; font-size: 0.84rem; }
+
+  .hero-picker-sheet { position: fixed; left: 0; right: 0; bottom: var(--portrait-thumb, 64px); width: auto; border-radius: 16px 16px 0 0; max-height: calc(100dvh - var(--portrait-thumb, 64px) - 40px); }
+  #hero-picker.modal { place-items: end stretch; padding-bottom: 0 !important; }
+  .npc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hero-picker-foot { grid-template-columns: 1fr; }
+  .hero-picker-foot .hq-gold-btn { min-height: 48px; font-size: 1rem; }
+
+  .quest-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .craft-sidetabs { flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 6px; padding-bottom: 4px; scroll-snap-type: x proximity; }
+  .sidetab { flex: none; border-radius: 16px; border-left: 1px solid #8a6238; padding: 7px 12px; min-height: 36px; scroll-snap-align: start; }
+  .sidetab.is-on { border-left-color: var(--gold); }
+  .sidetab small { display: none; }
+  .quest-list { max-height: none; }
+  .quest-card { grid-template-columns: 40px minmax(0, 1fr); padding: 8px; }
+  .quest-icon { width: 40px; height: 40px; }
+  .quest-side { grid-column: 1 / -1; grid-row: auto; grid-template-columns: 1fr auto; justify-items: stretch; align-items: center; }
+  .quest-hint { text-align: left; max-width: none; }
+  .hero-chip { width: 40px; height: 40px; }
+  .quest-assign { flex-wrap: wrap; }
+  .hero-pick { min-height: 40px; font-size: 0.8rem; }
+  .hero-pick img { width: 32px; height: 32px; }
+  .quest-side .hq-start, .quest-side .hq-collect { min-height: 44px; }
+  .quest-run { grid-column: 1 / -1; }
+  .quest-card.is-running .quest-side, .quest-card.is-ready .quest-side { order: 5; grid-template-columns: 1fr; }
+  .quest-card.is-running .quest-recall { justify-self: end; min-height: 36px; padding: 4px 14px; }
+  .quest-card .quest-rewards { grid-column: 1 / -1 !important; }
+  .away-sheet { position: fixed; left: 0; right: 0; bottom: var(--portrait-thumb, 64px); width: auto; border-radius: 16px 16px 0 0; }
+  #away-modal.modal { place-items: end stretch; }
+  .away-actions button { min-height: 48px; }
+  /* Storage full: the left drawer is narrow, so the tag sits under the name and taps open the popover. */
+  .materials-row.is-full { flex-wrap: wrap; }
+  .materials-row .sf-full { margin-left: 0; font-size: 0.64rem; padding: 2px 6px; }
+  .sf-pop { width: min(300px, calc(100vw - 24px)); }
+  .sf-craft.modal { padding-top: 104px; }
+  .sf-toast { white-space: normal; width: calc(100vw - 24px); text-align: center; }
+  .sf-craft .craft-qty button { min-height: 36px; }
+}
+
+.more-quick { display: none; }
+#heroes-dock.hq-dock[hidden], #quests-dock.hq-dock[hidden], #hero-picker[hidden] { display: none; }
+@media (orientation: portrait) and (pointer: coarse) {
+  #settings-dock .more-quick { display: grid; }
 }

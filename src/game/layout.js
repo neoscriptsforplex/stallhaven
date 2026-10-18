@@ -116,9 +116,11 @@ export const FURNITURE_SHOP = [
   { type: 'farming_patch', kind: 'patch', label: 'Farming Patch' },
 ];
 
-/** Gold for the 1st through 4th farming patch. Further buys are refused. */
-export const FARMING_PATCH_COSTS = Object.freeze([1000000, 2000000, 4000000, 8000000]);
-export const FARMING_PATCH_CAP = 4;
+/** Gold for the 1st through 6th farming patch. Further buys are refused. */
+export const FARMING_PATCH_COSTS = Object.freeze([
+  1000000, 2000000, 4000000, 8000000, 16000000, 32000000,
+]);
+export const FARMING_PATCH_CAP = 6;
 /** Half of a 2×2 tile patch at the OSRS unit scale (2.88 / 2). */
 export const FARMING_PATCH_HALF = 1.44;
 
@@ -157,12 +159,22 @@ export const FURNITURE_BUILD_COSTS = Object.freeze({
   wheel: buildMaterialRow('adamant_nails', 20, 'yew_plank', 4),
   portal: buildMaterialRow('runite_nails', 25, 'magic_plank', 6),
   cauldron: buildMaterialRow('dragon_nails', 30, 'magic_plank', 8),
-  farming_patch: buildMaterialRow('iron_nails', 6, 'oak_plank', 2),
 });
 
-/** Material parts for a build-menu id. Empty when that piece spends no stock. */
-export function furnitureBuildParts(id) {
-  const row = FURNITURE_BUILD_COSTS[id];
+/**
+ * Nails and planks for the 1st through 6th farming patch.
+ * Index is how many patches have already been paid for.
+ */
+export const FARMING_PATCH_MATERIALS = Object.freeze([
+  buildMaterialRow('iron_nails', 6, 'oak_plank', 2),
+  buildMaterialRow('steel_nails', 8, 'willow_plank', 3),
+  buildMaterialRow('mithril_nails', 10, 'maple_plank', 4),
+  buildMaterialRow('adamant_nails', 12, 'yew_plank', 5),
+  buildMaterialRow('runite_nails', 15, 'magic_plank', 6),
+  buildMaterialRow('dragon_nails', 20, 'magic_plank', 8),
+]);
+
+function partsFromRow(row) {
   if (!row) return [];
   const parts = [];
   if (row.nails?.id && row.nails.count > 0) {
@@ -173,6 +185,53 @@ export function furnitureBuildParts(id) {
   }
   return parts;
 }
+
+/**
+ * Material parts for a build-menu id. Empty when that piece spends no stock.
+ * `index` is the next farming-patch tier (bought count before this purchase).
+ */
+export function furnitureBuildParts(id, index = 0) {
+  if (id === 'farming_patch') {
+    const n = Math.max(0, Math.min(FARMING_PATCH_MATERIALS.length - 1, Math.floor(Number(index) || 0)));
+    return partsFromRow(FARMING_PATCH_MATERIALS[n]);
+  }
+  return partsFromRow(FURNITURE_BUILD_COSTS[id]);
+}
+
+/** True when a lawn point sits inside a placed farming patch. */
+export function spotOnFarmingPatch(x, z, furniture = null, pad = 0) {
+  const patches = furniture?.patches ?? [];
+  const hw = FARMING_PATCH_HALF + pad;
+  const hd = FARMING_PATCH_HALF + pad;
+  return patches.some((pose) => (
+    pose
+    && Number.isFinite(pose.x)
+    && Number.isFinite(pose.z)
+    && Math.abs(x - pose.x) <= hw
+    && Math.abs(z - pose.z) <= hd
+  ));
+}
+
+/** 'tree', 'rock', or null when a patch rectangle meets a trunk or boulder. */
+export function patchHitsTreeOrRock(pose, expansionIds = []) {
+  if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) return null;
+  const hw = FARMING_PATCH_HALF;
+  const hd = FARMING_PATCH_HALF;
+  const hits = (x, z, r) => {
+    const dx = Math.max(Math.abs(x - pose.x) - hw, 0);
+    const dz = Math.max(Math.abs(z - pose.z) - hd, 0);
+    return dx * dx + dz * dz < r * r;
+  };
+  const trunk = TREE_TRUNK_RADIUS * OUTDOOR_TREE_SCALE;
+  for (const tree of gardenTreeSpots(expansionIds)) {
+    if (hits(tree.x, tree.z, trunk)) return 'tree';
+  }
+  for (const rock of gardenRockSpots(expansionIds)) {
+    if (hits(rock.x, rock.z, gardenRockRadius(rock.scale ?? 1))) return 'rock';
+  }
+  return null;
+}
+
 /** How far a wall shelf sits past the walk-floor edge, toward the wall. */
 export const SHELF_WALL_OUTSET = 0.04;
 /**
@@ -653,7 +712,7 @@ export function furnitureHalfSize(kind) {
   if (kind === 'loom') return { hw: 0.48, hd: 0.36 };
   if (kind === 'fletch') return { hw: 0.55, hd: 0.4 };
   if (kind === 'potter') return { hw: 0.4, hd: 0.4 };
-  if (kind === 'sawmill') return { hw: 1.44, hd: 0.72 };
+  if (kind === 'sawmill') return { hw: 0.72, hd: 0.36 };
   if (kind === 'patch' || kind === 'farming_patch') return { hw: FARMING_PATCH_HALF, hd: FARMING_PATCH_HALF };
   if (kind === 'portal') return { hw: PORTAL_TARGET_WIDTH / 2, hd: PORTAL_TARGET_DEPTH / 2 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
@@ -1147,6 +1206,22 @@ export function patchPlaceFloors(expansionIds = []) {
   return [{ minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: grass.maxZ }];
 }
 
+/**
+ * A paid patch we can still draw. Off-map, NaN, and shop-interior poses are
+ * not kept — those go back to a free re-place instead of an invisible buy.
+ */
+export function farmingPatchPoseKept(pose, expansionIds = []) {
+  if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) return false;
+  if (Math.abs(pose.x) > 80 || Math.abs(pose.z) > 80) return false;
+  const lawn = patchPlaceFloors(expansionIds)[0];
+  if (!lawn) return false;
+  const { hw, hd } = furnitureHalfSize('patch');
+  if (pose.x - hw < lawn.minX - 0.05 || pose.x + hw > lawn.maxX + 0.05) return false;
+  if (pose.z - hd < lawn.minZ - 0.05 || pose.z + hd > lawn.maxZ + 0.05) return false;
+  if (pointHitsShop(pose.x, pose.z, expansionIds, 0.15)) return false;
+  return true;
+}
+
 export function gardenRockSpots(expansionIds = []) {
   const spots = [
     { x: -3.45, z: 8.15, scale: 0.85, side: 'path' },
@@ -1349,6 +1424,7 @@ export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furnit
     const gap = Math.max(spacing, other.spacing ?? 0);
     if (Math.hypot(x - other.x, z - other.z) < gap) return true;
   }
+  if (spotOnFarmingPatch(x, z, furniture, 0.05)) return true;
   return false;
 }
 
@@ -1475,10 +1551,10 @@ function flowerBlocked(x, z, expansionIds, trees, rocks) {
  * Deterministic blossoms on every lawn. Centres stay off the shop, path,
  * fountain, hatch, door, trunks, and rocks. Callers instance the flower mesh.
  */
-export function gardenFlowerSpots(expansionIds = []) {
+export function gardenFlowerSpots(expansionIds = [], furniture = null) {
   const key = expansionIds.length ? [...expansionIds].sort().join('|') : '-';
   const cached = flowerSpotCache.get(key);
-  if (cached) return cached;
+  if (cached) return filterSpotsOffPatches(cached, furniture);
   const grass = gardenBox(expansionIds);
   const rand = gardenSeedRand(510510 + key.length * 97);
   const trees = gardenTreeSpots(expansionIds);
@@ -1510,7 +1586,12 @@ export function gardenFlowerSpots(expansionIds = []) {
     }
   }
   flowerSpotCache.set(key, spots);
-  return spots;
+  return filterSpotsOffPatches(spots, furniture);
+}
+
+function filterSpotsOffPatches(spots, furniture) {
+  if (!furniture?.patches?.length) return spots;
+  return spots.filter((spot) => !spotOnFarmingPatch(spot.x, spot.z, furniture));
 }
 
 function gardenSeedRand(seed) {
@@ -1522,7 +1603,7 @@ function gardenSeedRand(seed) {
 }
 
 /** Cluster centers for instanced lawn blades. Filtered like trees when a room is built. */
-export function gardenGrassClusters(expansionIds = []) {
+export function gardenGrassClusters(expansionIds = [], furniture = null) {
   const grass = gardenBox(expansionIds);
   const path = cobblePathSpan(expansionIds);
   const rand = gardenSeedRand(424242 + expansionIds.join(':').length * 31);
@@ -1562,7 +1643,7 @@ export function gardenGrassClusters(expansionIds = []) {
       });
     }
   }
-  return clusters;
+  return filterSpotsOffPatches(clusters, furniture);
 }
 
 export function keepFountain(expansionIds = []) {

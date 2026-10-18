@@ -21,6 +21,7 @@ import {
   shopMapBounds,
   trapdoorMarkerUrls,
   worldToMap,
+  compassNeedleDegrees,
 } from './minimap.js';
 import { SHOP } from './catalog.js';
 import { FOUNTAIN, PATH_HALF_W, TRAPDOOR, furnitureVisualYaw } from './layout.js';
@@ -28,6 +29,24 @@ import { DUNGEON_BOULDERS } from './shopbuild.js';
 import { PLAYER_RADIUS, dungeonMoveObstacles, isWalkable, planWalk } from './nav.js';
 
 describe('minimap', () => {
+  it('loads the compass from the public folder when the page is unbuilt', () => {
+    const root = dirname(fileURLToPath(import.meta.url));
+    const hud = readFileSync(join(root, 'hud.js'), 'utf8');
+    const css = readFileSync(join(root, '../style.css'), 'utf8');
+    assert.match(hud, /let compassBase = '\.\/public\/';/);
+    assert.match(hud, /try \{[\s\S]*import\.meta\.env\.BASE_URL/);
+    assert.doesNotMatch(hud, /`url\("\$\{import\.meta\.env\.BASE_URL\}minimap\/compass\.svg"\)`/);
+    assert.match(css, /url\("\.\/public\/minimap\/compass\.svg"\)/);
+    assert.doesNotMatch(css, /url\("\/minimap\/compass\.svg"\)/);
+  });
+
+  it('keeps the compass needle on world north as the camera yaws', () => {
+    assert.equal(compassNeedleDegrees(0), 0);
+    assert.equal(compassNeedleDegrees(Math.PI / 2), 90);
+    assert.equal(compassNeedleDegrees(Math.PI), 180);
+    assert.equal(compassNeedleDegrees(-Math.PI / 2), -90);
+  });
+
   it('round-trips world points through canvas pixels, including yaw and zoom', () => {
     const bounds = shopMapBounds([]);
     const size = 196;

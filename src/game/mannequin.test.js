@@ -165,7 +165,7 @@ describe('mannequin body and leg fit', () => {
           assert.ok(value <= MANNEQUIN_WEAR_LIMITS.scaleMax, `${id} ${axis} ${value} above clamp`);
         }
         mounted.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(mounted);
+        const box = new THREE.Box3().setFromObject(mounted, true);
         const section = LEG_SHAPES.has(RECIPES[id].shape) ? 'legs' : 'body';
         const wood = section === 'legs' ? legsWood : bodyWood;
         assert.ok(covers(box, wood), `${id} box ${box.min.toArray()} ${box.max.toArray()} misses ${section}`);

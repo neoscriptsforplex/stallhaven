@@ -34,9 +34,10 @@ import {
   customerName,
   shelfSlotPoses,
   SHELF_SLOT_COUNT,
+  stationForRecipe,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
-import { grantChoppedLogs, grantFountainWater, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, pushLog } from './economy.js';
+import { createFountainFill, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, miningBarAmount, pushLog } from './economy.js';
 import { gatherBlockText, meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
 import {
   FURNITURE_FORWARD,
@@ -50,6 +51,7 @@ import {
   furnitureVisualYaw,
   FLAX_CLICK_RADIUS,
   FLAX_COUNT,
+  FLAX_SPACING,
   FOUNTAIN,
   keepFountain,
   gardenBox,
@@ -59,6 +61,9 @@ import {
   buyerCobbleRoute,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  patchHitsTreeOrRock,
+  FARMING_PATCH_HALF,
+  FLAX_RESPAWN_SEC,
   runeFieldTreeSpots,
   runeFieldRect,
   RUNE_ALTAR_SPOTS,
@@ -94,6 +99,8 @@ import {
   runeFieldMoveObstacles,
   floorsForState,
   isWalkable,
+  dropRecordedPatchObstacle,
+  firstOpenFurniturePose,
   liveObstacles,
   moveWithCollision,
   placementBlocked,
@@ -157,7 +164,8 @@ import {
   defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
+import { tickPortalJelly } from './portalJelly.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -181,6 +189,22 @@ export const TOUCH_HOLD_MOVE_PX = 8;
 export const TOUCH_DOUBLE_TAP_MS = 280;
 /** Second tap must land near the first. */
 export const TOUCH_DOUBLE_TAP_PX = 28;
+
+/** Second ground click while placing furniture confirms the spot. */
+export const PLACE_DOUBLE_CLICK_MS = 420;
+
+/**
+ * Preview on the first click. A second click inside the window confirms,
+ * the same on a phone double-tap as on a desktop double-click.
+ */
+export function nextPlaceClick(lastAt, now, needsConfirm) {
+  const at = Number(now) || 0;
+  const prev = Number(lastAt) || 0;
+  if (needsConfirm && prev > 0 && at >= prev && at - prev < PLACE_DOUBLE_CLICK_MS) {
+    return { confirm: true, lastAt: 0 };
+  }
+  return { confirm: false, lastAt: at };
+}
 
 export function isCanvasDoubleTap(prev, next, now = 0) {
   if (!prev || !next) return false;
@@ -1089,6 +1113,84 @@ export function createWorld(canvas, state, opts = {}) {
     return nodes.filter((node) => node.alive).map((node) => ({ x: node.x, z: node.z, spacing }));
   }
 
+  function shiftDecorOffPatch(pose) {
+    if (!architecture || !pose) return;
+    const hw = FARMING_PATCH_HALF;
+    const hd = FARMING_PATCH_HALF;
+    const matrix = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    const scl = new THREE.Vector3();
+    architecture.traverse((child) => {
+      if (!child.isInstancedMesh) return;
+      if (child.name !== 'flowers' && child.name !== 'grass') return;
+      let moved = false;
+      for (let i = 0; i < child.count; i += 1) {
+        child.getMatrixAt(i, matrix);
+        matrix.decompose(pos, quat, scl);
+        if (Math.abs(pos.x - pose.x) > hw || Math.abs(pos.z - pose.z) > hd) continue;
+        const dx = pos.x - pose.x;
+        const dz = pos.z - pose.z;
+        if (Math.abs(dx) >= Math.abs(dz)) pos.x = pose.x + Math.sign(dx || 1) * (hw + 0.25);
+        else pos.z = pose.z + Math.sign(dz || 1) * (hd + 0.25);
+        matrix.compose(pos, quat, scl);
+        child.setMatrixAt(i, matrix);
+        moved = true;
+      }
+      if (moved) child.instanceMatrix.needsUpdate = true;
+    });
+  }
+
+  function relocateCrop(nodes, roll, spacing) {
+    let moved = false;
+    for (const node of nodes) {
+      if (!node.alive) continue;
+      if (!spotInsidePatch(node.x, node.z)) continue;
+      const occupied = nodes
+        .filter((item) => item.alive && item !== node)
+        .map((item) => ({ x: item.x, z: item.z, spacing }));
+      const spot = roll(occupied);
+      if (spot) {
+        node.x = spot.x;
+        node.z = spot.z;
+      } else {
+        node.alive = false;
+        node.respawnAt = (lastNow || 0) + FLAX_RESPAWN_SEC;
+      }
+      moved = true;
+    }
+    return moved;
+  }
+
+  let shiftPatchPose = null;
+  function spotInsidePatch(x, z) {
+    const pose = shiftPatchPose;
+    if (!pose) return false;
+    return Math.abs(x - pose.x) <= FARMING_PATCH_HALF && Math.abs(z - pose.z) <= FARMING_PATCH_HALF;
+  }
+
+  function shiftPlantsOffPatch(pose) {
+    shiftPatchPose = pose;
+    const flaxMoved = relocateCrop(flaxNodes, (occupied) => (
+      rollFlaxSpots(state.expansions ?? [], {
+        count: 1,
+        furniture: state.furniture,
+        occupied: [...occupied, ...livingCropSpots(wheatNodes, WHEAT_SPACING)],
+      })[0] ?? null
+    ), FLAX_SPACING);
+    const wheatMoved = relocateCrop(wheatNodes, (occupied) => (
+      rollWheatSpots(state.expansions ?? [], {
+        count: 1,
+        furniture: state.furniture,
+        occupied: [...occupied, ...livingCropSpots(flaxNodes, FLAX_SPACING)],
+      })[0] ?? null
+    ), WHEAT_SPACING);
+    shiftPatchPose = null;
+    if (flaxMoved) syncFlaxMeshes();
+    if (wheatMoved) syncWheatMeshes();
+    shiftDecorOffPatch(pose);
+  }
+
   function refillFlaxField() {
     if (mining?.mode === 'pick') stopMining();
     for (const mesh of flaxMeshes.values()) releaseFlaxMesh(mesh);
@@ -1268,7 +1370,7 @@ export function createWorld(canvas, state, opts = {}) {
     const poses = state.furniture?.patches ?? [];
     poses.forEach((pose, index) => {
       const mesh = buildFarmingPatch();
-      mesh.position.set(pose.x, OUTDOOR_GROUND_Y, pose.z);
+      placeFarmingPatchMesh(mesh, pose, OUTDOOR_GROUND_Y);
       mesh.rotation.y = furnitureVisualYaw('farming_patch', pose.rot);
       patchGroup.add(mesh);
       const { hw, hd } = furnitureHalfSize('patch');
@@ -1603,7 +1705,8 @@ export function createWorld(canvas, state, opts = {}) {
   function barYield(session) {
     if (session?.mode === 'chop') return chopYield(session.materialId);
     if (session?.mode === 'pick') return session.yield ?? FLAX_YIELD;
-    if (session?.yield != null) return session.yield;
+    if (session?.mode === 'fill') return session.yield ?? FOUNTAIN_WATER_YIELD;
+    // Always read the rock table. A stored 0 must not hide bronze's +5.
     return mineYield(session?.materialId);
   }
 
@@ -1695,12 +1798,23 @@ export function createWorld(canvas, state, opts = {}) {
     rebuildNav();
   }
 
-  function fillFromFountain() {
-    stopMining();
-    const got = intentBus.run({ type: 'gather', mode: 'water' }) || 0;
-    if (got > 0) pushLog(state, `Filled ${got} Buckets of water.`);
-    else pushLog(state, 'Buckets of water are full.');
-    pickHandler?.({ type: 'drew-water', amount: got });
+  function startFountainFill(pose) {
+    if (mining?.mode === 'pick') releaseHeldFlax(true);
+    const now = performance.now() / 1000;
+    mining = {
+      ...createFountainFill(now),
+      x: pose?.x ?? FOUNTAIN.x,
+      z: pose?.z ?? FOUNTAIN.z,
+      faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : null,
+    };
+    setHeldTool(shopkeeper, null);
+    faceGather(pose ?? { x: FOUNTAIN.x, z: FOUNTAIN.z });
+    setGatherClip(shopkeeper, 'pick');
+    emitLocalActivity('pick');
+  }
+
+  function fillFromFountain(pose) {
+    startFountainFill(pose);
   }
 
   function startPicking(pose) {
@@ -1728,6 +1842,20 @@ export function createWorld(canvas, state, opts = {}) {
 
   function tickMining(now) {
     if (!mining) return;
+    if (mining.mode === 'fill') {
+      // Same bar as advanceFountainFill(); the water itself goes through the intent bus (co-op safe).
+      if (now - mining.startedAt < mining.duration) return;
+      const got = intentBus.run({ type: 'gather', mode: 'water' }) || 0;
+      if (got <= 0) {
+        pushLog(state, 'Buckets of water are full.');
+        stopMining();
+        return;
+      }
+      pushLog(state, `Filled ${got} Buckets of water.`);
+      pickHandler?.({ type: 'drew-water', amount: got });
+      mining = { ...mining, startedAt: now };
+      return;
+    }
     if (now - mining.startedAt < mining.duration) return;
     if (mining.mode === 'pick') {
       releaseHeldFlax(false);
@@ -1991,7 +2119,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (type === 'fountain') {
-        fillFromFountain();
+        fillFromFountain(aimed);
         playClick('ui');
         return;
       }
@@ -2035,7 +2163,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (type === 'boulder') startMining(materialId, pose);
     else if (type === 'tree') startChopping(pose);
     else if (type === 'flax' || type === 'wheat') startPicking(pose);
-    else if (type === 'fountain') fillFromFountain();
+    else if (type === 'fountain') fillFromFountain(pose);
     else pickHandler?.({ type, element });
   }
 
@@ -2244,6 +2372,9 @@ export function createWorld(canvas, state, opts = {}) {
     if (corners.some(([x, z]) => pointHitsShop(x, z, expansions, 0.05))) return grass;
     if (corners.some(([x, z]) => pointOnPath(x, z, expansions, 0.05))) return grass;
     if (!gardenSpotClearOfBeds(pose, expansions, hw + 0.55)) return grass;
+    const blocked = patchHitsTreeOrRock(pose, expansions);
+    if (blocked === 'tree') return 'That spot overlaps a tree.';
+    if (blocked === 'rock') return 'That spot overlaps a rock.';
     return null;
   }
 
@@ -2256,7 +2387,8 @@ export function createWorld(canvas, state, opts = {}) {
     if (kind === 'farming_patch' || kind === 'patch') {
       const grass = patchPlaceReason(pose);
       if (grass) return grass;
-      const reason = placementBlocked(pose, 'patch', blocks, floors, { checkAisle: false });
+      const patchBlocks = dropRecordedPatchObstacle(blocks, state.furniture?.patches, pose);
+      const reason = placementBlocked(pose, 'patch', patchBlocks, floors, { checkAisle: false });
       if (reason === 'That spot is off the shop floor.') return 'Place the patch on open grass.';
       return reason;
     }
@@ -2284,6 +2416,15 @@ export function createWorld(canvas, state, opts = {}) {
       z: slot.mesh.position.z,
       rot: slot.mesh.rotation.y - furnitureStartYaw(moveTarget.id),
     };
+  }
+
+  function patchRecordedAt(pose) {
+    if (!pose) return false;
+    return (state.furniture?.patches ?? []).some((patch) => (
+      Number.isFinite(patch?.x)
+      && Number.isFinite(patch?.z)
+      && Math.hypot(patch.x - pose.x, patch.z - pose.z) < 0.05
+    ));
   }
 
   function tryConfirmPlace() {
@@ -2366,13 +2507,12 @@ export function createWorld(canvas, state, opts = {}) {
       if (point) {
         placeMovingFurniture(point.x, point.z);
         playClick('ui');
-        const nowClick = performance.now();
-        if (placeNeedsConfirm && nowClick - lastPlaceClickAt < 420) {
-          lastPlaceClickAt = 0;
+        const click = nextPlaceClick(lastPlaceClickAt, performance.now(), placeNeedsConfirm);
+        lastPlaceClickAt = click.lastAt;
+        if (click.confirm) {
           pickHandler?.({ type: 'furniture-place-confirm' });
           return;
         }
-        lastPlaceClickAt = nowClick;
         pickHandler?.({ type: placeNeedsConfirm ? 'furniture-place-preview' : 'furniture-moved' });
       }
       return;
@@ -3391,6 +3531,8 @@ export function createWorld(canvas, state, opts = {}) {
       outlineBoxMat.opacity = 0.72 + Math.sin(now * 2.4) * 0.18;
     }
     remoteKeepers.tick(dt, now, sceneMode);
+    tickPortalJelly(portalMesh, dt);
+    if (runeField?.root?.visible) tickPortalJelly(runeField.portal, dt);
     if (sceneMode === 'shop') {
       updateCustomers(dt, now);
       updateGoblins(dt, now);
@@ -3410,16 +3552,42 @@ export function createWorld(canvas, state, opts = {}) {
         updateWalkPose(rat, moving, dt, now);
       });
     }
-    const wheel = fixtureMeshes.wheel?.mesh?.userData.spinWheel;
-    if (wheel) {
-      const spinning = Object.keys(state.crafts ?? {}).some((id) => RECIPES[id]?.category === 'spin');
-      if (spinning) wheel.rotation.z += dt * 9.5;
+    const craftIds = Object.keys(state.crafts ?? {});
+    const spinning = craftIds.some((id) => RECIPES[id]?.category === 'spin');
+    const sawing = craftIds.some((id) => RECIPES[id]?.category === 'saw');
+    const wheelMesh = fixtureMeshes.wheel?.mesh;
+    if (wheelMesh?.userData.spinner) {
+      wheelMesh.userData.spinner.setActive(spinning);
+      wheelMesh.userData.spinner.update(dt);
+    } else if (wheelMesh?.userData.spinWheel && spinning) {
+      wheelMesh.userData.spinWheel.rotation.z += dt * 9.5;
     }
-    const sawing = Object.keys(state.crafts ?? {}).some((id) => RECIPES[id]?.category === 'saw');
     const sawSpinner = fixtureMeshes.sawmill?.mesh?.userData.spinner;
     if (sawSpinner) {
       sawSpinner.setActive(sawing);
       sawSpinner.update(dt);
+    }
+    // Station animations run only while a craft for that station is in state.crafts.
+    const potterSpinner = fixtureMeshes.potter?.mesh?.userData.spinner;
+    if (potterSpinner) {
+      potterSpinner.setActive(craftIds.some((id) => RECIPES[id] && stationForRecipe(RECIPES[id]) === 'potter'));
+      potterSpinner.update(dt);
+    }
+    const furnaceFx = fixtureMeshes.furnace?.mesh?.userData.furnaceFx;
+    if (furnaceFx) {
+      const smelt = craftIds.map((id) => RECIPES[id]).find((r) => r && stationForRecipe(r) === 'furnace');
+      furnaceFx.setActive(Boolean(smelt), smelt?.tint);
+      furnaceFx.update(dt);
+    }
+    const rangeFx = fixtureMeshes.range?.mesh?.userData.rangeFx;
+    if (rangeFx) {
+      rangeFx.setActive(craftIds.some((id) => RECIPES[id] && stationForRecipe(RECIPES[id]) === 'range'));
+      rangeFx.update(dt);
+    }
+    const loomFx = fixtureMeshes.loom?.mesh?.userData.loomFx;
+    if (loomFx) {
+      loomFx.setActive(craftIds.some((id) => RECIPES[id] && stationForRecipe(RECIPES[id]) === 'loom'));
+      loomFx.update(dt);
     }
     for (const fx of magicSparkles) fx.update(dt);
     if (drawScene) renderer.render(scene, camera);
@@ -3899,9 +4067,7 @@ export function createWorld(canvas, state, opts = {}) {
       pickHandler?.({ type: 'furniture-place-start', furniture: { id } });
     },
     beginPlaceFurniture(kind) {
-      const start = kind === 'shelf'
-        ? snapToWallGrid(0, -3.11, state.expansions ?? [])
-        : snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, placeRects);
+      const start = firstOpenFurniturePose(state, kind);
       const index = displays.length;
       const spot = {
         id: `new-${kind}-${index}`,
@@ -3931,17 +4097,24 @@ export function createWorld(canvas, state, opts = {}) {
     confirmPlaceUnlock() {
       if (!moveTarget || !placeNeedsConfirm) return null;
       const check = tryConfirmPlace();
-      if (!check.ok) {
-        pickHandler?.({ type: 'furniture-place-blocked', reason: check.reason });
-        return null;
-      }
-      const pose = { x: check.pose.x, z: check.pose.z, rot: check.pose.rot };
       const target = { id: moveTarget.id, index: moveTarget.index };
+      if (!check.ok) {
+        // The buy is recorded before this second check. A patch must not
+        // reject its own pose and then skip the mesh.
+        const recorded = target.id === 'farming_patch' && patchRecordedAt(visualPlacePose());
+        if (!recorded) {
+          pickHandler?.({ type: 'furniture-place-blocked', reason: check.reason });
+          return null;
+        }
+      }
+      const source = check.ok ? check.pose : visualPlacePose();
+      const pose = { x: source.x, z: source.z, rot: source.rot };
       rebuildNav();
       clearMoveMode();
       if (target.id === 'display') applyDisplayPose(target.index);
       else if (target.id !== 'farming_patch') applyFixturePose(target.id);
       if (patchesReady) syncPatchMeshes();
+      if (target.id === 'farming_patch') shiftPlantsOffPatch(pose);
       return pose;
     },
     beginPlacePatch() {
@@ -4153,12 +4326,19 @@ export function createWorld(canvas, state, opts = {}) {
       const t = Math.min(1, Math.max(0, (now - mining.startedAt) / mining.duration));
       const want = barYield(mining);
       const have = state.materials[mining.materialId] ?? 0;
-      const grant = Math.min(want, Math.max(0, MATERIAL_CAP - have));
+      const mineMode = (mining.mode ?? 'mine') === 'mine';
+      const grant = mineMode
+        ? miningBarAmount(state, mining.materialId, want)
+        : Math.min(want, Math.max(0, MATERIAL_CAP - have));
       return {
         materialId: mining.materialId,
         name: mining.name,
         mode: mining.mode ?? 'mine',
-        verb: mining.mode === 'chop' ? 'Chopping' : mining.mode === 'pick' ? 'Picking' : 'Mining',
+        verb: mining.verb
+          ?? (mining.mode === 'chop' ? 'Chopping'
+            : mining.mode === 'pick' ? 'Picking'
+              : mining.mode === 'fill' ? 'Filling'
+                : 'Mining'),
         t,
         yield: grant,
       };

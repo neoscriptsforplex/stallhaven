@@ -12,6 +12,7 @@ import {
   isMaterialCraft,
   CHOP_YIELD,
   FLAX_YIELD,
+  FOUNTAIN_DURATION,
   FOUNTAIN_WATER_YIELD,
   WHEAT_YIELD,
   mineYield,
@@ -52,7 +53,10 @@ import {
   xpForLevel,
   xpForMine,
   xpFromCraftHistory,
+  ESSENCE_DOUBLE_LEVEL,
 } from './skills.js';
+import { RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
+import { emptyHeroQuestState, normalizeHeroQuestState } from './heroesQuests.js';
 import {
   CAULDRON_COST,
   WHEEL_COST,
@@ -79,6 +83,7 @@ import {
   FURNITURE_SHOP,
   FARMING_PATCH_CAP,
   FARMING_PATCH_COSTS,
+  farmingPatchPoseKept,
   padById,
   padConnects,
   snapToWallGrid,
@@ -116,7 +121,9 @@ export {
   DEFAULT_BRIGHTNESS,
 };
 
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
+/** Ore counts were copied onto bars before save version 11. Later saves must not run that again. */
+const ORE_BAR_MIGRATION_VERSION = 11;
 export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
@@ -127,13 +134,13 @@ function emptyBoughtFurniture() {
 export const FREE_FURNITURE_REPLACE = 2;
 
 function emptyFreeFurnitureReplace() {
-  return { table: 0, mannequin: 0 };
+  return { table: 0, mannequin: 0, farming_patch: 0 };
 }
 
 /** Old saves used ores for smithing. Copy ore counts onto bars so progress is not bricked. */
 function migrateLegacyMetalBars(next, data) {
   const version = data.version ?? 0;
-  if (version >= SAVE_VERSION) return;
+  if (version >= ORE_BAR_MIGRATION_VERSION) return;
   for (const metal of METALS) {
     const barId = `${metal.id}_bar`;
     const savedBar = data.materials?.[barId];
@@ -347,6 +354,7 @@ export function createState() {
     kingRoaldAt: scheduleKingRoald(0),
     log: [],
     skills: createSkills(),
+    hq: emptyHeroQuestState(),
   };
 }
 
@@ -411,20 +419,20 @@ function legacyChainUnlocked(state, recipe) {
   return craftCount(state, recipe.previousId) >= (recipe.unlockNeed ?? 0);
 }
 
-function planksFor(buildId) {
+function planksFor(buildId, index = 0) {
   const planks = {};
-  for (const part of furnitureBuildParts(buildId)) {
+  for (const part of furnitureBuildParts(buildId, index)) {
     if (part.kind !== 'planks' || !part.count) continue;
     planks[part.id] = (planks[part.id] ?? 0) + part.count;
   }
   return planks;
 }
 
-function constructionXp(kind, gp, buildId = null) {
+function constructionXp(kind, gp, buildId = null, index = 0) {
   return xpForBuild({
     kind,
     gp,
-    planks: buildId ? planksFor(buildId) : null,
+    planks: buildId ? planksFor(buildId, index) : null,
   });
 }
 
@@ -483,7 +491,7 @@ export function craftBlockReason(state, recipeId) {
     return 'Place a fletching bench from Build to make ranged weapons and ammo.';
   }
   if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) {
-    return 'Place a Potter Wheel from Build to turn soft clay into clay.';
+    return 'Place a Potter Wheel from Build to soften hard clay.';
   }
   if (stationForRecipe(recipe) === 'sawmill' && !ownsStation(state, 'sawmill')) {
     return 'Place a sawmill from Build to saw logs into planks.';
@@ -761,26 +769,46 @@ export function ownsStation(state, id) {
   return Boolean(state.furniture?.[id]);
 }
 
+function buildIndex(state, id) {
+  return id === 'farming_patch' ? boughtFurnitureCount(state, id) : 0;
+}
+
+function buildParts(state, id) {
+  return furnitureBuildParts(id, buildIndex(state, id));
+}
+
 export function hasBuildMaterials(state, id) {
-  return furnitureBuildParts(id).every((part) => (state.materials?.[part.id] ?? 0) >= part.count);
+  return buildParts(state, id).every((part) => (state.materials?.[part.id] ?? 0) >= part.count);
 }
 
 function payBuildMaterials(state, id) {
-  for (const part of furnitureBuildParts(id)) {
+  for (const part of buildParts(state, id)) {
     state.materials[part.id] = (state.materials[part.id] ?? 0) - part.count;
   }
 }
 
 /** "Bronze Nails ×8 · Plank ×4", or empty when the piece spends no stock. */
-export function buildMaterialLabel(id) {
-  return furnitureBuildParts(id)
+export function buildMaterialLabel(id, index = 0) {
+  return furnitureBuildParts(id, index)
     .map((part) => `${MATERIALS[part.id]?.name ?? part.id} ×${formatGold(part.count)}`)
     .join(' · ');
 }
 
+/** "Needs: Iron Nails ×6 (have 2) · Oak Plank ×2 (have 0)", or empty. */
+export function buildMaterialNeedLine(state, id) {
+  const parts = buildParts(state, id);
+  if (!parts.length) return '';
+  const bits = parts.map((part) => {
+    const name = MATERIALS[part.id]?.name ?? part.id;
+    const have = state.materials?.[part.id] ?? 0;
+    return `${name} ×${formatGold(part.count)} (have ${formatGold(have)})`;
+  });
+  return `Needs: ${bits.join(' · ')}`;
+}
+
 /** Empty when the player already holds every nail and plank on the row. */
 export function buildMaterialBlock(state, id) {
-  const missing = furnitureBuildParts(id).filter((part) => (state.materials?.[part.id] ?? 0) < part.count);
+  const missing = buildParts(state, id).filter((part) => (state.materials?.[part.id] ?? 0) < part.count);
   if (!missing.length) return '';
   const bits = missing.map((part) => {
     const name = MATERIALS[part.id]?.name ?? part.id;
@@ -887,6 +915,7 @@ export function liveFurnitureCount(state, type) {
 
 export function nextFurnitureCost(state, type) {
   if (type === 'farming_patch') {
+    if ((state.freeFurnitureReplace?.farming_patch ?? 0) > 0) return 0;
     const n = Math.min(boughtFurnitureCount(state, type), FARMING_PATCH_CAP - 1);
     return FARMING_PATCH_COSTS[Math.max(0, n)];
   }
@@ -904,7 +933,14 @@ export function nextFurnitureCost(state, type) {
 
 export function canBuyFurniture(state, type) {
   if (!FURNITURE_SHOP.some((item) => item.type === type)) return false;
-  if (type === 'farming_patch' && boughtFurnitureCount(state, type) >= FARMING_PATCH_CAP) return false;
+  // Tables, mannequins, and shelves have no count cap. Price is
+  // furnitureBuyCost(n) = 500·3^n. Farming patches stay capped.
+  if (type === 'farming_patch') {
+    const placed = Array.isArray(state.furniture?.patches) ? state.furniture.patches.length : 0;
+    const credit = Math.max(0, state.freeFurnitureReplace?.farming_patch ?? 0);
+    if (placed >= FARMING_PATCH_CAP) return false;
+    if (credit <= 0 && boughtFurnitureCount(state, type) >= FARMING_PATCH_CAP) return false;
+  }
   const cost = nextFurnitureCost(state, type);
   if ((state.gold ?? 0) < cost) return false;
   if (cost === 0) return true;
@@ -931,17 +967,18 @@ export function buyFurniture(state, type, pose) {
   if (!canBuyFurniture(state, type) || !pose) return false;
   const kind = furnitureKindForType(type);
   const cost = nextFurnitureCost(state, type);
+  const materialIndex = type === 'farming_patch' ? boughtFurnitureCount(state, type) : 0;
   state.gold -= cost;
   if (cost > 0) payBuildMaterials(state, type);
   if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
   if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
-  if (cost === 0 && (type === 'table' || type === 'mannequin') && state.freeFurnitureReplace[type] > 0) {
+  if (cost === 0 && (type === 'table' || type === 'mannequin' || type === 'farming_patch') && state.freeFurnitureReplace[type] > 0) {
     state.freeFurnitureReplace[type] -= 1;
   }
   const paidExtra = cost > 0;
   if (paidExtra) {
     state.boughtFurniture[type] = boughtFurnitureCount(state, type) + 1;
-    state.skills?.addXp('construction', constructionXp('item', cost, type));
+    state.skills?.addXp('construction', constructionXp('item', cost, type, materialIndex));
   }
   if (type === 'farming_patch') {
     if (!state.furniture) state.furniture = defaultFurniture();
@@ -1141,7 +1178,7 @@ export function craftedOutputCount(state, recipe) {
   if (recipe?.category !== 'rune') return base;
   const need = Math.max(1, recipe.requires?.level ?? 1);
   const level = state.skills?.getLevel?.('runecrafting') ?? 1;
-  return level >= need * 2 ? base * 2 : base;
+  return level >= need * RUNE_DOUBLE_LEVEL_MULT ? base * 2 : base;
 }
 
 function finishOneCraft(state, recipeId) {
@@ -1308,13 +1345,21 @@ function grantMaterial(state, materialId, amount) {
 /** Essence rocks give 2 essence once Mining is 50 or higher. Other rocks do not. */
 export function minedGrantAmount(state, materialId, amount = mineYield(materialId)) {
   const n = Math.max(0, Math.round(Number(amount) || 0));
-  if (materialId === 'essence' && (state.skills?.getLevel?.('mining') ?? 1) >= 50) return n * 2;
+  if (materialId === 'essence' && (state.skills?.getLevel?.('mining') ?? 1) >= ESSENCE_DOUBLE_LEVEL) return n * 2;
   return n;
 }
 
 export function grantMinedMaterial(state, materialId, amount = mineYield(materialId)) {
   if (!isMinedMaterial(materialId)) return 0;
   return grantMaterial(state, materialId, minedGrantAmount(state, materialId, amount));
+}
+
+/** Ore one finished mining bar adds. The progress bar shows this same number. */
+export function miningBarAmount(state, materialId, amount = mineYield(materialId)) {
+  if (!isMinedMaterial(materialId)) return 0;
+  const want = minedGrantAmount(state, materialId, amount);
+  const have = Math.max(0, state?.materials?.[materialId] ?? 0);
+  return Math.min(want, Math.max(0, MATERIAL_CAP - have));
 }
 
 export function grantChoppedLogs(state, amount = CHOP_YIELD, materialId = 'logs') {
@@ -1330,9 +1375,48 @@ export function grantPickedWheat(state, amount = WHEAT_YIELD) {
   return grantMaterial(state, 'wheat', amount);
 }
 
-/** One fountain click. Caps at the material limit, same as other gathered goods. */
+/** One completed fountain fill. Caps at the material limit, same as other gathered goods. */
 export function grantFountainWater(state, amount = FOUNTAIN_WATER_YIELD) {
   return grantMaterial(state, 'water', amount);
+}
+
+/** Gather session for drawing buckets. The bar matches mining, flax, and woodcutting. */
+export function createFountainFill(now = 0) {
+  return {
+    mode: 'fill',
+    materialId: 'water',
+    name: 'Buckets of water',
+    verb: 'Filling',
+    startedAt: now,
+    duration: FOUNTAIN_DURATION,
+    yield: FOUNTAIN_WATER_YIELD,
+  };
+}
+
+/**
+ * Advance a fountain fill. Before the bar finishes, nothing is granted.
+ * A finished bar adds the yield and restarts. A full inventory ends the loop.
+ */
+export function advanceFountainFill(state, session, now) {
+  if (!session || now - session.startedAt < session.duration) {
+    return { ready: false, got: 0, full: false, session };
+  }
+  const got = grantFountainWater(state, session.yield ?? FOUNTAIN_WATER_YIELD);
+  if (got <= 0) return { ready: true, got: 0, full: true, session: null };
+  return {
+    ready: true,
+    got,
+    full: false,
+    session: { ...session, startedAt: now },
+  };
+}
+
+/** Quest reward. Adds Molten Glass straight into materials (id `molten_glass`). */
+export function grantMoltenGlass(state, amount = 1) {
+  const add = Math.max(0, Math.round(Number(amount) || 0));
+  if (!add || !state?.materials) return 0;
+  state.materials.molten_glass = (state.materials.molten_glass ?? 0) + add;
+  return add;
 }
 
 /** Quest reward. Adds Dwarven Plans straight into materials (id `dwarven_plans`). */
@@ -1407,6 +1491,7 @@ export function serializeState(state) {
     playTime: Math.max(0, Number(state.playTime) || 0),
     kingRoaldAt: Number.isFinite(state.kingRoaldAt) ? state.kingRoaldAt : scheduleKingRoald(Math.max(0, Number(state.playTime) || 0)),
     skills: state.skills?.toJSON?.() ?? createSkills().toJSON(),
+    hq: savedHeroQuest(state),
     displays: state.displays.map((display, index) => ({
       ware: display.ware ? { recipeId: display.ware.recipeId } : null,
       furnitureId: display.furnitureId ?? null,
@@ -1428,6 +1513,7 @@ export function serializeState(state) {
     freeFurnitureReplace: {
       table: Math.max(0, state.freeFurnitureReplace?.table ?? 0),
       mannequin: Math.max(0, state.freeFurnitureReplace?.mannequin ?? 0),
+      farming_patch: Math.max(0, state.freeFurnitureReplace?.farming_patch ?? 0),
     },
   };
 }
@@ -1495,10 +1581,11 @@ export function applyState(state, data) {
   next.boughtFurniture = emptyBoughtFurniture();
   next.freeFurnitureReplace = emptyFreeFurnitureReplace();
   if (data.freeFurnitureReplace && typeof data.freeFurnitureReplace === 'object') {
-    for (const type of ['table', 'mannequin']) {
+    for (const type of ['table', 'mannequin', 'farming_patch']) {
       const value = data.freeFurnitureReplace[type];
+      const cap = type === 'farming_patch' ? FARMING_PATCH_CAP : FREE_FURNITURE_REPLACE;
       if (typeof value === 'number' && Number.isFinite(value)) {
-        next.freeFurnitureReplace[type] = Math.max(0, Math.min(FREE_FURNITURE_REPLACE, Math.round(value)));
+        next.freeFurnitureReplace[type] = Math.max(0, Math.min(cap, Math.round(value)));
       }
     }
   }
@@ -1687,7 +1774,44 @@ export function applyState(state, data) {
       ? `Skills have arrived! Your past work earned you: ${earned.join(', ')}.`
       : 'Skills have arrived! Every skill starts at level 1.');
   }
+  state.hq = normalizeHeroQuestState(data.hq, Date.now());
+  repairFarmingPatches(state);
   return true;
+}
+
+/** Heroes and quests ride along in every save, including Net's autosave. */
+function savedHeroQuest(state, now = Date.now()) {
+  const hq = normalizeHeroQuestState(state?.hq, now);
+  hq.lastSeenAt = now;
+  if (state) state.hq = hq;
+  return hq;
+}
+
+/**
+ * Paid patches with a lawn pose stay, so a reload draws them.
+ * A pose with nowhere to draw (or a buy that never stored a pose) becomes
+ * one free re-place. Cancel never reaches this — it does not charge.
+ */
+export function repairFarmingPatches(state) {
+  if (!state) return { kept: 0, credited: 0 };
+  if (!state.furniture) state.furniture = defaultFurniture();
+  if (!Array.isArray(state.furniture.patches)) state.furniture.patches = [];
+  const expansions = state.expansions ?? [];
+  const kept = [];
+  for (const pose of state.furniture.patches) {
+    if (farmingPatchPoseKept(pose, expansions)) kept.push(pose);
+  }
+  state.furniture.patches = kept.slice(0, FARMING_PATCH_CAP);
+  if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
+  const bought = boughtFurnitureCount(state, 'farming_patch');
+  const room = Math.max(0, FARMING_PATCH_CAP - state.furniture.patches.length);
+  const unplaced = Math.max(0, bought - state.furniture.patches.length);
+  if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
+  state.freeFurnitureReplace.farming_patch = Math.min(room, unplaced);
+  return {
+    kept: state.furniture.patches.length,
+    credited: state.freeFurnitureReplace.farming_patch,
+  };
 }
 
 export function autoStock(state) {
@@ -1767,7 +1891,7 @@ function chestReadyIds(state) {
 
 export function canRestock(state, materialId) {
   const mat = MATERIALS[materialId];
-  if (!mat || isCraftedMaterial(materialId) || !mat.restock || mat.restock <= 0) return false;
+  if (!mat || isCraftedMaterial(materialId) || mat.quest || !mat.restock || mat.restock <= 0) return false;
   return state.gold >= mat.restock;
 }
 
@@ -1808,7 +1932,7 @@ export function sellToCustomer(state, recipeId, gold = RECIPES[recipeId]?.price 
 
 export function buyFromCustomer(state, materialId, price) {
   const mat = MATERIALS[materialId];
-  if (!mat || isCraftedMaterial(materialId) || price < 0 || state.gold < price) return false;
+  if (!mat || isCraftedMaterial(materialId) || mat.quest || price < 0 || state.gold < price) return false;
   state.gold -= price;
   state.materials[materialId] += 1;
   return true;
@@ -1842,8 +1966,13 @@ export function isCustomerActivityLog(text) {
   return / looks around for | grows tired and leaves\.| arrives, seeking /.test(String(text ?? ''));
 }
 
+/** File, cheat, and browser notices. Gathering, crafting, sales, and level-ups stay. */
+export function isSystemLog(text) {
+  return /^(Shop (saved to|loaded from) a file|Could not (save that|read that save) file|Rune Craft is open|Cleared uploaded models|Fullscreen is not available|Cheat applied)/.test(String(text ?? ''));
+}
+
 export function visibleLog(state) {
-  return (state?.log ?? []).filter((line) => !isCustomerActivityLog(line));
+  return (state?.log ?? []).filter((line) => !isCustomerActivityLog(line) && !isSystemLog(line));
 }
 
 export function decidePurchase(customerId, wares, rng = Math.random) {

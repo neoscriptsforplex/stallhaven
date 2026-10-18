@@ -219,7 +219,7 @@ describe('player look UI', () => {
   it('keeps a crafting list in place when a recipe repaints', () => {
     const paint = hud.slice(hud.indexOf('function paintCrafts'), hud.indexOf('function fillMats'));
     assert.match(paint, /holdCraftScroll\(craftsEl, \{ reveal, focusId: craftFocusId \}\)/);
-    assert.match(paint, /paintRecipeButtons\(craftsEl, currentRecipes\(\)\)/);
+    assert.match(paint, /paintRecipeButtons\(craftsEl, sideList,/);
     assert.match(paint, /restoreCraftScrollNow\(\)/);
     assert.equal(/requestAnimationFrame\(\(\) => \{\s*craftsEl\.querySelector/.test(paint), false);
     assert.match(hud, /plan\.list\.scrollTop = plan\.top/);

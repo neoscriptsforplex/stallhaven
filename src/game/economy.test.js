@@ -43,6 +43,9 @@ import {
   chopTiming,
   FLAX_DURATION,
   FLAX_YIELD,
+  FOUNTAIN_DURATION,
+  FOUNTAIN_WATER_YIELD,
+  MINE_DURATION,
   MINE_YIELD,
   MINE_YIELDS,
   CLAY_MINE_DURATION,
@@ -80,6 +83,7 @@ import {
   canRestock,
   canBuyFurniture,
   canCraft,
+  grantMoltenGlass,
   CAULDRON_COST,
   PORTAL_COST,
   SAWMILL_COST,
@@ -89,8 +93,11 @@ import {
   chestDisplayList,
   grantAncientPlans,
   grantChoppedLogs,
+  advanceFountainFill,
+  createFountainFill,
   grantFountainWater,
   grantMinedMaterial,
+  miningBarAmount,
   grantPickedFlax,
   grantPickedWheat,
   FREE_FURNITURE_REPLACE,
@@ -131,10 +138,11 @@ import {
   tickMaterials,
   pushLog,
   visibleLog,
+  isSystemLog,
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
-import { defaultFurniture, furnitureBuildParts, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
+import { defaultFurniture, furnitureBuildParts, furnitureBuyCost, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
 
 function giveBuildMats(state, id, times = 1) {
   const n = Math.max(1, times);
@@ -192,6 +200,18 @@ describe('stall economy', () => {
     assert.equal(state.materials.flour, 0);
     assert.equal(MATERIALS.flour.name, 'Pot of flour');
     assert.equal(MATERIALS.flour.crafted, true);
+    assert.equal(state.materials.soft_clay, 0);
+    assert.equal(MATERIALS.soft_clay.crafted, true);
+    assert.equal(state.materials.orb, 0);
+    assert.equal(MATERIALS.orb.crafted, true);
+    assert.equal(MATERIALS.orb.restock, 0);
+    assert.equal(MATERIALS.orb.regenEvery, 0);
+    assert.equal(MATERIALS.molten_glass.quest, true);
+    assert.equal(MATERIALS.molten_glass.restock, 0);
+    assert.equal(state.materials.molten_glass, 0);
+    assert.equal(MATERIALS.soft_clay.restock, 0);
+    assert.equal(MATERIALS.soft_clay.regenEvery, 0);
+    assert.equal(MATERIALS.hard_clay.crafted, undefined);
     assert.equal(MATERIALS.water.name, 'Bucket of water');
     assert.equal(MATERIALS.water.restock, 0);
     assert.equal(CUSTOMERS.pilgrim.offer, null);
@@ -454,6 +474,20 @@ describe('save and load', () => {
     assert.match(state.log[0], /Smithing 7/);
     assert.match(state.log[0], /Crafting 12/);
     assert.deepEqual(visibleLog(state), state.log);
+    state.log = [
+      'Chopped 5 Logs.',
+      'Shop saved to a file.',
+      'Cheat applied. Gold is now 9.',
+      'Fullscreen is not available in this browser.',
+      'Smithing advanced to 5.',
+    ];
+    assert.equal(isSystemLog('Shop loaded from a file.'), true);
+    assert.equal(isSystemLog('Could not save that file.'), true);
+    assert.equal(isSystemLog('Could not read that save file.'), true);
+    assert.equal(isSystemLog('Rune Craft is open. Walk to an altar to craft runes.'), true);
+    assert.equal(isSystemLog('Cleared uploaded models.'), true);
+    assert.equal(isSystemLog('Chopped 5 Logs.'), false);
+    assert.deepEqual(visibleLog(state), ['Chopped 5 Logs.', 'Smithing advanced to 5.']);
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
     assert.equal(ownsFurnace(state), false);
     assert.equal(ownsRange(state), false);
@@ -847,18 +881,36 @@ describe('catalog', () => {
   });
 
   it('groups anvil recipes by melee, magic, ranged, and tools with weapons and armour subtabs', () => {
-    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Tools']);
+    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Tools', 'Misc']);
     assert.equal(stationForRecipe(RECIPES.shortbow), 'fletch');
     assert.equal(stationForRecipe(RECIPES.bronze_arrows), 'fletch');
     assert.equal(stationForRecipe(RECIPES.green_dragon_mask), 'loom');
     assert.equal(stationForRecipe(RECIPES.wizard_robe), 'loom');
     assert.equal(stationForRecipe(RECIPES.staff), 'anvil');
     assert.equal(stationForRecipe(RECIPES.weave_cloth), 'loom');
-    assert.equal(stationForRecipe(RECIPES.fire_clay), 'potter');
+    assert.equal(stationForRecipe(RECIPES.soft_clay), 'potter');
     assert.equal(recipeCost(RECIPES.weave_cloth).materials.flax, 1);
     assert.equal(RECIPES.weave_cloth.outputMaterial, 'cloth');
-    assert.equal(recipeCost(RECIPES.fire_clay).materials.soft_clay, 1);
-    assert.equal(RECIPES.fire_clay.outputMaterial, 'hard_clay');
+    assert.equal(RECIPES.fire_clay, undefined);
+    assert.equal(recipesForTab('potter')[0].id, 'soft_clay');
+    assert.equal(recipeCost(RECIPES.soft_clay).materials.hard_clay, 1);
+    assert.equal(recipeCost(RECIPES.soft_clay).materials.water, 1);
+    assert.equal(recipeCost(RECIPES.soft_clay).materials.soft_clay, undefined);
+    assert.equal(RECIPES.soft_clay.outputMaterial, 'soft_clay');
+    assert.equal(RECIPES.soft_clay.requires.skill, 'crafting');
+    assert.equal(RECIPES.soft_clay.requires.level, 1);
+    assert.equal(RECIPES.soft_clay.xp, 5);
+    assert.equal(stationForRecipe(RECIPES.unpowered_orb), 'anvil');
+    assert.equal(anvilTabForRecipe(RECIPES.unpowered_orb), 'misc');
+    assert.deepEqual(anvilSubtabsForTab('misc'), []);
+    assert.equal(recipesForTab('misc')[0].id, 'unpowered_orb');
+    assert.equal(isCraftHidden(RECIPES.unpowered_orb), false);
+    assert.equal(recipeCost(RECIPES.unpowered_orb).materials.molten_glass, 1);
+    assert.equal(RECIPES.unpowered_orb.outputMaterial, 'orb');
+    assert.equal(RECIPES.unpowered_orb.price, 250);
+    assert.deepEqual(RECIPES.unpowered_orb.buyers, []);
+    assert.equal(RECIPES.unpowered_orb.requires.level, 1);
+    assert.equal(craftUiForStation('anvil', { tab: 'misc', subtab: 'weapon' }).tab, 'misc');
     assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Hatchet', 'Pickaxe']);
     assert.equal(anvilSubtabsForTab('magic').some((tab) => tab.id === 'rune'), false);
     assert.equal(recipesForTab('magic', 'rune').some((recipe) => stationForRecipe(recipe) === 'anvil'), false);
@@ -1053,7 +1105,7 @@ describe('material regen', () => {
       iron: 4,
       steel: 3,
       mithril: 3,
-      adamant: 2,
+      adamant: 3,
       runite: 2,
       dragon: 1,
       hard_clay: 1,
@@ -1075,11 +1127,18 @@ describe('material regen', () => {
     assert.deepEqual(mineTiming('essence'), { duration: 3.2, yield: 1 });
     assert.equal(grantMinedMaterial(state, 'bronze'), 5);
     assert.equal(state.materials.bronze, 17);
+    const fresh = createState();
+    fresh.materials.bronze = 0;
+    assert.equal(miningBarAmount(fresh, 'bronze'), 5);
+    assert.equal(grantMinedMaterial(fresh, 'bronze'), 5);
+    fresh.materials.bronze = 250;
+    assert.equal(miningBarAmount(fresh, 'bronze'), 0);
+    assert.equal(grantMinedMaterial(fresh, 'bronze'), 0);
     for (const [id, amount] of [
       ['iron', 4],
       ['steel', 3],
       ['mithril', 3],
-      ['adamant', 2],
+      ['adamant', 3],
       ['runite', 2],
       ['dragon', 1],
     ]) {
@@ -1196,9 +1255,86 @@ describe('material regen', () => {
     assert.equal(state.materials.water, 0);
     assert.equal(canRestock(state, 'water'), false);
     assert.equal(grantFountainWater(state), 5);
+    const clay = createState();
+    assert.equal(canRestock(clay, 'soft_clay'), false);
+    assert.equal(buyFromCustomer(clay, 'soft_clay', 1), false);
+    assert.equal(Object.values(CUSTOMERS).some((buyer) => buyer.offer?.materialId === 'soft_clay'), false);
+    clay.materials.soft_clay = 0;
+    tickMaterials(clay, 240);
+    assert.equal(clay.materials.soft_clay, 0);
+    const kept = createState();
+    assert.equal(applyState(kept, { gold: 40, materials: { soft_clay: 8, hard_clay: 3 } }), true);
+    assert.equal(kept.materials.soft_clay, 8);
+    assert.equal(kept.materials.hard_clay, 3);
+    placeStation(clay, 'potter');
+    clay.materials.hard_clay = 2;
+    clay.materials.water = 2;
+    clay.materials.soft_clay = 0;
+    assert.equal(canCraft(clay, 'soft_clay'), true);
+    assert.equal(startCraft(clay, 'soft_clay', 0), true);
+    assert.equal(clay.materials.hard_clay, 1);
+    assert.equal(clay.materials.water, 1);
+    assert.deepEqual(completeCrafts(clay, 4), ['soft_clay']);
+    assert.equal(clay.materials.soft_clay, 1);
+    assert.equal(clay.chest.soft_clay, undefined);
+    const glass = createState();
+    assert.equal(canCraft(glass, 'unpowered_orb'), false);
+    assert.match(craftBlockReason(glass, 'unpowered_orb'), /Molten Glass/);
+    assert.equal(maxCraftActions(glass, 'unpowered_orb'), 0);
+    assert.equal(grantMoltenGlass(glass, 2), 2);
+    assert.equal(canCraft(glass, 'unpowered_orb'), true);
+    assert.equal(startCraft(glass, 'unpowered_orb', 0), true);
+    assert.equal(glass.materials.molten_glass, 1);
+    assert.deepEqual(completeCrafts(glass, 3), ['unpowered_orb']);
+    assert.equal(glass.materials.orb, 1);
+    assert.equal(glass.chest.unpowered_orb, undefined);
+    assert.equal(canRestock(glass, 'orb'), false);
+    assert.equal(canRestock(glass, 'molten_glass'), false);
+    assert.equal(buyFromCustomer(glass, 'molten_glass', 1), false);
+    assert.equal(buyFromCustomer(glass, 'orb', 1), false);
+    const orbSave = createState();
+    assert.equal(applyState(orbSave, { gold: 40, materials: { orb: 7 } }), true);
+    assert.equal(orbSave.materials.orb, 7);
+    assert.equal(miningBarAmount(clay, 'hard_clay'), 1);
     assert.equal(state.materials.water, 5);
+    assert.equal(FOUNTAIN_WATER_YIELD, 5);
+    assert.equal(FOUNTAIN_DURATION, MINE_DURATION);
+    assert.equal(FOUNTAIN_DURATION, FLAX_DURATION);
     state.materials.water = 248;
     assert.equal(grantFountainWater(state), 2);
+    assert.equal(state.materials.water, 250);
+  });
+
+  it('fills buckets on a gathering bar and keeps drawing until water is full', () => {
+    const state = createState();
+    state.materials.water = 0;
+    const session = createFountainFill(10);
+    assert.equal(session.mode, 'fill');
+    assert.equal(session.verb, 'Filling');
+    assert.equal(session.duration, FOUNTAIN_DURATION);
+    assert.equal(session.yield, 5);
+    const early = advanceFountainFill(state, session, 10 + FOUNTAIN_DURATION - 0.01);
+    assert.equal(early.ready, false);
+    assert.equal(early.session, session);
+    assert.equal(state.materials.water, 0);
+    const first = advanceFountainFill(state, session, 10 + FOUNTAIN_DURATION + 0.02);
+    assert.equal(first.ready, true);
+    assert.equal(first.got, 5);
+    assert.equal(first.full, false);
+    assert.equal(state.materials.water, 5);
+    assert.equal(first.session.startedAt, 10 + FOUNTAIN_DURATION + 0.02);
+    const second = advanceFountainFill(state, first.session, first.session.startedAt + FOUNTAIN_DURATION + 0.02);
+    assert.equal(second.got, 5);
+    assert.equal(state.materials.water, 10);
+    state.materials.water = 248;
+    const partial = advanceFountainFill(state, second.session, second.session.startedAt + FOUNTAIN_DURATION + 0.02);
+    assert.equal(partial.got, 2);
+    assert.equal(partial.full, false);
+    assert.equal(state.materials.water, 250);
+    const full = advanceFountainFill(state, partial.session, partial.session.startedAt + FOUNTAIN_DURATION + 0.02);
+    assert.equal(full.got, 0);
+    assert.equal(full.full, true);
+    assert.equal(full.session, null);
     assert.equal(state.materials.water, 250);
   });
 
@@ -1583,6 +1719,66 @@ describe('build furniture', () => {
     assert.equal(state.freeFurnitureReplace.mannequin, 1);
     assert.equal(nextFurnitureCost(state, 'mannequin'), 0);
     assert.equal(removePlacedFurniture(state, standIndex), false);
+  });
+
+  it('sells fifteen tables, mannequins, and shelves with no count cap and keeps an old layout', () => {
+    const curve = Array.from({ length: 15 }, (_, n) => furnitureBuyCost(n));
+    assert.equal(curve[0], 500);
+    assert.equal(curve[1], 1500);
+    assert.equal(curve[14], 500 * (3 ** 14));
+    const state = createState();
+    const starterTables = SHOP.displays.filter((d) => d.kind === 'table').length;
+    const starterStands = SHOP.displays.filter((d) => d.kind === 'stand').length;
+    const starterShelves = SHOP.displays.filter((d) => d.kind === 'shelf').length;
+    const moved = { x: -1.2, z: 0.4, rot: 0.25 };
+    state.furniture.displays[0] = { ...moved };
+    state.gold = 1e16;
+    giveBuildMats(state, 'table', 16);
+    giveBuildMats(state, 'mannequin', 15);
+    giveBuildMats(state, 'shelf', 15);
+    const paid = { table: [], mannequin: [], shelf: [] };
+    for (let i = 0; i < 15; i += 1) {
+      for (const type of ['table', 'mannequin', 'shelf']) {
+        paid[type].push(nextFurnitureCost(state, type));
+        assert.equal(
+          buyFurniture(state, type, { x: -40 - i, z: type === 'shelf' ? -3.11 : 0.2, rot: 0 }),
+          true,
+          `${type} ${i}`,
+        );
+      }
+    }
+    assert.deepEqual(paid.table, curve);
+    assert.deepEqual(paid.mannequin, curve);
+    assert.deepEqual(paid.shelf, curve);
+    assert.equal(state.displays.filter((d) => d.kind === 'table').length, starterTables + 15);
+    assert.equal(state.displays.filter((d) => d.kind === 'stand').length, starterStands + 15);
+    assert.equal(state.displays.filter((d) => d.kind === 'shelf').length, starterShelves + 15);
+    assert.equal(canBuyFurniture(state, 'table'), true);
+    assert.equal(nextFurnitureCost(state, 'table'), furnitureBuyCost(15));
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.boughtFurniture.table, 15);
+    assert.equal(next.boughtFurniture.mannequin, 15);
+    assert.equal(next.boughtFurniture.shelf, 15);
+    assert.equal(next.displays.length, state.displays.length);
+    assert.equal(next.furniture.displays[0].x, moved.x);
+    assert.equal(next.furniture.displays[0].z, moved.z);
+    assert.equal(next.furniture.displays[0].rot, moved.rot);
+    const lastTable = next.displays.findLastIndex((display) => display.kind === 'table' && display.bought);
+    assert.equal(next.furniture.displays[lastTable].x, -40 - 14);
+    assert.equal(next.displays.filter((display) => display.kind === 'shelf').length, starterShelves + 15);
+    const old = createState();
+    const blob = serializeState(old);
+    blob.furniture.displays[0] = { ...moved };
+    const restored = createState();
+    assert.equal(applyState(restored, blob), true);
+    assert.equal(restored.displays.length, SHOP.displays.length);
+    assert.equal(restored.boughtFurniture.table, 0);
+    assert.equal(restored.boughtFurniture.mannequin, 0);
+    assert.equal(restored.boughtFurniture.shelf, 0);
+    assert.equal(restored.furniture.displays[0].x, moved.x);
+    assert.equal(restored.furniture.displays[0].rot, moved.rot);
   });
 
   it('does not count starter tables or mannequins as paid extras in an old save', () => {
@@ -2590,25 +2786,39 @@ describe('furniture nails and planks', () => {
     assert.equal(grantChoppedLogs(state, chopYield('logs'), 'logs'), 5);
   });
 
-  it('sells at most four farming patches and keeps an old save without them', () => {
+  it('sells at most six farming patches and keeps an old save without them', () => {
     const state = createState();
-    state.gold = 20000000;
-    state.materials.iron_nails = 40;
-    state.materials.oak_plank = 20;
+    state.gold = 70000000;
+    state.materials.iron_nails = 6;
+    state.materials.oak_plank = 2;
+    state.materials.steel_nails = 8;
+    state.materials.willow_plank = 3;
+    state.materials.mithril_nails = 10;
+    state.materials.maple_plank = 4;
+    state.materials.adamant_nails = 12;
+    state.materials.yew_plank = 5;
+    state.materials.runite_nails = 15;
+    state.materials.magic_plank = 14;
+    state.materials.dragon_nails = 20;
     const costs = [];
     const displaysBefore = state.displays.length;
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       costs.push(nextFurnitureCost(state, 'farming_patch'));
       assert.equal(canBuyFurniture(state, 'farming_patch'), true);
       assert.equal(buyFurniture(state, 'farming_patch', { x: i * 3, z: -6, rot: 0 }), true);
     }
-    assert.deepEqual(costs, [1000000, 2000000, 4000000, 8000000]);
-    assert.equal(state.furniture.patches.length, 4);
+    assert.deepEqual(costs, [1000000, 2000000, 4000000, 8000000, 16000000, 32000000]);
+    assert.equal(state.furniture.patches.length, 6);
     assert.equal(state.displays.length, displaysBefore);
-    assert.equal(state.boughtFurniture.farming_patch, 4);
+    assert.equal(state.boughtFurniture.farming_patch, 6);
+    assert.equal(state.materials.iron_nails, 0);
+    assert.equal(state.materials.oak_plank, 0);
+    assert.equal(state.materials.dragon_nails, 0);
+    assert.equal(state.materials.magic_plank, 0);
     assert.equal(canBuyFurniture(state, 'farming_patch'), false);
     assert.equal(buyFurniture(state, 'farming_patch', { x: 0, z: -8, rot: 0 }), false);
-    assert.equal(buildMaterialLabel('farming_patch'), 'Iron Nails ×6 · Oak Plank ×2');
+    assert.equal(buildMaterialLabel('farming_patch', 0), 'Iron Nails ×6 · Oak Plank ×2');
+    assert.equal(buildMaterialLabel('farming_patch', 5), 'Dragon Nails ×20 · Magic Plank ×8');
     const broke = createState();
     broke.gold = 1000000;
     assert.equal(canBuyFurniture(broke, 'farming_patch'), false);

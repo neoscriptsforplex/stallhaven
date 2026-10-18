@@ -20,6 +20,7 @@ export const SHARED_KEYS = Object.freeze([
   'shopXp',
   'skills',
   'chefHat',
+  'hq',
 ]);
 
 /** Keys whose change means the 3D shop has to be rebuilt. */
@@ -29,6 +30,11 @@ export function sharedView(state) {
   const data = serializeState(state);
   const out = {};
   for (const key of SHARED_KEYS) out[key] = data[key];
+  // The save stamps "last seen" on every serialize; it isn't shop state, so leave it out of patches.
+  if (out.hq && typeof out.hq === 'object') {
+    const { lastSeenAt, ...hq } = out.hq;
+    out.hq = hq;
+  }
   return out;
 }
 

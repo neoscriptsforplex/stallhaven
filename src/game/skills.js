@@ -177,6 +177,9 @@ export const WOODCUTTING_LEVELS = Object.freeze({
   magic: 75,
 });
 
+/** Essence rocks grant two essence once Mining reaches this level. */
+export const ESSENCE_DOUBLE_LEVEL = 50;
+
 /** Mining rock unlocks. Clay and essence stay at 1. XP is unchanged. */
 export const MINING_LEVELS = Object.freeze({
   hard_clay: 1,

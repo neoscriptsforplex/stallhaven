@@ -965,6 +965,8 @@ export function createWorld(canvas, state, opts = {}) {
     speed: PLAYER_SPEED,
     buildMesh: (player) => {
       const mesh = buildShopkeeper({ appearance: player.appearance ?? state.appearance });
+      // Drop the built-in "You" tag; remote keepers get their own coloured name tag.
+      for (const child of [...mesh.children]) if (child.isSprite) mesh.remove(child);
       mesh.scale.setScalar(PLAYER_WORLD_SCALE);
       return mesh;
     },

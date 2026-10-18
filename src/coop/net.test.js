@@ -56,15 +56,23 @@ function makeServer() {
     send(text) {
       setTimeout(() => this.readyState === 1 && route(this.room, this.room.message(this.id, text)), 1);
     }
+    // One ordered queue per socket, like a real connection: messages, then the close.
+    _push(fn) {
+      (this.q ??= []).push(fn);
+      if (this.q.length === 1) setTimeout(() => this._drain(), 1);
+    }
+    _drain() {
+      while (this.q.length) this.q.shift()();
+    }
     _deliver(data) {
-      setTimeout(() => this.onmessage?.({ data }), 1);
+      this._push(() => this.onmessage?.({ data }));
     }
     _gone(code) {
       if (this.readyState === 3) return;
       this.readyState = 3;
       sockets.delete(this.id);
       if (this.room?.exists()) route(this.room, this.room.disconnect(this.id));
-      setTimeout(() => this.onclose?.({ code }), 2);
+      this._push(() => this.onclose?.({ code }));
     }
     _serverClose(code) {
       this._gone(code);

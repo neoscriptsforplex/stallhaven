@@ -1,0 +1,479 @@
+/*
+ * Co-op UI (draft) for Store of Geilenor / RuneCraft.
+ * Load AFTER src/style.css. Reuses the game's tokens and classes:
+ * --panel, --line, --gold, --parchment, --skill-yellow, button, .tabs/.tab,
+ * .expand-dock, .skills-head/.skills-grip/.skills-close, .ledger, .modal/.sheet, .game-toast look.
+ * Phone rules live only inside @media (orientation: portrait) and (pointer: coarse).
+ */
+
+:root {
+  --coop-ok: #5fcf5a;
+  --coop-warn: #e8c43a;
+  --coop-bad: #d9533b;
+  --coop-p1: #c45a32; /* slot colours, slot order */
+  --coop-p2: #3f7fc4;
+  --coop-p3: #5fae4a;
+  --coop-p4: #a35fc4;
+}
+
+/* ---------- Top-bar button: sits right after Music, same size/style ---------- */
+
+#coop-btn {
+  position: relative;
+  min-width: 4.5rem;
+  font-weight: 700;
+}
+
+#coop-btn svg {
+  display: block;
+  width: 1.15em;
+  height: 1.15em;
+  margin: 0 auto;
+}
+
+#coop-btn.is-on {
+  border-color: var(--gold);
+  background: linear-gradient(#8a5a30, #5a3518);
+}
+
+/* Party count once you are in a room: "3/4". Yellow while reconnecting. */
+.coop-badge {
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  min-width: 1.9em;
+  padding: 1px 5px;
+  border-radius: 99px;
+  border: 1px solid #1c120c;
+  background: var(--coop-ok);
+  color: #10200c;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.coop-badge.is-warn { background: var(--coop-warn); color: #2a1e04; }
+.coop-badge[hidden] { display: none; }
+
+/* ---------- Dock (desktop / landscape): an .expand-dock like Skills ---------- */
+
+.coop-dock {
+  width: min(330px, calc(100vw - 32px));
+  padding: 10px 12px 12px;
+}
+
+.coop-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.coop-pane[hidden] { display: none; }
+
+.coop-hint {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  color: #d9c4a0;
+}
+
+.coop-code-box {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid #1c120c;
+  border-radius: 6px;
+  background: rgba(16, 10, 6, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.28);
+}
+
+.coop-code {
+  font: 700 1.7rem/1.1 "Courier New", ui-monospace, monospace;
+  letter-spacing: 0.28em;
+  color: var(--skill-yellow);
+  text-shadow: 1px 1px 0 #000;
+}
+
+.coop-copy { min-width: 4.5rem; font-weight: 700; }
+.coop-copy.is-done { border-color: var(--coop-ok); }
+
+/* Player slots: same inset well + tile look as the skills grid. */
+.coop-slots {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 4px;
+  border: 1px solid #1c120c;
+  border-radius: 6px;
+  background: rgba(16, 10, 6, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.18);
+}
+
+.coop-slot {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 6px 4px 8px;
+  border: 1px solid #6e4b2a;
+  border-radius: 4px;
+  background: linear-gradient(var(--skill-tile-top), var(--skill-tile-bottom));
+  box-shadow: inset 0 1px 0 rgba(240, 217, 168, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  font-size: 0.86rem;
+}
+
+.coop-slot.is-you { border-color: rgba(227, 179, 74, 0.7); }
+
+.coop-slot.is-empty {
+  background: transparent;
+  border-style: dashed;
+  color: #a8916c;
+  font-style: italic;
+  box-shadow: none;
+}
+
+.coop-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #f6e4c4;
+  box-shadow: 1px 1px 0 #000;
+}
+
+.coop-slot.is-empty .coop-swatch { border-style: dashed; border-color: #8a6238; box-shadow: none; }
+
+.coop-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f3e2c0;
+  font-weight: 700;
+}
+
+.coop-name small { font-weight: 400; color: #cbb48a; }
+
+.coop-crown { color: var(--skill-yellow); text-shadow: 1px 1px 0 #000; margin-right: 3px; }
+
+.coop-host-tag { color: #cbb48a; font-size: 0.74rem; white-space: nowrap; }
+
+.coop-kick {
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.coop-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.coop-primary {
+  font-weight: 700;
+  border-color: var(--gold);
+  background: linear-gradient(#8a5a30, #5a3518);
+}
+
+.coop-actions.is-single { grid-template-columns: 1fr; }
+
+/* End party: destructive, so red instead of the gold primary. */
+.coop-danger {
+  font-weight: 700;
+  border-color: var(--coop-bad);
+  background: linear-gradient(#8a3a24, #5a2012);
+  color: #fbe3d8;
+}
+
+@media (hover: hover) {
+  .coop-danger:hover:not(:disabled) { background: linear-gradient(#9c4429, #682616); }
+}
+
+.coop-create { width: 100%; min-height: 2.6rem; font-size: 0.95rem; }
+
+.coop-status {
+  margin: 6px 0 0;
+  font-size: 0.74rem;
+  text-align: center;
+  color: #cbb48a;
+}
+
+/* Join: 6 code boxes + name. */
+.coop-codein {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  margin: 4px 0 10px;
+}
+
+.coop-codein input {
+  min-width: 0;
+  height: 48px;
+  padding: 0;
+  text-align: center;
+  text-transform: uppercase;
+  font: 700 1.45rem "Courier New", ui-monospace, monospace;
+  color: var(--skill-yellow);
+  background: rgba(16, 10, 6, 0.7);
+  border: 1px solid #8a6238;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.coop-codein input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 1px rgba(227, 179, 74, 0.55); }
+.coop-codein.is-error input,
+.coop-namein.is-error { border-color: var(--coop-bad); }
+
+.coop-label { display: block; margin: 0 0 4px; font-size: 0.78rem; color: #d9c4a0; }
+
+.coop-namein {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 7px 9px;
+  font: inherit;
+  color: var(--parchment);
+  background: rgba(16, 10, 6, 0.7);
+  border: 1px solid #8a6238;
+  border-radius: 4px;
+}
+
+.coop-error {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 7px 9px;
+  border: 1px solid var(--coop-bad);
+  border-radius: 6px;
+  background: rgba(217, 83, 59, 0.16);
+  font-size: 0.8rem;
+  color: #f0d9c8;
+}
+
+.coop-error b { color: #ffb4a4; }
+
+/* Connecting: reuses the loading-screen pill bar look. */
+.coop-connecting { text-align: center; }
+
+.coop-connecting .boot-track {
+  position: relative;
+  width: 100%;
+  height: 1.6rem;
+  margin: 6px 0 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(244, 228, 196, 0.34);
+  background: rgba(8, 6, 4, 0.46);
+}
+
+.coop-connecting .boot-bar { width: 55%; }
+
+.coop-steps {
+  display: grid;
+  gap: 3px;
+  margin: 0 auto 10px;
+  width: fit-content;
+  text-align: left;
+  font-size: 0.82rem;
+}
+
+.coop-steps .is-done { color: var(--coop-ok); }
+.coop-steps .is-now { color: var(--gold); font-weight: 700; }
+.coop-steps .is-todo { color: #8f7a5a; }
+
+/* ---------- HUD: party panel is a second ledger under the main one (left column) ---------- */
+
+.coop-party {
+  padding: 7px 10px 8px;
+  border-radius: 6px;
+  pointer-events: auto;
+}
+
+.coop-party-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #f0d9a8;
+}
+
+.coop-party-head span:last-child {
+  font-family: "Courier New", ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+}
+
+.coop-pm {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) 8px 3.2em;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 0.76rem;
+  color: #e7d7b0;
+}
+
+.coop-pm .coop-swatch { width: 10px; height: 10px; border-width: 1px; box-shadow: none; }
+.coop-pm .coop-name { font-weight: 400; color: #e7d7b0; }
+.coop-pm.is-you .coop-name { color: #f3e2c0; font-weight: 700; }
+
+.coop-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
+.coop-dot.is-ok { background: var(--coop-ok); }
+.coop-dot.is-warn { background: var(--coop-warn); }
+.coop-dot.is-bad { background: var(--coop-bad); }
+
+.coop-ping { text-align: right; font-size: 0.68rem; color: #cbb48a; font-variant-numeric: tabular-nums; }
+
+.coop-party.is-paused { opacity: 0.55; }
+
+/* Toasts: same look as .game-toast, but their own class so hud.js's
+   ".game-toast" cleanup does not wipe them. Stack upward, max 3. */
+.coop-toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 92px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.coop-toast {
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 6px 14px;
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  color: #f3e6c4;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.coop-toast .coop-swatch { display: inline-block; width: 10px; height: 10px; border-width: 1px; margin-right: 6px; vertical-align: -1px; box-shadow: none; }
+.coop-toast.is-left { border-color: #8a6238; color: #d9c4a0; }
+
+/* Reconnecting banner: under the top bar, centred, clear of the ledger column. */
+.coop-banner {
+  position: absolute;
+  top: calc(64px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(440px, calc(100vw - 24px));
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--coop-warn);
+  border-radius: 8px;
+  background: rgba(36, 22, 12, 0.92);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  color: #f3e2c0;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.coop-banner b { color: var(--coop-warn); }
+.coop-timer { font-family: "Courier New", ui-monospace, monospace; font-weight: 700; color: var(--skill-yellow); }
+
+.coop-spin {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 3px solid rgba(232, 196, 58, 0.25);
+  border-top-color: var(--coop-warn);
+  border-radius: 50%;
+  animation: coop-spin 1s linear infinite;
+}
+
+@keyframes coop-spin { to { transform: rotate(360deg); } }
+
+/* End-of-session modals: plain .modal + .sheet like Help. */
+.coop-end { text-align: center; }
+.coop-end .coop-icon { font-size: 2.2rem; line-height: 1; color: var(--skill-yellow); text-shadow: 1px 1px 0 #000; margin-bottom: 6px; }
+.coop-end .coop-safe { margin: 4px 0 14px; padding: 8px 10px; border: 1px solid rgba(95, 207, 90, 0.5); border-radius: 6px; background: rgba(95, 207, 90, 0.1); color: #dff2d0; font-weight: 700; }
+.coop-end ul { margin: 8px 0 14px; padding-left: 18px; text-align: left; font-size: 0.88rem; line-height: 1.5; color: #e6d3b2; }
+.coop-end .coop-primary { width: 100%; }
+
+/* End party confirm: narrow sheet over the dock (.modal z-index 20 > dock 18). */
+.coop-confirm { width: min(340px, calc(100vw - 32px)); }
+.coop-confirm h2 { margin-bottom: 6px; }
+.coop-confirm p { margin: 0 0 14px; }
+
+/* ---------- Phone portrait ---------- */
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #save-bar #coop-btn { min-width: 0; font-size: 1.15rem; }
+  .coop-badge { top: 2px; right: 2px; font-size: 0.6rem; }
+
+  /* Bottom sheet, exactly like #skills-dock. */
+  #coop-dock.coop-dock {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: var(--portrait-thumb, 64px);
+    left: 0;
+    z-index: 18;
+    width: auto;
+    max-height: calc(100dvh - var(--portrait-thumb, 64px) - env(safe-area-inset-top, 0px) - 16px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 6px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px));
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    background: rgba(36, 22, 12, 0.96);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.4);
+    animation: skills-sheet-up 0.22s ease-out;
+  }
+
+  .coop-tabs .tab { min-height: 44px; font-size: 0.9rem; }
+  .coop-hint { font-size: 0.88rem; }
+  .coop-code { font-size: 2rem; }
+  .coop-copy, .coop-actions button, .coop-create { min-height: 44px; }
+  .coop-slot { min-height: 52px; font-size: 0.95rem; }
+  .coop-kick { width: 44px; height: 44px; }
+  .coop-codein input { height: 54px; font-size: 1.6rem; }
+  .coop-namein { min-height: 44px; font-size: 1rem; }
+  .coop-error { font-size: 0.9rem; }
+
+  /* Party panel: compact, top right, beside the minimap and under the strip. */
+  #hud .coop-party {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: max(8px, env(safe-area-inset-right, 0px));
+    width: 150px;
+    padding: 5px 8px 6px;
+    border-radius: 8px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+  }
+
+  .coop-pm { grid-template-columns: 10px minmax(0, 1fr) 8px; font-size: 0.78rem; }
+  .coop-pm .coop-ping { display: none; }
+
+  /* Toasts and banner sit just above the bottom bar. */
+  .coop-toasts { bottom: calc(var(--portrait-thumb, 64px) + 10px); }
+  .coop-banner {
+    top: auto;
+    bottom: calc(var(--portrait-thumb, 64px) + 10px);
+    white-space: normal;
+    width: calc(100vw - 24px);
+    box-sizing: border-box;
+  }
+
+  .coop-end .coop-primary, .coop-confirm button { min-height: 44px; }
+}

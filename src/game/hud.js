@@ -125,6 +125,7 @@ import {
 import { clampMapZoom, compassAssetUrl, compassNeedleDegrees, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
 import { boulderInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
+import { intentBus } from './intents.js';
 import { createCraftPreview } from './craftpreview.js';
 import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
 import { bindSkillsPanel, showLevelUpToast } from './skillsPanel.js';
@@ -151,6 +152,7 @@ import {
 } from './materialsDrawer.js';
 
 export function bindHud(root, state, world) {
+  intentBus.bind(state);
   const goldEl = root.querySelector('#gold');
   const matsEl = document.querySelector('#materials');
   const potionMatsEl = document.querySelector('#potion-materials');
@@ -608,7 +610,7 @@ export function bindHud(root, state, world) {
     container.addEventListener('click', (event) => {
       const btn = event.target.closest('[data-restock]');
       if (btn) {
-        if (restock(state, btn.dataset.restock)) render(performance.now() / 1000);
+        if (intentBus.run({ type: 'restock', materialId: btn.dataset.restock })) render(performance.now() / 1000);
         return;
       }
       const matEl = event.target.closest('[data-mat]');
@@ -713,7 +715,11 @@ export function bindHud(root, state, world) {
       render(performance.now() / 1000);
       return;
     }
-    const n = startCraftBatch(state, recipeId, want, performance.now() / 1000);
+    const n = intentBus.run({
+      type: 'craft',
+      recipeId,
+      count: want === Infinity || want === 'max' ? 'max' : want,
+    });
     if (!n) {
       revealCraftFocus = false;
       return;
@@ -757,7 +763,7 @@ export function bindHud(root, state, world) {
 
   function onCancelCraft() {
     const recipeId = busyCraftId(state);
-    const refunded = cancelCrafts(state);
+    const refunded = intentBus.run({ type: 'cancelCrafts' });
     if (!refunded) return;
     const name = RECIPES[recipeId]?.name ?? 'craft';
     const extra = refunded > 1 ? ` · ${refunded} actions returned` : '';
@@ -796,7 +802,7 @@ export function bindHud(root, state, world) {
     }
     const btn = event.target.closest('[data-place]');
     if (!btn) return;
-    if (placeFromChest(state, btn.dataset.place)) {
+    if (intentBus.run({ type: 'placeFromChest', recipeId: btn.dataset.place })) {
       world.syncDisplays();
       paintChest();
       render(performance.now() / 1000);
@@ -808,7 +814,7 @@ export function bindHud(root, state, world) {
     if (box) box.hidden = true;
   });
   chestModal.querySelector('[data-discard-yes]')?.addEventListener('click', () => {
-    if (pendingDiscardId && discardFromChest(state, pendingDiscardId)) {
+    if (pendingDiscardId && intentBus.run({ type: 'discard', recipeId: pendingDiscardId })) {
       pushLog(state, `Discarded ${RECIPES[pendingDiscardId]?.name ?? 'a ware'}.`);
     }
     pendingDiscardId = null;
@@ -925,7 +931,7 @@ export function bindHud(root, state, world) {
     paintCrafts();
     setModalOpen();
     if (options.autoStart && craftFocusId && canCraft(state, craftFocusId)) {
-      if (startCraft(state, craftFocusId, performance.now() / 1000)) {
+      if (intentBus.run({ type: 'craft', recipeId: craftFocusId, count: 1 }) > 0) {
         playClick('craft');
         setCraftNote('');
         pushLog(state, `Crafting ${RECIPES[craftFocusId].name}…`);
@@ -1142,7 +1148,7 @@ export function bindHud(root, state, world) {
   function confirmDisplay(slotIndex = 0) {
     const recipeId = selectedDisplayId;
     const index = displayTarget?.index ?? state.selectedDisplay;
-    if (!recipeId || !placeOnDisplay(state, recipeId, index, slotIndex)) {
+    if (!recipeId || !intentBus.run({ type: 'placeOnDisplay', recipeId, displayIndex: index, slotIndex })) {
       paintDisplayPicker();
       return false;
     }
@@ -1338,7 +1344,7 @@ export function bindHud(root, state, world) {
       return;
     }
     const recipeId = actor.requestRecipeId;
-    const paid = sellToCustomer(state, recipeId, actor.offerGold);
+    const paid = intentBus.run({ type: 'sell', recipeId, gold: actor.offerGold, customerId: actor.id });
     if (!paid) {
       paintTrade();
       return;
@@ -1354,6 +1360,7 @@ export function bindHud(root, state, world) {
   tradeModal.querySelector('[data-trade-refuse]').addEventListener('click', () => {
     const actor = tradeActor && world.getCustomer(tradeActor.id);
     if (actor) {
+      intentBus.run({ type: 'refuseCustomer', customerId: actor.id });
       pushLog(state, `You refuse ${customerName(actor.typeId)}.`);
       world.refuseActor(actor);
     }
@@ -1364,7 +1371,12 @@ export function bindHud(root, state, world) {
   tradeModal.querySelector('[data-trade-buy-btn]').addEventListener('click', () => {
     const actor = tradeActor && world.getCustomer(tradeActor.id);
     if (!actor?.offer) return;
-    if (buyFromCustomer(state, actor.offer.materialId, actor.offer.price)) {
+    if (intentBus.run({
+      type: 'buyFromCustomer',
+      materialId: actor.offer.materialId,
+      price: actor.offer.price,
+      customerId: actor.id,
+    })) {
       playClick('trade');
       const mat = MATERIALS[actor.offer.materialId];
       pushLog(state, `Bought ${mat.name} from ${customerName(actor.typeId)} for ${formatGold(actor.offer.price)}g.`);
@@ -1459,7 +1471,7 @@ export function bindHud(root, state, world) {
       paintOfferPicker();
       return;
     }
-    const paid = sellToCustomer(state, choice.recipeId, choice.gold);
+    const paid = intentBus.run({ type: 'sell', recipeId: choice.recipeId, gold: choice.gold, customerId: actor.id });
     if (!paid) {
       lastOfferListKey = '';
       paintOfferPicker();
@@ -1622,7 +1634,7 @@ export function bindHud(root, state, world) {
   upgradeModal.querySelector('[data-upgrade-buy]').addEventListener('click', () => {
     const level = state.chestLevel ?? 1;
     const cost = chestUpgradeCost(level);
-    if (upgradeChest(state)) {
+    if (intentBus.run({ type: 'upgradeChest' })) {
       pushLog(state, `Chest upgraded to level ${state.chestLevel} (${chestSlots(state.chestLevel)} slots) for ${formatGold(cost)}g.`);
       paintUpgrade();
       paintChest();
@@ -1738,7 +1750,7 @@ export function bindHud(root, state, world) {
     }
     const cost = expansionCost((state.expansions ?? []).length);
     fadeShop(() => {
-      if (buyExpansion(state, padId)) {
+      if (intentBus.run({ type: 'buyExpansion', padId })) {
         world.rebuildAfterExpansion();
         world.setExpandMode(false);
         pushLog(state, `Opened a new room (${padById(padId)?.label ?? padId}) for ${formatGold(cost)}g.`);
@@ -2022,7 +2034,7 @@ export function bindHud(root, state, world) {
         render(performance.now() / 1000);
         return;
       }
-      if (!buyStation(state, pending.type, pose)) {
+      if (!intentBus.run({ type: 'buyStation', stationId: pending.type, pose })) {
         render(performance.now() / 1000);
         return;
       }
@@ -2047,7 +2059,7 @@ export function bindHud(root, state, world) {
       render(performance.now() / 1000);
       return;
     }
-    if (!buyFurniture(state, pending.type, pose)) {
+    if (!intentBus.run({ type: 'buyFurniture', furnitureType: pending.type, pose })) {
       render(performance.now() / 1000);
       return;
     }
@@ -2100,7 +2112,7 @@ export function bindHud(root, state, world) {
     const target = furnTarget;
     hideFurnMenu();
     if (target?.id !== 'display') return;
-    if (!clearDisplay(state, target.index)) return;
+    if (!intentBus.run({ type: 'clearDisplay', index: target.index })) return;
     playClick('ui');
     const kind = displayKind(target.index, state);
     pushLog(state, kind === 'stand'
@@ -2113,7 +2125,7 @@ export function bindHud(root, state, world) {
     const target = furnTarget;
     hideFurnMenu();
     if (target?.id !== 'display') return;
-    if (!removePlacedFurniture(state, target.index)) return;
+    if (!intentBus.run({ type: 'removeFurniture', index: target.index })) return;
     playClick('ui');
     const removedKind = displayKind(target.index, state);
     const removedLabel = removedKind === 'shelf' ? 'wall shelf'
@@ -2223,7 +2235,7 @@ export function bindHud(root, state, world) {
   });
   fillModal?.querySelector('[data-fill-assign]')?.addEventListener('click', () => {
     const index = fillTarget?.index ?? state.selectedDisplay;
-    if (!selectedFillId || !assignStandPiece(state, index, selectedFillId)) {
+    if (!selectedFillId || !intentBus.run({ type: 'assignStand', index, recipeId: selectedFillId })) {
       paintFillPicker();
       return;
     }
@@ -2236,7 +2248,7 @@ export function bindHud(root, state, world) {
   });
   fillModal?.querySelector('[data-fill-set]')?.addEventListener('click', () => {
     const index = fillTarget?.index ?? state.selectedDisplay;
-    if (!selectedFillId || !fillStandFromRecipe(state, index, selectedFillId)) {
+    if (!selectedFillId || !intentBus.run({ type: 'fillStand', index, recipeId: selectedFillId })) {
       paintFillPicker();
       return;
     }
@@ -2616,12 +2628,12 @@ export function bindHud(root, state, world) {
     event.preventDefault();
     const input = settingsDock.querySelector('[data-cheat-code]');
     const note = settingsDock.querySelector('[data-cheat-note]');
-    const result = applyCheat(state, input?.value ?? '');
+    const result = intentBus.run({ type: 'cheat', code: String(input?.value ?? '') });
     if (input) input.value = '';
     if (!result) {
       if (note) {
         note.hidden = false;
-        note.textContent = 'Unknown code.';
+        note.textContent = intentBus.coop ? 'Cheats are off in co-op.' : 'Unknown code.';
       }
       return;
     }
@@ -3246,5 +3258,16 @@ export function bindHud(root, state, world) {
   syncOwnedMaterials();
   syncMaterialsDrawerPlace();
 
-  return { render, openChest, openTrade, openCraft, openOfferPicker, selectOfferItem, tryStartMusic };
+  /** Redraw everything after the whole shop state was swapped (co-op join/leave, shared furniture). */
+  function refreshAll({ layout = true } = {}) {
+    if (layout) world.applyLayout();
+    world.syncDisplays();
+    world.refreshSelection(true);
+    paintCrafts();
+    paintChest();
+    paintBuild();
+    render(performance.now() / 1000);
+  }
+
+  return { render, openChest, openTrade, openCraft, openOfferPicker, selectOfferItem, tryStartMusic, refreshAll, paintCrafts };
 }

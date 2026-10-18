@@ -12,11 +12,11 @@ import {
   heroName,
   heroQuest,
   heroTitle,
-  hireHero,
   questProgress,
   questStatus,
   readyQuests,
 } from './heroesQuests.js';
+import { intentBus } from './intents.js';
 
 function portraitUrl(npcId, mode) {
   const file = String(npcId ?? '').replace(/^buyer-[a-z]+-/, '');
@@ -241,7 +241,7 @@ export function bindHeroesPanel({
   picker.querySelector('[data-picker-hire]')?.addEventListener('click', () => {
     const cls = HERO_CLASSES.find((item) => item.id === pickClass);
     if (!cls || !pickNpc) return;
-    if (!hireHero(state, state.hq, cls.id, pickNpc)) {
+    if (!intentBus.run({ type: 'hireHero', classId: cls.id, npcId: pickNpc })) {
       paintPicker();
       paintHeroes();
       return;

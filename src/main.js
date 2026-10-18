@@ -6,6 +6,8 @@ import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRigg
 import { loadBundledMusic, unlockAudio } from './game/audio.js';
 import { createWorld } from './game/world.js';
 import { normalizeImported, setBundledLooks, setRiggedBuyers } from './game/models.js';
+import { loadAutosave, startAutosave } from './game/autosave.js';
+import { mountCoop } from './coop/coopUi.js';
 
 const canvas = document.querySelector('#view');
 const hudRoot = document.querySelector('#hud');
@@ -126,7 +128,10 @@ if (!hasWebGL()) {
 
 async function bootGame() {
   const state = createState();
-  pushLog(state, 'Rune Craft is open. Craft into the chest, then trade at the counter.');
+  const resumed = loadAutosave(state, performance.now() / 1000);
+  pushLog(state, resumed
+    ? 'Welcome back. Your shop was saved in this browser.'
+    : 'Rune Craft is open. Craft into the chest, then trade at the counter.');
   setBootProgress(0, 1);
 
   let bundledPlayer = null;
@@ -189,6 +194,9 @@ async function bootGame() {
   };
   const hud = bindHud(hudRoot, state, world);
   window.stallhaven.hud = hud;
+  const autosave = startAutosave(state);
+  window.stallhaven.autosave = autosave;
+  window.stallhaven.coop = mountCoop({ state, world, hud, autosave });
   bindUploadUI({
     button: document.querySelector('#upload-btn'),
     modal: document.querySelector('#import-modal'),

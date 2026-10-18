@@ -15,8 +15,12 @@ import {
   ignoredClickObject,
   ladderFaceYaw,
   pickUseHit,
+  clickLeavesGather,
   fletchFaceYaw,
   fletchStandWorld,
+  furnaceFaceYaw,
+  furnaceStandWorld,
+  FURNACE_STAND_STEP,
   rangeFaceYaw,
   rangeStandWorld,
   resolveStationUse,
@@ -248,6 +252,53 @@ describe('station walk-then-open', () => {
       isWalkable(turnedStand.x, turnedStand.z, playerObstacles(state), PLAYER_RADIUS, playerWalkFloors([])),
       true,
     );
+  });
+
+  it('stands one step in front of the furnace mouth and faces it when the oven is turned', () => {
+    const state = createState();
+    const from = { x: SHOP.keeper.x, z: SHOP.keeper.z };
+    const pose = { x: SHOP.furnace.x, z: SHOP.furnace.z, rot: 0 };
+    state.furniture.furnace = pose;
+    const plan = resolveStationUse(from, pose, state, undefined, 'furnace');
+    const stand = furnaceStandWorld(pose);
+    assert.equal(plan.action, 'walk');
+    assert.ok(Math.hypot(plan.dest.x - stand.x, plan.dest.z - stand.z) < 1e-6);
+    assert.ok(Math.abs(Math.hypot(stand.x - pose.x, stand.z - pose.z) - (0.31 + FURNACE_STAND_STEP)) < 0.02);
+    const face = furnaceFaceYaw(pose, stand);
+    const towardX = Math.sin(face);
+    const towardZ = Math.cos(face);
+    const dx = pose.x - stand.x;
+    const dz = pose.z - stand.z;
+    const len = Math.hypot(dx, dz);
+    assert.ok(towardX * dx / len + towardZ * dz / len > 0.99, 'the stand faces the furnace');
+    assert.equal(plan.face, face);
+    assert.equal(
+      isWalkable(stand.x, stand.z, playerObstacles(state), PLAYER_RADIUS, playerWalkFloors([])),
+      true,
+    );
+
+    const turned = { ...pose, rot: Math.PI / 2 };
+    state.furniture.furnace = turned;
+    const turnedPlan = resolveStationUse(from, turned, state, undefined, 'furnace');
+    const turnedStand = furnaceStandWorld(turned);
+    assert.equal(turnedPlan.action, 'walk');
+    assert.ok(Math.hypot(turnedPlan.dest.x - turnedStand.x, turnedPlan.dest.z - turnedStand.z) < 1e-6);
+    assert.ok(Math.abs(Math.hypot(turnedStand.x - turned.x, turnedStand.z - turned.z) - (0.31 + FURNACE_STAND_STEP)) < 0.02);
+    const turnedFace = furnaceFaceYaw(turned, turnedStand);
+    const tdx = turned.x - turnedStand.x;
+    const tdz = turned.z - turnedStand.z;
+    const tlen = Math.hypot(tdx, tdz);
+    assert.ok(Math.sin(turnedFace) * tdx / tlen + Math.cos(turnedFace) * tdz / tlen > 0.99);
+    assert.ok(Math.hypot(turnedStand.x - stand.x, turnedStand.z - stand.z) > 0.5, 'a quarter turn moves the stand');
+  });
+
+  it('walks away from an active chop when the click is off the trunk', () => {
+    const chopping = { x: 4, z: 8, mode: 'chop' };
+    assert.equal(clickLeavesGather(chopping, { x: 4.2, z: 8.1 }, 'tree'), false);
+    assert.equal(clickLeavesGather(chopping, { x: 6.5, z: 8 }, 'tree'), true);
+    assert.equal(clickLeavesGather(chopping, { x: 6.5, z: 8 }, null), true);
+    assert.equal(clickLeavesGather(chopping, { x: 6.5, z: 8 }, 'anvil'), false);
+    assert.equal(clickLeavesGather(null, { x: 6.5, z: 8 }, 'tree'), false);
   });
 
   it('stands one step in front of the fletching bench vice, not at the left end', () => {

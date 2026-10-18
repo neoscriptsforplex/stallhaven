@@ -32,6 +32,8 @@ export const WALL_THICK = 0.16;
 export const FURNITURE_ROT_STEP = Math.PI / 12;
 /** Shared default facing: +Z, toward the shop door / customer side. */
 export const FURNITURE_FORWARD = 0;
+/** Starter armour stands face into the shop. +Z (0) looks out the door. */
+export const STARTER_MANNEQUIN_YAW = Math.PI;
 
 /** Yaw added by one furniture-menu Rotate click. Floor pieces 15°; shelves 90°. */
 export function furnitureRotateDelta(kind) {
@@ -784,13 +786,38 @@ export function defaultFurniture() {
     displays: SHOP.displays.map((spot) => (
       (spot.kind ?? 'table') === 'shelf'
         ? snapToWallGrid(spot.x, spot.z, [])
-        : { x: spot.x, z: spot.z, rot: FURNITURE_FORWARD }
+        : {
+          x: spot.x,
+          z: spot.z,
+          rot: spot.kind === 'stand' ? STARTER_MANNEQUIN_YAW : FURNITURE_FORWARD,
+        }
     )),
   };
 }
 
 function clonePose(pose) {
   return pose ? { ...pose } : null;
+}
+
+function yawNear(a, b, eps = 0.02) {
+  let delta = ((a ?? 0) - (b ?? 0)) % (Math.PI * 2);
+  if (delta > Math.PI) delta -= Math.PI * 2;
+  if (delta < -Math.PI) delta += Math.PI * 2;
+  return Math.abs(delta) <= eps;
+}
+
+/**
+ * Starter mannequins that were never moved or turned face into the shop.
+ * A different spot or rotation is the player's, including later placements.
+ */
+export function migrateStarterMannequins(poses, displays = SHOP.displays) {
+  return (poses ?? []).map((pose, index) => {
+    const spot = displays[index];
+    if (!pose || !spot || spot.kind !== 'stand' || spot.bought) return pose;
+    const unmoved = Math.abs(pose.x - spot.x) <= 0.02 && Math.abs(pose.z - spot.z) <= 0.02;
+    if (!unmoved || !yawNear(pose.rot, FURNITURE_FORWARD)) return pose;
+    return { ...pose, rot: STARTER_MANNEQUIN_YAW };
+  });
 }
 
 export function cloneFurniture(furniture = defaultFurniture()) {

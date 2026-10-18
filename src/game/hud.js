@@ -1713,6 +1713,7 @@ export function bindHud(root, state, world) {
   }
 
   async function toggleFullscreen() {
+    closeHeroesDock();
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
@@ -2676,6 +2677,7 @@ export function bindHud(root, state, world) {
       closeBuild();
       closeExpand();
       closeMusicDock();
+      closeHeroesDock();
       closeSettingsDock();
       hideFurnMenu();
     },
@@ -2726,6 +2728,7 @@ export function bindHud(root, state, world) {
     if (event.type === 'wheat-inspect') {
       showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'wheat' });
     }
+    if (event.type === 'player-move') closeHeroesDock();
     if (event.type === 'mined' || event.type === 'chopped' || event.type === 'picked') {
       if (activeCraftYield) {
         activeCraftYield.classList.add('is-grant');
@@ -2820,6 +2823,7 @@ export function bindHud(root, state, world) {
   const saveBtn = document.querySelector('#save-btn');
   const loadBtn = document.querySelector('#load-btn');
   saveBtn?.addEventListener('click', async () => {
+    closeHeroesDock();
     try {
       if (await saveStateToFile(state)) pushLog(state, 'Shop saved to a file.');
     } catch {
@@ -2828,6 +2832,7 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   });
   loadBtn?.addEventListener('click', async () => {
+    closeHeroesDock();
     try {
       if (await loadStateFromFile(state)) {
         world.applyLayout();
@@ -3008,6 +3013,9 @@ export function bindHud(root, state, world) {
   }
 
   function render(now) {
+    if (document.body.classList.contains('modal-open') && !document.querySelector('.modal:not([hidden])')) {
+      document.body.classList.remove('modal-open');
+    }
     const dt = lastPreviewAt ? Math.min(0.05, Math.max(0, now - lastPreviewAt)) : 0;
     lastPreviewAt = now;
     if (!craftModal.hidden) craftPreview?.tick(dt);

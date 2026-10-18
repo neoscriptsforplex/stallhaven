@@ -33,6 +33,7 @@
     </style>
     <link rel="stylesheet" href="./src/style.css" />
     <link rel="stylesheet" href="./src/coop/coop.css" />
+    <link rel="stylesheet" href="./src/save.css" />
     <script type="importmap">
       {
         "imports": {
@@ -57,9 +58,8 @@
       <button type="button" id="skills-btn" title="Skills" aria-label="Skills" aria-controls="skills-dock" aria-expanded="false">Skills</button>
       <button type="button" id="build-btn" title="Build" aria-label="Build" aria-controls="build-dock" aria-expanded="false">Build</button>
       <button type="button" id="help-btn" title="Help" aria-label="Help">Help</button>
-      <button type="button" id="save-btn">Save</button>
-      <button type="button" id="load-btn">Load</button>
       <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
+      <button type="button" id="saves-btn" title="Saves" aria-label="Saves" aria-controls="saves-dock" aria-expanded="false"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 3h13l3 3v15H4z"/><rect x="7" y="4.5" width="9" height="5" fill="#24160c"/><rect x="13" y="5.3" width="2" height="3.4"/><rect x="7" y="13" width="10" height="6.5" rx="1" fill="#24160c"/></svg></button>
       <button type="button" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
       <input id="music-file" type="file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav" multiple hidden />
@@ -87,6 +87,7 @@
         <div class="ledger-row">
           <p id="gold" class="gold">Coins: 40</p>
         </div>
+        <div id="autosave-status" data-autosave aria-live="polite" hidden></div>
         <ul id="game-log" class="game-log" aria-live="polite"></ul>
         <div id="active-craft" class="active-craft" hidden>
           <p data-active-craft-name>Crafting</p>
@@ -402,8 +403,7 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
     <aside id="settings-dock" class="expand-dock" hidden>
       <div class="more-quick">
         <button type="button" data-more="help">Help</button>
-        <button type="button" data-more="save">Save</button>
-        <button type="button" data-more="load">Load</button>
+        <button type="button" data-more="saves">Saves</button>
         <button type="button" data-more="fullscreen">Fullscreen</button>
       </div>
       <h2>Settings</h2>
@@ -455,7 +455,28 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
         <button type="submit">Enter</button>
       </form>
       <p data-cheat-note class="craft-note" hidden></p>
+      <section class="sv-section" data-settings-saves>
+        <h3>Save files</h3>
+        <p class="meta" data-save-files-note>Back up or move a shop between browsers. Export saves the current slot.</p>
+        <div class="sv-stack">
+          <button type="button" class="sv-ghost" data-save-export>Export save to file</button>
+          <button type="button" class="sv-ghost" data-save-import>Import save file</button>
+        </div>
+      </section>
       <button type="button" class="ghost" data-settings-close>Close</button>
+    </aside>
+
+    <aside id="saves-dock" class="expand-dock" role="dialog" aria-label="Saves" hidden>
+      <header class="skills-head"><span class="skills-grip"></span><h2>Saves</h2><button type="button" class="skills-close" data-saves-close aria-label="Close">✕</button></header>
+      <div class="sv-panel-info"><b data-saves-title>Slot 1</b><br><span data-saves-stats></span><br><span data-saves-last>Never saved</span> · autosaves every 3 min</div>
+      <label class="settings-bright sv-name-edit">Shop name
+        <input type="text" data-saves-name maxlength="32" autocomplete="off" spellcheck="false" aria-label="Shop name" />
+      </label>
+      <div class="sv-stack">
+        <button type="button" class="sv-primary" data-saves-now>Save now</button>
+        <button type="button" class="sv-ghost" data-saves-switch>Switch slot</button>
+      </div>
+      <p class="meta">Switch slot saves first, then returns you to the slot picker. Import and export live in Settings (⚙).</p>
     </aside>
 
     <aside id="skills-dock" class="expand-dock skills-dock" role="dialog" aria-label="Skills" hidden></aside>

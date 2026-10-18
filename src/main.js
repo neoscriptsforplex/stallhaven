@@ -6,7 +6,8 @@ import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRigg
 import { loadBundledMusic, unlockAudio } from './game/audio.js';
 import { createWorld } from './game/world.js';
 import { normalizeImported, setBundledLooks, setRiggedBuyers } from './game/models.js';
-import { loadAutosave, startAutosave } from './game/autosave.js';
+import { createAutosave, createSlotStore, openBackend, applySlotData } from './game/saveSlots.js';
+import { keepSharedSettings, mountSaves, readBootSlot } from './game/saveUi.js';
 import { mountCoop } from './coop/coopUi.js';
 
 const canvas = document.querySelector('#view');
@@ -128,7 +129,38 @@ if (!hasWebGL()) {
 
 async function bootGame() {
   const state = createState();
-  const resumed = loadAutosave(state, performance.now() / 1000);
+  // Save slots: open storage, migrate the old single autosave once, then either
+  // reload into the slot chosen before a reload (Switch slot / import) or wait
+  // for the picker after Click to play.
+  let local = null;
+  try {
+    local = window.localStorage;
+  } catch {
+    local = null;
+  }
+  const backend = await openBackend({ local });
+  const store = createSlotStore({ backend, legacy: local });
+  await store.loadMeta();
+  await store.migrateLegacy().catch(() => null);
+  let saves = null;
+  const autosave = createAutosave({
+    store,
+    getState: () => state,
+    nowSeconds: () => performance.now() / 1000,
+    getName: () => state.shopName ?? null,
+    emit: (type, detail) => saves?.emit(type, detail),
+    onStatus: (s) => saves?.paintStatus(s),
+  });
+  const bootSlot = readBootSlot();
+  let resumed = false;
+  if (bootSlot && !bootSlot.isNew) {
+    const data = await store.read(bootSlot.slot);
+    if (data && keepSharedSettings(state, () => applySlotData(state, data, performance.now() / 1000))) {
+      state.shopName = store.meta.slots[String(bootSlot.slot)]?.name ?? data.shopName;
+      autosave.setSlot(bootSlot.slot, data);
+      resumed = true;
+    }
+  }
   pushLog(state, resumed
     ? 'Welcome back. Your shop was saved in this browser.'
     : 'Rune Craft is open. Craft into the chest, then trade at the counter.');
@@ -194,8 +226,22 @@ async function bootGame() {
   };
   const hud = bindHud(hudRoot, state, world);
   window.stallhaven.hud = hud;
-  const autosave = startAutosave(state);
   window.stallhaven.autosave = autosave;
+  window.stallhaven.slots = store;
+  saves = mountSaves({
+    state,
+    hud,
+    store,
+    autosave,
+    makeState: createState,
+    nowSeconds: () => performance.now() / 1000,
+    log: (msg) => {
+      pushLog(state, msg);
+      hud.render(performance.now() / 1000);
+    },
+  });
+  window.stallhaven.saves = saves;
+  window.stallhaven.saveEvents = saves.events;
   window.stallhaven.coop = mountCoop({ state, world, hud, autosave });
   bindUploadUI({
     button: document.querySelector('#upload-btn'),
@@ -250,6 +296,26 @@ async function bootGame() {
     if (music && typeof music.catch === 'function') music.catch(() => {});
     world.tick(0, performance.now() / 1000);
   });
+  // Always show "Choose a save" after Click to play, even with one filled slot,
+  // unless this load is the reload that follows a choice made in the picker.
+  if (bootSlot?.isNew) {
+    await saves.startNew(bootSlot.slot, bootSlot.name);
+  } else if (!resumed) {
+    for (;;) {
+      const choice = await saves.showPicker();
+      if (choice.isNew) {
+        await saves.startNew(choice.slot, choice.name);
+        break;
+      }
+      if (await saves.loadSlotInto(choice.slot)) {
+        hud.refreshAll?.({ layout: true });
+        pushLog(state, 'Welcome back. Your shop was saved in this browser.');
+        break;
+      }
+    }
+  }
+  await store.setLastSlot(autosave.slot);
+  autosave.start();
   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
   world.tick(0, performance.now() / 1000);
   hideBootCover({ immediate: true });

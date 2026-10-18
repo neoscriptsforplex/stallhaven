@@ -366,7 +366,7 @@ export function createNet(deps) {
   /** Guests get their own solo save back; the host keeps playing the room's (their own) shop. */
   function restoreSolo() {
     if (!amHost && autosave) {
-      safe(() => loadAutosave(state, nowLocal(), store));
+      safe(() => (autosave.restore ? autosave.restore(state, nowLocal()) : loadAutosave(state, nowLocal(), store)));
       autosave.resume?.();
       safe(() => hud?.refreshAll?.({ layout: true }));
     } else {

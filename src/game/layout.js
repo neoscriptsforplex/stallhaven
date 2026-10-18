@@ -1147,6 +1147,22 @@ export function patchPlaceFloors(expansionIds = []) {
   return [{ minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: grass.maxZ }];
 }
 
+/**
+ * A paid patch we can still draw. Off-map, NaN, and shop-interior poses are
+ * not kept — those go back to a free re-place instead of an invisible buy.
+ */
+export function farmingPatchPoseKept(pose, expansionIds = []) {
+  if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) return false;
+  if (Math.abs(pose.x) > 80 || Math.abs(pose.z) > 80) return false;
+  const lawn = patchPlaceFloors(expansionIds)[0];
+  if (!lawn) return false;
+  const { hw, hd } = furnitureHalfSize('patch');
+  if (pose.x - hw < lawn.minX - 0.05 || pose.x + hw > lawn.maxX + 0.05) return false;
+  if (pose.z - hd < lawn.minZ - 0.05 || pose.z + hd > lawn.maxZ + 0.05) return false;
+  if (pointHitsShop(pose.x, pose.z, expansionIds, 0.15)) return false;
+  return true;
+}
+
 export function gardenRockSpots(expansionIds = []) {
   const spots = [
     { x: -3.45, z: 8.15, scale: 0.85, side: 'path' },

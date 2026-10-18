@@ -80,6 +80,7 @@ import {
   FURNITURE_SHOP,
   FARMING_PATCH_CAP,
   FARMING_PATCH_COSTS,
+  farmingPatchPoseKept,
   padById,
   padConnects,
   snapToWallGrid,
@@ -128,7 +129,7 @@ function emptyBoughtFurniture() {
 export const FREE_FURNITURE_REPLACE = 2;
 
 function emptyFreeFurnitureReplace() {
-  return { table: 0, mannequin: 0 };
+  return { table: 0, mannequin: 0, farming_patch: 0 };
 }
 
 /** Old saves used ores for smithing. Copy ore counts onto bars so progress is not bricked. */
@@ -888,6 +889,7 @@ export function liveFurnitureCount(state, type) {
 
 export function nextFurnitureCost(state, type) {
   if (type === 'farming_patch') {
+    if ((state.freeFurnitureReplace?.farming_patch ?? 0) > 0) return 0;
     const n = Math.min(boughtFurnitureCount(state, type), FARMING_PATCH_CAP - 1);
     return FARMING_PATCH_COSTS[Math.max(0, n)];
   }
@@ -906,8 +908,13 @@ export function nextFurnitureCost(state, type) {
 export function canBuyFurniture(state, type) {
   if (!FURNITURE_SHOP.some((item) => item.type === type)) return false;
   // Tables, mannequins, and shelves have no count cap. Price is
-  // furnitureBuyCost(n) = 500·3^n. Farming patches stay capped at four.
-  if (type === 'farming_patch' && boughtFurnitureCount(state, type) >= FARMING_PATCH_CAP) return false;
+  // furnitureBuyCost(n) = 500·3^n. Farming patches stay capped.
+  if (type === 'farming_patch') {
+    const placed = Array.isArray(state.furniture?.patches) ? state.furniture.patches.length : 0;
+    const credit = Math.max(0, state.freeFurnitureReplace?.farming_patch ?? 0);
+    if (placed >= FARMING_PATCH_CAP) return false;
+    if (credit <= 0 && boughtFurnitureCount(state, type) >= FARMING_PATCH_CAP) return false;
+  }
   const cost = nextFurnitureCost(state, type);
   if ((state.gold ?? 0) < cost) return false;
   if (cost === 0) return true;
@@ -938,7 +945,7 @@ export function buyFurniture(state, type, pose) {
   if (cost > 0) payBuildMaterials(state, type);
   if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
   if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
-  if (cost === 0 && (type === 'table' || type === 'mannequin') && state.freeFurnitureReplace[type] > 0) {
+  if (cost === 0 && (type === 'table' || type === 'mannequin' || type === 'farming_patch') && state.freeFurnitureReplace[type] > 0) {
     state.freeFurnitureReplace[type] -= 1;
   }
   const paidExtra = cost > 0;
@@ -1462,6 +1469,7 @@ export function serializeState(state) {
     freeFurnitureReplace: {
       table: Math.max(0, state.freeFurnitureReplace?.table ?? 0),
       mannequin: Math.max(0, state.freeFurnitureReplace?.mannequin ?? 0),
+      farming_patch: Math.max(0, state.freeFurnitureReplace?.farming_patch ?? 0),
     },
   };
 }
@@ -1529,10 +1537,11 @@ export function applyState(state, data) {
   next.boughtFurniture = emptyBoughtFurniture();
   next.freeFurnitureReplace = emptyFreeFurnitureReplace();
   if (data.freeFurnitureReplace && typeof data.freeFurnitureReplace === 'object') {
-    for (const type of ['table', 'mannequin']) {
+    for (const type of ['table', 'mannequin', 'farming_patch']) {
       const value = data.freeFurnitureReplace[type];
+      const cap = type === 'farming_patch' ? FARMING_PATCH_CAP : FREE_FURNITURE_REPLACE;
       if (typeof value === 'number' && Number.isFinite(value)) {
-        next.freeFurnitureReplace[type] = Math.max(0, Math.min(FREE_FURNITURE_REPLACE, Math.round(value)));
+        next.freeFurnitureReplace[type] = Math.max(0, Math.min(cap, Math.round(value)));
       }
     }
   }
@@ -1721,7 +1730,35 @@ export function applyState(state, data) {
       ? `Skills have arrived! Your past work earned you: ${earned.join(', ')}.`
       : 'Skills have arrived! Every skill starts at level 1.');
   }
+  repairFarmingPatches(state);
   return true;
+}
+
+/**
+ * Paid patches with a lawn pose stay, so a reload draws them.
+ * A pose with nowhere to draw (or a buy that never stored a pose) becomes
+ * one free re-place. Cancel never reaches this — it does not charge.
+ */
+export function repairFarmingPatches(state) {
+  if (!state) return { kept: 0, credited: 0 };
+  if (!state.furniture) state.furniture = defaultFurniture();
+  if (!Array.isArray(state.furniture.patches)) state.furniture.patches = [];
+  const expansions = state.expansions ?? [];
+  const kept = [];
+  for (const pose of state.furniture.patches) {
+    if (farmingPatchPoseKept(pose, expansions)) kept.push(pose);
+  }
+  state.furniture.patches = kept.slice(0, FARMING_PATCH_CAP);
+  if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
+  const bought = boughtFurnitureCount(state, 'farming_patch');
+  const room = Math.max(0, FARMING_PATCH_CAP - state.furniture.patches.length);
+  const unplaced = Math.max(0, bought - state.furniture.patches.length);
+  if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
+  state.freeFurnitureReplace.farming_patch = Math.min(room, unplaced);
+  return {
+    kept: state.furniture.patches.length,
+    credited: state.freeFurnitureReplace.farming_patch,
+  };
 }
 
 export function autoStock(state) {

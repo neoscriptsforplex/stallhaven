@@ -94,6 +94,7 @@ import {
   runeFieldMoveObstacles,
   floorsForState,
   isWalkable,
+  dropRecordedPatchObstacle,
   firstOpenFurniturePose,
   liveObstacles,
   moveWithCollision,
@@ -158,7 +159,7 @@ import {
   defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -179,6 +180,22 @@ export const TOUCH_HOLD_MOVE_PX = 8;
 export const TOUCH_DOUBLE_TAP_MS = 280;
 /** Second tap must land near the first. */
 export const TOUCH_DOUBLE_TAP_PX = 28;
+
+/** Second ground click while placing furniture confirms the spot. */
+export const PLACE_DOUBLE_CLICK_MS = 420;
+
+/**
+ * Preview on the first click. A second click inside the window confirms,
+ * the same on a phone double-tap as on a desktop double-click.
+ */
+export function nextPlaceClick(lastAt, now, needsConfirm) {
+  const at = Number(now) || 0;
+  const prev = Number(lastAt) || 0;
+  if (needsConfirm && prev > 0 && at >= prev && at - prev < PLACE_DOUBLE_CLICK_MS) {
+    return { confirm: true, lastAt: 0 };
+  }
+  return { confirm: false, lastAt: at };
+}
 
 export function isCanvasDoubleTap(prev, next, now = 0) {
   if (!prev || !next) return false;
@@ -1223,7 +1240,7 @@ export function createWorld(canvas, state, opts = {}) {
     const poses = state.furniture?.patches ?? [];
     poses.forEach((pose, index) => {
       const mesh = buildFarmingPatch();
-      mesh.position.set(pose.x, OUTDOOR_GROUND_Y, pose.z);
+      placeFarmingPatchMesh(mesh, pose, OUTDOOR_GROUND_Y);
       mesh.rotation.y = furnitureVisualYaw('farming_patch', pose.rot);
       patchGroup.add(mesh);
       const { hw, hd } = furnitureHalfSize('patch');
@@ -2235,7 +2252,8 @@ export function createWorld(canvas, state, opts = {}) {
     if (kind === 'farming_patch' || kind === 'patch') {
       const grass = patchPlaceReason(pose);
       if (grass) return grass;
-      const reason = placementBlocked(pose, 'patch', blocks, floors, { checkAisle: false });
+      const patchBlocks = dropRecordedPatchObstacle(blocks, state.furniture?.patches, pose);
+      const reason = placementBlocked(pose, 'patch', patchBlocks, floors, { checkAisle: false });
       if (reason === 'That spot is off the shop floor.') return 'Place the patch on open grass.';
       return reason;
     }
@@ -2263,6 +2281,15 @@ export function createWorld(canvas, state, opts = {}) {
       z: slot.mesh.position.z,
       rot: slot.mesh.rotation.y - furnitureStartYaw(moveTarget.id),
     };
+  }
+
+  function patchRecordedAt(pose) {
+    if (!pose) return false;
+    return (state.furniture?.patches ?? []).some((patch) => (
+      Number.isFinite(patch?.x)
+      && Number.isFinite(patch?.z)
+      && Math.hypot(patch.x - pose.x, patch.z - pose.z) < 0.05
+    ));
   }
 
   function tryConfirmPlace() {
@@ -2345,13 +2372,12 @@ export function createWorld(canvas, state, opts = {}) {
       if (point) {
         placeMovingFurniture(point.x, point.z);
         playClick('ui');
-        const nowClick = performance.now();
-        if (placeNeedsConfirm && nowClick - lastPlaceClickAt < 420) {
-          lastPlaceClickAt = 0;
+        const click = nextPlaceClick(lastPlaceClickAt, performance.now(), placeNeedsConfirm);
+        lastPlaceClickAt = click.lastAt;
+        if (click.confirm) {
           pickHandler?.({ type: 'furniture-place-confirm' });
           return;
         }
-        lastPlaceClickAt = nowClick;
         pickHandler?.({ type: placeNeedsConfirm ? 'furniture-place-preview' : 'furniture-moved' });
       }
       return;
@@ -3893,12 +3919,18 @@ export function createWorld(canvas, state, opts = {}) {
     confirmPlaceUnlock() {
       if (!moveTarget || !placeNeedsConfirm) return null;
       const check = tryConfirmPlace();
-      if (!check.ok) {
-        pickHandler?.({ type: 'furniture-place-blocked', reason: check.reason });
-        return null;
-      }
-      const pose = { x: check.pose.x, z: check.pose.z, rot: check.pose.rot };
       const target = { id: moveTarget.id, index: moveTarget.index };
+      if (!check.ok) {
+        // The buy is recorded before this second check. A patch must not
+        // reject its own pose and then skip the mesh.
+        const recorded = target.id === 'farming_patch' && patchRecordedAt(visualPlacePose());
+        if (!recorded) {
+          pickHandler?.({ type: 'furniture-place-blocked', reason: check.reason });
+          return null;
+        }
+      }
+      const source = check.ok ? check.pose : visualPlacePose();
+      const pose = { x: source.x, z: source.z, rot: source.rot };
       rebuildNav();
       clearMoveMode();
       if (target.id === 'display') applyDisplayPose(target.index);

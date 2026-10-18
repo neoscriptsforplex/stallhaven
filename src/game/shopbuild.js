@@ -1841,21 +1841,17 @@ export function buildSawmill() {
   return bench;
 }
 
-/** 2×2 outdoor soil. Origin at the centre, y = 0 on the grass. */
-export function buildFarmingPatch() {
-  const bundled = getBundledLook('farming-patch');
-  if (bundled) {
-    const fitted = wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'farming-patch', fit: 'max' });
-    sitVisibleOnY(fitted, 0);
-    return fitted;
-  }
+/** Brown 2×2-tile soil used when the dump is missing, tiny, or buried. */
+function buildProceduralFarmingPatch() {
   const group = new THREE.Group();
   group.name = 'farming-patch';
+  group.userData.farmingPatchFallback = true;
   const soil = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(2.88, 0.08, 2.88),
+    new THREE.BoxGeometry(2.88, 0.1, 2.88),
     new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.95 }),
   ));
-  soil.position.y = 0.04;
+  soil.name = 'farming-patch-soil';
+  soil.position.y = 0.05;
   group.add(soil);
   const rim = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(2.88, 0.1, 0.08),
@@ -1864,6 +1860,42 @@ export function buildFarmingPatch() {
   rim.position.set(0, 0.08, 1.4);
   group.add(rim);
   return group;
+}
+
+/** A plot you can see on the grass: about two tiles across, sitting on y = 0. */
+export function farmingPatchVisible(mesh) {
+  if (!mesh) return false;
+  const box = measureVisibleBox(mesh);
+  if (!box || box.isEmpty()) return false;
+  const size = box.getSize(new THREE.Vector3());
+  if (size.x < 1.6 || size.z < 1.6) return false;
+  if (size.x > 6 || size.z > 6) return false;
+  if (!(box.max.y > 0.04)) return false;
+  if (box.min.y < -0.05) return false;
+  return true;
+}
+
+/** Put the plot on the confirmed ground point. groundY is the lawn plane. */
+export function placeFarmingPatchMesh(mesh, pose, groundY = 0) {
+  if (!mesh || !pose) return mesh;
+  mesh.position.set(pose.x, groundY, pose.z);
+  if (pose.rot != null) mesh.rotation.y = pose.rot;
+  return mesh;
+}
+
+/** 2×2 outdoor soil. Origin at the centre, y = 0 on the grass. */
+export function buildFarmingPatch() {
+  const bundled = getBundledLook('farming-patch');
+  if (bundled) {
+    try {
+      const fitted = wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'farming-patch', fit: 'max' });
+      sitVisibleOnY(fitted, 0);
+      if (farmingPatchVisible(fitted)) return fitted;
+    } catch (err) {
+      console.warn('Farming patch model skipped:', err?.message || err);
+    }
+  }
+  return buildProceduralFarmingPatch();
 }
 
 export function buildSpinningWheel() {

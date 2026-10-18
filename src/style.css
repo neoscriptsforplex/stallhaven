@@ -3663,7 +3663,7 @@ html.is-booting.is-scene-live #view {
 /* ---------- Phone portrait: bottom sheets ---------- */
 @media (orientation: portrait) and (pointer: coarse) {
   /* 7 slots on the bar: Skills, Build, Heroes, Quests, Music, Co-op, More. Help/Save/Load/Fullscreen move into More. */
-  #save-bar #help-btn, #save-bar #save-btn, #save-bar #load-btn, #save-bar #expand-btn { display: none; }
+  #save-bar #help-btn, #save-bar #saves-btn, #save-bar #expand-btn { display: none; }
   #save-bar #heroes-btn, #save-bar #quests-btn, #save-bar #coop-btn { min-width: 0; }
   #save-bar #heroes-btn .hq-btn-icon, #save-bar #quests-btn .hq-btn-icon { display: block; margin: 0 auto 1px; width: 1.1rem; height: 1.1rem; }
   #save-bar #heroes-btn, #save-bar #quests-btn { font-size: 0.66rem; display: grid; place-content: center; }

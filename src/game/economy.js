@@ -1489,6 +1489,7 @@ export function serializeState(state) {
     chefHat: Boolean(state.chefHat),
     appearance: normalizeAppearance(state.appearance),
     playTime: Math.max(0, Number(state.playTime) || 0),
+    ...(typeof state.shopName === 'string' && state.shopName ? { shopName: state.shopName.slice(0, 32) } : {}),
     kingRoaldAt: Number.isFinite(state.kingRoaldAt) ? state.kingRoaldAt : scheduleKingRoald(Math.max(0, Number(state.playTime) || 0)),
     skills: state.skills?.toJSON?.() ?? createSkills().toJSON(),
     hq: savedHeroQuest(state),
@@ -1648,6 +1649,7 @@ export function applyState(state, data) {
   if (typeof data.playTime === 'number' && Number.isFinite(data.playTime)) {
     next.playTime = Math.max(0, data.playTime);
   }
+  if (typeof data.shopName === 'string' && data.shopName.trim()) next.shopName = data.shopName.trim().slice(0, 32);
   if (typeof data.kingRoaldAt === 'number' && Number.isFinite(data.kingRoaldAt)) {
     next.kingRoaldAt = Math.max(0, data.kingRoaldAt);
   } else {
@@ -1757,6 +1759,7 @@ export function applyState(state, data) {
   state.chefHat = next.chefHat;
   state.appearance = next.appearance;
   state.playTime = next.playTime;
+  state.shopName = next.shopName;
   state.kingRoaldAt = next.kingRoaldAt;
   state.ready = [];
   claimLoadedDisplays(state);

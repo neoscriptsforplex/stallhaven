@@ -69,6 +69,7 @@ const DOCK_HTML = `
     <div class="coop-slots" data-coop-slots></div>
     <div class="coop-actions" data-coop-actions></div>
     <p class="coop-status" data-coop-status></p>
+    <p class="sv-coopnote" data-coop-savenote hidden></p>
   </div>
   <div class="coop-pane" data-coop-pane="join" hidden>
     <p class="coop-hint">Ask the host for their 6-character code.</p>
@@ -254,6 +255,25 @@ export function mountCoop({ state, world, hud, autosave } = {}) {
     if (p === 'invite') paintLobby();
     if (p === 'join') paintJoin();
     paintParty();
+    paintSaveNote(inRoom);
+  }
+
+  // Save system (SPEC section 5): host autosaves its slot, guests' slots are never written.
+  let lastParty = '';
+  function paintSaveNote(inRoom) {
+    const amHost = Boolean(net?.isHost);
+    const guest = inRoom && !amHost;
+    const note = $('[data-coop-savenote]');
+    const slot = autosave?.slot;
+    note.hidden = !inRoom;
+    note.classList.toggle('is-guest', guest);
+    note.textContent = guest ? "Your saves aren't touched while visiting" : `Autosaving to Slot ${slot ?? 1}`;
+    const key = `${inRoom}:${amHost}`;
+    if (key !== lastParty) {
+      lastParty = key;
+      autosave?.setGuest?.(guest);
+      document.dispatchEvent(new CustomEvent('rc-party', { detail: { inRoom, host: amHost, guest } }));
+    }
   }
 
   // ---------------------------------------------------------- lobby

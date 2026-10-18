@@ -241,7 +241,9 @@ export function bindHeroesPanel({
   picker.querySelector('[data-picker-hire]')?.addEventListener('click', () => {
     const cls = HERO_CLASSES.find((item) => item.id === pickClass);
     if (!cls || !pickNpc) return;
-    if (!intentBus.run({ type: 'hireHero', classId: cls.id, npcId: pickNpc })) {
+    const hired = intentBus.run({ type: 'hireHero', classId: cls.id, npcId: pickNpc });
+    if (hired) document.dispatchEvent(new CustomEvent('rc-save-trigger', { detail: { trigger: 'quest' } }));
+    if (!hired) {
       paintPicker();
       paintHeroes();
       return;
@@ -269,7 +271,7 @@ export function bindHeroesPanel({
       onFullscreen?.();
       return;
     }
-    const id = { help: '#help-btn', save: '#save-btn', load: '#load-btn' }[btn.dataset.more];
+    const id = { help: '#help-btn', saves: '#saves-btn' }[btn.dataset.more];
     if (id) document.querySelector(id)?.click();
   });
 

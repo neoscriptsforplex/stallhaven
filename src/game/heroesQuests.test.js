@@ -131,15 +131,15 @@ test('hero hires survive save and load, and old saves stay empty', () => {
   assert.deepEqual(old.hq.quests, { active: {}, done: {} });
 });
 
-test('the top bar has Heroes and Quests, and the phone gear menu keeps Help Save Load', () => {
+test('the top bar has Heroes and Quests, and the phone gear menu keeps Help Saves Fullscreen', () => {
   const html = readFileSync(join(root, '../../index.html'), 'utf8');
   const css = readFileSync(join(root, '../style.css'), 'utf8');
   const bar = html.slice(html.indexOf('id="save-bar"'), html.indexOf('id="hud"'));
   assert.match(bar, /id="heroes-btn"[\s\S]*id="quests-btn"[\s\S]*id="skills-btn"[\s\S]*id="build-btn"/);
   assert.match(html, /id="heroes-dock"/);
   assert.match(html, /id="hero-picker"/);
-  assert.match(html, /data-more="help"[\s\S]*data-more="save"[\s\S]*data-more="load"[\s\S]*data-more="fullscreen"/);
-  assert.match(css, /#save-bar #help-btn, #save-bar #save-btn, #save-bar #load-btn, #save-bar #expand-btn \{ display: none; \}/);
+  assert.match(html, /data-more="help"[\s\S]*data-more="saves"[\s\S]*data-more="fullscreen"/);
+  assert.match(css, /#save-bar #help-btn, #save-bar #saves-btn, #save-bar #expand-btn \{ display: none; \}/);
   assert.match(css, /#settings-dock \.more-quick \{ display: grid; \}/);
   const panel = readFileSync(join(root, 'heroesPanel.js'), 'utf8');
   assert.match(panel, /let base = '\.\/public\/';/);

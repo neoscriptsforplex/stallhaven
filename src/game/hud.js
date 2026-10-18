@@ -124,7 +124,6 @@ import {
 } from './layout.js';
 import { clampMapZoom, compassAssetUrl, compassNeedleDegrees, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
 import { boulderInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
-import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { intentBus } from './intents.js';
 import { createCraftPreview } from './craftpreview.js';
 import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
@@ -2817,40 +2816,7 @@ export function bindHud(root, state, world) {
   document.querySelector('#help-btn')?.addEventListener('click', openHelp);
   setModalOpen();
 
-  const saveBtn = document.querySelector('#save-btn');
-  const loadBtn = document.querySelector('#load-btn');
-  saveBtn?.addEventListener('click', async () => {
-    try {
-      if (await saveStateToFile(state)) pushLog(state, 'Shop saved to a file.');
-    } catch {
-      pushLog(state, 'Could not save that file.');
-    }
-    render(performance.now() / 1000);
-  });
-  loadBtn?.addEventListener('click', async () => {
-    try {
-      if (await loadStateFromFile(state)) {
-        world.applyLayout();
-        world.syncDisplays();
-        world.refreshSelection(true);
-        setMusicVolume(state.music?.volume ?? DEFAULT_MUSIC_VOLUME);
-        setLoop(Boolean(state.music?.loop));
-        writeStoredBrightness(state.brightness ?? DEFAULT_BRIGHTNESS);
-        writeStoredDungeonBrightness(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
-        writeStoredPhotoMode(Boolean(state.photoMode));
-        world.setBrightness?.(state.brightness ?? DEFAULT_BRIGHTNESS);
-        world.setDungeonBrightness?.(state.dungeonBrightness ?? DEFAULT_DUNGEON_BRIGHTNESS);
-        world.setPhotoMode?.(Boolean(state.photoMode));
-        paintCrafts();
-        paintMusic();
-        paintSettings();
-        pushLog(state, 'Shop loaded from a file.');
-      }
-    } catch {
-      pushLog(state, 'Could not read that save file.');
-    }
-    render(performance.now() / 1000);
-  });
+  // Save/Load moved to the Saves panel and Settings → Save files (src/game/saveUi.js).
 
   function bumpMapZoom(factor) {
     mapZoom = clampMapZoom(mapZoom * factor);

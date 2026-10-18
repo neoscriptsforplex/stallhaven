@@ -241,3 +241,10 @@ test('conflict times and device labels', () => {
   assert.equal(deviceLabel('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit Version/17.0 Mobile Safari/604.1'), 'iPhone · Safari');
   assert.equal(deviceLabel('Mozilla/5.0 (Windows NT 10.0) Chrome/130 Safari/537'), 'Windows · Chrome');
 });
+
+test('cloud config falls back to meta tags', () => {
+  const doc = { querySelector: (sel) => ({ getAttribute: () => (sel.includes('url') ? 'https://abc.supabase.co/' : 'anon-key') }) };
+  assert.deepEqual(cloudConfig(undefined, doc), { url: 'https://abc.supabase.co', anonKey: 'anon-key' });
+  const empty = { querySelector: () => null };
+  assert.equal(cloudConfig(undefined, empty), null);
+});

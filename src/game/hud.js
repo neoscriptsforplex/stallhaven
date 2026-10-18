@@ -186,10 +186,12 @@ export function bindHud(root, state, world) {
   let inspectTarget = null;
   const minimap = document.querySelector('#minimap');
   const minimapWrap = document.querySelector('.minimap-wrap');
-  document.documentElement.style.setProperty(
-    '--compass-url',
-    `url("${import.meta.env.BASE_URL}minimap/compass.svg")`,
-  );
+  let compassBase = './public/';
+  try {
+    const raw = import.meta.env.BASE_URL;
+    if (raw) compassBase = raw.endsWith('/') ? raw : `${raw}/`;
+  } catch { /* GitHub Pages serves this file unbuilt, where import.meta.env is missing. */ }
+  document.documentElement.style.setProperty('--compass-url', `url("${compassBase}minimap/compass.svg")`);
   const mapToggle = document.querySelector('[data-map-toggle]');
   const mapClose = document.querySelector('[data-map-close]');
   const mapDismiss = document.querySelector('[data-map-dismiss]');

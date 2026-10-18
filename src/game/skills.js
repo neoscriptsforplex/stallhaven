@@ -231,7 +231,7 @@ export function gatherBlockText(materialId) {
   const req = gatherLevelRequirement(materialId);
   if (!req) return '';
   const action = req.skill === 'woodcutting'
-    ? 'chop this tree'
+    ? `chop this ${req.nodeName}`
     : req.skill === 'farming'
       ? `pick this ${req.nodeName.toLowerCase()}`
       : 'mine this rock';

@@ -77,6 +77,8 @@ import {
   furnitureKindForType,
   furnitureLabelForType,
   FURNITURE_SHOP,
+  FARMING_PATCH_CAP,
+  FARMING_PATCH_COSTS,
   padById,
   padConnects,
   snapToWallGrid,
@@ -119,7 +121,7 @@ export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
 function emptyBoughtFurniture() {
-  return { table: 0, mannequin: 0, shelf: 0 };
+  return { table: 0, mannequin: 0, shelf: 0, farming_patch: 0 };
 }
 
 export const FREE_FURNITURE_REPLACE = 2;
@@ -884,6 +886,10 @@ export function liveFurnitureCount(state, type) {
 }
 
 export function nextFurnitureCost(state, type) {
+  if (type === 'farming_patch') {
+    const n = Math.min(boughtFurnitureCount(state, type), FARMING_PATCH_CAP - 1);
+    return FARMING_PATCH_COSTS[Math.max(0, n)];
+  }
   if (type === 'shelf') {
     const live = liveFurnitureCount(state, 'shelf');
     const included = includedFurnitureCount('shelf');
@@ -898,6 +904,7 @@ export function nextFurnitureCost(state, type) {
 
 export function canBuyFurniture(state, type) {
   if (!FURNITURE_SHOP.some((item) => item.type === type)) return false;
+  if (type === 'farming_patch' && boughtFurnitureCount(state, type) >= FARMING_PATCH_CAP) return false;
   const cost = nextFurnitureCost(state, type);
   if ((state.gold ?? 0) < cost) return false;
   if (cost === 0) return true;
@@ -935,6 +942,16 @@ export function buyFurniture(state, type, pose) {
   if (paidExtra) {
     state.boughtFurniture[type] = boughtFurnitureCount(state, type) + 1;
     state.skills?.addXp('construction', constructionXp('item', cost, type));
+  }
+  if (type === 'farming_patch') {
+    if (!state.furniture) state.furniture = defaultFurniture();
+    if (!Array.isArray(state.furniture.patches)) state.furniture.patches = [];
+    state.furniture.patches.push({
+      x: pose.x,
+      z: pose.z,
+      rot: pose.rot ?? FURNITURE_FORWARD,
+    });
+    return true;
   }
   const n = liveFurnitureCount(state, type) + 1;
   const label = furnitureLabelForType(type);
@@ -1387,6 +1404,7 @@ export function serializeState(state) {
       table: boughtFurnitureCount(state, 'table'),
       mannequin: boughtFurnitureCount(state, 'mannequin'),
       shelf: boughtFurnitureCount(state, 'shelf'),
+      farming_patch: boughtFurnitureCount(state, 'farming_patch'),
     },
     freeFurnitureReplace: {
       table: Math.max(0, state.freeFurnitureReplace?.table ?? 0),
@@ -1466,7 +1484,7 @@ export function applyState(state, data) {
     }
   }
   if (data.boughtFurniture && typeof data.boughtFurniture === 'object') {
-    for (const type of ['table', 'mannequin', 'shelf']) {
+    for (const type of ['table', 'mannequin', 'shelf', 'farming_patch']) {
       const value = data.boughtFurniture[type];
       if (typeof value === 'number' && Number.isFinite(value)) {
         next.boughtFurniture[type] = Math.max(0, Math.round(value));
@@ -1582,6 +1600,11 @@ export function applyState(state, data) {
         ? readPose(data.furniture.portal, { x: 0, z: 0, rot: FURNITURE_FORWARD })
         : null,
       rug: readPose(data.furniture.rug, defaults.rug),
+      patches: Array.isArray(data.furniture.patches)
+        ? data.furniture.patches.filter((pose) => (
+          pose && typeof pose.x === 'number' && typeof pose.z === 'number'
+        )).slice(0, FARMING_PATCH_CAP).map((pose) => readPose(pose, { x: pose.x, z: pose.z, rot: FURNITURE_FORWARD }))
+        : [],
       displays: next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {
           x: 0,
@@ -1599,6 +1622,11 @@ export function applyState(state, data) {
   while ((next.furniture.displays?.length ?? 0) < next.displays.length) {
     next.furniture.displays.push({ x: 0, z: 0.8, rot: FURNITURE_FORWARD });
   }
+  if (!Array.isArray(next.furniture.patches)) next.furniture.patches = [];
+  next.boughtFurniture.farming_patch = Math.max(
+    next.boughtFurniture.farming_patch ?? 0,
+    next.furniture.patches.length,
+  );
   state.gold = next.gold;
   state.materials = next.materials;
   state.materialAcc = next.materialAcc;

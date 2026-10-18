@@ -38,6 +38,9 @@ import {
   isMinedMaterial,
   CHOP_DURATION,
   CHOP_YIELD,
+  CHOP_YIELDS,
+  chopYield,
+  chopTiming,
   FLAX_DURATION,
   FLAX_YIELD,
   MINE_YIELD,
@@ -1116,7 +1119,7 @@ describe('material regen', () => {
     assert.equal(state.materials.logs, 10);
     assert.equal(grantChoppedLogs(state, 3, 'not-a-log'), 3);
     assert.equal(state.materials.logs, 13);
-    assert.match(treeInspect('oak_logs').blurb, /5 Oak Logs/);
+    assert.match(treeInspect('oak_logs').blurb, /4 Oak Logs/);
     assert.match(treeInspect().blurb, /5 Logs/);
   });
 
@@ -2524,6 +2527,54 @@ describe('furniture nails and planks', () => {
     assert.equal(state.gold, 0);
     assert.equal(state.materials.bronze_nails, 0);
     assert.equal(state.materials.plank, 0);
+  });
+
+  it('steps woodcutting yields down by tree tier on the same bar', () => {
+    assert.deepEqual(CHOP_YIELDS, {
+      logs: 5,
+      oak_logs: 4,
+      willow_logs: 3,
+      maple_logs: 3,
+      yew_logs: 2,
+      magic_logs: 1,
+    });
+    for (const [id, amount] of Object.entries(CHOP_YIELDS)) {
+      assert.equal(chopYield(id), amount);
+      assert.deepEqual(chopTiming(id), { duration: 3.2, yield: amount });
+    }
+    const state = createState();
+    assert.equal(grantChoppedLogs(state, chopYield('magic_logs'), 'magic_logs'), 1);
+    assert.equal(state.materials.magic_logs, 1);
+    assert.equal(grantChoppedLogs(state, chopYield('logs'), 'logs'), 5);
+  });
+
+  it('sells at most four farming patches and keeps an old save without them', () => {
+    const state = createState();
+    state.gold = 20000000;
+    state.materials.iron_nails = 40;
+    state.materials.oak_plank = 20;
+    const costs = [];
+    const displaysBefore = state.displays.length;
+    for (let i = 0; i < 4; i += 1) {
+      costs.push(nextFurnitureCost(state, 'farming_patch'));
+      assert.equal(canBuyFurniture(state, 'farming_patch'), true);
+      assert.equal(buyFurniture(state, 'farming_patch', { x: i * 3, z: -6, rot: 0 }), true);
+    }
+    assert.deepEqual(costs, [1000000, 2000000, 4000000, 8000000]);
+    assert.equal(state.furniture.patches.length, 4);
+    assert.equal(state.displays.length, displaysBefore);
+    assert.equal(state.boughtFurniture.farming_patch, 4);
+    assert.equal(canBuyFurniture(state, 'farming_patch'), false);
+    assert.equal(buyFurniture(state, 'farming_patch', { x: 0, z: -8, rot: 0 }), false);
+    assert.equal(buildMaterialLabel('farming_patch'), 'Iron Nails ×6 · Oak Plank ×2');
+    const broke = createState();
+    broke.gold = 1000000;
+    assert.equal(canBuyFurniture(broke, 'farming_patch'), false);
+    const old = createState();
+    assert.equal(applyState(old, { gold: 80, materials: { logs: 3 } }), true);
+    assert.deepEqual(old.furniture.patches, []);
+    assert.equal(old.gold, 80);
+    assert.equal(old.materials.logs, 3);
   });
 });
 

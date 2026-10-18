@@ -17,7 +17,7 @@ import {
   isHandOrFootWare,
   MATERIALS,
   CHOP_DURATION,
-  CHOP_YIELD,
+  chopYield,
   FLAX_ARRIVE,
   FLAX_DURATION,
   FLAX_YIELD,
@@ -53,6 +53,9 @@ import {
   FOUNTAIN,
   keepFountain,
   gardenBox,
+  gardenSpotClearOfBeds,
+  patchPlaceFloors,
+  pointOnPath,
   buyerCobbleRoute,
   gardenTrapdoorSpot,
   gardenTreeSpots,
@@ -154,7 +157,7 @@ import {
   defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -353,6 +356,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   if (!state.furniture) state.furniture = cloneFurniture();
   let architecture = null;
+  let magicSparkles = [];
   let roofGroup = null;
   let groundGroup = null;
   let padGroup = null;
@@ -366,6 +370,7 @@ export function createWorld(canvas, state, opts = {}) {
   let moveOrigin = null;
   let placeNeedsConfirm = false;
   let placeDraft = null;
+  let patchesReady = false;
   let snapGrid = null;
   let flaxGroup = null;
   let flaxNodes = [];
@@ -386,12 +391,31 @@ export function createWorld(canvas, state, opts = {}) {
     });
   }
 
+  function disposeSparkles(root) {
+    root?.traverse((child) => {
+      const fx = child.userData?.sparkles;
+      if (!fx?.dispose) return;
+      fx.dispose();
+      child.userData.sparkles = null;
+    });
+  }
+
+  function collectSparkles(root) {
+    const found = [];
+    root?.traverse((child) => {
+      if (child.userData?.sparkles?.update) found.push(child.userData.sparkles);
+    });
+    return found;
+  }
+
   function rebuildArchitecture() {
+    disposeSparkles(architecture);
+    magicSparkles = [];
     disposeGroup(architecture);
     disposeGroup(roofGroup);
     disposeGroup(groundGroup);
     disposeGroup(padGroup);
-    const built = buildShop(state.expansions ?? []);
+    const built = buildShop(state.expansions ?? [], state.furniture);
     architecture = built.root;
     roofGroup = built.roofs;
     groundGroup = built.grounds;
@@ -401,6 +425,7 @@ export function createWorld(canvas, state, opts = {}) {
     scene.add(roofGroup);
     scene.add(groundGroup);
     scene.add(padGroup);
+    magicSparkles = collectSparkles(architecture);
     floors = floorsForState(state);
     placeRects = placeFloors(state.expansions ?? []);
     playerFloors = playerWalkFloors(state.expansions ?? []);
@@ -746,6 +771,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (placeDraft && target.id === placeDraft.id) {
       if (target.id !== 'display' || target.index === placeDraft.index) return placeDraft;
     }
+    if (target.id === 'farming_patch') return null;
     return target.id === 'display'
       ? state.furniture.displays[target.index]
       : state.furniture[target.id];
@@ -754,6 +780,7 @@ export function createWorld(canvas, state, opts = {}) {
   function applyMovePose(target) {
     if (!target) return;
     if (target.id === 'display') applyDisplayPose(target.index);
+    else if (target.id === 'farming_patch') applyPatchGhost();
     else applyFixturePose(target.id);
   }
 
@@ -771,9 +798,12 @@ export function createWorld(canvas, state, opts = {}) {
     });
     const positions = [];
     const y = 0.108;
-    const gridRects = moveTarget && placeKindOf(moveTarget) === 'portal'
+    const placeKind = moveTarget ? placeKindOf(moveTarget) : null;
+    const gridRects = placeKind === 'portal'
       ? portalPlaceFloors(state.expansions ?? [])
-      : interiorFloors(state.expansions ?? []);
+      : placeKind === 'farming_patch' || placeKind === 'patch'
+        ? patchPlaceFloors(state.expansions ?? [])
+        : interiorFloors(state.expansions ?? []);
     for (const rect of gridRects) {
       const { xs, zs } = snapGridLines(rect);
       for (const gx of xs) {
@@ -846,13 +876,15 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function clearMoveMode() {
-    const wasPortal = moveTarget && placeKindOf(moveTarget) === 'portal';
+    const kind = moveTarget ? placeKindOf(moveTarget) : null;
+    const refreshGrid = kind === 'portal' || kind === 'farming_patch';
+    if (kind === 'farming_patch') clearPatchGhost();
     moveTarget = null;
     moveOrigin = null;
     placeNeedsConfirm = false;
     placeDraft = null;
     setSnapGridVisible(false);
-    if (wasPortal) rebuildSnapGrid();
+    if (refreshGrid) rebuildSnapGrid();
   }
 
   function discardPlaceDisplay() {
@@ -872,7 +904,7 @@ export function createWorld(canvas, state, opts = {}) {
     const id = placeNeedsConfirm ? moveTarget.id : null;
     discardPlaceDisplay();
     clearMoveMode();
-    if (id && id !== 'display') applyFixturePose(id);
+    if (id && id !== 'display' && id !== 'farming_patch') applyFixturePose(id);
   }
 
   function floorPointFromEvent(event) {
@@ -884,6 +916,7 @@ export function createWorld(canvas, state, opts = {}) {
   function applyAllPoses() {
     for (const id of Object.keys(fixtureMeshes)) applyFixturePose(id);
     displays.forEach((_, index) => applyDisplayPose(index));
+    if (patchesReady) syncPatchMeshes();
     rebuildNav();
   }
   applyAllPoses();
@@ -1082,10 +1115,17 @@ export function createWorld(canvas, state, opts = {}) {
       alive.add(node.id);
       let mesh = wheatMeshes.get(node.id);
       if (!mesh) {
-        mesh = buildWheatPlant();
-        mesh.rotation.y = node.yaw ?? 0;
-        attachWheatPick(mesh, node);
-        wheatGroup.add(mesh);
+        // The pick sits on an unscaled holder. An OSRS wheat dump scales its
+        // root, and a pick parented on that root shrinks to nothing.
+        const holder = new THREE.Group();
+        holder.name = 'wheat-holder';
+        const plant = buildWheatPlant();
+        holder.userData.wheatProcedural = Boolean(plant.userData?.wheatProcedural);
+        plant.rotation.y = node.yaw ?? 0;
+        holder.add(plant);
+        attachWheatPick(holder, node);
+        wheatGroup.add(holder);
+        mesh = holder;
         wheatMeshes.set(node.id, mesh);
       }
       mesh.position.set(node.x, 0, node.z);
@@ -1135,6 +1175,94 @@ export function createWorld(canvas, state, opts = {}) {
     ));
     if (changed) syncWheatMeshes();
   }
+
+  const patchGroup = new THREE.Group();
+  patchGroup.name = 'farming-patches';
+  scene.add(patchGroup);
+  let patchGhost = null;
+
+  function releasePatchObject(object) {
+    if (!object) return;
+    object.removeFromParent();
+    object.traverse((child) => {
+      if (!child.isMesh) return;
+      if (child.userData?.kind === 'farming_patch') {
+        child.geometry?.dispose();
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) mat?.dispose?.();
+      } else if (child.userData?.patchGhost) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) mat?.dispose?.();
+      }
+    });
+  }
+
+  function ghostifyPatch(root) {
+    root.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      const next = mats.map((mat) => {
+        const copy = mat.clone();
+        copy.transparent = true;
+        copy.opacity = Math.min(copy.opacity ?? 1, 0.55);
+        copy.depthWrite = false;
+        return copy;
+      });
+      child.material = Array.isArray(child.material) ? next : next[0];
+      child.userData.patchGhost = true;
+    });
+  }
+
+  function syncPatchMeshes() {
+    const keep = patchGhost;
+    for (const child of [...patchGroup.children]) {
+      if (child === keep) continue;
+      releasePatchObject(child);
+    }
+    const poses = state.furniture?.patches ?? [];
+    poses.forEach((pose, index) => {
+      const mesh = buildFarmingPatch();
+      mesh.position.set(pose.x, OUTDOOR_GROUND_Y, pose.z);
+      mesh.rotation.y = furnitureVisualYaw('farming_patch', pose.rot);
+      patchGroup.add(mesh);
+      const { hw, hd } = furnitureHalfSize('patch');
+      const pick = new THREE.Mesh(
+        new THREE.BoxGeometry(hw * 2, 0.6, hd * 2),
+        new THREE.MeshBasicMaterial({
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      pick.position.set(pose.x, OUTDOOR_GROUND_Y + 0.3, pose.z);
+      pick.userData.kind = 'farming_patch';
+      pick.userData.index = index;
+      pick.userData.x = pose.x;
+      pick.userData.z = pose.z;
+      patchGroup.add(pick);
+    });
+  }
+
+  function clearPatchGhost() {
+    releasePatchObject(patchGhost);
+    patchGhost = null;
+  }
+
+  function applyPatchGhost() {
+    if (placeDraft?.id !== 'farming_patch') return;
+    if (!patchGhost) {
+      patchGhost = buildFarmingPatch();
+      patchGhost.name = 'farming-patch-ghost';
+      ghostifyPatch(patchGhost);
+      patchGroup.add(patchGhost);
+    }
+    patchGhost.position.set(placeDraft.x, OUTDOOR_GROUND_Y, placeDraft.z);
+    patchGhost.rotation.y = furnitureVisualYaw('farming_patch', placeDraft.rot);
+  }
+
+  patchesReady = true;
+  syncPatchMeshes();
 
   function pickCrop(crop) {
     if (crop === 'wheat') {
@@ -1257,6 +1385,9 @@ export function createWorld(canvas, state, opts = {}) {
     });
     wheatGroup?.traverse((child) => {
       if (child.userData?.kind === 'wheat') found.push(child);
+    });
+    patchGroup?.traverse((child) => {
+      if (child.userData?.kind === 'farming_patch') found.push(child);
     });
     return found;
   }
@@ -1423,7 +1554,7 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function barYield(session) {
-    if (session?.mode === 'chop') return CHOP_YIELD;
+    if (session?.mode === 'chop') return chopYield(session.materialId);
     if (session?.mode === 'pick') return session.yield ?? FLAX_YIELD;
     if (session?.yield != null) return session.yield;
     return mineYield(session?.materialId);
@@ -1431,7 +1562,9 @@ export function createWorld(canvas, state, opts = {}) {
 
   function refuseGather(materialId) {
     if (!materialId || meetsGatherLevel(state, materialId)) return false;
-    pushLog(state, gatherBlockText(materialId));
+    const text = gatherBlockText(materialId);
+    pushLog(state, text);
+    pickHandler?.({ type: 'gather-block', text });
     return true;
   }
 
@@ -1466,7 +1599,7 @@ export function createWorld(canvas, state, opts = {}) {
       mode: 'chop',
       startedAt: performance.now() / 1000,
       duration: CHOP_DURATION,
-      yield: CHOP_YIELD,
+      yield: chopYield(materialId),
       x: pose.x,
       z: pose.z,
       faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : null,
@@ -1571,7 +1704,7 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     const got = mining.mode === 'chop'
-      ? grantChoppedLogs(state, CHOP_YIELD, mining.materialId)
+      ? grantChoppedLogs(state, barYield(mining), mining.materialId)
       : grantMinedMaterial(state, mining.materialId, barYield(mining));
     if (got > 0) {
       if (mining.mode === 'chop') state.skills?.addXp('woodcutting', xpForChop(mining.materialId));
@@ -1750,7 +1883,7 @@ export function createWorld(canvas, state, opts = {}) {
     const canStand = (x, z) => isWalkable(x, z, standBlocks, PLAYER_RADIUS, standFloors);
     const plan = resolveStationUse(from, pose, state, planSceneWalk, type, canStand);
     const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax' || type === 'wheat';
-    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch' || type === 'ladder' || gatherKind || type === 'fountain';
+    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch' || type === 'ladder' || gatherKind || type === 'fountain' || type === 'farming_patch';
     const faceYaw = plan.face != null
       ? plan.face
       : type === 'range' ? rangeFaceYaw(pose)
@@ -2035,8 +2168,33 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function activePlaceRects(target = moveTarget) {
-    if (target && placeKindOf(target) === 'portal') return portalPlaceFloors(state.expansions ?? []);
+    const kind = placeKindOf(target);
+    if (kind === 'portal') return portalPlaceFloors(state.expansions ?? []);
+    if (kind === 'farming_patch' || kind === 'patch') return patchPlaceFloors(state.expansions ?? []);
     return placeRects;
+  }
+
+  function patchPlaceReason(pose) {
+    const grass = 'Place the patch on open grass.';
+    const expansions = state.expansions ?? [];
+    const { hw, hd } = furnitureHalfSize('patch');
+    const lawn = patchPlaceFloors(expansions)[0];
+    if (!lawn) return grass;
+    if (
+      pose.x - hw < lawn.minX || pose.x + hw > lawn.maxX
+      || pose.z - hd < lawn.minZ || pose.z + hd > lawn.maxZ
+    ) return grass;
+    const corners = [
+      [pose.x - hw, pose.z - hd],
+      [pose.x + hw, pose.z - hd],
+      [pose.x - hw, pose.z + hd],
+      [pose.x + hw, pose.z + hd],
+      [pose.x, pose.z],
+    ];
+    if (corners.some(([x, z]) => pointHitsShop(x, z, expansions, 0.05))) return grass;
+    if (corners.some(([x, z]) => pointOnPath(x, z, expansions, 0.05))) return grass;
+    if (!gardenSpotClearOfBeds(pose, expansions, hw + 0.55)) return grass;
+    return null;
   }
 
   function blockedPlaceReason(pose, target = moveTarget) {
@@ -2045,6 +2203,13 @@ export function createWorld(canvas, state, opts = {}) {
     const skip = target.id === 'display' ? { id: 'display', index: target.index } : { id: target.id };
     const blocks = liveObstacles(state, SHOP, skip);
     const floors = activePlaceRects(target);
+    if (kind === 'farming_patch' || kind === 'patch') {
+      const grass = patchPlaceReason(pose);
+      if (grass) return grass;
+      const reason = placementBlocked(pose, 'patch', blocks, floors, { checkAisle: false });
+      if (reason === 'That spot is off the shop floor.') return 'Place the patch on open grass.';
+      return reason;
+    }
     const off = kind === 'portal' ? 'That spot is off the grass.' : 'That spot is off the shop floor.';
     if (!pose) return off;
     const reason = placementBlocked(pose, kind, blocks, floors, {
@@ -2061,6 +2226,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (!slot) return null;
       return { x: slot.anchor.position.x, z: slot.anchor.position.z, rot: slot.anchor.rotation.y };
     }
+    if (moveTarget.id === 'farming_patch') return poseOf(moveTarget);
     const slot = fixtureMeshes[moveTarget.id];
     if (!slot) return poseOf(moveTarget);
     return {
@@ -2116,6 +2282,7 @@ export function createWorld(canvas, state, opts = {}) {
       pose.rot = nextRot;
     }
     if (target.id === 'display') applyDisplayPose(target.index);
+    else if (target.id === 'farming_patch') applyPatchGhost();
     else applyFixturePose(target.id);
     rebuildNav();
     return true;
@@ -2234,6 +2401,11 @@ export function createWorld(canvas, state, opts = {}) {
         queueUse('wheat', { x: data.x, z: data.z, materialId: 'wheat', plantId: data.plantId });
         return;
       }
+      if (data.kind === 'farming_patch') {
+        const pose = state.furniture.patches?.[data.index];
+        if (pose) queueUse('farming_patch', pose);
+        return;
+      }
       if (data.kind === 'fountain') {
         queueUse('fountain', { x: data.x ?? FOUNTAIN.x, z: data.z ?? FOUNTAIN.z });
         return;
@@ -2313,6 +2485,14 @@ export function createWorld(canvas, state, opts = {}) {
         ));
         if (wheat) {
           queueUse('wheat', { x: wheat.x, z: wheat.z, materialId: 'wheat', plantId: wheat.id });
+          return;
+        }
+        const { hw, hd } = furnitureHalfSize('patch');
+        const patch = (state.furniture.patches ?? []).find((pose) => (
+          Math.abs(point.x - pose.x) <= hw + 0.12 && Math.abs(point.z - pose.z) <= hd + 0.12
+        ));
+        if (patch) {
+          queueUse('farming_patch', patch);
           return;
         }
       }
@@ -3203,6 +3383,13 @@ export function createWorld(canvas, state, opts = {}) {
       const spinning = Object.keys(state.crafts ?? {}).some((id) => RECIPES[id]?.category === 'spin');
       if (spinning) wheel.rotation.z += dt * 9.5;
     }
+    const sawing = Object.keys(state.crafts ?? {}).some((id) => RECIPES[id]?.category === 'saw');
+    const sawSpinner = fixtureMeshes.sawmill?.mesh?.userData.spinner;
+    if (sawSpinner) {
+      sawSpinner.setActive(sawing);
+      sawSpinner.update(dt);
+    }
+    for (const fx of magicSparkles) fx.update(dt);
     if (drawScene) renderer.render(scene, camera);
   }
 
@@ -3662,8 +3849,26 @@ export function createWorld(canvas, state, opts = {}) {
       rebuildNav();
       clearMoveMode();
       if (target.id === 'display') applyDisplayPose(target.index);
-      else applyFixturePose(target.id);
+      else if (target.id !== 'farming_patch') applyFixturePose(target.id);
+      if (patchesReady) syncPatchMeshes();
       return pose;
+    },
+    beginPlacePatch() {
+      const grass = gardenBox(state.expansions ?? []);
+      const rects = patchPlaceFloors(state.expansions ?? []);
+      const home = { x: (grass.minX + grass.maxX) / 2 - 4.2, z: grass.minZ + 4.4 };
+      const start = snapToFloor(home.x, home.z, rects);
+      placeDraft = { id: 'farming_patch', x: start.x, z: start.z, rot: FURNITURE_FORWARD };
+      moveTarget = { id: 'farming_patch' };
+      placeNeedsConfirm = true;
+      expandMode = false;
+      if (padGroup) padGroup.visible = false;
+      moveOrigin = null;
+      applyPatchGhost();
+      rebuildSnapGrid();
+      setSnapGridVisible(true);
+      highlightSnapCell(start.x, start.z);
+      pickHandler?.({ type: 'furniture-place-start', furniture: { id: 'farming_patch' } });
     },
     tryConfirmPlace,
     getPlacePose() {

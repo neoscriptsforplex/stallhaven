@@ -7,6 +7,9 @@ import {
   gardenBedSpots,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  gardenBox,
+  footprintBox,
+  treeClickRadius,
   playerWalkFloors,
   portalPlaceFloors,
   PORTAL_HOME,
@@ -556,6 +559,48 @@ describe('rune field walks', () => {
       assert.equal(isWalkable(stand.x, stand.z, blocks, PLAYER_RADIUS, floors), true, altar.id);
       const path = planWalk(RUNE_FIELD_ARRIVE, stand, blocks, PLAYER_RADIUS, floors);
       assert.ok(path.length > 0, altar.id);
+    }
+  });
+});
+
+describe('expanded lawn walk bounds', () => {
+  const all = ['left', 'right', 'back', 'back-left', 'back-right'];
+
+  it('covers every expansion room and the far back grass, clear of tree clicks', () => {
+    const grass = gardenBox(all);
+    const shop = footprintBox(all);
+    const floors = playerWalkFloors(all);
+    const edge = [
+      { x: 0, z: grass.minZ + 0.05 },
+      { x: grass.minX + 0.05, z: grass.minZ + 0.05 },
+      { x: grass.maxX - 0.05, z: grass.minZ + 0.05 },
+      { x: grass.minX + 0.05, z: grass.maxZ - 0.05 },
+      { x: grass.maxX - 0.05, z: grass.maxZ - 0.05 },
+      { x: 0, z: shop.minZ - 0.6 },
+    ];
+    for (const point of edge) {
+      assert.equal(
+        isWalkable(point.x, point.z, [], PLAYER_RADIUS, floors),
+        true,
+        `walk ${point.x},${point.z}`,
+      );
+    }
+    for (const id of all) {
+      const pad = { 'back-left': [-1, -1], back: [0, -1], 'back-right': [1, -1], left: [-1, 0], right: [1, 0] }[id];
+      const centre = roomCenter(pad[0], pad[1]);
+      assert.equal(
+        isWalkable(centre.x, centre.z, [], PLAYER_RADIUS, floors),
+        true,
+        id,
+      );
+    }
+    const trees = gardenTreeSpots(all);
+    for (const tree of trees) {
+      for (const point of edge) {
+        const reach = treeClickRadius(tree);
+        const dist = Math.hypot(point.x - tree.x, point.z - tree.z);
+        assert.ok(dist > reach, `${tree.wood ?? 'pine'} covers ${point.x},${point.z}`);
+      }
     }
   });
 });

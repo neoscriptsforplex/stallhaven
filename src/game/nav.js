@@ -101,6 +101,10 @@ export function shopObstacles(shop = SHOP, furniture = null) {
     const { hw, hd } = furnitureHalfSize(id);
     blocks.push(blockFromPose(yaw(id, poses[id]), hw, hd));
   }
+  for (const pose of poses.patches ?? []) {
+    const { hw, hd } = furnitureHalfSize('patch');
+    blocks.push(blockFromPose(pose, hw, hd));
+  }
   const displayPoses = poses.displays ?? [];
   const kinds = furniture?.displayKinds;
   const removed = furniture?.displayRemoved;

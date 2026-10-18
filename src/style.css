@@ -2303,6 +2303,47 @@ html.is-booting.is-scene-live #view {
   100% { box-shadow: 0 0 0 10px rgba(255, 217, 74, 0); }
 }
 
+.game-log {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 4.6em;
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: #e7d7b0;
+}
+
+.game-log li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 92px;
+  z-index: 40;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 8px 14px;
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  color: #f3e6c4;
+  font-size: 0.92rem;
+  text-align: center;
+  transform: translateX(-50%);
+  animation: skill-toast-in 0.25s ease-out;
+  pointer-events: none;
+}
+
+.game-toast.is-leaving {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
 .skill-toast {
   position: absolute;
   left: 50%;

@@ -1564,14 +1564,32 @@ export function mineYield(materialId) {
   return MINE_YIELDS[materialId] ?? 0;
 }
 
+/**
+ * Logs from one completed chop bar. Same step-down as MINE_YIELDS:
+ * the plain tree matches bronze, and Magic matches dragon.
+ */
+export const CHOP_YIELDS = {
+  logs: 5,
+  oak_logs: 4,
+  willow_logs: 3,
+  maple_logs: 3,
+  yew_logs: 2,
+  magic_logs: 1,
+};
+
+export function chopYield(materialId) {
+  const id = MATERIALS[materialId]?.log ? materialId : 'logs';
+  return CHOP_YIELDS[id] ?? CHOP_YIELDS.logs;
+}
+
 /** Bronze's per-bar amount. Other rocks use mineYield. */
 export const MINE_YIELD = MINE_YIELDS.bronze;
 export const MINE_DURATION = 3.2;
 export const CLAY_MINE_YIELD = MINE_YIELDS.hard_clay;
 /** Clay uses the same bar length as every other dungeon rock. */
 export const CLAY_MINE_DURATION = MINE_DURATION;
-/** Logs (wood) from one completed chop bar. */
-export const CHOP_YIELD = 5;
+/** Logs from one completed pine chop. Other trees use chopYield. */
+export const CHOP_YIELD = CHOP_YIELDS.logs;
 export const CHOP_DURATION = 3.2;
 /** Exactly one flax from one completed pick bar. */
 export const FLAX_YIELD = 1;
@@ -1587,6 +1605,23 @@ export const FOUNTAIN_WATER_YIELD = 5;
 
 export function mineTiming(materialId) {
   return { duration: MINE_DURATION, yield: mineYield(materialId) };
+}
+
+/** Same bar length as mining. The yield steps down with the tree tier. */
+export function chopTiming(materialId) {
+  return { duration: CHOP_DURATION, yield: chopYield(materialId) };
+}
+
+/**
+ * Timed grow recipes for a placed farming patch. Empty until herbs arrive.
+ * Add a row here and it shows on the patch screen:
+ *   { id, name, level, seconds, xp, cost: { materials }, product }
+ * `xp` is Farming XP paid when the grow finishes.
+ */
+export const GROW_RECIPES = Object.freeze([]);
+
+export function growRecipes() {
+  return GROW_RECIPES;
 }
 
 export function isMinedMaterial(materialId) {

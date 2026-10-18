@@ -3889,3 +3889,82 @@ describe('nail preview', () => {
     assert.equal(dragon.includes(RECIPES.bronze_nails.tint), false);
   });
 });
+
+describe('nail dumps, magic sparkles, and the saw blade', () => {
+  const modelsRoot = join(dirname(fileURLToPath(import.meta.url)), '../../public/models');
+
+  async function loadFolder(folder) {
+    const base = folder.split('/').pop();
+    const obj = readFileSync(join(modelsRoot, folder, `${base}.obj`));
+    const mtl = readFileSync(join(modelsRoot, folder, `${base}.mtl`));
+    return parseModelBuffer(
+      obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength),
+      `${folder}/${base}.obj`,
+      { [`${base}.mtl`]: mtl.buffer.slice(mtl.byteOffset, mtl.byteOffset + mtl.byteLength) },
+    );
+  }
+
+  it('registers the farming patch and every nail tier', () => {
+    const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
+    for (const id of ['farming-patch', 'nails-bronze', 'nails-iron', 'nails-steel', 'nails-mithril', 'nails-adamant', 'nails-rune', 'nails-dragon']) {
+      assert.ok(ids.includes(id), id);
+    }
+  });
+
+  it('draws a loaded nail pile at the OSRS scale', async () => {
+    const raw = await loadFolder('nails/bronze');
+    const rawSize = measureVisibleBox(raw).getSize(new THREE.Vector3());
+    const rawMax = Math.max(rawSize.x, rawSize.y, rawSize.z);
+    setBundledLook('nails-bronze', raw);
+    try {
+      const ware = buildWare('bronze_nails');
+      const size = measureVisibleBox(ware).getSize(new THREE.Vector3());
+      const max = Math.max(size.x, size.y, size.z);
+      assert.ok(Math.abs(max - rawMax * OSRS_MODEL_SCALE) / (rawMax * OSRS_MODEL_SCALE) < 0.08, `max ${max}`);
+    } finally {
+      setBundledLook('nails-bronze', null);
+    }
+  });
+
+  it('parents magic sparkles on the crown and keeps them off the click ray', () => {
+    const tree = buildWoodTree('magic');
+    const visual = tree.getObjectByName('pine-visual');
+    const fx = tree.userData.sparkles;
+    assert.ok(fx, 'magic tree should carry sparkles');
+    const points = visual?.getObjectByName('magic-sparkles');
+    assert.equal(points?.name, 'magic-sparkles');
+    assert.equal(points?.parent, visual);
+    points.raycast();
+    fx.update(0.016);
+    fx.dispose();
+    assert.equal(visual.getObjectByName('magic-sparkles'), undefined);
+  });
+
+  it('spins the sawmill blade up and down around its axle', async () => {
+    const bundled = await loadFolder('sawmill');
+    setBundledLook('sawmill', bundled);
+    try {
+      const { buildSawmill } = await import('./shopbuild.js');
+      const bench = buildSawmill();
+      const spin = bench.userData.spinner;
+      assert.ok(spin, 'bundled sawmill should attach the blade');
+      assert.equal(spin.part.name, 'saw_blade');
+      const still = spin.angle();
+      spin.setActive(false);
+      spin.update(0.1);
+      assert.equal(spin.angle(), still);
+      spin.setActive(true);
+      for (let i = 0; i < 4; i += 1) spin.update(0.1);
+      const spun = spin.angle();
+      assert.ok(Math.abs(spun - still) > 0.5, `angle ${spun}`);
+      spin.setActive(false);
+      for (let i = 0; i < 4; i += 1) spin.update(0.1);
+      const stopped = spin.angle();
+      spin.update(0.1);
+      assert.ok(Math.abs(spin.angle() - stopped) < 1e-6);
+      spin.dispose();
+    } finally {
+      setBundledLook('sawmill', null);
+    }
+  });
+});

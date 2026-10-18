@@ -129,6 +129,8 @@ import {
   startCraftBatch,
   swapOffer,
   tickMaterials,
+  pushLog,
+  visibleLog,
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
@@ -451,6 +453,7 @@ describe('save and load', () => {
     assert.match(state.log[0], /Skills have arrived!/);
     assert.match(state.log[0], /Smithing 7/);
     assert.match(state.log[0], /Crafting 12/);
+    assert.deepEqual(visibleLog(state), state.log);
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
     assert.equal(ownsFurnace(state), false);
     assert.equal(ownsRange(state), false);
@@ -1217,6 +1220,23 @@ describe('material regen', () => {
     assert.equal(state.skills, skills);
     assert.equal(state.skills.getLevel('smithing'), 1);
     assert.equal(state.materials.ancient_plans, 0);
+  });
+});
+
+describe('on-screen log', () => {
+  it('keeps customer activity in history and hides it from the bottom box', () => {
+    const state = createState();
+    state.log = [];
+    pushLog(state, 'Mined 2 Iron Ore.');
+    pushLog(state, 'Wizard looks around for Lunar Hat.');
+    pushLog(state, 'Ranger grows tired and leaves.');
+    pushLog(state, 'Adventurer grows tired and leaves.');
+    pushLog(state, 'King Roald arrives, seeking Ancient Staff.');
+    assert.match(state.log.join('\n'), /Wizard looks around for Lunar Hat/);
+    assert.match(state.log.join('\n'), /Ranger grows tired and leaves/);
+    assert.match(state.log.join('\n'), /Adventurer grows tired and leaves/);
+    assert.match(state.log.join('\n'), /King Roald arrives, seeking Ancient Staff/);
+    assert.deepEqual(visibleLog(state), ['Mined 2 Iron Ore.']);
   });
 });
 

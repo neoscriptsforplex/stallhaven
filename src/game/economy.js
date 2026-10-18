@@ -1837,6 +1837,15 @@ export function pushLog(state, text) {
   state.log = state.log.slice(0, 5);
 }
 
+/** Ambient traveler lines. They stay in state.log; the bottom box does not draw them. */
+export function isCustomerActivityLog(text) {
+  return / looks around for | grows tired and leaves\.| arrives, seeking /.test(String(text ?? ''));
+}
+
+export function visibleLog(state) {
+  return (state?.log ?? []).filter((line) => !isCustomerActivityLog(line));
+}
+
 export function decidePurchase(customerId, wares, rng = Math.random) {
   const customer = CUSTOMERS[customerId];
   const preferred = wares.filter((w) => customer.prefers.includes(w.recipeId));

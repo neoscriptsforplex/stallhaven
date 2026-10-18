@@ -21,6 +21,7 @@ import {
   shopMapBounds,
   trapdoorMarkerUrls,
   worldToMap,
+  compassAssetUrl,
   compassNeedleDegrees,
 } from './minimap.js';
 import { SHOP } from './catalog.js';
@@ -35,9 +36,28 @@ describe('minimap', () => {
     const css = readFileSync(join(root, '../style.css'), 'utf8');
     assert.match(hud, /let compassBase = '\.\/public\/';/);
     assert.match(hud, /try \{[\s\S]*import\.meta\.env\.BASE_URL/);
+    assert.match(hud, /compassAssetUrl\(compassBase, document\.baseURI\)/);
+    assert.doesNotMatch(hud, /`url\("\$\{compassBase\}minimap\/compass\.svg"\)`/);
     assert.doesNotMatch(hud, /`url\("\$\{import\.meta\.env\.BASE_URL\}minimap\/compass\.svg"\)`/);
-    assert.match(css, /url\("\.\/public\/minimap\/compass\.svg"\)/);
+    assert.match(css, /url\("\.\.\/public\/minimap\/compass\.svg"\)/);
+    assert.doesNotMatch(css, /url\("\.\/public\/minimap\/compass\.svg"\)/);
     assert.doesNotMatch(css, /url\("\/minimap\/compass\.svg"\)/);
+    const needleAt = css.indexOf('.minimap-needle {');
+    const needle = css.slice(needleAt, css.indexOf('\n}', needleAt));
+    assert.match(needle, /background: var\(--compass-url/);
+    assert.match(needle, /transform: rotate\(var\(--map-yaw\)\)/);
+    assert.equal((css.match(/\.minimap-needle[^{]*\{[^}]*background/g) ?? []).length, 1);
+    assert.match(hud, /compassNeedleDegrees\(frame\.yaw\)/);
+    assert.match(hud, /minimapWrap\.style\.setProperty\('--map-yaw'/);
+    const page = 'https://neoscriptsforplex.github.io/stallhaven/';
+    assert.equal(
+      compassAssetUrl('./public/', page),
+      'https://neoscriptsforplex.github.io/stallhaven/public/minimap/compass.svg',
+    );
+    assert.equal(
+      compassAssetUrl('/stallhaven/', `${page}index.html`),
+      'https://neoscriptsforplex.github.io/stallhaven/minimap/compass.svg',
+    );
   });
 
   it('keeps the compass needle on world north as the camera yaws', () => {

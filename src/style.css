@@ -2715,7 +2715,7 @@ html.is-booting.is-scene-live #view {
 .minimap-needle {
   width: 100%;
   height: 100%;
-  background: var(--compass-url, url("./public/minimap/compass.svg")) center / contain no-repeat;
+  background: var(--compass-url, url("../public/minimap/compass.svg")) center / contain no-repeat;
   transform: rotate(var(--map-yaw));
   transition: transform 120ms linear;
 }
@@ -2778,78 +2778,114 @@ html.is-booting.is-scene-live #view {
   #hud.is-map-open .minimap-close { bottom: auto; top: -6px; right: -6px; }
 }
 
-/* Crafting screen: header, one tab row, and type side tabs. */
-.craft-head {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+/* Desktop craft panel: the pre-tab layout, sized to its content.
+   Phone portrait rules above and below are left alone. */
+@media not ((orientation: portrait) and (pointer: coarse)) {
+  #craft-modal,
+  #potion-modal {
+    overflow-x: hidden;
+  }
+
+  .sheet.craft-sheet,
+  #potion-modal .sheet.craft-sheet {
+    position: relative;
+    box-sizing: border-box;
+    width: fit-content;
+    height: auto;
+    max-width: 94vw;
+    max-height: 92vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .craft-sheet::-webkit-scrollbar,
+  .craft-sheet #crafts::-webkit-scrollbar,
+  .craft-sheet #potion-crafts::-webkit-scrollbar,
+  .craft-sheet .craft-mats::-webkit-scrollbar,
+  .craft-sheet .craft-sidetabs::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .craft-sheet > h2,
+  .craft-sheet > p {
+    width: 0;
+    min-width: 100%;
+    padding-right: 36px;
+  }
+
+  .craft-x {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 3;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    font-size: 16px;
+    line-height: 26px;
+  }
+
+  .craft-body,
+  .craft-body.no-side {
+    grid-template-columns: minmax(12rem, max-content) 200px;
+    min-height: 0;
+    max-height: none;
+    height: auto;
+    flex: 0 0 auto;
+  }
+
+  .craft-body:not(.no-side) {
+    grid-template-columns: 7.5rem minmax(12rem, max-content) 200px;
+  }
+
+  .craft-body > * {
+    min-width: 0;
+  }
+
+  .craft-sheet #crafts,
+  .craft-sheet #potion-crafts,
+  .craft-sheet .craft-sidetabs {
+    overflow: auto;
+    max-height: none;
+    scrollbar-width: none;
+  }
+
+  .craft {
+    min-height: 40px;
+    padding: 4px 9px;
+  }
+
+  .craft-qty {
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .craft-qty button {
+    min-height: 28px;
+    min-width: 2.4rem;
+    padding: 2px 6px;
+  }
+
+  .craft-mats {
+    width: 0;
+    min-width: 100%;
+    flex-wrap: wrap;
+    max-height: none;
+    overflow: visible;
+  }
 }
-.craft-head h2 { margin: 0; flex: 1 1 auto; }
-.craft-info,
-.craft-x {
-  flex: none;
-  min-width: 1.8rem;
-  min-height: 1.8rem;
-  padding: 0 8px;
-}
-.craft-info-tip {
-  display: none;
-  position: absolute;
-  z-index: 3;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  margin: 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #2a1a10;
-  border: 1px solid var(--line);
-  color: #f0d9a8;
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-.craft-info:hover + .craft-info-tip,
-.craft-info:focus + .craft-info-tip,
-.craft-head.is-info .craft-info-tip {
-  display: block;
-}
-.craft-sheet .tabbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  overflow-x: auto;
-}
-.craft-sheet .tabbar .tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  width: auto;
-  margin: 0;
-  grid-template-columns: none;
-}
-.craft-sheet .tab {
-  min-height: 1.8rem;
-  width: auto;
-}
-.craft-sheet .tabbar .subtabs:not([hidden]) {
-  border-left: 1px solid var(--line);
-  padding-left: 8px;
-}
-.craft-body {
-  grid-template-columns: 118px minmax(0, 1fr) 220px;
-}
-.craft-body.no-side {
-  grid-template-columns: minmax(0, 1fr) 220px;
-}
+
 .craft-sidetabs {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-height: 0;
-  overflow: auto;
 }
 .sidetab {
   display: flex;
@@ -2861,9 +2897,6 @@ html.is-booting.is-scene-live #view {
 }
 .sidetab.is-on { outline: 1px solid var(--gold); }
 .sidetab-count { opacity: 0.75; font-variant-numeric: tabular-nums; }
-.craft-row { align-items: center; }
-.craft-qty { flex-direction: row; gap: 4px; }
-.craft { padding: 5px 9px; }
 .craft-mats-line { display: block; grid-column: 1 / -1; }
 
 @media (orientation: portrait) and (pointer: coarse) {

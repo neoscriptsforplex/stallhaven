@@ -51,10 +51,10 @@
     </div>
 
     <aside id="save-bar" aria-label="Save and load">
-      <button type="button" id="skills-btn" title="Skills" aria-label="Skills" aria-controls="skills-dock" aria-expanded="false">Skills</button>
-      <button type="button" id="build-btn" title="Build" aria-label="Build" aria-controls="build-dock" aria-expanded="false">Build</button>
       <button type="button" id="heroes-btn" title="Heroes" aria-label="Heroes" aria-controls="heroes-dock" aria-expanded="false"><svg class="hq-btn-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2.5l7.5 2.8v6.2c0 4.6-3.1 7.8-7.5 9.5-4.4-1.7-7.5-4.9-7.5-9.5V5.3z"/></svg><span class="hq-btn-label">Heroes</span></button>
       <button type="button" id="quests-btn" title="Quests" aria-label="Quests" aria-controls="quests-dock" aria-expanded="false"><svg class="hq-btn-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6 3h8.2L19 7.8V21H6z"/><path d="M14 3.5V8h4.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span class="hq-btn-label">Quests</span><span class="hq-badge" data-quest-badge hidden>0</span></button>
+      <button type="button" id="skills-btn" title="Skills" aria-label="Skills" aria-controls="skills-dock" aria-expanded="false">Skills</button>
+      <button type="button" id="build-btn" title="Build" aria-label="Build" aria-controls="build-dock" aria-expanded="false">Build</button>
       <button type="button" id="help-btn" title="Help" aria-label="Help">Help</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
@@ -164,16 +164,11 @@ This will allow you to load it back again.
 
     <div id="craft-modal" class="modal" hidden>
       <div class="sheet craft-sheet">
-        <div class="craft-head">
-          <h2 data-craft-title>Anvil</h2>
-          <button type="button" class="craft-info" aria-label="About this station" title="About this station">i</button>
-          <p data-craft-blurb class="craft-info-tip" role="tooltip">Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
-          <button type="button" class="ghost craft-x" data-craft-close aria-label="Close">✕</button>
-        </div>
-        <div class="tabbar">
-          <div id="craft-tabs" class="tabs" role="tablist"></div>
-          <div id="craft-subtabs" class="tabs subtabs" role="tablist" hidden></div>
-        </div>
+        <button type="button" class="craft-x" data-craft-close aria-label="Close">✕</button>
+        <h2 data-craft-title>Anvil</h2>
+        <p data-craft-blurb>Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
+        <div id="craft-tabs" class="tabs" role="tablist"></div>
+        <div id="craft-subtabs" class="tabs subtabs" role="tablist" hidden></div>
         <p data-craft-note class="craft-note" hidden></p>
         <div class="craft-body no-side">
           <nav id="craft-sidetabs" class="craft-sidetabs" role="tablist" aria-label="Recipe types" hidden></nav>
@@ -187,6 +182,7 @@ This will allow you to load it back again.
           </aside>
         </div>
         <div id="materials" class="craft-mats" aria-label="Materials"></div>
+        <button type="button" class="ghost" data-craft-close>Close</button>
       </div>
     </div>
 
@@ -381,6 +377,7 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
 
     <div id="potion-modal" class="modal" hidden>
       <div class="sheet craft-sheet">
+        <button type="button" class="craft-x" data-potion-close aria-label="Close">✕</button>
         <h2>Cauldron</h2>
         <p>Brew potions from herbs and water. Finished vials land in the chest and sit on wall shelves.</p>
         <p data-potion-note class="craft-note" hidden></p>

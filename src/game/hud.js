@@ -122,7 +122,7 @@ import {
   stationLabel,
   STATION_UNLOCKS,
 } from './layout.js';
-import { clampMapZoom, compassNeedleDegrees, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
+import { clampMapZoom, compassAssetUrl, compassNeedleDegrees, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
 import { boulderInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
@@ -193,7 +193,8 @@ export function bindHud(root, state, world) {
     const raw = import.meta.env.BASE_URL;
     if (raw) compassBase = raw.endsWith('/') ? raw : `${raw}/`;
   } catch { /* GitHub Pages serves this file unbuilt, where import.meta.env is missing. */ }
-  document.documentElement.style.setProperty('--compass-url', `url("${compassBase}minimap/compass.svg")`);
+  const compassHref = compassAssetUrl(compassBase, document.baseURI);
+  document.documentElement.style.setProperty('--compass-url', `url("${compassHref}")`);
   const mapToggle = document.querySelector('[data-map-toggle]');
   const mapClose = document.querySelector('[data-map-close]');
   const mapDismiss = document.querySelector('[data-map-dismiss]');
@@ -506,7 +507,7 @@ export function bindHud(root, state, world) {
     const altarMark = altarMode ? craftStation.slice('altar-'.length) : '';
     const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode || potterMode || sawmillMode || patchMode || altarMode;
     ensureCraftTabs();
-    tabsEl.hidden = simpleStation;
+    tabsEl.hidden = simpleStation || tabsEl.querySelectorAll('[data-tab]').length <= 1;
     subtabsEl.hidden = simpleStation || loomMode || fletchMode;
     const title = craftModal.querySelector('[data-craft-title]');
     const blurb = craftModal.querySelector('[data-craft-blurb]');
@@ -557,7 +558,7 @@ export function bindHud(root, state, world) {
                       : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
     }
     if (!simpleStation) paintSubtabs();
-    if (simpleStation || loomMode || fletchMode || !subtabsEl.querySelector('[data-subtab]')) {
+    if (simpleStation || loomMode || fletchMode || subtabsEl.querySelectorAll('[data-subtab]').length <= 1) {
       subtabsEl.hidden = true;
     }
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
@@ -575,7 +576,7 @@ export function bindHud(root, state, world) {
     const sideList = groups.size >= 2 ? (groups.get(craftSide) ?? []) : [...groups.values()].flat();
     holdCraftScroll(craftsEl, { reveal, focusId: craftFocusId });
     if (sideBefore !== craftSide && craftScrollPlan && !craftScrollPlan.focusId) craftScrollPlan.top = 0;
-    paintRecipeButtons(craftsEl, sideList, { headings: groups.size < 2 });
+    paintRecipeButtons(craftsEl, sideList, { headings: false });
     restoreCraftScrollNow();
     syncQtyHint(craftFocusId);
     if (craftFocusId) showPreview(craftFocusId);
@@ -1507,7 +1508,9 @@ export function bindHud(root, state, world) {
     confirmDisplay(Number(btn.dataset.shelfSlot));
   });
 
-  craftModal.querySelector('[data-craft-close]').addEventListener('click', closeCraft);
+  craftModal.querySelectorAll('[data-craft-close]').forEach((btn) => {
+    btn.addEventListener('click', closeCraft);
+  });
   craftModal.addEventListener('click', (event) => {
     if (event.target === craftModal) closeCraft();
   });
@@ -1605,7 +1608,9 @@ export function bindHud(root, state, world) {
 
   chestModal.querySelector('[data-chest-upgrade]')?.addEventListener('click', openUpgrade);
 
-  potionModal.querySelector('[data-potion-close]').addEventListener('click', closePotion);
+  potionModal.querySelectorAll('[data-potion-close]').forEach((btn) => {
+    btn.addEventListener('click', closePotion);
+  });
   potionModal.addEventListener('click', (event) => {
     if (event.target === potionModal) closePotion();
   });

@@ -162,7 +162,8 @@ describe('skill xp hooks', () => {
     assert.equal(xpForMine('runite'), 505);
     assert.equal(xpForMine('dragon'), 645);
     assert.equal(gatherBlockText('runite'), 'You need a Mining level of 85 to mine this rock.');
-    assert.equal(gatherBlockText('oak_logs'), 'You need a Woodcutting level of 15 to chop this tree.');
+    assert.equal(gatherBlockText('oak_logs'), 'You need a Woodcutting level of 15 to chop this Oak tree.');
+    assert.equal(gatherBlockText('yew_logs'), 'You need a Woodcutting level of 60 to chop this Yew tree.');
     assert.equal(gatherBlockText('wheat'), 'You need a Farming level of 5 to pick this wheat.');
     assert.equal(gatherInspectTitle('Logs', 'logs'), 'Logs');
     assert.equal(gatherInspectTitle('Oak logs', 'oak_logs'), 'Oak tree · Requires Woodcutting 15');

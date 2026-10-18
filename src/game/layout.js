@@ -113,7 +113,14 @@ export const FURNITURE_SHOP = [
   { type: 'table', kind: 'table', label: 'Table' },
   { type: 'mannequin', kind: 'stand', label: 'Mannequin' },
   { type: 'shelf', kind: 'shelf', label: 'Shelf' },
+  { type: 'farming_patch', kind: 'patch', label: 'Farming Patch' },
 ];
+
+/** Gold for the 1st through 4th farming patch. Further buys are refused. */
+export const FARMING_PATCH_COSTS = Object.freeze([1000000, 2000000, 4000000, 8000000]);
+export const FARMING_PATCH_CAP = 4;
+/** Half of a 2×2 tile patch at the OSRS unit scale (2.88 / 2). */
+export const FARMING_PATCH_HALF = 1.44;
 
 /**
  * Nails and planks for one new build-menu placement.
@@ -150,6 +157,7 @@ export const FURNITURE_BUILD_COSTS = Object.freeze({
   wheel: buildMaterialRow('adamant_nails', 20, 'yew_plank', 4),
   portal: buildMaterialRow('runite_nails', 25, 'magic_plank', 6),
   cauldron: buildMaterialRow('dragon_nails', 30, 'magic_plank', 8),
+  farming_patch: buildMaterialRow('iron_nails', 6, 'oak_plank', 2),
 });
 
 /** Material parts for a build-menu id. Empty when that piece spends no stock. */
@@ -599,7 +607,15 @@ export function outdoorWalkFloors(expansionIds = []) {
   const sideMaxZ = Math.min(grass.maxZ, shop.maxZ + OUTDOOR_CORNER_LINK);
   // One lawn rect, not only the strips around the room box. An L-shaped
   // expansion leaves grass in the notch, and strip seams drop the corners.
-  const lawn = { minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: grass.maxZ };
+  // The extra 0.28 matches the player radius so a click on the visible grass
+  // edge, including the far back of a fully expanded shop, is a legal stand.
+  const edge = 0.28;
+  const lawn = {
+    minX: grass.minX - edge,
+    maxX: grass.maxX + edge,
+    minZ: grass.minZ - edge,
+    maxZ: grass.maxZ + edge,
+  };
   return [
     lawn,
     { minX: grass.minX, maxX: grass.maxX, minZ: shop.maxZ, maxZ: grass.maxZ },
@@ -637,7 +653,8 @@ export function furnitureHalfSize(kind) {
   if (kind === 'loom') return { hw: 0.48, hd: 0.36 };
   if (kind === 'fletch') return { hw: 0.55, hd: 0.4 };
   if (kind === 'potter') return { hw: 0.4, hd: 0.4 };
-  if (kind === 'sawmill') return { hw: 1.08, hd: 0.24 };
+  if (kind === 'sawmill') return { hw: 1.44, hd: 0.72 };
+  if (kind === 'patch' || kind === 'farming_patch') return { hw: FARMING_PATCH_HALF, hd: FARMING_PATCH_HALF };
   if (kind === 'portal') return { hw: PORTAL_TARGET_WIDTH / 2, hd: PORTAL_TARGET_DEPTH / 2 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
@@ -704,6 +721,7 @@ export function defaultFurniture() {
     sawmill: null,
     portal: null,
     rug: { x: shopRugPose().x, z: shopRugPose().z, rot: FURNITURE_FORWARD },
+    patches: [],
     displays: SHOP.displays.map((spot) => (
       (spot.kind ?? 'table') === 'shelf'
         ? snapToWallGrid(spot.x, spot.z, [])
@@ -733,6 +751,7 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     portal: clonePose(furniture.portal),
     rug: { ...(furniture.rug ?? defaults.rug) },
     displays: (furniture.displays ?? defaults.displays).map((pose) => ({ ...pose })),
+    patches: (furniture.patches ?? []).map((pose) => ({ ...pose })),
   };
 }
 
@@ -887,20 +906,81 @@ function treeSitRadius(spotOrSide) {
   return treeCanopyRadius(spot.side);
 }
 
-/** Push a pine off boulders and neighbouring crowns. Loops are capped. */
-function settleGardenTree(spot, others, rocks, grass) {
-  const inset = treeSitRadius(spot);
+/** Grass-click reach. A walk click outside this radius must not start a chop. */
+function treeChopClear(spot) {
+  const canopy = Number(spot?.canopy);
+  if (Number.isFinite(canopy) && canopy > 0) return canopy + 0.4;
+  return TREE_CLICK_RADIUS;
+}
+
+function pushOutOfAabb(x, z, rect) {
+  if (x < rect.minX || x > rect.maxX || z < rect.minZ || z > rect.maxZ) {
+    return { x, z, hit: false };
+  }
+  const left = x - rect.minX;
+  const right = rect.maxX - x;
+  const back = z - rect.minZ;
+  const front = rect.maxZ - z;
+  const min = Math.min(left, right, back, front);
+  if (min === left) return { x: rect.minX - 0.08, z, hit: true };
+  if (min === right) return { x: rect.maxX + 0.08, z, hit: true };
+  if (min === back) return { x, z: rect.minZ - 0.08, hit: true };
+  return { x, z: rect.maxZ + 0.08, hit: true };
+}
+
+/** Push a pine off the shop, the path, boulders, and neighbouring crowns. */
+function settleGardenTree(spot, others, rocks, grass, expansionIds = []) {
+  const crown = treeSitRadius(spot);
+  const chop = treeChopClear(spot);
+  const edgeInset = chop + 1.05;
+  const shopPad = chop + 1.15;
   let x = spot.x;
   let z = spot.z;
   const clamp = () => {
-    x = Math.min(grass.maxX - inset, Math.max(grass.minX + inset, x));
-    z = Math.min(grass.maxZ - inset, Math.max(grass.minZ + inset, z));
+    x = Math.min(grass.maxX - edgeInset, Math.max(grass.minX + edgeInset, x));
+    z = Math.min(grass.maxZ - edgeInset, Math.max(grass.minZ + edgeInset, z));
+  };
+  const shove = () => {
+    for (const rect of occupiedCells(expansionIds).map((cell) => {
+      const c = roomCenter(cell.gx, cell.gz);
+      return {
+        minX: c.x - ROOM_W / 2 - shopPad,
+        maxX: c.x + ROOM_W / 2 + shopPad,
+        minZ: c.z - ROOM_D / 2 - shopPad,
+        maxZ: c.z + ROOM_D / 2 + shopPad,
+      };
+    })) {
+      const next = pushOutOfAabb(x, z, rect);
+      x = next.x;
+      z = next.z;
+    }
+    const path = cobblePathSpan(expansionIds);
+    const pathRect = {
+      minX: path.minX - crown,
+      maxX: path.maxX + crown,
+      minZ: path.minZ - crown,
+      maxZ: path.maxZ + crown,
+    };
+    const offPath = pushOutOfAabb(x, z, pathRect);
+    x = offPath.x;
+    z = offPath.z;
+    const apron = (FOUNTAIN.apron ?? 1.42) + crown;
+    const dx = x - FOUNTAIN.x;
+    const dz = z - FOUNTAIN.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < apron) {
+      const len = dist || 1;
+      x = FOUNTAIN.x + (dx / len) * (apron + 0.08);
+      z = FOUNTAIN.z + (dz / len) * (apron + 0.08);
+    }
   };
   clamp();
-  for (let pass = 0; pass < 8; pass += 1) {
+  shove();
+  clamp();
+  for (let pass = 0; pass < 12; pass += 1) {
     let moved = false;
     for (const rock of rocks) {
-      const need = gardenRockRadius(rock.scale ?? 1) + 1.05;
+      const need = gardenRockRadius(rock.scale ?? 1) + crown;
       let dx = x - rock.x;
       let dz = z - rock.z;
       const dist = Math.hypot(dx, dz);
@@ -915,9 +995,8 @@ function settleGardenTree(spot, others, rocks, grass) {
       z += (dz / len) * push;
       moved = true;
     }
-    const mine = treeSitRadius(spot);
     for (const other of others) {
-      const need = (mine + treeSitRadius(other)) * 0.86;
+      const need = crown + treeSitRadius(other) + 0.35;
       let dx = x - other.x;
       let dz = z - other.z;
       const dist = Math.hypot(dx, dz);
@@ -926,19 +1005,90 @@ function settleGardenTree(spot, others, rocks, grass) {
         dx = 1;
         dz = 0;
       }
-      const push = (need - Math.max(dist, 1e-4)) * 0.5 + 0.02;
+      const push = (need - Math.max(dist, 1e-4)) * 0.65 + 0.02;
       const len = Math.hypot(dx, dz) || 1;
       x += (dx / len) * push;
       z += (dz / len) * push;
       moved = true;
     }
+    shove();
     clamp();
     if (!moved) break;
   }
   return { ...spot, x, z };
 }
 
-export function gardenTreeSpots(expansionIds = []) {
+export function gardenTreeTypeId(spot) {
+  const wood = spot?.wood;
+  if (wood && wood !== 'logs' && WOOD_TREE_SPECS[wood]) return wood;
+  return 'pine';
+}
+
+const GARDEN_TYPE_ORDER = ['pine', 'oak', 'willow', 'maple', 'yew', 'magic'];
+
+function patchBlocksTree(x, z, radius, furniture) {
+  if (!furniture) return false;
+  const poses = [];
+  if (furniture.portal) poses.push({ kind: 'portal', pose: furniture.portal });
+  for (const pose of furniture.patches ?? []) poses.push({ kind: 'patch', pose });
+  return poses.some((item) => {
+    const rect = poseRect(item.kind, item.pose);
+    return x >= rect.minX - radius && x <= rect.maxX + radius
+      && z >= rect.minZ - radius && z <= rect.maxZ + radius;
+  });
+}
+
+function treeSpotFree(x, z, spot, kept, expansionIds, rocks, grass, furniture) {
+  const crown = treeSitRadius(spot);
+  const chop = treeChopClear(spot);
+  if (x < grass.minX + chop + 0.8 || x > grass.maxX - chop - 0.8) return false;
+  if (z < grass.minZ + chop + 0.8 || z > grass.maxZ - chop - 0.8) return false;
+  if (pointHitsShop(x, z, expansionIds, chop + 1.15)) return false;
+  if (pointOnPath(x, z, expansionIds, crown)) return false;
+  if (!gardenSpotClearOfBeds({ x, z }, expansionIds, crown + 0.4)) return false;
+  if (patchBlocksTree(x, z, crown, furniture)) return false;
+  for (const rock of rocks) {
+    if (Math.hypot(x - rock.x, z - rock.z) < gardenRockRadius(rock.scale ?? 1) + crown) return false;
+  }
+  for (const other of kept) {
+    if (Math.hypot(x - other.x, z - other.z) < crown + treeSitRadius(other) + 0.35) return false;
+  }
+  return true;
+}
+
+function fallbackTreeSpot(wood, kept, expansionIds, grass, rocks, furniture) {
+  const spec = wood === 'pine' ? null : WOOD_TREE_SPECS[wood];
+  const spot = spec
+    ? {
+      x: 0,
+      z: 0,
+      side: 'edge',
+      wood: spec.id,
+      materialId: spec.materialId,
+      name: `${spec.name} tree`,
+      canopy: spec.canopy,
+    }
+    : { x: 0, z: 0, side: 'edge', materialId: 'logs', name: 'Tree' };
+  const step = 1.7;
+  for (let z = grass.minZ + 4; z <= grass.maxZ - 4; z += step) {
+    for (let x = grass.minX + 4; x <= grass.maxX - 4; x += step) {
+      if (!treeSpotFree(x, z, spot, kept, expansionIds, rocks, grass, furniture)) continue;
+      return { ...spot, x, z };
+    }
+  }
+  return null;
+}
+
+/** After layout or an expansion, every wood still has a living spot. Felled trees count. */
+function ensureGardenTreeTypes(kept, expansionIds, grass, rocks, furniture) {
+  for (const wood of GARDEN_TYPE_ORDER) {
+    if (kept.some((spot) => gardenTreeTypeId(spot) === wood)) continue;
+    const spot = fallbackTreeSpot(wood, kept, expansionIds, grass, rocks, furniture);
+    if (spot) kept.push(spot);
+  }
+}
+
+export function gardenTreeSpots(expansionIds = [], opts = {}) {
   const box = footprintBox(expansionIds);
   const grass = gardenBox(expansionIds);
   const cx = (box.minX + box.maxX) / 2;
@@ -978,7 +1128,7 @@ export function gardenTreeSpots(expansionIds = []) {
   const rocks = gardenRockSpots(expansionIds);
   const kept = [];
   for (const spot of spots) {
-    const settled = settleGardenTree(spot, kept, rocks, grass);
+    const settled = settleGardenTree(spot, kept, rocks, grass, expansionIds);
     if (!keepGardenSpot(settled, expansionIds)) continue;
     if (!gardenSpotClearOfBeds(settled, expansionIds)) continue;
     const stillInRock = rocks.some((rock) => (
@@ -987,7 +1137,14 @@ export function gardenTreeSpots(expansionIds = []) {
     if (stillInRock) continue;
     kept.push(settled);
   }
+  ensureGardenTreeTypes(kept, expansionIds, grass, rocks, opts.furniture ?? null);
   return kept;
+}
+
+/** Outdoor grass only. A farming patch does not sit on the shop floor. */
+export function patchPlaceFloors(expansionIds = []) {
+  const grass = gardenBox(expansionIds);
+  return [{ minX: grass.minX, maxX: grass.maxX, minZ: grass.minZ, maxZ: grass.maxZ }];
 }
 
 export function gardenRockSpots(expansionIds = []) {

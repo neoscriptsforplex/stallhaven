@@ -818,3 +818,33 @@ describe('furniture build costs', () => {
     }
   });
 });
+
+describe('garden tree guarantee and sawmill footprint', () => {
+  function woodId(spot) {
+    return spot.wood && spot.wood !== 'logs' ? spot.wood : 'pine';
+  }
+
+  it('keeps one of every wood after the origin layout and a full expansion', () => {
+    const woods = ['pine', 'oak', 'willow', 'maple', 'yew', 'magic'];
+    const layouts = [[], ['left', 'right', 'back', 'back-left', 'back-right']];
+    for (const ids of layouts) {
+      const spots = gardenTreeSpots(ids);
+      for (const wood of woods) {
+        assert.ok(spots.some((spot) => woodId(spot) === wood), `${wood} missing for ${ids.join('+') || 'origin'}`);
+      }
+    }
+    const origin = gardenTreeSpots([]);
+    assert.equal(origin.find((spot) => spot.wood === 'oak').materialId, 'oak_logs');
+    assert.equal(origin.find((spot) => spot.wood === 'willow').materialId, 'willow_logs');
+    assert.equal(origin.find((spot) => spot.wood === 'maple').materialId, 'maple_logs');
+    assert.equal(origin.find((spot) => spot.wood === 'yew').materialId, 'yew_logs');
+    assert.equal(origin.find((spot) => spot.wood === 'magic').materialId, 'magic_logs');
+    assert.ok(origin.some((spot) => !spot.materialId || spot.materialId === 'logs'));
+  });
+
+  it('sizes the sawmill and farming patch footprints', () => {
+    assert.deepEqual(furnitureHalfSize('sawmill'), { hw: 1.44, hd: 0.72 });
+    assert.deepEqual(furnitureHalfSize('patch'), { hw: 1.44, hd: 1.44 });
+    assert.deepEqual(furnitureHalfSize('farming_patch'), { hw: 1.44, hd: 1.44 });
+  });
+});

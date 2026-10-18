@@ -50,12 +50,14 @@ import {
   doorwayFloor,
   wallVineMounts,
 } from './layout.js';
-import { MATERIALS, METALS } from './catalog.js';
+import { MATERIALS, METALS, chopYield } from './catalog.js';
+import { createMagicSparkles } from './magic-tree-sparkles.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
 import { applyOsrsScale, getBundledLook, measureVisibleBox, OSRS_MODEL_SCALE, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
 import { prepareDungeonRockMaterials } from './upload.js';
+import { attachSpinner } from './stationSpin.js';
 
 export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
 
@@ -1794,9 +1796,45 @@ function buildProceduralSawmill() {
   return group;
 }
 
-/** Long bench with a circular blade. A bundled `sawmill` folder replaces this. */
+/**
+ * Luke's sawmill dump at the true OSRS unit scale (256×128 → 2.88×1.44 m).
+ * The procedural bench is only the fallback when the dump is missing.
+ */
 export function buildSawmill() {
-  return fitBundledStation('sawmill', buildProceduralSawmill());
+  const bundled = getBundledLook('sawmill');
+  const bench = bundled
+    ? wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'sawmill', fit: 'max' })
+    : buildProceduralSawmill();
+  if (bundled) sitVisibleOnY(bench, 0);
+  // Bundled OBJ splits the blade into `o saw_blade`. Spin it on the Z axle while sawing.
+  const spinner = attachSpinner(bench, { partName: 'saw_blade' });
+  if (spinner) bench.userData.spinner = spinner;
+  return bench;
+}
+
+/** 2×2 outdoor soil. Origin at the centre, y = 0 on the grass. */
+export function buildFarmingPatch() {
+  const bundled = getBundledLook('farming-patch');
+  if (bundled) {
+    const fitted = wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'farming-patch', fit: 'max' });
+    sitVisibleOnY(fitted, 0);
+    return fitted;
+  }
+  const group = new THREE.Group();
+  group.name = 'farming-patch';
+  const soil = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(2.88, 0.08, 2.88),
+    new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.95 }),
+  ));
+  soil.position.y = 0.04;
+  group.add(soil);
+  const rim = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(2.88, 0.1, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x8a6238, roughness: 0.9 }),
+  ));
+  rim.position.set(0, 0.08, 1.4);
+  group.add(rim);
+  return group;
 }
 
 export function buildSpinningWheel() {
@@ -2030,6 +2068,7 @@ export function buildWoodTree(woodId, scale = 1) {
     const tree = buildTree(scale);
     tree.userData.wood = woodId ?? 'logs';
     if (spec?.canopy) tree.userData.canopy = spec.canopy;
+    attachMagicSparkles(tree, woodId);
     return tree;
   }
   const fitted = wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'pine', fit: 'max' });
@@ -2038,7 +2077,19 @@ export function buildWoodTree(woodId, scale = 1) {
   tree.userData.wood = woodId;
   tree.userData.osrsScale = true;
   tree.userData.canopy = spec.canopy;
+  attachMagicSparkles(tree, woodId);
   return tree;
+}
+
+/** Parent sparkles on the crown so a felled magic tree hides them with the visual. */
+function attachMagicSparkles(tree, woodId) {
+  if (woodId !== 'magic') return;
+  const visual = tree.getObjectByName('pine-visual') ?? tree;
+  try {
+    tree.userData.sparkles = createMagicSparkles(visual);
+  } catch (err) {
+    console.warn('Magic sparkles skipped:', err?.message || err);
+  }
 }
 
 /**
@@ -2581,7 +2632,7 @@ function buildProceduralFlowerCluster(rand) {
   return group;
 }
 
-function addGarden(root, cells, expansionIds = []) {
+function addGarden(root, cells, expansionIds = [], furniture = null) {
   const grass = gardenBox(expansionIds);
   const grassW = grass.maxX - grass.minX;
   const grassD = grass.maxZ - grass.minZ;
@@ -2600,7 +2651,7 @@ function addGarden(root, cells, expansionIds = []) {
 
   const rand = randAt(1337 + cells.length * 17);
   resetPlantedTrunks();
-  for (const spot of gardenTreeSpots(expansionIds)) {
+  for (const spot of gardenTreeSpots(expansionIds, { furniture })) {
     const vary = 1 + (rand() * 2 - 1) * TREE_SCALE_SPREAD;
     const tree = spot.wood && spot.wood !== 'logs'
       ? buildWoodTree(spot.wood, vary)
@@ -2913,7 +2964,7 @@ function addLushGrass(root, grass, expansionIds, rand) {
   }
 }
 
-export function buildShop(expansionIds = []) {
+export function buildShop(expansionIds = [], furniture = null) {
   const root = new THREE.Group();
   root.name = 'stall';
   const roofs = new THREE.Group();
@@ -2924,7 +2975,7 @@ export function buildShop(expansionIds = []) {
   pads.name = 'expand-pads';
 
   const cells = occupiedCells(expansionIds);
-  addGarden(root, cells, expansionIds);
+  addGarden(root, cells, expansionIds, furniture);
 
   for (const cell of cells) {
     const c = roomCenter(cell.gx, cell.gz);
@@ -3052,11 +3103,12 @@ export const DUNGEON_BOULDERS = [
 
 export function treeInspect(materialId = 'logs') {
   const mat = MATERIALS[materialId];
+  const n = chopYield(materialId);
   if (!mat?.log || materialId === 'logs') {
-    return { name: 'Tree', blurb: 'An outdoor pine. Chop it for 5 Logs.' };
+    return { name: 'Tree', blurb: `An outdoor pine. Chop it for ${n} Logs.` };
   }
   const wood = mat.name.replace(/ Logs$/, '');
-  return { name: `${wood} tree`, blurb: `An outdoor ${wood.toLowerCase()}. Chop it for 5 ${mat.name}.` };
+  return { name: `${wood} tree`, blurb: `An outdoor ${wood.toLowerCase()}. Chop it for ${n} ${mat.name}.` };
 }
 
 export function flaxInspect() {

@@ -3,7 +3,7 @@ import { PLAYER_RADIUS, isWalkable, planPlayerWalk, playerObstacles } from './na
 import { FOUNTAIN, furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, PORTAL_TARGET_HEIGHT, TREE_TRUNK_RADIUS } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'sawmill', 'portal'];
-export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder', 'fountain']);
+export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder', 'fountain', 'farming_patch']);
 
 function stationHit(kind, height, pickY) {
   const { hw, hd } = furnitureHalfSize(kind);
@@ -485,6 +485,30 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
   }
   if (kind === 'fountain') {
     const reach = (FOUNTAIN.radius ?? 0.7) + 0.65;
+    const offsets = [
+      [0, reach],
+      [0, -reach],
+      [reach, 0],
+      [-reach, 0],
+      [reach * 0.72, reach * 0.72],
+      [-reach * 0.72, reach * 0.72],
+      [reach * 0.72, -reach * 0.72],
+      [-reach * 0.72, -reach * 0.72],
+    ];
+    const spots = offsets
+      .map(([dx, dz]) => ({ x: pose.x + dx, z: pose.z + dz }))
+      .filter((dest) => !canStand || canStand(dest.x, dest.z));
+    for (const dest of spots) {
+      if (isNearPoint(from, dest, 0.45)) return { action: 'open', dest };
+    }
+    for (const dest of spots) {
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      if (path.length) return { action: 'walk', path, dest };
+    }
+    return { action: 'blocked', dest: spots[0] ?? { x: pose.x, z: pose.z + reach } };
+  }
+  if (kind === 'farming_patch') {
+    const reach = furnitureHalfSize('patch').hw + 0.45;
     const offsets = [
       [0, reach],
       [0, -reach],

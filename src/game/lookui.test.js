@@ -195,7 +195,7 @@ describe('player look UI', () => {
     const yieldAt = hudBar.indexOf('data-active-craft-yield');
     assert.ok(bar >= 0 && yieldAt > bar, 'yield should sit under the bar');
     assert.match(hud, /mining\.yield/);
-    assert.match(hud, /kind === 'tree' \? 'Chop'/);
+    assert.match(hud, /kind === 'tree'[\s\S]{0,40}'Chop down'/);
   });
 
   it('rotates furniture with the wheel while placing', () => {

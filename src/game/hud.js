@@ -23,6 +23,7 @@ import {
   recipeMatsLabel,
   recipesForAltar,
   recipesForTab,
+  growRecipes,
   SHELF_SLOT_LABELS,
   stationForRecipe,
   craftUiForStation,
@@ -112,6 +113,7 @@ import {
   chestSlots,
   chestUpgradeCost,
   expansionCost,
+  FARMING_PATCH_CAP,
   FURNITURE_SHOP,
   furnitureKindForType,
   furnitureLabelForType,
@@ -251,6 +253,7 @@ export function bindHud(root, state, world) {
     if (craftStation === 'wheel') return recipesForTab('spin');
     if (craftStation === 'potter') return recipesForTab('potter');
     if (craftStation === 'sawmill') return recipesForTab('saw');
+    if (craftStation === 'farming_patch') return growRecipes();
     if (craftStation === 'loom') {
       if (craftTab === 'ranged') {
         return recipesForTab('ranged', 'armour');
@@ -276,6 +279,10 @@ export function bindHud(root, state, world) {
 
   function paintRecipeButtons(container, recipes) {
     if (!container) return;
+    if (craftStation === 'farming_patch' && recipes.length === 0) {
+      container.innerHTML = '<p class="empty">Nothing to grow yet.</p>';
+      return;
+    }
     const lines = new Map();
     for (const recipe of recipes) {
       const lineId = recipe.lineId || recipe.id;
@@ -392,9 +399,10 @@ export function bindHud(root, state, world) {
     const fletchMode = craftStation === 'fletch';
     const potterMode = craftStation === 'potter';
     const sawmillMode = craftStation === 'sawmill';
+    const patchMode = craftStation === 'farming_patch';
     const altarMode = typeof craftStation === 'string' && craftStation.startsWith('altar-');
     const altarMark = altarMode ? craftStation.slice('altar-'.length) : '';
-    const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode || potterMode || sawmillMode || altarMode;
+    const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode || potterMode || sawmillMode || patchMode || altarMode;
     ensureCraftTabs();
     tabsEl.hidden = simpleStation;
     subtabsEl.hidden = simpleStation || loomMode || fletchMode;
@@ -417,6 +425,8 @@ export function bindHud(root, state, world) {
                     ? 'Potter Wheel'
                     : sawmillMode
                       ? 'Sawmill'
+                      : patchMode
+                        ? 'Farming Patch'
                       : altarMode
                       ? `${altarMark.charAt(0).toUpperCase()}${altarMark.slice(1)} Altar`
                       : 'Anvil';
@@ -438,6 +448,8 @@ export function bindHud(root, state, world) {
                     ? 'Turn soft clay into clay. This wheel does not make ranged gear.'
                     : sawmillMode
                       ? 'Saw logs into planks. Finished planks stay in your materials.'
+                      : patchMode
+                        ? 'Nothing to grow yet.'
                       : altarMode
                       ? 'Bind rune essence into this element. Finished runes land in the chest.'
                       : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
@@ -713,7 +725,15 @@ export function bindHud(root, state, world) {
     const mineBtn = inspectPop.querySelector('[data-inspect-mine]');
     if (nameEl) nameEl.textContent = gatherInspectTitle(info.name, materialId);
     if (blurbEl) blurbEl.textContent = info.blurb;
-    if (mineBtn) mineBtn.textContent = kind === 'tree' ? 'Chop' : kind === 'flax' || kind === 'wheat' ? 'Pick' : 'Mine';
+    if (mineBtn) {
+      mineBtn.textContent = kind === 'tree'
+        ? 'Chop down'
+        : kind === 'flax'
+          ? 'Pick Flax'
+          : kind === 'wheat'
+            ? 'Pick Wheat'
+            : 'Mine';
+    }
     inspectPop.hidden = false;
     const x = Math.min(window.innerWidth - 250, Math.max(8, clientX ?? 24));
     const y = Math.min(window.innerHeight - 180, Math.max(8, clientY ?? 80));
@@ -1637,6 +1657,13 @@ export function bindHud(root, state, world) {
       const cost = nextFurnitureCost(state, type);
       const label = furnitureLabelForType(type);
       const bought = state.boughtFurniture?.[type] ?? 0;
+      if (type === 'farming_patch' && bought >= FARMING_PATCH_CAP) {
+        itemStatus.textContent = 'You can only own 4 farming patches.';
+        itemStatus.classList.remove('craft-note');
+        itemBuy.disabled = true;
+        itemBuy.textContent = 'Owned';
+        continue;
+      }
       const extra = type === 'shelf'
         ? (() => {
           const live = liveFurnitureCount(state, 'shelf');
@@ -1677,7 +1704,9 @@ export function bindHud(root, state, world) {
     const label = stationLabel(pendingPlace.type);
     if (title) title.textContent = `Place ${label}`;
     if (blurb) {
-      blurb.textContent = pendingPlace.type === 'portal'
+      blurb.textContent = pendingPlace.type === 'farming_patch'
+        ? 'Place the patch on open grass, clear of the path and flower beds. Gold is spent only when you confirm.'
+        : pendingPlace.type === 'portal'
         ? 'Move it on the grass or the floor snap grid, then confirm. Gold is spent only when you confirm placement. Double-click a highlighted cell to confirm.'
         : STATION_UNLOCKS.some((item) => item.id === pendingPlace.type)
         ? 'Move it on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Double-click a highlighted cell to confirm.'
@@ -1710,7 +1739,8 @@ export function bindHud(root, state, world) {
       return;
     }
     pendingPlace = { type, cost, note: '' };
-    world.beginPlaceFurniture(furnitureKindForType(type));
+    if (type === 'farming_patch') world.beginPlacePatch();
+    else world.beginPlaceFurniture(furnitureKindForType(type));
     openPlaceDock();
     paintPlaceDock();
     render(performance.now() / 1000);
@@ -1808,6 +1838,7 @@ export function bindHud(root, state, world) {
   buildModal.querySelector('[data-table-buy]')?.addEventListener('click', () => startFurniturePlace('table'));
   buildModal.querySelector('[data-mannequin-buy]')?.addEventListener('click', () => startFurniturePlace('mannequin'));
   buildModal.querySelector('[data-shelf-buy]')?.addEventListener('click', () => startFurniturePlace('shelf'));
+  buildModal.querySelector('[data-farming_patch-buy]')?.addEventListener('click', () => startFurniturePlace('farming_patch'));
   function confirmPendingPlace() {
     if (!pendingPlace) return;
     const check = world.tryConfirmPlace?.() ?? { ok: Boolean(world.getPlacePose()), pose: world.getPlacePose() };
@@ -2510,6 +2541,11 @@ export function bindHud(root, state, world) {
     if (event.type === 'fletch') openCraft('fletch');
     if (event.type === 'potter') openCraft('potter');
     if (event.type === 'sawmill') openCraft('sawmill');
+    if (event.type === 'farming_patch') openCraft('farming_patch');
+    if (event.type === 'gather-block') {
+      showGameToast(event.text);
+      render(performance.now() / 1000);
+    }
     if (event.type === 'portal') {
       fadeShop(() => world.enterRuneField?.());
     }
@@ -2739,12 +2775,42 @@ export function bindHud(root, state, world) {
     }
   }
 
+  function escapeLog(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function paintGameLog() {
+    const el = document.querySelector('#game-log');
+    if (!el) return;
+    const lines = state.log ?? [];
+    const next = lines.map((line) => `<li>${escapeLog(line)}</li>`).join('');
+    if (el.innerHTML !== next) el.innerHTML = next;
+  }
+
+  function showGameToast(text) {
+    if (!text) return;
+    document.querySelectorAll('.game-toast').forEach((old) => old.remove());
+    const toast = document.createElement('div');
+    toast.className = 'game-toast';
+    toast.setAttribute('role', 'status');
+    toast.textContent = text;
+    document.body.appendChild(toast);
+    window.setTimeout(() => {
+      toast.classList.add('is-leaving');
+      window.setTimeout(() => toast.remove(), 220);
+    }, 3200);
+  }
+
   function render(now) {
     const dt = lastPreviewAt ? Math.min(0.05, Math.max(0, now - lastPreviewAt)) : 0;
     lastPreviewAt = now;
     if (!craftModal.hidden) craftPreview?.tick(dt);
     if (!potionModal.hidden) potionPreview?.tick(dt);
     goldEl.textContent = `Coins: ${formatGold(state.gold)}`;
+    paintGameLog();
     syncOwnedMaterials();
     const xp = shopProgress(state.shopXp ?? 0);
     const levelEl = document.querySelector('#shop-level');

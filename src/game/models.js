@@ -1959,7 +1959,7 @@ export function buildWare(recipeId) {
     host.add(lump);
   }
   if (recipe?.category !== 'food') {
-    const bundled = recipe ? woodBundledLook(recipe.id) : null;
+    const bundled = recipe ? (nailBundledLook(recipe.id) ?? woodBundledLook(recipe.id)) : null;
     attachBundledWare(group, host, bundled, recipe?.id);
   }
   if (isShelfItem(recipe)) group.scale.setScalar(0.55);
@@ -1993,6 +1993,41 @@ const WOOD_TINT_LOOK = {
   saw_yew_plank: { source: 'saw_plank', tint: 0x6a3a48 },
   saw_magic_plank: { source: 'saw_plank', tint: 0x3a6ec8 },
 };
+
+const NAIL_LOOK_ORDER = [
+  'bronze_nails',
+  'iron_nails',
+  'steel_nails',
+  'mithril_nails',
+  'adamant_nails',
+  'rune_nails',
+  'dragon_nails',
+];
+
+const NAIL_LOOK = {
+  bronze_nails: 'nails-bronze',
+  iron_nails: 'nails-iron',
+  steel_nails: 'nails-steel',
+  mithril_nails: 'nails-mithril',
+  adamant_nails: 'nails-adamant',
+  rune_nails: 'nails-rune',
+  dragon_nails: 'nails-dragon',
+};
+
+function nailBundledLook(recipeId) {
+  const lookId = NAIL_LOOK[recipeId];
+  if (!lookId) return null;
+  const direct = getBundledLook(lookId);
+  if (direct) return direct;
+  const index = NAIL_LOOK_ORDER.indexOf(recipeId);
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const sourceId = NAIL_LOOK[NAIL_LOOK_ORDER[i]];
+    if (!getBundledLook(sourceId)) continue;
+    const tint = RECIPES[recipeId]?.tint;
+    return tintedBundledLook(sourceId, tint);
+  }
+  return null;
+}
 
 function woodBundledLook(id) {
   const direct = getBundledLook(id);
@@ -2074,7 +2109,7 @@ function attachBundledWare(group, host, bundled, recipeId) {
     group.add(host);
     return;
   }
-  if (recipeId === 'dwarven_multicannon') {
+  if (recipeId === 'dwarven_multicannon' || NAIL_LOOK[recipeId]) {
     group.add(wrapBundledProp(bundled, osrsScaleHost(bundled), { name: 'dump', fit: 'max' }));
     return;
   }
@@ -2709,7 +2744,7 @@ function addProceduralRune(group, mark, tint) {
   }
 }
 
-/** Small tinted pile. No nail dump is shipped, so the craft preview uses this. */
+/** Small tinted pile. Used when no nail dump is loaded for this tier. */
 function addNails(group, tint) {
   const mat = metal(tint);
   const spots = [

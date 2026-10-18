@@ -122,7 +122,7 @@ import {
   stationLabel,
   STATION_UNLOCKS,
 } from './layout.js';
-import { clampMapZoom, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
+import { clampMapZoom, compassNeedleDegrees, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
 import { boulderInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
@@ -184,6 +184,10 @@ export function bindHud(root, state, world) {
   let inspectTarget = null;
   const minimap = document.querySelector('#minimap');
   const minimapWrap = document.querySelector('.minimap-wrap');
+  document.documentElement.style.setProperty(
+    '--compass-url',
+    `url("${import.meta.env.BASE_URL}minimap/compass.svg")`,
+  );
   const mapToggle = document.querySelector('[data-map-toggle]');
   const mapClose = document.querySelector('[data-map-close]');
   const mapDismiss = document.querySelector('[data-map-dismiss]');
@@ -222,6 +226,7 @@ export function bindHud(root, state, world) {
 
   let craftTab = 'melee';
   let craftSubtab = 'weapon';
+  let craftSide = '';
   let craftStation = 'anvil';
   let craftFocusId = null;
   let tradeActor = null;
@@ -279,7 +284,90 @@ export function bindHud(root, state, world) {
     note.textContent = text || '';
   }
 
-  function paintRecipeButtons(container, recipes) {
+  function escCraft(value) {
+    return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+
+  function recipeGroups(recipes) {
+    const groups = new Map();
+    for (const recipe of recipes) {
+      const name = recipe.lineName || recipe.name || recipe.id;
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(recipe);
+    }
+    for (const list of groups.values()) list.sort((a, b) => a.lineIndex - b.lineIndex);
+    return groups;
+  }
+
+  function craftSideStorageKey() {
+    return `craftSide:${craftStation}:${craftTab}:${craftSubtab}`;
+  }
+
+  function savedCraftSide() {
+    try {
+      return localStorage.getItem(craftSideStorageKey()) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function rememberCraftSide(name) {
+    if (!name) return;
+    try {
+      localStorage.setItem(craftSideStorageKey(), name);
+    } catch {
+      /* private mode */
+    }
+  }
+
+  function recipeOpen(recipe) {
+    return isUnlocked(state, recipe.id)
+      && meetsLevelRequirement(recipe, (skillId) => skillLevelOf(state, skillId));
+  }
+
+  function chooseCraftSide(groups) {
+    const names = [...groups.keys()];
+    if (craftFocusId) {
+      const recipe = RECIPES[craftFocusId];
+      const name = recipe?.lineName || recipe?.name;
+      if (name && groups.has(name)) {
+        craftSide = name;
+        rememberCraftSide(name);
+        return;
+      }
+    }
+    const saved = savedCraftSide();
+    if (saved && groups.has(saved)) {
+      craftSide = saved;
+      return;
+    }
+    if (groups.has(craftSide)) return;
+    const unlocked = names.find((name) => groups.get(name).some(recipeOpen));
+    craftSide = unlocked || names[0] || '';
+  }
+
+  function paintSideTabs(groups) {
+    const nav = document.querySelector('#craft-sidetabs');
+    const body = craftModal.querySelector('.craft-body');
+    if (!nav || !body) return;
+    const show = groups.size >= 2;
+    nav.hidden = !show;
+    body.classList.toggle('no-side', !show);
+    if (!show) {
+      nav.innerHTML = '';
+      return;
+    }
+    nav.innerHTML = [...groups.entries()].map(([name, list]) => {
+      const open = list.filter(recipeOpen).length;
+      const on = name === craftSide;
+      return `<button type="button" class="sidetab${on ? ' is-on' : ''}" role="tab" aria-selected="${on ? 'true' : 'false'}" data-side="${escCraft(name)}">${escCraft(name)}<span class="sidetab-count">${open}/${list.length}</span></button>`;
+    }).join('');
+    if (window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches) {
+      nav.querySelector('.sidetab.is-on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }
+  }
+
+  function paintRecipeButtons(container, recipes, { headings = true } = {}) {
     if (!container) return;
     if (craftStation === 'farming_patch' && recipes.length === 0) {
       container.innerHTML = '<p class="empty">Nothing to grow yet.</p>';
@@ -293,7 +381,7 @@ export function bindHud(root, state, world) {
     }
     container.innerHTML = [...lines.values()].map((list) => {
       list.sort((a, b) => a.lineIndex - b.lineIndex);
-      const lineTitle = list[0]?.lineName ? `<h4 class="line">${list[0].lineName}</h4>` : '';
+      const lineTitle = headings && list[0]?.lineName ? `<h4 class="line">${escCraft(list[0].lineName)}</h4>` : '';
       return lineTitle + list.map((recipe) => {
         const levelText = levelRequirementText(recipe);
         const levelLocked = Boolean(levelText)
@@ -351,12 +439,18 @@ export function bindHud(root, state, world) {
       sheetTop: sheet?.scrollTop ?? 0,
       sheet,
       list,
+      key: `${craftStation}:${craftTab}:${craftSubtab}:${craftSide}`,
     };
   }
 
   function restoreCraftScrollNow() {
     const plan = craftScrollPlan;
     if (!plan || plan.focusId) return;
+    const key = `${craftStation}:${craftTab}:${craftSubtab}:${craftSide}`;
+    if (plan.key && plan.key !== key) {
+      if (plan.list) plan.list.scrollTop = 0;
+      return;
+    }
     if (plan.list) plan.list.scrollTop = plan.top;
     if (plan.sheet) plan.sheet.scrollTop = plan.sheetTop;
   }
@@ -447,7 +541,7 @@ export function bindHud(root, state, world) {
                 : fletchMode
                   ? 'Fletch ranged weapons and ammo. Arrows still make 20 per craft action.'
                     : potterMode
-                    ? 'Turn soft clay into clay. This wheel does not make ranged gear.'
+                    ? 'Soften hard clay with a bucket of water. Finished soft clay stays in your materials.'
                     : sawmillMode
                       ? 'Saw logs into planks. Finished planks stay in your materials.'
                       : patchMode
@@ -457,6 +551,9 @@ export function bindHud(root, state, world) {
                       : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
     }
     if (!simpleStation) paintSubtabs();
+    if (simpleStation || loomMode || fletchMode || !subtabsEl.querySelector('[data-subtab]')) {
+      subtabsEl.hidden = true;
+    }
     for (const btn of tabsEl.querySelectorAll('[data-tab]')) {
       btn.classList.toggle('is-on', btn.dataset.tab === craftTab);
     }
@@ -465,8 +562,14 @@ export function bindHud(root, state, world) {
     }
     const reveal = revealCraftFocus;
     revealCraftFocus = false;
+    const groups = recipeGroups(currentRecipes());
+    const sideBefore = craftSide;
+    chooseCraftSide(groups);
+    paintSideTabs(groups);
+    const sideList = groups.size >= 2 ? (groups.get(craftSide) ?? []) : [...groups.values()].flat();
     holdCraftScroll(craftsEl, { reveal, focusId: craftFocusId });
-    paintRecipeButtons(craftsEl, currentRecipes());
+    if (sideBefore !== craftSide && craftScrollPlan && !craftScrollPlan.focusId) craftScrollPlan.top = 0;
+    paintRecipeButtons(craftsEl, sideList, { headings: groups.size < 2 });
     restoreCraftScrollNow();
     syncQtyHint(craftFocusId);
     if (craftFocusId) showPreview(craftFocusId);
@@ -528,6 +631,34 @@ export function bindHud(root, state, world) {
     setCraftNote('');
     paintCrafts();
     render(performance.now() / 1000);
+  });
+
+  document.querySelector('#craft-sidetabs')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-side]');
+    if (!btn) return;
+    craftSide = btn.dataset.side;
+    rememberCraftSide(craftSide);
+    craftFocusId = null;
+    if (craftsEl) craftsEl.scrollTop = 0;
+    setCraftNote('');
+    paintCrafts();
+    render(performance.now() / 1000);
+  });
+  document.querySelector('#craft-sidetabs')?.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    if (window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches) return;
+    const buttons = [...event.currentTarget.querySelectorAll('[data-side]')];
+    const index = buttons.indexOf(document.activeElement);
+    if (index < 0) return;
+    event.preventDefault();
+    const next = buttons[index + (event.key === 'ArrowDown' ? 1 : -1)];
+    if (!next) return;
+    next.focus();
+    next.click();
+  });
+  craftModal.querySelector('.craft-info')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    craftModal.querySelector('.craft-head')?.classList.toggle('is-info');
   });
 
   subtabsEl.addEventListener('click', (event) => {
@@ -2714,6 +2845,7 @@ export function bindHud(root, state, world) {
     const size = minimap.width;
     const px = (event.clientX - rect.left) * (size / rect.width);
     const py = (event.clientY - rect.top) * (size / rect.height);
+    if (Math.hypot(px - size / 2, py - size / 2) > size / 2) return;
     const frame = minimapFrame(snap);
     const dest = mapToWorld(px, py, frame.bounds, size, frame.yaw, mapZoom, frame.focus);
     mapPing = { x: dest.x, z: dest.z, at: performance.now() / 1000 };
@@ -2936,6 +3068,13 @@ export function bindHud(root, state, world) {
             else mapPing = null;
           }
           drawMinimap(ctx, mapSnap);
+          if (minimapWrap) {
+            const deg = compassNeedleDegrees(frame.yaw);
+            const next = `${deg}deg`;
+            if (minimapWrap.style.getPropertyValue('--map-yaw') !== next) {
+              minimapWrap.style.setProperty('--map-yaw', next);
+            }
+          }
         }
       }
     }

@@ -2580,3 +2580,305 @@ html.is-booting.is-scene-live #view {
     animation: none;
   }
 }
+
+/* HUD panel width matches the minimap. Phones keep a two-line log under the gathering bar. */
+:root { --hud-map: 196px; }
+
+#hud {
+  width: max-content;
+  max-width: calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+}
+#hud .ledger {
+  box-sizing: content-box;
+  width: var(--hud-map);
+}
+#hud .minimap-wrap { width: var(--hud-map); }
+#hud .shop-xp {
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+#hud .ledger-row { min-width: 0; }
+#hud .gold {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#hud .game-log {
+  width: 100%;
+  max-height: calc(3 * 1.3em);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 1.3em), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 1.3em), transparent);
+}
+#hud .game-log li {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+}
+#hud .game-log li:nth-child(2) { opacity: 0.75; }
+#hud .game-log li:nth-child(n+3) { opacity: 0.5; }
+#hud .active-craft { width: 100%; }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #hud { width: auto; max-width: none; }
+  #hud .ledger { box-sizing: border-box; width: 100%; }
+  #hud .minimap-wrap { width: var(--portrait-map); }
+  #hud .shop-xp { width: auto; }
+  #hud .gold { max-width: 46vw; }
+  #hud .active-craft {
+    left: calc(max(8px, env(safe-area-inset-left, 0px)) + 32px);
+    width: min(200px, calc(100vw - 56px));
+  }
+  #hud .game-log {
+    position: absolute;
+    top: calc(100% + 8px + var(--portrait-map) + 8px + 58px);
+    left: calc(max(8px, env(safe-area-inset-left, 0px)) + 32px);
+    width: var(--portrait-map);
+    max-width: var(--portrait-map);
+    max-height: calc(2 * 1.3em);
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.3;
+    overflow: hidden;
+    pointer-events: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+  #hud.is-map-open .game-log {
+    top: calc(100% + 16px + var(--portrait-map-open) + 58px);
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 720px) {
+  #hud { width: auto; max-width: none; max-height: none; }
+}
+
+/* ---- Round OSRS-style minimap ---- */
+.minimap-wrap {
+  --ring: 7px;
+  --map-yaw: 0deg;
+  aspect-ratio: 1;
+  isolation: isolate;
+  margin: 9px 9px 16px;
+  max-width: calc(196px - 18px);
+}
+
+.minimap {
+  border-radius: 50%;
+  border: 0;
+  background: #2a4a28;
+  max-width: 100%;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 0 10px rgba(0, 0, 0, 0.45),
+    0 0 0 2px #2a1a0c,
+    0 0 0 calc(var(--ring) - 2px) #6b4a1e,
+    0 0 0 var(--ring) #c9a14a,
+    0 0 0 calc(var(--ring) + 2px) #2a1a0c,
+    0 4px 14px calc(var(--ring) + 2px) rgba(0, 0, 0, 0.35);
+}
+
+.minimap-wrap::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--ring) + 1px);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 230, 170, 0.35), transparent 45%),
+    radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.35), transparent 50%);
+  -webkit-mask: radial-gradient(circle, transparent calc(50% - var(--ring) + 1px), #000 calc(50% - var(--ring) + 2px));
+  mask: radial-gradient(circle, transparent calc(50% - var(--ring) + 1px), #000 calc(50% - var(--ring) + 2px));
+}
+
+.minimap-compass {
+  left: -9px;
+  top: -9px;
+  z-index: 2;
+}
+
+.minimap-compass button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid #2a1a0c;
+  background: #3a2612;
+  box-shadow: 0 0 0 2px #c9a14a, 0 2px 6px rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.minimap-needle {
+  width: 100%;
+  height: 100%;
+  background: var(--compass-url, url("/minimap/compass.svg")) center / contain no-repeat;
+  transform: rotate(var(--map-yaw));
+  transition: transform 120ms linear;
+}
+
+.minimap-zoom {
+  right: -8px;
+  bottom: -8px;
+  z-index: 2;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.minimap-zoom button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #2a1a0c;
+  background: radial-gradient(circle at 35% 30%, #7a5a2a, #3a2612 70%);
+  box-shadow: 0 0 0 1.5px #c9a14a, 0 2px 5px rgba(0, 0, 0, 0.5);
+  font-weight: 700;
+}
+
+@media (hover: hover) {
+  .minimap-compass button:hover,
+  .minimap-zoom button:hover {
+    background: radial-gradient(circle at 35% 30%, #9a7438, #4a3016 70%);
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #hud .minimap-wrap {
+    --ring: 4px;
+    top: calc(100% + 12px);
+    left: calc(max(8px, env(safe-area-inset-left, 0px)) + 4px);
+    width: calc(var(--portrait-map) - 8px);
+    max-width: calc(var(--portrait-map) - 8px);
+    margin: 0;
+  }
+  #hud .minimap-wrap.is-expanded {
+    --ring: 7px;
+    width: calc(var(--portrait-map-open) - 14px);
+    max-width: calc(var(--portrait-map-open) - 14px);
+  }
+  #hud .minimap-compass { left: -6px; top: -6px; }
+  #hud .minimap-compass button { width: 24px; height: 24px; }
+  #hud .minimap-zoom { display: none; }
+  #hud .minimap-wrap.is-expanded .minimap-zoom { display: flex; }
+  #hud .minimap-toggle,
+  #hud .minimap-close {
+    top: auto;
+    bottom: -8px;
+    right: -6px;
+    height: 22px;
+    min-width: 0;
+    border-radius: 11px;
+    border: 2px solid #2a1a0c;
+    background: #3a2612;
+    box-shadow: 0 0 0 1.5px #c9a14a;
+  }
+  #hud.is-map-open .minimap-close { bottom: auto; top: -6px; right: -6px; }
+}
+
+/* Crafting screen: header, one tab row, and type side tabs. */
+.craft-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.craft-head h2 { margin: 0; flex: 1 1 auto; }
+.craft-info,
+.craft-x {
+  flex: none;
+  min-width: 1.8rem;
+  min-height: 1.8rem;
+  padding: 0 8px;
+}
+.craft-info-tip {
+  display: none;
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #2a1a10;
+  border: 1px solid var(--line);
+  color: #f0d9a8;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.craft-info:hover + .craft-info-tip,
+.craft-info:focus + .craft-info-tip,
+.craft-head.is-info .craft-info-tip {
+  display: block;
+}
+.craft-sheet .tabbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+.craft-sheet .tabbar .tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: auto;
+  margin: 0;
+  grid-template-columns: none;
+}
+.craft-sheet .tab {
+  min-height: 1.8rem;
+  width: auto;
+}
+.craft-sheet .tabbar .subtabs:not([hidden]) {
+  border-left: 1px solid var(--line);
+  padding-left: 8px;
+}
+.craft-body {
+  grid-template-columns: 118px minmax(0, 1fr) 220px;
+}
+.craft-body.no-side {
+  grid-template-columns: minmax(0, 1fr) 220px;
+}
+.craft-sidetabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow: auto;
+}
+.sidetab {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  text-align: left;
+  min-height: 2rem;
+  padding: 4px 8px;
+}
+.sidetab.is-on { outline: 1px solid var(--gold); }
+.sidetab-count { opacity: 0.75; font-variant-numeric: tabular-nums; }
+.craft-row { align-items: center; }
+.craft-qty { flex-direction: row; gap: 4px; }
+.craft { padding: 5px 9px; }
+.craft-mats-line { display: block; grid-column: 1 / -1; }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .craft-body,
+  .craft-body.no-side {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+  }
+  .craft-sidetabs {
+    flex-direction: row;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+  .sidetab { flex: none; border-radius: 16px; scroll-snap-align: start; }
+  .craft-preview-pane { flex-direction: row; align-items: center; }
+  .craft-preview-pane canvas { width: 64px; height: 64px; flex: none; }
+  .craft-qty button { min-width: 40px; min-height: 32px; }
+}

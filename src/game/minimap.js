@@ -103,6 +103,16 @@ function mapYaw(yaw) {
   return MAP_YAW_OFFSET - (yaw ?? 0);
 }
 
+/**
+ * Compass needle rotation in degrees. Camera yaw 0 looks from the south, so
+ * world north (−Z) is up. Increasing yaw swings north clockwise on screen.
+ */
+export function compassNeedleDegrees(yaw = 0) {
+  const n = Number(yaw);
+  if (!Number.isFinite(n)) return 0;
+  return n * (180 / Math.PI);
+}
+
 function focusOf(bounds, focus) {
   return {
     x: focus?.x ?? (bounds.minX + bounds.maxX) / 2,
@@ -323,13 +333,19 @@ function drawPlayerMarker(ctx, snap, toMap, yaw, scale = 1) {
   ctx.save();
   ctx.translate(you.x, you.y);
   ctx.rotate(-(snap.player.facing ?? 0) + mapYaw(yaw));
-  ctx.fillStyle = '#f4f0e4';
   ctx.beginPath();
-  ctx.moveTo(0, -5 * scale);
-  ctx.lineTo(3.5 * scale, 4 * scale);
-  ctx.lineTo(-3.5 * scale, 4 * scale);
-  ctx.closePath();
+  ctx.arc(0, 0, 3 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = '#f4f0e4';
   ctx.fill();
+  ctx.lineWidth = 1.5 * scale;
+  ctx.strokeStyle = '#1a120c';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, -3 * scale);
+  ctx.lineTo(0, -8 * scale);
+  ctx.strokeStyle = '#f4f0e4';
+  ctx.lineWidth = 2 * scale;
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -474,7 +490,7 @@ export function drawMinimap(ctx, snap) {
   drawCounterMarker(ctx, snap.counter, toMap, scale);
 
   for (const piece of snap.furniture ?? []) {
-    drawDot(ctx, toMap(piece.x, piece.z), 2.2, '#c4a05a', undefined, scale);
+    drawDot(ctx, toMap(piece.x, piece.z), 2.4, '#c4a05a', '#3a240e', scale);
   }
   for (const actor of snap.customers ?? []) {
     drawDot(ctx, toMap(actor.x, actor.z), 2.4, '#e8b45a', '#3a240e', scale);

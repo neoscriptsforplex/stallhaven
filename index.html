@@ -70,7 +70,7 @@
           <button type="button" class="minimap-toggle" data-map-toggle aria-expanded="false">Map</button>
           <button type="button" class="minimap-close" data-map-close aria-label="Close map">Close</button>
           <div class="minimap-compass">
-            <button type="button" data-map-north aria-label="Reset camera">N</button>
+            <button type="button" data-map-north aria-label="Look North" title="Look North"><span class="minimap-needle"></span></button>
           </div>
           <div class="minimap-zoom">
             <button type="button" data-map-zoom="out" aria-label="Zoom map out">−</button>
@@ -162,12 +162,19 @@ This will allow you to load it back again.
 
     <div id="craft-modal" class="modal" hidden>
       <div class="sheet craft-sheet">
-        <h2 data-craft-title>Anvil</h2>
-        <p data-craft-blurb>Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
-        <div id="craft-tabs" class="tabs"></div>
-        <div id="craft-subtabs" class="tabs subtabs" hidden></div>
+        <div class="craft-head">
+          <h2 data-craft-title>Anvil</h2>
+          <button type="button" class="craft-info" aria-label="About this station" title="About this station">i</button>
+          <p data-craft-blurb class="craft-info-tip" role="tooltip">Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
+          <button type="button" class="ghost craft-x" data-craft-close aria-label="Close">✕</button>
+        </div>
+        <div class="tabbar">
+          <div id="craft-tabs" class="tabs" role="tablist"></div>
+          <div id="craft-subtabs" class="tabs subtabs" role="tablist" hidden></div>
+        </div>
         <p data-craft-note class="craft-note" hidden></p>
-        <div class="craft-body">
+        <div class="craft-body no-side">
+          <nav id="craft-sidetabs" class="craft-sidetabs" role="tablist" aria-label="Recipe types" hidden></nav>
           <div id="crafts"></div>
           <aside class="craft-preview-pane">
             <canvas data-craft-preview width="220" height="220" aria-label="Item preview"></canvas>
@@ -178,7 +185,6 @@ This will allow you to load it back again.
           </aside>
         </div>
         <div id="materials" class="craft-mats" aria-label="Materials"></div>
-        <button type="button" class="ghost" data-craft-close>Close</button>
       </div>
     </div>
 

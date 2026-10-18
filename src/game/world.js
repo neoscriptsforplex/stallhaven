@@ -37,12 +37,11 @@ import {
   stationForRecipe,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
-import { createFountainFill, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, miningBarAmount, pushLog } from './economy.js';
+import { createFountainFill, gatherFullMessage, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, materialIsFull, miningBarAmount, pushLog, storageCap } from './economy.js';
 import { gatherBlockText, meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
 import {
   FURNITURE_FORWARD,
   FURNITURE_SNAP,
-  MATERIAL_CAP,
   furnitureRotateDelta,
   snapGridLines,
   cloneFurniture,
@@ -117,7 +116,10 @@ import {
   isTreeStump,
   reviveDueTrees,
   setTreeFallen,
+  startTreeTopple,
+  tickTreeTopple,
   treeCanChop,
+  treeSpotKey,
 } from './trees.js';
 import {
   LADDER_STAND,
@@ -806,9 +808,12 @@ export function createWorld(canvas, state, opts = {}) {
   function poseOf(target) {
     if (!target) return null;
     if (placeDraft && target.id === placeDraft.id) {
-      if (target.id !== 'display' || target.index === placeDraft.index) return placeDraft;
+      const indexOk = (target.id !== 'display' && target.id !== 'farming_patch')
+        || target.index === placeDraft.index
+        || (target.id === 'farming_patch' && placeDraft.index == null);
+      if (indexOk) return placeDraft;
     }
-    if (target.id === 'farming_patch') return null;
+    if (target.id === 'farming_patch') return state.furniture.patches?.[target.index] ?? null;
     return target.id === 'display'
       ? state.furniture.displays[target.index]
       : state.furniture[target.id];
@@ -922,6 +927,7 @@ export function createWorld(canvas, state, opts = {}) {
     placeDraft = null;
     setSnapGridVisible(false);
     if (refreshGrid) rebuildSnapGrid();
+    if (kind === 'farming_patch' && patchesReady) syncPatchMeshes();
   }
 
   function discardPlaceDisplay() {
@@ -1370,10 +1376,14 @@ export function createWorld(canvas, state, opts = {}) {
       releasePatchObject(child);
     }
     const poses = state.furniture?.patches ?? [];
+    const movingIndex = placeDraft?.id === 'farming_patch' && placeDraft.index != null
+      ? placeDraft.index
+      : -1;
     poses.forEach((pose, index) => {
       const mesh = buildFarmingPatch();
       placeFarmingPatchMesh(mesh, pose, OUTDOOR_GROUND_Y);
       mesh.rotation.y = furnitureVisualYaw('farming_patch', pose.rot);
+      if (index === movingIndex) mesh.visible = false;
       patchGroup.add(mesh);
       const { hw, hd } = furnitureHalfSize('patch');
       const pick = new THREE.Mesh(
@@ -1390,6 +1400,7 @@ export function createWorld(canvas, state, opts = {}) {
       pick.userData.index = index;
       pick.userData.x = pose.x;
       pick.userData.z = pose.z;
+      if (index === movingIndex) pick.visible = false;
       patchGroup.add(pick);
     });
   }
@@ -1720,9 +1731,31 @@ export function createWorld(canvas, state, opts = {}) {
     return true;
   }
 
+  function refuseFull(materialId) {
+    if (!materialId || !materialIsFull(state, materialId)) return false;
+    const text = gatherFullMessage(materialId);
+    pushLog(state, text);
+    pickHandler?.({ type: 'gather-block', text });
+    return true;
+  }
+
+  function findGardenPine(x, z) {
+    const key = treeSpotKey(x, z);
+    let found = null;
+    const visit = (root) => {
+      root?.traverse((child) => {
+        if (found || child.name !== 'pine') return;
+        if (treeSpotKey(child.position.x, child.position.z) === key) found = child;
+      });
+    };
+    visit(architecture);
+    visit(runeField?.root);
+    return found;
+  }
+
   function startMining(materialId, pose) {
     const mat = MATERIALS[materialId];
-    if (!mat || refuseGather(materialId)) return;
+    if (!mat || refuseGather(materialId) || refuseFull(materialId)) return;
     const timing = mineTiming(materialId);
     mining = {
       materialId,
@@ -1745,7 +1778,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pose || !treeCanChop(pose.x, pose.z)) return;
     ensureTreeNode(pose.x, pose.z);
     const materialId = MATERIALS[pose.materialId]?.log ? pose.materialId : 'logs';
-    if (refuseGather(materialId)) return;
+    if (refuseGather(materialId) || refuseFull(materialId)) return;
     mining = {
       materialId,
       name: MATERIALS[materialId]?.name ?? 'Tree',
@@ -1767,6 +1800,7 @@ export function createWorld(canvas, state, opts = {}) {
     const visit = (root) => {
       root?.traverse((child) => {
         if (child.name !== 'pine' || child.userData?.gardenSide == null) return;
+        if (child.userData?.toppling) return;
         const node = ensureTreeNode(child.position.x, child.position.z);
         setTreeFallen(child, !node.alive);
       });
@@ -1778,6 +1812,7 @@ export function createWorld(canvas, state, opts = {}) {
   function fellChoppedTree(x, z, now) {
     const result = completeTreeChop(x, z, now);
     if (!result.felled) return false;
+    startTreeTopple(findGardenPine(x, z), now);
     syncTreeVisuals();
     rebuildNav();
     if (
@@ -1800,7 +1835,19 @@ export function createWorld(canvas, state, opts = {}) {
     rebuildNav();
   }
 
+  function tickTopples(now) {
+    const visit = (root) => {
+      root?.traverse((child) => {
+        if (child.name !== 'pine' || !child.userData?.toppling) return;
+        tickTreeTopple(child, now);
+      });
+    };
+    visit(architecture);
+    visit(runeField?.root);
+  }
+
   function startFountainFill(pose) {
+    if (refuseFull('water')) return;
     if (mining?.mode === 'pick') releaseHeldFlax(true);
     const now = performance.now() / 1000;
     mining = {
@@ -1822,7 +1869,7 @@ export function createWorld(canvas, state, opts = {}) {
   function startPicking(pose) {
     const field = pickCrop(pose?.materialId === 'wheat' ? 'wheat' : 'flax');
     const node = field.nodes.find((item) => item.id === pose?.plantId && item.alive);
-    if (!node || refuseGather(field.materialId)) return;
+    if (!node || refuseGather(field.materialId) || refuseFull(field.materialId)) return;
     mining = {
       materialId: field.materialId,
       name: field.name,
@@ -1849,7 +1896,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (now - mining.startedAt < mining.duration) return;
       const got = intentBus.run({ type: 'gather', mode: 'water' }) || 0;
       if (got <= 0) {
-        pushLog(state, 'Buckets of water are full.');
+        pushLog(state, gatherFullMessage('water'));
         stopMining();
         return;
       }
@@ -1873,7 +1920,7 @@ export function createWorld(canvas, state, opts = {}) {
         pickFlaxNode(field.nodes, mining.plantId, now);
         field.sync();
       } else {
-        pushLog(state, `${field.name} is full.`);
+        pushLog(state, gatherFullMessage(field.materialId));
       }
       stopMining();
       return;
@@ -1887,6 +1934,13 @@ export function createWorld(canvas, state, opts = {}) {
       mode: mining.mode === 'chop' ? 'chop' : 'mine',
       materialId: mining.materialId,
     }) || 0;
+    if (got <= 0) {
+      const text = gatherFullMessage(mining.materialId);
+      pushLog(state, text);
+      pickHandler?.({ type: 'gather-block', text });
+      stopMining();
+      return;
+    }
     if (got > 0) {
       const choppedName = MATERIALS[mining.materialId]?.name ?? 'Logs';
       pushLog(state, mining.mode === 'chop' ? `Chopped ${got} ${choppedName}.` : `Mined ${got} ${mining.name}.`);
@@ -2094,6 +2148,7 @@ export function createWorld(canvas, state, opts = {}) {
         nodeX: pose.x,
         nodeZ: pose.z,
         releaseTree: dest?.releaseTree ?? null,
+        patchIndex: pose.index,
       };
     };
     if (atStation) {
@@ -2128,7 +2183,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       stopMining();
-      pickHandler?.({ type, element: pose.element });
+      pickHandler?.({ type, element: pose.element, patchIndex: pose.index });
       playClick('ui');
       return;
     }
@@ -2151,7 +2206,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function finishPendingUse() {
     if (!pendingUse) return;
-    const { type, materialId, x, z, plantId, faceYaw, nodeX, nodeZ, element } = pendingUse;
+    const { type, materialId, x, z, plantId, faceYaw, nodeX, nodeZ, element, patchIndex } = pendingUse;
     pendingUse = null;
     if (type === 'counter') {
       servingAtCounter = true;
@@ -2168,7 +2223,7 @@ export function createWorld(canvas, state, opts = {}) {
     else if (type === 'tree') startChopping(pose);
     else if (type === 'flax' || type === 'wheat') startPicking(pose);
     else if (type === 'fountain') fillFromFountain(pose);
-    else pickHandler?.({ type, element });
+    else pickHandler?.({ type, element, patchIndex });
   }
 
   function updatePlayer(dt, now) {
@@ -2335,6 +2390,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function furnitureIdFromKind(kind, displayIndex) {
     if (kind === 'display') return { id: 'display', index: displayIndex };
+    if (kind === 'farming_patch') return { id: 'farming_patch', index: displayIndex };
     if (kind === 'chest' || kind === 'anvil' || kind === 'range' || kind === 'counter' || UNLOCK_STATIONS.includes(kind)) {
       return { id: kind };
     }
@@ -2385,7 +2441,9 @@ export function createWorld(canvas, state, opts = {}) {
   function blockedPlaceReason(pose, target = moveTarget) {
     if (!pose || !target) return 'That spot is off the shop floor.';
     const kind = placeKindOf(target);
-    const skip = target.id === 'display' ? { id: 'display', index: target.index } : { id: target.id };
+    const skip = target.id === 'display' || target.id === 'farming_patch'
+      ? { id: target.id, index: target.index }
+      : { id: target.id };
     const blocks = liveObstacles(state, SHOP, skip);
     const floors = activePlaceRects(target);
     if (kind === 'farming_patch' || kind === 'patch') {
@@ -2612,7 +2670,7 @@ export function createWorld(canvas, state, opts = {}) {
       }
       if (data.kind === 'farming_patch') {
         const pose = state.furniture.patches?.[data.index];
-        if (pose) queueUse('farming_patch', pose);
+        if (pose) queueUse('farming_patch', { ...pose, index: data.index });
         return;
       }
       if (data.kind === 'fountain') {
@@ -2697,11 +2755,12 @@ export function createWorld(canvas, state, opts = {}) {
           return;
         }
         const { hw, hd } = furnitureHalfSize('patch');
-        const patch = (state.furniture.patches ?? []).find((pose) => (
+        const patchIndex = (state.furniture.patches ?? []).findIndex((pose) => (
           Math.abs(point.x - pose.x) <= hw + 0.12 && Math.abs(point.z - pose.z) <= hd + 0.12
         ));
+        const patch = state.furniture.patches?.[patchIndex];
         if (patch) {
-          queueUse('farming_patch', patch);
+          queueUse('farming_patch', { ...patch, index: patchIndex });
           return;
         }
       }
@@ -2920,7 +2979,10 @@ export function createWorld(canvas, state, opts = {}) {
       });
       return;
     }
-    const furn = furnitureIdFromKind(data.kind, data.displayIndex);
+    const furn = furnitureIdFromKind(
+      data.kind,
+      data.kind === 'farming_patch' ? data.index : data.displayIndex,
+    );
     if (!furn) return;
     playClick('ui');
     if (data.kind === 'display') {
@@ -3541,6 +3603,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (puff.position.x > 28) puff.position.x = -28;
     }
     tickTrees(now);
+    tickTopples(now);
     syncDisplays();
     refreshSelection();
     const selected = displays[state.selectedDisplay];
@@ -3852,6 +3915,24 @@ export function createWorld(canvas, state, opts = {}) {
     };
   }
 
+  function beginMovePatch(index) {
+    const saved = state.furniture?.patches?.[index];
+    if (!saved) return false;
+    const rot = saved.rot ?? FURNITURE_FORWARD;
+    placeDraft = { id: 'farming_patch', index, x: saved.x, z: saved.z, rot };
+    moveTarget = { id: 'farming_patch', index, moving: true };
+    placeNeedsConfirm = true;
+    expandMode = false;
+    if (padGroup) padGroup.visible = false;
+    moveOrigin = null;
+    applyPatchGhost();
+    rebuildSnapGrid();
+    setSnapGridVisible(true);
+    highlightSnapCell(saved.x, saved.z);
+    if (patchesReady) syncPatchMeshes();
+    return true;
+  }
+
   return {
     tick,
     warmScene,
@@ -4058,6 +4139,10 @@ export function createWorld(canvas, state, opts = {}) {
       dismissCustomer(actor, false, 'Sold.');
     },
     beginMoveFurniture(target) {
+      if (target?.id === 'farming_patch') {
+        beginMovePatch(target.index);
+        return;
+      }
       moveTarget = target;
       placeNeedsConfirm = false;
       placeDraft = null;
@@ -4136,6 +4221,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (target.id === 'farming_patch') shiftPlantsOffPatch(pose);
       return pose;
     },
+    beginMovePatch,
     beginPlacePatch() {
       const grass = gardenBox(state.expansions ?? []);
       const rects = patchPlaceFloors(state.expansions ?? []);
@@ -4348,7 +4434,7 @@ export function createWorld(canvas, state, opts = {}) {
       const mineMode = (mining.mode ?? 'mine') === 'mine';
       const grant = mineMode
         ? miningBarAmount(state, mining.materialId, want)
-        : Math.min(want, Math.max(0, MATERIAL_CAP - have));
+        : Math.min(want, Math.max(0, storageCap(state) - have));
       return {
         materialId: mining.materialId,
         name: mining.name,

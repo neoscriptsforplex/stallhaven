@@ -174,7 +174,10 @@ const farming = {
     },
     {
       id: 'herbs', label: 'Herbs',
-      rows: HERBS.map(([lv, name]) => ({ lv, name, desc: 'Herb patch · feeds Herblore', icon: 'leaf', tint: '#6fbf5a', soon: true })),
+      rows: HERBS.map(([lv, name]) => {
+        const real = ['Guam', 'Marrentill', 'Tarromin', 'Harralander', 'Ranarr', 'Lantadyme', 'Dwarf weed'].includes(name);
+        return { lv, name, desc: 'Herb patch · feeds Herblore', icon: 'leaf', tint: '#6fbf5a', ...(real ? {} : { soon: true }) };
+      }),
     },
   ],
 };

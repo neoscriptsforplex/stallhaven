@@ -16,6 +16,8 @@ import {
   FOUNTAIN_WATER_YIELD,
   WHEAT_YIELD,
   mineYield,
+  GROW_BY_ID,
+  HERB_GROW_YIELD,
   SHOP,
   SHELF_SLOT_COUNT,
   SHOP_MAX_LEVEL,
@@ -56,7 +58,7 @@ import {
   ESSENCE_DOUBLE_LEVEL,
 } from './skills.js';
 import { RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
-import { emptyHeroQuestState, normalizeHeroQuestState } from './heroesQuests.js';
+import { emptyHeroQuestState, isMaterialFull, materialCap, normalizeHeroQuestState } from './heroesQuests.js';
 import {
   CAULDRON_COST,
   WHEEL_COST,
@@ -67,7 +69,6 @@ import {
   STATION_UNLOCKS,
   CHEST_MAX_LEVEL,
   FURNITURE_FORWARD,
-  MATERIAL_CAP,
   SWAP_PRICE_RATIO,
   chestSlots,
   chestUpgradeCost,
@@ -469,6 +470,21 @@ function skillCatchUp(source) {
   return seeded;
 }
 
+/** Per-material storage cap. Chest level 1 keeps the old flat 250. */
+export function storageCap(state) {
+  return materialCap(state?.chestLevel);
+}
+
+export function materialIsFull(state, materialId) {
+  return isMaterialFull(state?.materials, materialId, storageCap(state));
+}
+
+/** "Logs full." / "Bucket of water full." Shared by chop, mine, pick, fountain, and later fishing. */
+export function gatherFullMessage(materialId) {
+  const name = MATERIALS[materialId]?.name ?? 'Storage';
+  return `${name} full.`;
+}
+
 export function craftBlockReason(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 'Unknown recipe.';
@@ -507,6 +523,7 @@ export function craftBlockReason(state, recipeId) {
   }
   if (state.crafts[recipeId]) return `${recipe.name} is already in progress.`;
   if (!isMaterialCraft(recipe) && !chestHasSpace(state, recipe.outputCount ?? 1)) return 'The chest is full.';
+  if (isMaterialCraft(recipe) && materialIsFull(state, recipe.outputMaterial)) return 'Storage full.';
   const cost = recipeCost(recipe);
   if ((cost.gold || 0) > state.gold) return `Need ${formatGold(cost.gold)}g more.`;
   for (const [materialId, need] of Object.entries(cost.materials)) {
@@ -580,6 +597,11 @@ export function maxCraftActions(state, recipeId) {
     const out = Math.max(1, recipe.outputCount ?? 1);
     const reserved = (state.crafts[recipeId]?.left ?? 0) * out;
     const free = chestCapacity(state) - chestTotal(state) - reserved;
+    max = Math.min(max, Math.floor(Math.max(0, free) / out));
+  } else if (MATERIALS[recipe.outputMaterial]) {
+    const out = Math.max(1, recipe.outputCount ?? 1);
+    const reserved = (state.crafts[recipeId]?.left ?? 0) * out;
+    const free = storageCap(state) - (state.materials[recipe.outputMaterial] ?? 0) - reserved;
     max = Math.min(max, Math.floor(Math.max(0, free) / out));
   }
   if (!Number.isFinite(max)) return 0;
@@ -988,6 +1010,8 @@ export function buyFurniture(state, type, pose) {
       x: pose.x,
       z: pose.z,
       rot: pose.rot ?? FURNITURE_FORWARD,
+      paid: paidExtra,
+      crop: null,
     });
     return true;
   }
@@ -1067,6 +1091,82 @@ export function removePlacedFurniture(state, index) {
   return true;
 }
 
+/**
+ * Delete one farming patch.
+ * A paid patch refunds the current top tier (gold, nails, and planks, uncapped)
+ * and frees that tier for the next buy. A free-credit patch refunds nothing and
+ * restores one free place. Anything growing on it is lost.
+ */
+export function removeFarmingPatch(state, index) {
+  const patches = state.furniture?.patches;
+  if (!Array.isArray(patches) || !Number.isInteger(index) || index < 0 || index >= patches.length) return false;
+  const pose = patches[index];
+  if (pose?.paid === false) {
+    if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
+    const room = Math.max(0, FARMING_PATCH_CAP - (patches.length - 1));
+    state.freeFurnitureReplace.farming_patch = Math.min(
+      room,
+      (state.freeFurnitureReplace.farming_patch ?? 0) + 1,
+    );
+  } else {
+    if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
+    const bought = boughtFurnitureCount(state, 'farming_patch');
+    const tier = Math.max(0, Math.min(FARMING_PATCH_COSTS.length - 1, bought - 1));
+    state.gold = (state.gold ?? 0) + (FARMING_PATCH_COSTS[tier] ?? 0);
+    for (const part of furnitureBuildParts('farming_patch', tier)) {
+      state.materials[part.id] = (state.materials[part.id] ?? 0) + part.count;
+    }
+    state.boughtFurniture.farming_patch = Math.max(0, bought - 1);
+  }
+  patches.splice(index, 1);
+  return true;
+}
+
+/** Move a placed patch. The crop stays on the same object. */
+export function moveFarmingPatch(state, index, pose) {
+  const patch = state.furniture?.patches?.[index];
+  if (!patch || !pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) return false;
+  patch.x = pose.x;
+  patch.z = pose.z;
+  if (Number.isFinite(pose.rot)) patch.rot = pose.rot;
+  return true;
+}
+
+/** Plant one herb. `now` is wall-clock milliseconds, not the room clock. */
+export function plantHerb(state, index, recipeId, now = Date.now()) {
+  const recipe = GROW_BY_ID[recipeId];
+  const patch = state.furniture?.patches?.[index];
+  if (!patch || !recipe || patch.crop) return false;
+  const level = state.skills?.getLevel?.('farming') ?? 1;
+  if (level < recipe.level) return false;
+  const start = Number.isFinite(now) ? now : Date.now();
+  patch.crop = {
+    id: recipe.id,
+    startedAt: start,
+    endsAt: start + recipe.seconds * 1000,
+  };
+  return true;
+}
+
+/**
+ * Harvest a finished crop. Returns how many herbs landed.
+ * A full chest leaves the crop in the ground. A short stack grants what fits and clears it.
+ */
+export function harvestHerb(state, index, now = Date.now()) {
+  const patch = state.furniture?.patches?.[index];
+  const crop = patch?.crop;
+  if (!crop) return 0;
+  const when = Number.isFinite(now) ? now : Date.now();
+  if (when < crop.endsAt) return 0;
+  const recipe = GROW_BY_ID[crop.id];
+  if (!recipe) return 0;
+  const got = grantMaterial(state, recipe.product, HERB_GROW_YIELD);
+  if (got <= 0) return 0;
+  state.skills?.addXp('farming', recipe.xp);
+  patch.crop = null;
+  return got;
+}
+
 export function reducedSalePrice(listPrice) {
   return Math.max(1, Math.round((listPrice ?? 0) * SWAP_PRICE_RATIO));
 }
@@ -1120,7 +1220,8 @@ export function tickMaterials(state, dt) {
     const every = mat.regenEvery;
     if (mat.crafted || !every || every <= 0) continue;
     const cur = state.materials[mat.id] ?? 0;
-    if (cur >= MATERIAL_CAP) {
+    const cap = storageCap(state);
+    if (cur >= cap) {
       state.materialAcc[mat.id] = 0;
       continue;
     }
@@ -1128,7 +1229,7 @@ export function tickMaterials(state, dt) {
     const add = Math.floor(state.materialAcc[mat.id]);
     if (add <= 0) continue;
     state.materialAcc[mat.id] -= add;
-    state.materials[mat.id] = Math.min(MATERIAL_CAP, cur + add);
+    state.materials[mat.id] = Math.min(cap, cur + add);
   }
 }
 
@@ -1186,7 +1287,11 @@ function finishOneCraft(state, recipeId) {
   const recipe = RECIPES[recipeId];
   const n = craftedOutputCount(state, recipe);
   if (isMaterialCraft(recipe) && MATERIALS[recipe.outputMaterial]) {
-    state.materials[recipe.outputMaterial] = (state.materials[recipe.outputMaterial] ?? 0) + n;
+    const cur = state.materials[recipe.outputMaterial] ?? 0;
+    const room = Math.max(0, storageCap(state) - cur);
+    const add = Math.min(n, room);
+    if (add <= 0) return 0;
+    state.materials[recipe.outputMaterial] = cur + add;
   } else {
     addToChest(state, recipeId, n);
   }
@@ -1195,6 +1300,7 @@ function finishOneCraft(state, recipeId) {
   grantShopXp(state, recipeId);
   const skillId = skillForRecipe(recipe, stationForRecipe(recipe));
   if (skillId) state.skills?.addXp(skillId, xpForCraft(recipe));
+  return n;
 }
 
 export function completeCrafts(state, nowSeconds) {
@@ -1203,7 +1309,15 @@ export function completeCrafts(state, nowSeconds) {
     let craft = startCraftState;
     while (craft && nowSeconds - craft.startedAt >= craft.duration) {
       const finishAt = craft.startedAt + craft.duration;
-      finishOneCraft(state, recipeId);
+      const produced = finishOneCraft(state, recipeId);
+      if (produced === 0) {
+        const recipe = RECIPES[recipeId];
+        const remaining = Math.max(0, craft.left ?? 1);
+        if (remaining > 0 && recipe) refundCraftCost(state, recipe, remaining);
+        delete state.crafts[recipeId];
+        craft = null;
+        continue;
+      }
       finished.push(recipeId);
       const remaining = (craft.left ?? 1) - 1;
       if (remaining > 0) {
@@ -1337,7 +1451,7 @@ export function chestDisplayList(state, kind) {
 
 function grantMaterial(state, materialId, amount) {
   const cur = state.materials[materialId] ?? 0;
-  const add = Math.min(MATERIAL_CAP - cur, Math.max(0, Math.round(Number(amount) || 0)));
+  const add = Math.min(storageCap(state) - cur, Math.max(0, Math.round(Number(amount) || 0)));
   if (add <= 0) return 0;
   state.materials[materialId] = cur + add;
   return add;
@@ -1360,7 +1474,7 @@ export function miningBarAmount(state, materialId, amount = mineYield(materialId
   if (!isMinedMaterial(materialId)) return 0;
   const want = minedGrantAmount(state, materialId, amount);
   const have = Math.max(0, state?.materials?.[materialId] ?? 0);
-  return Math.min(want, Math.max(0, MATERIAL_CAP - have));
+  return Math.min(want, Math.max(0, storageCap(state) - have));
 }
 
 export function grantChoppedLogs(state, amount = CHOP_YIELD, materialId = 'logs') {
@@ -1535,6 +1649,11 @@ export function applyState(state, data) {
       }
     }
     migrateLegacyMetalBars(next, data);
+    if (typeof data.materials.herbs === 'number' && Number.isFinite(data.materials.herbs)) {
+      const extra = Math.max(0, Math.round(data.materials.herbs));
+      if (data.materials.guam == null) next.materials.guam = extra;
+      else next.materials.guam = (next.materials.guam ?? 0) + extra;
+    }
   }
   if (data.chest && typeof data.chest === 'object') {
     for (const [id, count] of Object.entries(data.chest)) {
@@ -1665,6 +1784,20 @@ export function applyState(state, data) {
       const rot = typeof saved.rot === 'number' && Number.isFinite(saved.rot) ? saved.rot : fallback.rot;
       return { x, z, rot };
     };
+    const readPatch = (pose) => {
+      const base = readPose(pose, { x: pose.x, z: pose.z, rot: FURNITURE_FORWARD });
+      const paid = pose.paid === false ? false : true;
+      let crop = null;
+      if (
+        pose.crop
+        && typeof pose.crop.id === 'string'
+        && Number.isFinite(pose.crop.startedAt)
+        && Number.isFinite(pose.crop.endsAt)
+      ) {
+        crop = { id: pose.crop.id, startedAt: pose.crop.startedAt, endsAt: pose.crop.endsAt };
+      }
+      return { ...base, paid, crop };
+    };
     next.furniture = {
       counter: readPose(data.furniture.counter, defaults.counter),
       anvil: readPose(data.furniture.anvil, defaults.anvil),
@@ -1712,7 +1845,7 @@ export function applyState(state, data) {
       patches: Array.isArray(data.furniture.patches)
         ? data.furniture.patches.filter((pose) => (
           pose && typeof pose.x === 'number' && typeof pose.z === 'number'
-        )).slice(0, FARMING_PATCH_CAP).map((pose) => readPose(pose, { x: pose.x, z: pose.z, rot: FURNITURE_FORWARD }))
+        )).slice(0, FARMING_PATCH_CAP).map((pose) => readPatch(pose))
         : [],
       displays: migrateStarterMannequins(next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {
@@ -1896,6 +2029,7 @@ function chestReadyIds(state) {
 export function canRestock(state, materialId) {
   const mat = MATERIALS[materialId];
   if (!mat || isCraftedMaterial(materialId) || mat.quest || !mat.restock || mat.restock <= 0) return false;
+  if (materialIsFull(state, materialId)) return false;
   return state.gold >= mat.restock;
 }
 
@@ -1903,7 +2037,10 @@ export function restock(state, materialId) {
   const mat = MATERIALS[materialId];
   if (!canRestock(state, materialId)) return false;
   state.gold -= mat.restock;
-  state.materials[materialId] += 1;
+  if (grantMaterial(state, materialId, 1) <= 0) {
+    state.gold += mat.restock;
+    return false;
+  }
   return true;
 }
 
@@ -1937,8 +2074,12 @@ export function sellToCustomer(state, recipeId, gold = RECIPES[recipeId]?.price 
 export function buyFromCustomer(state, materialId, price) {
   const mat = MATERIALS[materialId];
   if (!mat || isCraftedMaterial(materialId) || mat.quest || price < 0 || state.gold < price) return false;
+  if (materialIsFull(state, materialId)) return false;
   state.gold -= price;
-  state.materials[materialId] += 1;
+  if (grantMaterial(state, materialId, 1) <= 0) {
+    state.gold += price;
+    return false;
+  }
   return true;
 }
 

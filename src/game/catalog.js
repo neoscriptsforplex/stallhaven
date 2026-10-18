@@ -234,10 +234,10 @@ export const METALS = [
 ];
 
 export const DHIDE = [
-  { id: 'blue', name: 'Blue', tint: 0x2a4a8a },
+  { id: 'blue', name: 'Blue', tint: 0x5b8ee6 },
   { id: 'green', name: 'Green', tint: 0x2d6a32 },
   { id: 'red', name: 'Red', tint: 0x8a2424 },
-  { id: 'black', name: 'Black', tint: 0x1c1c1c },
+  { id: 'black', name: 'Black', tint: 0x6a6a72 },
 ];
 
 export const MAGIC_SETS = [
@@ -347,7 +347,13 @@ export const MATERIALS = {
   raspberry: { id: 'raspberry', name: 'Raspberry', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   chocolate: { id: 'chocolate', name: 'Chocolate', restock: 6, start: 2, tier: 1, regenEvery: regenEvery(1) },
   fish: { id: 'fish', name: 'Fish', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
-  herbs: { id: 'herbs', name: 'Herbs', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  guam: { id: 'guam', name: 'Guam', restock: 0, start: 8, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x1f6b1f },
+  marrentill: { id: 'marrentill', name: 'Marrentill', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x3a8a45 },
+  tarromin: { id: 'tarromin', name: 'Tarromin', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x6a9a3a },
+  harralander: { id: 'harralander', name: 'Harralander', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x8a6a28 },
+  ranarr: { id: 'ranarr', name: 'Ranarr', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0xc8d45a },
+  lantadyme: { id: 'lantadyme', name: 'Lantadyme', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x5a3a8a },
+  dwarf_weed: { id: 'dwarf_weed', name: 'Dwarf weed', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x2a4a28 },
   water: { id: 'water', name: 'Bucket of water', restock: 0, start: 12, tier: 1, regenEvery: 0, drawn: true },
   essence: { id: 'essence', name: 'Essence', restock: 0, start: 10, tier: 1, regenEvery: 0 },
   dwarven_plans: {
@@ -378,6 +384,10 @@ export const MATERIALS = {
     quest: true,
     tint: 0xe8a040,
   },
+  green_dhide: { id: 'green_dhide', name: 'Green Dragonhide', restock: 0, start: 0, tier: 4, regenEvery: 0, quest: true, tint: 0x2d6a32 },
+  blue_dhide: { id: 'blue_dhide', name: 'Blue Dragonhide', restock: 0, start: 0, tier: 5, regenEvery: 0, quest: true, tint: 0x5b8ee6 },
+  red_dhide: { id: 'red_dhide', name: 'Red Dragonhide', restock: 0, start: 0, tier: 6, regenEvery: 0, quest: true, tint: 0x8a2424 },
+  black_dhide: { id: 'black_dhide', name: 'Black Dragonhide', restock: 0, start: 0, tier: 7, regenEvery: 0, quest: true, tint: 0x6a6a72 },
 };
 
 METALS.forEach((metal, index) => {
@@ -626,9 +636,9 @@ const DHIDE_PIECES = [
 
 const DRAGON_MASKS = [
   { id: 'green', name: 'Green', tint: 0x2d6a32 },
-  { id: 'blue', name: 'Blue', tint: 0x2a4a8a },
+  { id: 'blue', name: 'Blue', tint: 0x5b8ee6 },
   { id: 'red', name: 'Red', tint: 0x8a2424 },
-  { id: 'black', name: 'Black', tint: 0x1c1c1c },
+  { id: 'black', name: 'Black', tint: 0x6a6a72 },
 ];
 
 DRAGON_MASKS.forEach((color, index) => {
@@ -648,7 +658,7 @@ DRAGON_MASKS.forEach((color, index) => {
     previousId,
     unlockNeed: unlockNeed(index),
     tier: index + 1,
-    cost: { materials: { hide: 1 }, gold: index * 2 },
+    cost: { materials: { [`${color.id}_dhide`]: 1 }, gold: index * 2 },
     time: 4 + index,
     price: tierSellPrice(index, { count: DRAGON_MASKS.length, weight: DHIDE_PIECE_WEIGHT.coif ?? 1 }),
     buyers: ['ranger'],
@@ -678,7 +688,7 @@ for (const piece of DHIDE_PIECES) {
       previousId,
       unlockNeed: unlockNeed(index),
       tier: index + 1,
-      cost: { materials: { hide: 1 }, gold: index * 2 },
+      cost: { materials: { [`${color.id}_dhide`]: 1 }, gold: index * 2 },
       time: 4 + index,
       price: tierSellPrice(index, { count: DHIDE.length, weight: DHIDE_PIECE_WEIGHT[piece.id] ?? 1 }),
       buyers: ['ranger'],
@@ -1059,7 +1069,8 @@ const FEAST_LINE = [
   { id: 'lobster', name: 'Lobster', mats: { fish: 1 }, tint: 0xc45a32, time: 5, price: 28 },
   { id: 'chocolate_cake', name: 'Chocolate Cake', mats: { flour: 1, egg: 1, chocolate: 1, water: 1 }, tint: 0x5a3220, time: 6, price: 38 },
   { id: 'monkfish', name: 'Monkfish', mats: { fish: 2 }, tint: 0xd8c8a0, time: 7, price: 50 },
-  { id: 'curry', name: 'Curry', mats: { fish: 1, herbs: 1 }, tint: 0xd48a28, time: 8, price: 64 },
+  // Harralander, not the starter Guam. Fish stays until the fishing change drops it.
+  { id: 'curry', name: 'Curry', mats: { fish: 1, harralander: 1 }, tint: 0xd48a28, time: 8, price: 64 },
   { id: 'shark', name: 'Shark', mats: { fish: 2 }, tint: 0x6a7a88, time: 9, price: 80 },
   { id: 'summer_pie', name: 'Summer Pie', mats: { flour: 1, pineapple: 1, raspberry: 1, egg: 1, water: 1 }, tint: 0xe8a04a, time: 10, price: 98 },
   { id: 'anglerfish', name: 'Anglerfish', mats: { fish: 3 }, tint: 0xc8a04a, time: 12, price: 120 },
@@ -1138,6 +1149,17 @@ const POTION_LINE = [
   { id: 'magic_potion', name: 'Magic Potion', tint: 0xf4c49a, buyers: ['hedgemage'], price: 16000 },
 ];
 
+const POTION_HERB = {
+  attack_potion: 'guam',
+  strength_potion: 'tarromin',
+  anti_poison_potion: 'marrentill',
+  energy_potion: 'harralander',
+  prayer_potion: 'ranarr',
+  antifire_potion: 'lantadyme',
+  ranging_potion: 'dwarf_weed',
+  magic_potion: 'lantadyme',
+};
+
 POTION_LINE.forEach((potion, index) => {
   const previousId = index === 0 ? null : POTION_LINE[index - 1].id;
   addRecipe({
@@ -1155,7 +1177,7 @@ POTION_LINE.forEach((potion, index) => {
     unlockNeed: index === 0 ? 0 : 5,
     tier: index + 1,
     cost: {
-      materials: { herbs: index >= 4 ? 2 : 1, water: 1 },
+      materials: { [POTION_HERB[potion.id]]: index >= 4 ? 2 : 1, water: 1 },
       gold: 0,
     },
     time: 4 + index,
@@ -1673,13 +1695,24 @@ export function chopTiming(materialId) {
   return { duration: CHOP_DURATION, yield: chopYield(materialId) };
 }
 
+/** Herbs picked from one finished patch. */
+export const HERB_GROW_YIELD = 3;
+
 /**
- * Timed grow recipes for a placed farming patch. Empty until herbs arrive.
- * Add a row here and it shows on the patch screen:
- *   { id, name, level, seconds, xp, cost: { materials }, product }
- * `xp` is Farming XP paid when the grow finishes.
+ * Timed grow recipes for a placed farming patch.
+ * `seconds` is wall-clock time. `xp` is Farming XP paid when the harvest lands.
  */
-export const GROW_RECIPES = Object.freeze([]);
+export const GROW_RECIPES = Object.freeze([
+  { id: 'grow_guam', name: 'Guam', level: 9, seconds: 30, xp: 11, product: 'guam' },
+  { id: 'grow_marrentill', name: 'Marrentill', level: 14, seconds: 40, xp: 15, product: 'marrentill' },
+  { id: 'grow_tarromin', name: 'Tarromin', level: 19, seconds: 50, xp: 18, product: 'tarromin' },
+  { id: 'grow_harralander', name: 'Harralander', level: 26, seconds: 60, xp: 24, product: 'harralander' },
+  { id: 'grow_ranarr', name: 'Ranarr', level: 32, seconds: 75, xp: 30, product: 'ranarr' },
+  { id: 'grow_lantadyme', name: 'Lantadyme', level: 73, seconds: 120, xp: 80, product: 'lantadyme' },
+  { id: 'grow_dwarf_weed', name: 'Dwarf weed', level: 79, seconds: 150, xp: 100, product: 'dwarf_weed' },
+]);
+
+export const GROW_BY_ID = Object.freeze(Object.fromEntries(GROW_RECIPES.map((row) => [row.id, row])));
 
 export function growRecipes() {
   return GROW_RECIPES;

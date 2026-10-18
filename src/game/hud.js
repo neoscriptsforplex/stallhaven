@@ -24,6 +24,9 @@ import {
   recipesForAltar,
   recipesForTab,
   growRecipes,
+  GROW_RECIPES,
+  GROW_BY_ID,
+  HERB_GROW_YIELD,
   SHELF_SLOT_LABELS,
   stationForRecipe,
   craftUiForStation,
@@ -101,6 +104,9 @@ import {
   sellToCustomer,
   shopProgress,
   maxCraftActions,
+  materialIsFull,
+  storageCap,
+  gatherFullMessage,
   busyCraftId,
   cancelCrafts,
   startCraft,
@@ -236,6 +242,7 @@ export function bindHud(root, state, world) {
   let craftSubtab = 'weapon';
   let craftSide = '';
   let craftStation = 'anvil';
+  let activePatchIndex = null;
   let craftFocusId = null;
   let tradeActor = null;
   let furnTarget = null;
@@ -409,9 +416,14 @@ export function bindHud(root, state, world) {
         const focus = recipe.id === craftFocusId ? ' is-focus' : '';
         const star = mastered ? '<span class="mastery-star" title="Mastered">★</span>' : '';
         const affordable = locked ? 0 : maxCraftActions(state, recipe.id);
+        const storageFull = !locked && Boolean(recipe.outputMaterial) && materialIsFull(state, recipe.outputMaterial);
+        const fullTitle = storageFull ? ' title="Storage full"' : '';
+        const fullActions = storageFull
+          ? `<button type="button" class="sf-full" data-storage-full="${escCraft(recipe.outputMaterial)}" title="Storage full">FULL</button><button type="button" class="sf-link" data-storage-upgrade>Upgrade chest</button>`
+          : '';
         return `
-          <article class="craft-row${locked ? ' is-locked' : ''}${focus}" data-craft-row="${recipe.id}">
-            <button type="button" class="craft${locked ? ' is-locked' : ''}${mastered ? ' is-mastered' : ''}${focus}" data-craft="${recipe.id}">
+          <article class="craft-row${locked ? ' is-locked' : ''}${storageFull ? ' is-full' : ''}${focus}" data-craft-row="${recipe.id}">
+            <button type="button" class="craft${locked ? ' is-locked' : ''}${mastered ? ' is-mastered' : ''}${focus}" data-craft="${recipe.id}"${storageFull ? ' disabled title="Storage full"' : ''}>
               <strong>${star}${recipe.name}</strong>
               <span class="meta">${lockText}</span>
               ${mats ? `<span class="craft-mats-line">${mats}</span>` : ''}
@@ -419,10 +431,11 @@ export function bindHud(root, state, world) {
               <span class="craft-bar" aria-hidden="true"><i data-bar="${recipe.id}"></i></span>
             </button>
             <div class="craft-qty">
-              <button type="button" data-craft-qty="1" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>1×</button>
-              <button type="button" data-craft-qty="5" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>5×</button>
-              <button type="button" data-craft-qty="max" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>Max</button>
+              <button type="button" data-craft-qty="1" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}${fullTitle}>1×</button>
+              <button type="button" data-craft-qty="5" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}${fullTitle}>5×</button>
+              <button type="button" data-craft-qty="max" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}${fullTitle}>Max</button>
             </div>
+            ${fullActions}
           </article>
         `;
       }).join('');
@@ -494,6 +507,71 @@ export function bindHud(root, state, world) {
     tabsEl.classList.toggle('has-tools', craftStation !== 'loom' && craftStation !== 'fletch');
   }
 
+  function paintHerbRows(container) {
+    if (!container) return;
+    const patch = state.furniture?.patches?.[activePatchIndex];
+    if (!patch) {
+      container.innerHTML = '<p class="empty">That patch is gone.</p>';
+      return;
+    }
+    const now = Date.now();
+    const crop = patch.crop;
+    const level = skillLevelOf(state, 'farming');
+    container.innerHTML = GROW_RECIPES.map((recipe) => {
+      const locked = level < recipe.level;
+      const growing = crop?.id === recipe.id;
+      const ready = growing && now >= crop.endsAt;
+      const busy = Boolean(crop) && !growing;
+      const full = materialIsFull(state, recipe.product);
+      const left = growing && !ready ? Math.max(1, Math.ceil((crop.endsAt - now) / 1000)) : 0;
+      const name = MATERIALS[recipe.product]?.name ?? recipe.name;
+      const meta = locked
+        ? `Requires level ${recipe.level} Farming`
+        : ready
+          ? `Ready · ${HERB_GROW_YIELD} ${name}`
+          : growing
+            ? 'Growing'
+            : busy
+              ? 'A crop is already growing'
+              : `Level ${recipe.level} · ${recipe.seconds}s · ${HERB_GROW_YIELD} ${name}`;
+      const disabled = locked || busy || (full && !growing);
+      const phase = ready ? 'ready' : growing ? 'grow' : 'plant';
+      const fullActions = full && !growing
+        ? `<button type="button" class="sf-full" data-storage-full="${escCraft(recipe.product)}" title="Storage full">FULL</button><button type="button" class="sf-link" data-storage-upgrade>Upgrade chest</button>`
+        : '';
+      return `
+        <article class="craft-row${locked || busy ? ' is-locked' : ''}${full && !growing ? ' is-full' : ''}" data-herb-row="${recipe.id}">
+          <button type="button" class="craft${ready ? ' is-ready' : ''}" data-herb="${recipe.id}" data-herb-phase="${phase}"${disabled ? ' disabled' : ''}${full && !growing ? ' title="Storage full"' : ''}>
+            <strong>${escCraft(ready ? `Harvest ${recipe.name}` : recipe.name)}</strong>
+            <span class="meta">${escCraft(meta)}</span>
+            <span class="timer" data-herb-left="${recipe.id}">${left ? `${left}s` : ''}</span>
+          </button>
+          ${fullActions}
+        </article>
+      `;
+    }).join('');
+  }
+
+  function paintHerbTimers() {
+    const patch = state.furniture?.patches?.[activePatchIndex];
+    if (!patch || !craftsEl) return;
+    const now = Date.now();
+    const crop = patch.crop;
+    let repaint = false;
+    for (const btn of craftsEl.querySelectorAll('[data-herb]')) {
+      const id = btn.dataset.herb;
+      const growing = crop?.id === id;
+      const ready = growing && now >= crop.endsAt;
+      const phase = ready ? 'ready' : growing ? 'grow' : 'plant';
+      if (btn.dataset.herbPhase !== phase) repaint = true;
+      const timer = craftsEl.querySelector(`[data-herb-left="${id}"]`);
+      if (timer && growing && !ready) {
+        timer.textContent = `${Math.max(1, Math.ceil((crop.endsAt - now) / 1000))}s`;
+      }
+    }
+    if (repaint) paintHerbRows(craftsEl);
+  }
+
   function paintCrafts() {
     const rangeMode = craftStation === 'range';
     const cauldronMode = craftStation === 'cauldron';
@@ -553,7 +631,7 @@ export function bindHud(root, state, world) {
                     : sawmillMode
                       ? 'Saw logs into planks. Finished planks stay in your materials.'
                       : patchMode
-                        ? 'Nothing to grow yet.'
+                        ? 'Plant a herb. It keeps growing while you are away, then harvest it for Farming XP.'
                       : altarMode
                       ? 'Bind rune essence into this element. Finished runes land in the chest.'
                       : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
@@ -567,6 +645,13 @@ export function bindHud(root, state, world) {
     }
     for (const btn of subtabsEl.querySelectorAll('[data-subtab]')) {
       btn.classList.toggle('is-on', btn.dataset.subtab === craftSubtab);
+    }
+    if (patchMode) {
+      paintSideTabs(new Map());
+      holdCraftScroll(craftsEl);
+      paintHerbRows(craftsEl);
+      queueCraftScrollFlush();
+      return;
     }
     const reveal = revealCraftFocus;
     revealCraftFocus = false;
@@ -742,6 +827,52 @@ export function bindHud(root, state, world) {
   }
 
   function onCraftClick(event) {
+    const full = event.target.closest('[data-storage-full]');
+    if (full) {
+      openStoragePop(full, full.dataset.storageFull);
+      return;
+    }
+    const upgrade = event.target.closest('[data-storage-upgrade]');
+    if (upgrade) {
+      closeStoragePop();
+      openUpgrade();
+      return;
+    }
+    const herbBtn = event.target.closest('[data-herb]');
+    if (herbBtn) {
+      const recipeId = herbBtn.dataset.herb;
+      const recipe = GROW_BY_ID[recipeId];
+      const index = activePatchIndex;
+      const patch = state.furniture?.patches?.[index];
+      if (!recipe || !patch) return;
+      const now = Date.now();
+      if (patch.crop?.id === recipeId && now >= patch.crop.endsAt) {
+        const got = intentBus.run({ type: 'harvestHerb', index });
+        const name = MATERIALS[recipe.product]?.name ?? recipe.name;
+        if (got > 0) {
+          pushLog(state, `Harvested ${got} ${name}.`);
+          playClick('ui');
+        } else if (state.furniture?.patches?.[index]?.crop) {
+          pushLog(state, gatherFullMessage(recipe.product));
+        }
+        paintHerbRows(craftsEl);
+        render(performance.now() / 1000);
+        return;
+      }
+      if (patch.crop) return;
+      if (skillLevelOf(state, 'farming') < recipe.level) {
+        pushLog(state, `You need a Farming level of ${recipe.level} to grow ${recipe.name}.`);
+        render(performance.now() / 1000);
+        return;
+      }
+      if (intentBus.run({ type: 'plantHerb', index, recipeId })) {
+        pushLog(state, `Planted ${recipe.name}.`);
+        playClick('ui');
+        paintHerbRows(craftsEl);
+      }
+      render(performance.now() / 1000);
+      return;
+    }
     const qty = event.target.closest('[data-craft-qty]');
     if (qty) {
       const recipeId = qty.dataset.craftFor;
@@ -918,6 +1049,7 @@ export function bindHud(root, state, world) {
     closeBuild();
     const recipe = options.focusId ? RECIPES[options.focusId] : null;
     craftStation = recipe ? stationForRecipe(recipe) : station;
+    activePatchIndex = craftStation === 'farming_patch' ? (options.patchIndex ?? activePatchIndex) : null;
     craftFocusId = options.focusId ?? null;
     const ui = craftUiForStation(craftStation, { tab: craftTab, subtab: craftSubtab }, recipe);
     craftTab = ui.tab;
@@ -984,7 +1116,40 @@ export function bindHud(root, state, world) {
     buyBtn.disabled = !canUpgradeChest(state);
   }
 
+  let storagePop = null;
+
+  function closeStoragePop() {
+    storagePop?.remove();
+    storagePop = null;
+  }
+
+  function openStoragePop(anchor, materialId) {
+    closeStoragePop();
+    if (!anchor) return;
+    const name = MATERIALS[materialId]?.name ?? 'Storage';
+    const have = Math.max(0, Math.round(Number(state.materials?.[materialId]) || 0));
+    const cap = storageCap(state);
+    const pop = document.createElement('div');
+    pop.className = 'sf-pop';
+    pop.innerHTML = `<p class="sf-pop-title"><b>${escCraft(name)}</b> <span>${formatGold(have)} / ${formatGold(cap)}</span></p>`
+      + '<p>Storage is full. Upgrade the chest to hold more.</p>'
+      + '<button type="button" class="sf-upgrade" data-storage-upgrade>Upgrade chest</button>'
+      + '<p class="sf-pop-meta">250 per chest level, up to 2,500.</p>';
+    document.body.appendChild(pop);
+    const rect = anchor.getBoundingClientRect();
+    const width = pop.offsetWidth || 270;
+    const height = pop.offsetHeight || 120;
+    const left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.left + rect.width / 2 - width / 2));
+    const top = Math.max(8, rect.top - height - 12);
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
+    const arrow = Math.min(width - 16, Math.max(16, rect.left + rect.width / 2 - left));
+    pop.style.setProperty('--arrow-x', `${arrow}px`);
+    storagePop = pop;
+  }
+
   function openUpgrade() {
+    closeStoragePop();
     closeChest();
     closeCraft();
     closeTrade();
@@ -1541,6 +1706,14 @@ export function bindHud(root, state, world) {
     closeDisplayPicker();
     closeBuild();
     closePlace(true);
+    if (target.id === 'farming_patch') {
+      if (!world.beginMovePatch?.(target.index)) return;
+      pendingPlace = { type: 'farming_patch', moving: true, index: target.index, cost: 0, note: '' };
+      openPlaceDock();
+      paintPlaceDock();
+      render(performance.now() / 1000);
+      return;
+    }
     world.beginMoveFurniture(target);
     render(performance.now() / 1000);
   }
@@ -1570,6 +1743,7 @@ export function bindHud(root, state, world) {
                     : target.id === 'display' && displayKind(target.index, state) === 'stand' ? 'Mannequin'
                       : target.id === 'display' && displayKind(target.index, state) === 'shelf' ? 'Shelf'
                         : target.id === 'display' ? 'Table'
+                        : target.id === 'farming_patch' ? 'Farming Patch'
                           : 'Display'
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
@@ -1609,7 +1783,11 @@ export function bindHud(root, state, world) {
     const canDelete = target.id === 'display'
       && (deleteKind === 'shelf' || deleteKind === 'table' || deleteKind === 'stand')
       && !state.displays[target.index]?.removed;
-    if (deleteBtn) deleteBtn.hidden = !canDelete;
+    if (deleteBtn) deleteBtn.hidden = !(canDelete || target.id === 'farming_patch');
+    const rotateBtn = furnMenu.querySelector('[data-furn-rotate]');
+    if (rotateBtn) rotateBtn.hidden = target.id === 'farming_patch';
+    const moveBtn = furnMenu.querySelector('[data-furn-move]');
+    if (moveBtn) moveBtn.textContent = target.id === 'farming_patch' ? 'Move' : 'Move Furniture';
     furnMenu.hidden = false;
     const x = Math.min(window.innerWidth - 230, Math.max(8, clientX ?? 24));
     const y = Math.min(window.innerHeight - 220, Math.max(8, clientY ?? 80));
@@ -1874,9 +2052,11 @@ export function bindHud(root, state, world) {
     const costEl = placeModal.querySelector('[data-place-cost]');
     const note = placeModal.querySelector('[data-place-note]');
     const label = stationLabel(pendingPlace.type);
-    if (title) title.textContent = `Place ${label}`;
+    if (title) title.textContent = pendingPlace.moving ? 'Move Farming Patch' : `Place ${label}`;
     if (blurb) {
-      blurb.textContent = pendingPlace.type === 'farming_patch'
+      blurb.textContent = pendingPlace.moving
+        ? 'Move the patch on open grass, clear of the path, buildings, and other patches. Nothing is spent. Cancel leaves the patch where it was.'
+        : pendingPlace.type === 'farming_patch'
         ? 'Place the patch on open grass, clear of the path and flower beds. Gold is spent only when you confirm.'
         : pendingPlace.type === 'portal'
         ? 'Move it on the grass or the floor snap grid, then confirm. Gold is spent only when you confirm placement. Double-click a highlighted cell to confirm.'
@@ -2024,6 +2204,17 @@ export function bindHud(root, state, world) {
     }
     const pose = check.pose;
     const pending = pendingPlace;
+    if (pending.moving && pending.type === 'farming_patch') {
+      if (!intentBus.run({ type: 'movePatch', index: pending.index, pose })) {
+        render(performance.now() / 1000);
+        return;
+      }
+      world.confirmPlaceUnlock();
+      closePlace();
+      pushLog(state, 'Moved the farming patch.');
+      render(performance.now() / 1000);
+      return;
+    }
     if (STATION_UNLOCKS.some((item) => item.id === pending.type)) {
       const cost = stationCost(pending.type);
       const block = stationPlaceBlock(state, pending.type);
@@ -2124,6 +2315,26 @@ export function bindHud(root, state, world) {
   furnMenu.querySelector('[data-furn-delete]')?.addEventListener('click', () => {
     const target = furnTarget;
     hideFurnMenu();
+    if (target?.id === 'farming_patch') {
+      const patch = state.furniture?.patches?.[target.index];
+      if (!patch) return;
+      const growing = patch.crop ? ' Anything growing is lost.' : '';
+      const pay = patch.paid === false
+        ? ' This free patch can be placed again at no cost.'
+        : ' Gold, nails, and planks are refunded.';
+      if (!window.confirm(`Delete this farming patch?${growing}${pay}`)) return;
+      const before = state.gold;
+      if (!intentBus.run({ type: 'removePatch', index: target.index })) return;
+      playClick('ui');
+      const refunded = state.gold - before;
+      pushLog(state, patch.paid === false
+        ? 'Removed the farming patch. It can be placed again for free.'
+        : `Removed the farming patch. Refunded ${formatGold(refunded)} gp plus the nails and planks.`);
+      world.refreshFurniture?.();
+      paintBuild();
+      render(performance.now() / 1000);
+      return;
+    }
     if (target?.id !== 'display') return;
     if (!intentBus.run({ type: 'removeFurniture', index: target.index })) return;
     playClick('ui');
@@ -2745,7 +2956,7 @@ export function bindHud(root, state, world) {
     if (event.type === 'fletch') openCraft('fletch');
     if (event.type === 'potter') openCraft('potter');
     if (event.type === 'sawmill') openCraft('sawmill');
-    if (event.type === 'farming_patch') openCraft('farming_patch');
+    if (event.type === 'farming_patch') openCraft('farming_patch', { patchIndex: event.patchIndex });
     if (event.type === 'gather-block') {
       showGameToast(event.text);
       render(performance.now() / 1000);
@@ -2907,6 +3118,13 @@ export function bindHud(root, state, world) {
   });
 
   document.addEventListener('click', (event) => {
+    const popUpgrade = event.target.closest('.sf-pop [data-storage-upgrade]');
+    if (popUpgrade) {
+      closeStoragePop();
+      openUpgrade();
+      return;
+    }
+    if (storagePop && !event.target.closest('.sf-pop, [data-storage-full]')) closeStoragePop();
     const btn = event.target.closest('button');
     if (!btn) return;
     if (
@@ -2935,8 +3153,18 @@ export function bindHud(root, state, world) {
       const progress = craftProgress(state, recipe.id, now);
       const locked = !isUnlocked(state, recipe.id);
       const affordable = maxCraftActions(state, recipe.id);
+      const storageFull = !locked && Boolean(recipe.outputMaterial) && materialIsFull(state, recipe.outputMaterial);
       btn.classList.toggle('is-locked', locked);
       row?.classList.toggle('is-locked', locked);
+      row?.classList.toggle('is-full', storageFull);
+      if (storageFull) {
+        btn.disabled = true;
+        btn.title = 'Storage full';
+      } else if (btn.title === 'Storage full') {
+        btn.disabled = false;
+        btn.removeAttribute('title');
+      }
+      if (row) syncStorageFullActions(row, recipe, storageFull);
       if (progress) {
         btn.classList.add('is-busy');
         const batch = progress.total > 1 ? `${progress.done + 1}/${progress.total} · ` : '';
@@ -2949,6 +3177,8 @@ export function bindHud(root, state, world) {
       }
       for (const qty of row?.querySelectorAll('[data-craft-qty]') ?? []) {
         qty.disabled = locked || affordable < 1;
+        if (storageFull) qty.title = 'Storage full';
+        else if (qty.title === 'Storage full') qty.removeAttribute('title');
       }
     }
   }
@@ -3020,7 +3250,8 @@ export function bindHud(root, state, world) {
       lastUnlockKey = unlockKey;
       if (!craftModal.hidden || !potionModal.hidden) paintCrafts();
     }
-    if (!craftModal.hidden) paintBusy(craftsEl, currentRecipes(), now);
+    if (!craftModal.hidden && craftStation === 'farming_patch') paintHerbTimers();
+    if (!craftModal.hidden && craftStation !== 'farming_patch') paintBusy(craftsEl, currentRecipes(), now);
     if (!potionModal.hidden) paintBusy(potionCraftsEl, recipesForTab('potion'), now);
     const busyId = Object.keys(state.crafts ?? {})[0];
     const cancelBtns = [
@@ -3151,11 +3382,40 @@ export function bindHud(root, state, world) {
 
   function syncOwnedMaterials() {
     if (!ownedMaterialsEl) return;
-    const key = ownedMaterialsKey(state.materials);
+    const key = `${ownedMaterialsKey(state.materials)}@${storageCap(state)}`;
     if (key === ownedKey) return;
     ownedKey = key;
-    ownedMaterialsEl.innerHTML = materialsDrawerHtml(state.materials);
+    ownedMaterialsEl.innerHTML = materialsDrawerHtml(state.materials, storageCap(state));
   }
+
+  function syncStorageFullActions(row, recipe, storageFull) {
+    const existing = row.querySelector('[data-storage-full]');
+    const link = row.querySelector('.sf-link[data-storage-upgrade]');
+    if (!storageFull) {
+      existing?.remove();
+      link?.remove();
+      return;
+    }
+    if (existing) return;
+    const fullBtn = document.createElement('button');
+    fullBtn.type = 'button';
+    fullBtn.className = 'sf-full';
+    fullBtn.dataset.storageFull = recipe.outputMaterial;
+    fullBtn.title = 'Storage full';
+    fullBtn.textContent = 'FULL';
+    const upgradeBtn = document.createElement('button');
+    upgradeBtn.type = 'button';
+    upgradeBtn.className = 'sf-link';
+    upgradeBtn.dataset.storageUpgrade = '';
+    upgradeBtn.textContent = 'Upgrade chest';
+    row.append(fullBtn, upgradeBtn);
+  }
+
+  ownedMaterialsEl?.addEventListener('click', (event) => {
+    const full = event.target.closest('[data-storage-full]');
+    if (!full) return;
+    openStoragePop(full, full.dataset.storageFull);
+  });
 
   function materialsObstacles() {
     const nodes = [

@@ -217,7 +217,8 @@ describe('stall economy', () => {
     assert.equal(CUSTOMERS.pilgrim.offer, null);
     assert.equal(state.materials.logs, 0);
     assert.equal(state.materials.hide, 8);
-    assert.equal(state.materials.herbs, 8);
+    assert.equal(state.materials.guam, 8);
+    assert.equal(state.materials.herbs, undefined);
     assert.equal(state.materials.water, 12);
     assert.equal(state.materials.essence, 10);
     assert.equal(state.materials.string, undefined);
@@ -463,7 +464,8 @@ describe('save and load', () => {
     assert.equal(state.materials.bronze_bar, 4);
     assert.equal(state.materials.bow_string, 0);
     assert.equal(state.materials.string, undefined);
-    assert.equal(state.materials.herbs, 8);
+    assert.equal(state.materials.guam, 8);
+    assert.equal(state.materials.herbs, undefined);
     assert.equal(state.materials.water, 12);
     assert.equal(state.materials.flour, 2);
     assert.equal(state.materials.wheat, 0);
@@ -1442,7 +1444,7 @@ describe('cauldron unlock', () => {
     assert.equal(canCraft(state, 'attack_potion'), true);
     finishCraft(state, 'attack_potion');
     assert.equal(state.chest.attack_potion, 1);
-    assert.equal(state.materials.herbs, 7);
+    assert.equal(state.materials.guam, 7);
     assert.equal(state.materials.water, 11);
     state.craftCounts.attack_potion = 5;
     assert.equal(isUnlocked(state, 'strength_potion'), false);
@@ -2710,6 +2712,7 @@ describe('anvil nails', () => {
     assert.equal(state.materials.bronze_bar, 0);
     assert.equal(state.materials.bronze_nails, NAIL_BATCH);
     assert.equal(state.chest.bronze_nails, undefined);
+    state.chestLevel = 2;
     state.materials.bronze_bar = 20;
     for (let i = 0; i < 18; i += 1) finishCraft(state, 'bronze_nails', i + 1);
     assert.equal(isUnlocked(state, 'iron_nails'), false);

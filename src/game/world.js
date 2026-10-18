@@ -3525,6 +3525,8 @@ export function createWorld(canvas, state, opts = {}) {
     dungeon.grounds.visible = true;
     applySkyColor(scene, skyIdForScene('dungeon', state.skybox));
     syncLighting('dungeon');
+    // Co-op: tell the room where we arrived (after the teleport below).
+    queueMicrotask(() => localMoveListener?.({ x: shopkeeper.position.x, z: shopkeeper.position.z, scene: sceneMode }));
     shopkeeper.userData.groundY = OUTDOOR_GROUND_Y;
     shopkeeper.position.set(-4.15, OUTDOOR_GROUND_Y, 0.4);
     shopkeeper.rotation.y = Math.PI / 2;
@@ -3544,6 +3546,8 @@ export function createWorld(canvas, state, opts = {}) {
     setShopLayerVisible(true);
     applySkyColor(scene, skyIdForScene('shop', state.skybox));
     syncLighting('shop');
+    // Co-op: tell the room where we arrived (after the teleport below).
+    queueMicrotask(() => localMoveListener?.({ x: shopkeeper.position.x, z: shopkeeper.position.z, scene: sceneMode }));
     shopkeeper.userData.groundY = characterGroundY(shopReturnPos.x, shopReturnPos.z, state.expansions ?? []);
     shopkeeper.position.set(shopReturnPos.x, shopkeeper.userData.groundY, shopReturnPos.z);
     shopkeeper.rotation.y = Math.PI;
@@ -3600,6 +3604,8 @@ export function createWorld(canvas, state, opts = {}) {
     runeField.grounds.visible = true;
     applySkyColor(scene, skyIdForScene('runefield', state.skybox));
     syncLighting('runefield');
+    // Co-op: tell the room where we arrived (after the teleport below).
+    queueMicrotask(() => localMoveListener?.({ x: shopkeeper.position.x, z: shopkeeper.position.z, scene: sceneMode }));
     shopkeeper.userData.groundY = OUTDOOR_GROUND_Y;
     shopkeeper.position.set(RUNE_FIELD_ARRIVE.x, OUTDOOR_GROUND_Y, RUNE_FIELD_ARRIVE.z);
     shopkeeper.rotation.y = Math.PI;
@@ -3620,6 +3626,8 @@ export function createWorld(canvas, state, opts = {}) {
     setShopLayerVisible(true);
     applySkyColor(scene, skyIdForScene('shop', state.skybox));
     syncLighting('shop');
+    // Co-op: tell the room where we arrived (after the teleport below).
+    queueMicrotask(() => localMoveListener?.({ x: shopkeeper.position.x, z: shopkeeper.position.z, scene: sceneMode }));
     const portal = state.furniture?.portal;
     const stand = portal ? standBesidePortal(portal) : { x: shopReturnPos.x, z: shopReturnPos.z };
     shopkeeper.userData.groundY = characterGroundY(stand.x, stand.z, state.expansions ?? []);

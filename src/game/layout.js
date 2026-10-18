@@ -114,6 +114,57 @@ export const FURNITURE_SHOP = [
   { type: 'mannequin', kind: 'stand', label: 'Mannequin' },
   { type: 'shelf', kind: 'shelf', label: 'Shelf' },
 ];
+
+/**
+ * Nails and planks for one new build-menu placement.
+ * Future furniture: add a key (the build-menu id) with `nails` and `planks`.
+ * Buy and place read this table, so that row is the whole material cost.
+ *
+ * Tiers follow the gold price already on the piece, then how built it is when
+ * the gold matches. Tables, shelves, and mannequins share the 500g curve, so
+ * the table stays on plain planks and bronze, the shelf steps up to oak and
+ * iron, and the mannequin steps up to willow and steel. The 50,000g stations
+ * share mithril and maple. The wheel, portal, and cauldron keep climbing.
+ *
+ * Furnace, cooking range, and sawmill are absent on purpose. The furnace
+ * smelts bars, the sawmill saws planks, and both starters are free to place.
+ * Shop expansions are rooms and stay gold-only.
+ *
+ * A gold cost of 0 (included shelf, or a free replacement of a piece the
+ * player already owned) does not spend the row. Loading a save never does.
+ */
+function buildMaterialRow(nailId, nails, plankId, planks) {
+  return Object.freeze({
+    nails: Object.freeze({ id: nailId, count: nails }),
+    planks: Object.freeze({ id: plankId, count: planks }),
+  });
+}
+
+export const FURNITURE_BUILD_COSTS = Object.freeze({
+  table: buildMaterialRow('bronze_nails', 8, 'plank', 4),
+  shelf: buildMaterialRow('iron_nails', 10, 'oak_plank', 3),
+  mannequin: buildMaterialRow('steel_nails', 12, 'willow_plank', 2),
+  loom: buildMaterialRow('mithril_nails', 15, 'maple_plank', 4),
+  fletch: buildMaterialRow('mithril_nails', 15, 'maple_plank', 4),
+  potter: buildMaterialRow('mithril_nails', 15, 'maple_plank', 4),
+  wheel: buildMaterialRow('adamant_nails', 20, 'yew_plank', 4),
+  portal: buildMaterialRow('runite_nails', 25, 'magic_plank', 6),
+  cauldron: buildMaterialRow('dragon_nails', 30, 'magic_plank', 8),
+});
+
+/** Material parts for a build-menu id. Empty when that piece spends no stock. */
+export function furnitureBuildParts(id) {
+  const row = FURNITURE_BUILD_COSTS[id];
+  if (!row) return [];
+  const parts = [];
+  if (row.nails?.id && row.nails.count > 0) {
+    parts.push({ id: row.nails.id, count: row.nails.count, kind: 'nails' });
+  }
+  if (row.planks?.id && row.planks.count > 0) {
+    parts.push({ id: row.planks.id, count: row.planks.count, kind: 'planks' });
+  }
+  return parts;
+}
 /** How far a wall shelf sits past the walk-floor edge, toward the wall. */
 export const SHELF_WALL_OUTSET = 0.04;
 /**

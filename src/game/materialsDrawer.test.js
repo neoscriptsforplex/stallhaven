@@ -61,6 +61,14 @@ describe('materials drawer', () => {
     assert.match(html, new RegExp(`background:${tintHex(materialTint(MATERIALS.essence))}`));
     assert.equal(tintHex(materialTint(MATERIALS.bronze_bar)), tintHex(METALS[0].tint));
     assert.equal(materialsDrawerHtml({ flax: 0 }), '<p class="materials-empty">No materials yet.</p>');
+    assert.equal(materialsDrawerHtml({ bronze_nails: 0, dragon_nails: 0 }).includes('Nails'), false);
+    const nails = materialsDrawerHtml({ bronze_nails: 15, dragon_nails: 2 });
+    assert.match(nails, /data-owned="bronze_nails"/);
+    assert.match(nails, /Bronze Nails/);
+    assert.match(nails, /×15/);
+    assert.match(nails, /data-owned="dragon_nails"/);
+    assert.match(nails, /Dragon Nails/);
+    assert.match(nails, new RegExp(`background:${tintHex(MATERIALS.bronze_nails.tint)}`));
   });
 
   it('sits the side drawer under the top-left HUD and above the bottom bar', () => {

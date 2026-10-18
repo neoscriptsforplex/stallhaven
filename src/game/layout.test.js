@@ -5,7 +5,10 @@ import {
   WHEEL_COST,
   FURNACE_COST,
   RANGE_COST,
+  FURNITURE_BUILD_COSTS,
   FURNITURE_SHOP,
+  STATION_UNLOCKS,
+  furnitureBuildParts,
   TREE_BED_CLEAR,
   furnaceBesideAnvil,
   poseRect,
@@ -101,7 +104,7 @@ import {
   ALTAR_OSRS_SCALE,
 } from './layout.js';
 import { FLOOR, gardenObstacles, isWalkable, shopObstacles } from './nav.js';
-import { SHOP } from './catalog.js';
+import { MATERIALS, SHOP } from './catalog.js';
 
 describe('layout numbers', () => {
   it('gives five pads around the origin: three behind, one either side', () => {
@@ -765,6 +768,53 @@ describe('rune field', () => {
     assert.ok(rocks.length >= 12);
     for (const spot of [...trees, ...rocks]) {
       assert.equal(runeFieldClearOf(spot), true);
+    }
+  });
+});
+
+describe('furniture build costs', () => {
+  it('charges every shop furniture piece and the paid stations from one table', () => {
+    for (const item of FURNITURE_SHOP) {
+      const parts = furnitureBuildParts(item.type);
+      assert.equal(parts.filter((part) => part.kind === 'nails').length, 1, item.type);
+      assert.equal(parts.filter((part) => part.kind === 'planks').length, 1, item.type);
+    }
+    for (const id of ['furnace', 'range', 'sawmill']) {
+      assert.deepEqual(furnitureBuildParts(id), [], id);
+    }
+    for (const station of STATION_UNLOCKS) {
+      if (station.cost === 0 || station.id === 'sawmill') continue;
+      const parts = furnitureBuildParts(station.id);
+      assert.equal(parts.length, 2, station.id);
+    }
+    const order = ['table', 'shelf', 'mannequin', 'loom', 'fletch', 'potter', 'wheel', 'portal', 'cauldron'];
+    const nailTier = {
+      bronze_nails: 1,
+      iron_nails: 2,
+      steel_nails: 3,
+      mithril_nails: 4,
+      adamant_nails: 5,
+      runite_nails: 6,
+      dragon_nails: 7,
+    };
+    const plankTier = {
+      plank: 1,
+      oak_plank: 2,
+      willow_plank: 3,
+      maple_plank: 4,
+      yew_plank: 5,
+      magic_plank: 6,
+    };
+    let lastNail = 0;
+    let lastPlank = 0;
+    for (const id of order) {
+      const row = FURNITURE_BUILD_COSTS[id];
+      assert.ok(MATERIALS[row.nails.id], row.nails.id);
+      assert.ok(MATERIALS[row.planks.id], row.planks.id);
+      assert.ok(nailTier[row.nails.id] >= lastNail, id);
+      assert.ok(plankTier[row.planks.id] >= lastPlank, id);
+      lastNail = nailTier[row.nails.id];
+      lastPlank = plankTier[row.planks.id];
     }
   });
 });

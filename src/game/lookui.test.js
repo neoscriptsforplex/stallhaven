@@ -125,8 +125,8 @@ describe('player look UI', () => {
     const cauldron = build.slice(build.indexOf('Cauldron'), build.indexOf('Portal'));
     assert.equal((wheel.match(/Place it on the floor snap grid/g) ?? []).length, 1);
     assert.equal((cauldron.match(/Place it on the floor snap grid/g) ?? []).length, 1);
-    assert.match(wheel, /data-wheel-status class="meta">Costs 100,000 gp\.</);
-    assert.match(cauldron, /data-cauldron-status class="meta">Costs 1,000,000 gp\.</);
+    assert.match(wheel, /data-wheel-status class="meta">Costs 100,000 gp\. Adamant Nails ×20 · Yew Plank ×4\.</);
+    assert.match(cauldron, /data-cauldron-status class="meta">Costs 1,000,000 gp\. Dragon Nails ×30 · Magic Plank ×8\.</);
     const portal = build.slice(build.indexOf('<h3>Portal</h3>'), build.indexOf('<h3>Table</h3>'));
     assert.match(portal, /data-portal-status class="meta">Costs 500,000 gp\./);
     assert.match(portal, /data-portal-buy>Buy · 500,000 gp</);

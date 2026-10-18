@@ -54,6 +54,7 @@ import {
   defaultAppearance,
   TIER_SELL,
   craftUiForStation,
+  NAIL_BATCH,
 } from './catalog.js';
 import {
   applyState,
@@ -64,6 +65,7 @@ import {
   ownsStation,
   buyExpansion,
   buyFromCustomer,
+  buildMaterialLabel,
   buyFurniture,
   buyFurnace,
   buyRange,
@@ -108,6 +110,7 @@ import {
   placeFromChest,
   clearDisplay,
   placeOnDisplay,
+  furniturePlaceBlock,
   nextFurnitureCost,
   removePlacedFurniture,
   reducedSalePrice,
@@ -126,7 +129,14 @@ import {
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
-import { defaultFurniture, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
+import { defaultFurniture, furnitureBuildParts, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
+
+function giveBuildMats(state, id, times = 1) {
+  const n = Math.max(1, times);
+  for (const part of furnitureBuildParts(id)) {
+    state.materials[part.id] = (state.materials[part.id] ?? 0) + part.count * n;
+  }
+}
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS, flaxInspect, treeInspect } from './shopbuild.js';
 import { xpForLevel } from './skills.js';
@@ -650,7 +660,7 @@ describe('catalog', () => {
     assert.equal(recipes.filter((r) => r.combatClass === 'range' && r.category === 'weapon').length, 27);
     assert.equal(recipes.filter((r) => r.category === 'ammo').length, 8);
     assert.equal(recipes.filter((r) => r.category === 'rune').length, 4);
-    assert.equal(recipes.filter((r) => r.combatClass === 'tools').length, 14);
+    assert.equal(recipes.filter((r) => r.combatClass === 'tools').length, 21);
     assert.equal(recipes.filter((r) => /d'hide/i.test(r.name)).length, 16);
     assert.deepEqual(DHIDE.map((color) => color.id), ['blue', 'green', 'red', 'black']);
     assert.equal(RECIPES.green_dragon_mask.name, 'Green Dragon Mask');
@@ -864,8 +874,10 @@ describe('catalog', () => {
     assert.deepEqual(RECIPES.pot_of_flour.buyers, []);
     assert.equal(recipeCost(RECIPES.bread).materials.egg, 1);
     assert.equal(recipeCost(RECIPES.bread).materials.water, 1);
-    assert.equal(recipeCost(RECIPES.pizza).materials.egg, undefined);
-    assert.equal(recipeCost(RECIPES.pizza).materials.water, undefined);
+    assert.equal(recipeCost(RECIPES.pizza).materials.flour, 1);
+    assert.equal(recipeCost(RECIPES.pizza).materials.pineapple, 1);
+    assert.equal(recipeCost(RECIPES.pizza).materials.egg, 1);
+    assert.equal(recipeCost(RECIPES.pizza).materials.water, 1);
     assert.equal(recipeCost(RECIPES.cake).materials.water, 1);
     assert.equal(recipeCost(RECIPES.pie).materials.egg, 1);
     assert.equal(recipeCost(RECIPES.fish_pie).materials.water, 1);
@@ -878,9 +890,11 @@ describe('catalog', () => {
     const tools = recipesForTab('tools');
     const hatchets = recipesForTab('tools', 'hatchet');
     const pickaxes = recipesForTab('tools', 'pickaxe');
+    const nails = recipesForTab('tools', 'nails');
     assert.equal(hatchets.length, 7);
     assert.equal(pickaxes.length, 7);
-    assert.equal(hatchets.length + pickaxes.length, tools.length);
+    assert.equal(nails.length, 7);
+    assert.equal(hatchets.length + pickaxes.length + nails.length, tools.length);
     assert.ok(hatchets.every((r) => r.category === 'hatchet'));
     assert.ok(pickaxes.every((r) => r.category === 'pickaxe'));
     assert.equal(RECIPES.strength_potion.name, 'Strength Potion');
@@ -1208,8 +1222,12 @@ describe('cauldron unlock', () => {
     assert.equal(ownsCauldron(state), false);
     assert.equal(canBuyCauldron(state), false);
     state.gold = CAULDRON_COST;
+    assert.equal(canBuyCauldron(state), false);
+    giveBuildMats(state, 'cauldron');
     assert.equal(canBuyCauldron(state), true);
     assert.equal(buyCauldron(state, { x: 1.2, z: 0.8, rot: 0 }), true);
+    assert.equal(state.materials.dragon_nails, 0);
+    assert.equal(state.materials.magic_plank, 0);
     assert.equal(state.gold, 0);
     assert.equal(ownsCauldron(state), true);
     assert.equal(state.furniture.cauldron.x, 1.2);
@@ -1235,6 +1253,7 @@ describe('cauldron unlock', () => {
     assert.equal(canCraft(state, 'attack_potion'), false);
     assert.equal(isUnlocked(state, 'strength_potion'), false);
     state.gold = CAULDRON_COST;
+    giveBuildMats(state, 'cauldron');
     buyCauldron(state, { x: 0, z: 0.8, rot: 0 });
     assert.equal(isUnlocked(state, 'attack_potion'), true);
     assert.equal(isUnlocked(state, 'strength_potion'), false);
@@ -1346,6 +1365,8 @@ describe('furnace and spinning wheel', () => {
     assert.equal(ownsWheel(state), false);
     assert.match(craftBlockReason(state, 'spin_bow_string'), /spinning wheel/i);
     state.gold = WHEEL_COST;
+    assert.equal(canBuyWheel(state), false);
+    giveBuildMats(state, 'wheel');
     assert.equal(canBuyWheel(state), true);
     assert.equal(buyWheel(state, { x: 1.1, z: 0.4, rot: 0 }), true);
     assert.equal(state.gold, 0);
@@ -1394,6 +1415,9 @@ describe('build furniture', () => {
     const starterStands = SHOP.displays.filter((d) => d.kind === 'stand').length;
     assert.equal(canBuyFurniture(state, 'table'), false);
     state.gold = 500;
+    assert.equal(canBuyFurniture(state, 'table'), false);
+    giveBuildMats(state, 'table', 2);
+    giveBuildMats(state, 'mannequin', 2);
     assert.equal(canBuyFurniture(state, 'table'), true);
     assert.equal(buyFurniture(state, 'table', { x: 0.4, z: 0.2, rot: 0 }), true);
     assert.equal(state.gold, 0);
@@ -1436,6 +1460,8 @@ describe('build furniture', () => {
     assert.equal(state.boughtFurniture.shelf, 0);
     assert.equal(canBuyFurniture(state, 'shelf'), false);
     state.gold = 500;
+    assert.equal(canBuyFurniture(state, 'shelf'), false);
+    giveBuildMats(state, 'shelf', 2);
     assert.equal(canBuyFurniture(state, 'shelf'), true);
     assert.equal(buyFurniture(state, 'shelf', { x: 0, z: -3.11, rot: 0 }), true);
     assert.equal(state.gold, 0);
@@ -1467,8 +1493,14 @@ describe('build furniture', () => {
     assert.equal(state.boughtFurniture.shelf, 0);
     assert.equal(state.displays.at(-1).bought, false);
     assert.equal(nextFurnitureCost(state, 'shelf'), 500);
+    assert.equal(state.materials.iron_nails, 0);
+    assert.equal(state.materials.oak_plank, 0);
     state.gold = 500;
+    assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.11, rot: 0 }), false);
+    giveBuildMats(state, 'shelf');
     assert.equal(buyFurniture(state, 'shelf', { x: 1.2, z: -3.11, rot: 0 }), true);
+    assert.equal(state.materials.iron_nails, 0);
+    assert.equal(state.materials.oak_plank, 0);
     assert.equal(state.gold, 0);
     assert.equal(state.boughtFurniture.shelf, 1);
     const extraIndex = state.displays.length - 1;
@@ -1511,7 +1543,10 @@ describe('build furniture', () => {
     assert.equal(state.boughtFurniture.mannequin, 0);
     assert.equal(state.boughtFurniture.shelf, 0);
     assert.equal(state.displays.length, SHOP.displays.length);
+    giveBuildMats(state, 'table');
     assert.equal(buyFurniture(state, 'table', { x: 0, z: 0.8, rot: 0 }), true);
+    assert.equal(state.materials.bronze_nails, 0);
+    assert.equal(state.materials.plank, 0);
     assert.equal(state.gold, 0);
     assert.equal(state.boughtFurniture.table, 1);
   });
@@ -2351,6 +2386,8 @@ describe('portal unlock', () => {
     assert.equal(buyStation(state, 'portal', { x: -11.2, z: 4.2, rot: 0 }), false);
     assert.equal(ownsStation(state, 'portal'), false);
     state.gold = PORTAL_COST;
+    assert.equal(canBuyStation(state, 'portal'), false);
+    giveBuildMats(state, 'portal');
     assert.equal(canBuyStation(state, 'portal'), true);
     assert.equal(buyStation(state, 'portal', { x: -11.2, z: 4.2, rot: 0 }), true);
     assert.equal(state.gold, 0);
@@ -2364,6 +2401,96 @@ describe('portal unlock', () => {
     assert.equal(applyState(next, saved), true);
     assert.equal(ownsStation(next, 'portal'), true);
     assert.equal(next.furniture.portal.z, 4.2);
+  });
+});
+
+describe('anvil nails', () => {
+  it('smiths one bar into the same batch of nails for every metal', () => {
+    const nails = recipesForTab('tools', 'nails');
+    assert.deepEqual(nails.map((recipe) => recipe.id), METALS.map((metal) => `${metal.id}_nails`));
+    assert.equal(RECIPES.bronze_nails.name, 'Bronze Nails');
+    assert.equal(RECIPES.runite_nails.name, 'Rune Nails');
+    assert.equal(RECIPES.dragon_nails.name, 'Dragon Nails');
+    assert.equal(anvilTabForRecipe(RECIPES.bronze_nails), 'tools');
+    assert.equal(anvilSubtabForRecipe(RECIPES.mithril_nails), 'nails');
+    assert.equal(stationForRecipe(RECIPES.steel_nails), 'anvil');
+    assert.equal(NAIL_BATCH, 15);
+    for (const metal of METALS) {
+      const recipe = RECIPES[`${metal.id}_nails`];
+      assert.equal(recipe.outputCount, NAIL_BATCH, metal.id);
+      assert.equal(recipe.outputMaterial, `${metal.id}_nails`, metal.id);
+      assert.equal(recipeCost(recipe).materials[`${metal.id}_bar`], 1, metal.id);
+      assert.equal(MATERIALS[`${metal.id}_nails`].name, `${metal.name} Nails`, metal.id);
+      assert.equal(MATERIALS[`${metal.id}_nails`].tint, metal.tint, metal.id);
+      assert.equal(MATERIALS[`${metal.id}_nails`].start, 0, metal.id);
+    }
+    const state = createState();
+    assert.equal(isUnlocked(state, 'bronze_nails'), true);
+    assert.equal(isUnlocked(state, 'iron_nails'), false);
+    assert.equal(canDisplayOn('table', RECIPES.bronze_nails), false);
+    state.materials.bronze_bar = 1;
+    finishCraft(state, 'bronze_nails');
+    assert.equal(state.materials.bronze_bar, 0);
+    assert.equal(state.materials.bronze_nails, NAIL_BATCH);
+    assert.equal(state.chest.bronze_nails, undefined);
+    state.materials.bronze_bar = 20;
+    for (let i = 0; i < 18; i += 1) finishCraft(state, 'bronze_nails', i + 1);
+    assert.equal(isUnlocked(state, 'iron_nails'), false);
+    finishCraft(state, 'bronze_nails', 30);
+    assert.equal(isUnlocked(state, 'iron_nails'), true);
+    assert.match(costLabel(RECIPES.bronze_nails), /Bronze Bar ×1/);
+    assert.match(costLabel(RECIPES.bronze_nails), /makes 15/);
+  });
+});
+
+describe('furniture nails and planks', () => {
+  it('keeps placed and owned furniture when an old save has no nails', () => {
+    const state = createState();
+    state.gold = 80;
+    state.materials.logs = 4;
+    const saved = serializeState(state);
+    delete saved.materials.bronze_nails;
+    delete saved.materials.dragon_nails;
+    delete saved.materials.plank;
+    delete saved.materials.magic_plank;
+    saved.furniture.loom = { x: 1.2, z: 0.4, rot: 0 };
+    saved.boughtFurniture = { table: 1, mannequin: 0, shelf: 2 };
+    const next = createState();
+    next.gold = 1;
+    next.materials.bronze_nails = 9;
+    next.materials.plank = 9;
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.gold, 80);
+    assert.equal(next.materials.logs, 4);
+    assert.equal(next.materials.bronze_nails, 0);
+    assert.equal(next.materials.dragon_nails, 0);
+    assert.equal(next.materials.plank, 0);
+    assert.equal(next.materials.magic_plank, 0);
+    assert.equal(next.furniture.loom.x, 1.2);
+    assert.equal(next.boughtFurniture.table, 1);
+    assert.equal(next.boughtFurniture.shelf, 2);
+    assert.equal(next.displays.length, SHOP.displays.length);
+  });
+
+  it('blocks a new table until the player has the nails and planks', () => {
+    const state = createState();
+    state.gold = 500;
+    assert.equal(canBuyFurniture(state, 'table'), false);
+    assert.match(furniturePlaceBlock(state, 'table'), /Bronze Nails/);
+    assert.match(furniturePlaceBlock(state, 'table'), /Plank/);
+    assert.equal(buildMaterialLabel('table'), 'Bronze Nails ×8 · Plank ×4');
+    assert.equal(buildMaterialLabel('shelf'), 'Iron Nails ×10 · Oak Plank ×3');
+    assert.equal(buildMaterialLabel('mannequin'), 'Steel Nails ×12 · Willow Plank ×2');
+    assert.equal(buildMaterialLabel('furnace'), '');
+    assert.equal(buildMaterialLabel('sawmill'), '');
+    state.materials.bronze_nails = 8;
+    assert.match(furniturePlaceBlock(state, 'table'), /Plank/);
+    state.materials.plank = 4;
+    assert.equal(furniturePlaceBlock(state, 'table'), '');
+    assert.equal(buyFurniture(state, 'table', { x: 0.2, z: 0.2, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.materials.bronze_nails, 0);
+    assert.equal(state.materials.plank, 0);
   });
 });
 

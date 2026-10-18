@@ -64,8 +64,10 @@ import {
   expansionCost,
   MAX_EXPANSIONS,
   furnitureBuyCost,
+  furnitureBuildParts,
   furnitureKindForType,
   furnitureLabelForType,
+  FURNITURE_SHOP,
   padById,
   padConnects,
   snapToWallGrid,
@@ -672,16 +674,57 @@ export function ownsStation(state, id) {
   return Boolean(state.furniture?.[id]);
 }
 
+export function hasBuildMaterials(state, id) {
+  return furnitureBuildParts(id).every((part) => (state.materials?.[part.id] ?? 0) >= part.count);
+}
+
+function payBuildMaterials(state, id) {
+  for (const part of furnitureBuildParts(id)) {
+    state.materials[part.id] = (state.materials[part.id] ?? 0) - part.count;
+  }
+}
+
+/** "Bronze Nails ×8 · Plank ×4", or empty when the piece spends no stock. */
+export function buildMaterialLabel(id) {
+  return furnitureBuildParts(id)
+    .map((part) => `${MATERIALS[part.id]?.name ?? part.id} ×${formatGold(part.count)}`)
+    .join(' · ');
+}
+
+/** Empty when the player already holds every nail and plank on the row. */
+export function buildMaterialBlock(state, id) {
+  const missing = furnitureBuildParts(id).filter((part) => (state.materials?.[part.id] ?? 0) < part.count);
+  if (!missing.length) return '';
+  const bits = missing.map((part) => {
+    const name = MATERIALS[part.id]?.name ?? part.id;
+    const have = state.materials?.[part.id] ?? 0;
+    return `${name} ×${formatGold(part.count)} (have ${formatGold(have)})`;
+  });
+  return `Need ${bits.join(' and ')}.`;
+}
+
 export function canBuyStation(state, id) {
   const unlock = stationUnlock(id);
   if (!unlock) return false;
-  return !ownsStation(state, id) && state.gold >= unlock.cost;
+  if (ownsStation(state, id) || state.gold < unlock.cost) return false;
+  return hasBuildMaterials(state, id);
+}
+
+export function stationPlaceBlock(state, id) {
+  const label = (stationUnlock(id)?.label ?? id).toLowerCase();
+  if (ownsStation(state, id)) return `A ${label} is already placed.`;
+  const cost = stationCost(id);
+  if ((state.gold ?? 0) < cost) {
+    return `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(state.gold)}g.`;
+  }
+  return buildMaterialBlock(state, id);
 }
 
 export function buyStation(state, id, pose) {
+  if (!pose || !canBuyStation(state, id)) return false;
   const cost = stationCost(id);
-  if (!stationUnlock(id) || state.gold < cost || !pose || ownsStation(state, id)) return false;
   state.gold -= cost;
+  payBuildMaterials(state, id);
   state.furniture[id] = {
     x: pose.x,
     z: pose.z,
@@ -768,8 +811,11 @@ export function nextFurnitureCost(state, type) {
 }
 
 export function canBuyFurniture(state, type) {
-  if (!['table', 'mannequin', 'shelf'].includes(type)) return false;
-  return state.gold >= nextFurnitureCost(state, type);
+  if (!FURNITURE_SHOP.some((item) => item.type === type)) return false;
+  const cost = nextFurnitureCost(state, type);
+  if ((state.gold ?? 0) < cost) return false;
+  if (cost === 0) return true;
+  return hasBuildMaterials(state, type);
 }
 
 export function furnitureNeedGold(state, type) {
@@ -780,11 +826,20 @@ export function furnitureNeedGold(state, type) {
   return `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(have)}g.`;
 }
 
+/** Gold first, then nails and planks. Free replacements and included shelves skip materials. */
+export function furniturePlaceBlock(state, type) {
+  const gold = furnitureNeedGold(state, type);
+  if (gold) return gold;
+  if (nextFurnitureCost(state, type) === 0) return '';
+  return buildMaterialBlock(state, type);
+}
+
 export function buyFurniture(state, type, pose) {
   if (!canBuyFurniture(state, type) || !pose) return false;
   const kind = furnitureKindForType(type);
   const cost = nextFurnitureCost(state, type);
   state.gold -= cost;
+  if (cost > 0) payBuildMaterials(state, type);
   if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
   if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
   if (cost === 0 && (type === 'table' || type === 'mannequin') && state.freeFurnitureReplace[type] > 0) {

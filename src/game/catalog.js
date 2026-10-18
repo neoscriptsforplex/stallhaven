@@ -134,10 +134,13 @@ export const ANVIL_SUBTABS = [
 export const TOOL_SUBTABS = [
   { id: 'hatchet', label: 'Hatchet' },
   { id: 'pickaxe', label: 'Pickaxe' },
+  { id: 'nails', label: 'Nails' },
 ];
 
 /** One anvil ammo recipe action puts this many units in the chest. */
 export const AMMO_BATCH = 20;
+/** One bar at the anvil makes this many nails. Same batch for every metal. */
+export const NAIL_BATCH = 15;
 
 /** Player-facing sell anchors: Bronze → Iron → Steel → Mithril → Adamant → Rune → Dragon. */
 export const TIER_SELL = [5000, 10000, 20000, 30000, 40000, 50000, 60000];
@@ -356,6 +359,18 @@ METALS.forEach((metal, index) => {
     regenEvery: 0,
     crafted: true,
     bar: true,
+    metalId: metal.id,
+    tint: metal.tint,
+  };
+  MATERIALS[`${metal.id}_nails`] = {
+    id: `${metal.id}_nails`,
+    name: `${metal.name} Nails`,
+    restock: 0,
+    start: 0,
+    tier: index + 1,
+    regenEvery: 0,
+    crafted: true,
+    nail: true,
     metalId: metal.id,
     tint: metal.tint,
   };
@@ -939,6 +954,32 @@ for (const piece of TOOL_PIECES) {
   });
 }
 
+METALS.forEach((metal, index) => {
+  const previousId = index === 0 ? null : `${METALS[index - 1].id}_nails`;
+  addRecipe({
+    id: `${metal.id}_nails`,
+    name: `${metal.name} Nails`,
+    category: 'nails',
+    combatClass: 'tools',
+    slot: 'nails',
+    shape: 'nails',
+    setKey: metal.id,
+    lineId: 'tools-nails',
+    lineName: 'Nails',
+    lineIndex: index,
+    previousId,
+    unlockNeed: unlockNeed(index),
+    tier: index + 1,
+    cost: { materials: { [barIdForMetal(metal.id)]: 1 }, gold: 0 },
+    time: 2 + index * 0.5,
+    price: 0,
+    buyers: [],
+    tint: metal.tint,
+    outputMaterial: `${metal.id}_nails`,
+    outputCount: NAIL_BATCH,
+  });
+});
+
 RUNE_LINE.forEach((rune, index) => {
   const previousId = index === 0 ? null : RUNE_LINE[index - 1].id;
   addRecipe({
@@ -967,7 +1008,7 @@ RUNE_LINE.forEach((rune, index) => {
 
 const FOOD_LINE = [
   { id: 'bread', name: 'Bread', mats: { flour: 1, egg: 1, water: 1 }, tint: 0xc4a05a, time: 3, price: 8 },
-  { id: 'pizza', name: 'Pizza', mats: { flour: 1, pineapple: 1 }, tint: 0xd4a04a, time: 4, price: 14 },
+  { id: 'pizza', name: 'Pizza', mats: { flour: 1, pineapple: 1, egg: 1, water: 1 }, tint: 0xd4a04a, time: 4, price: 14 },
   { id: 'cake', name: 'Cake', mats: { flour: 1, egg: 1, water: 1 }, tint: 0xe8c8a0, time: 5, price: 20 },
   { id: 'pie', name: 'Pie', mats: { flour: 1, raspberry: 1, egg: 1, water: 1 }, tint: 0xb45a4a, time: 6, price: 26 },
   { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, fish: 1, egg: 1, water: 1 }, tint: 0xc8b07a, time: 7, price: 32 },
@@ -1579,7 +1620,10 @@ export function isAmmoRecipe(recipe) {
 }
 
 export function isToolRecipe(recipe) {
-  return recipe?.combatClass === 'tools' || recipe?.category === 'hatchet' || recipe?.category === 'pickaxe';
+  return recipe?.combatClass === 'tools'
+    || recipe?.category === 'hatchet'
+    || recipe?.category === 'pickaxe'
+    || recipe?.category === 'nails';
 }
 
 export function isShelfItem(recipe) {
@@ -1649,6 +1693,7 @@ export function anvilSubtabForRecipe(recipe) {
   if (recipe?.category === 'rune') return 'rune';
   if (recipe?.category === 'hatchet') return 'hatchet';
   if (recipe?.category === 'pickaxe') return 'pickaxe';
+  if (recipe?.category === 'nails') return 'nails';
   return 'weapon';
 }
 
@@ -1667,7 +1712,8 @@ export function recipesForAltar(mark) {
 }
 
 const ANVIL_TAB_IDS = new Set(ANVIL_TABS.map((tab) => tab.id));
-const ANVIL_SUBTAB_IDS = new Set(['armour', 'ammo', 'hatchet', 'pickaxe']);
+const ANVIL_SUBTAB_IDS = new Set(['armour', 'ammo', 'hatchet', 'pickaxe', 'nails']);
+const TOOL_SUBTAB_IDS = new Set(TOOL_SUBTABS.map((tab) => tab.id));
 
 /** Reset shared craft-panel tab state so furnace/range/anvil never leak into each other. */
 export function craftUiForStation(station, prev = {}, recipe = null) {
@@ -1699,8 +1745,8 @@ export function craftUiForStation(station, prev = {}, recipe = null) {
     : (ANVIL_SUBTAB_IDS.has(prev.subtab) ? prev.subtab : 'weapon');
   if (tab !== 'ranged' && subtab === 'ammo') subtab = 'weapon';
   if (subtab === 'rune') subtab = 'weapon';
-  if (tab !== 'tools' && (subtab === 'hatchet' || subtab === 'pickaxe')) subtab = 'weapon';
-  if (tab === 'tools' && subtab !== 'hatchet' && subtab !== 'pickaxe') subtab = 'hatchet';
+  if (tab !== 'tools' && TOOL_SUBTAB_IDS.has(subtab)) subtab = 'weapon';
+  if (tab === 'tools' && !TOOL_SUBTAB_IDS.has(subtab)) subtab = 'hatchet';
   return { tab, subtab };
 }
 
@@ -1756,7 +1802,7 @@ export function recipesForTab(tabId, subtabId = null) {
   }
   const combatClass = tabId === 'ranged' ? 'range' : tabId;
   const list = recipeList().filter((recipe) => recipe.combatClass === combatClass && !isCraftHidden(recipe));
-  if (subtabId === 'weapon' || subtabId === 'armour' || subtabId === 'ammo' || subtabId === 'rune' || subtabId === 'hatchet' || subtabId === 'pickaxe') {
+  if (subtabId === 'weapon' || subtabId === 'armour' || subtabId === 'ammo' || subtabId === 'rune' || subtabId === 'hatchet' || subtabId === 'pickaxe' || subtabId === 'nails') {
     return list.filter((recipe) => recipe.category === subtabId);
   }
   return list;
@@ -1791,10 +1837,12 @@ export function costLabel(recipe, duration = recipe?.time) {
   const gold = cost.gold ? ` + ${formatGold(cost.gold)}g` : '';
   const time = Number.isFinite(duration) ? duration : recipe.time;
   const timeText = Number.isInteger(time) ? `${time}s` : `${time.toFixed(1)}s`;
-  const yieldText = (recipe.outputCount ?? 1) > 1 && !recipe.outputMaterial
-    ? ` · ×${recipe.outputCount}`
+  const count = recipe.outputCount ?? 1;
+  const yieldText = count > 1
+    ? (recipe.outputMaterial ? ` · makes ${count}` : ` · ×${count}`)
     : '';
-  return `${mats}${gold}${yieldText} · ${timeText} · sells ${formatGold(recipe.price)}g`;
+  const sellText = (recipe.price ?? 0) > 0 ? ` · sells ${formatGold(recipe.price)}g` : '';
+  return `${mats}${gold}${yieldText} · ${timeText}${sellText}`;
 }
 
 /** Offer/trade class: melee, ranged, magic, food, or potion. */
@@ -1830,7 +1878,7 @@ export function customerName(id, { plural = false } = {}) {
 export function classLabel(combatClass, category = null) {
   if (category === 'potion') return 'Potion';
   if (category === 'rune') return 'Magic';
-  if (category === 'hatchet' || category === 'pickaxe' || combatClass === 'tools') return 'Tools';
+  if (category === 'hatchet' || category === 'pickaxe' || category === 'nails' || combatClass === 'tools') return 'Tools';
   if (category === 'food' || (!combatClass && category !== 'weapon' && category !== 'armour' && category !== 'ammo' && category !== 'rune')) return 'Food';
   if (combatClass === 'melee') return 'Melee';
   if (combatClass === 'range') return 'Ranged';

@@ -76,7 +76,10 @@ import {
   DEFAULT_MUSIC_VOLUME,
   discardFromChest,
   fillStandFromRecipe,
-  furnitureNeedGold,
+  buildMaterialBlock,
+  buildMaterialLabel,
+  furniturePlaceBlock,
+  stationPlaceBlock,
   hasStock,
   isMastered,
   isUnlocked,
@@ -108,6 +111,7 @@ import {
   chestSlots,
   chestUpgradeCost,
   expansionCost,
+  FURNITURE_SHOP,
   furnitureKindForType,
   furnitureLabelForType,
   padById,
@@ -568,9 +572,11 @@ export function bindHud(root, state, world) {
       potionNote.textContent = '';
     }
     const recipe = RECIPES[recipeId];
-    const batch = recipe?.outputCount > 1 && !recipe.outputMaterial
-      ? ` ×${n} (${n * recipe.outputCount} in the chest)`
-      : n > 1 ? ` ×${n}` : '';
+    const batch = recipe?.outputMaterial && (recipe.outputCount ?? 1) > 1
+      ? ` ×${n} (${n * recipe.outputCount} ${MATERIALS[recipe.outputMaterial]?.name ?? 'items'})`
+      : recipe?.outputCount > 1 && !recipe.outputMaterial
+        ? ` ×${n} (${n * recipe.outputCount} in the chest)`
+        : n > 1 ? ` ×${n}` : '';
     pushLog(state, `Crafting ${recipe.name}${batch}…`);
     paintCrafts();
     render(performance.now() / 1000);
@@ -1575,7 +1581,9 @@ export function bindHud(root, state, world) {
       buyBtn.disabled = true;
       buyBtn.textContent = 'Owned';
     } else {
-      status.textContent = `Costs ${formatGold(CAULDRON_COST)} gp.`;
+      const mats = buildMaterialLabel('cauldron');
+      const missing = buildMaterialBlock(state, 'cauldron');
+      status.textContent = `Costs ${formatGold(CAULDRON_COST)} gp.${mats ? ` ${mats}.` : ''}${missing ? ` ${missing}` : ''}`;
       buyBtn.disabled = !canBuyCauldron(state);
       buyBtn.textContent = `Buy · ${formatGold(CAULDRON_COST)} gp`;
     }
@@ -1591,8 +1599,12 @@ export function bindHud(root, state, world) {
         itemBuy.textContent = 'Owned';
       } else {
         const paid = station.cost > 0;
+        const mats = buildMaterialLabel(station.id);
+        const missing = mats ? buildMaterialBlock(state, station.id) : '';
         itemStatus.hidden = !paid;
-        itemStatus.textContent = paid ? `Costs ${formatGold(station.cost)} gp.` : '';
+        itemStatus.textContent = paid
+          ? `Costs ${formatGold(station.cost)} gp.${mats ? ` ${mats}.` : ''}${missing ? ` ${missing}` : ''}`
+          : '';
         itemStatus.classList.remove('craft-note');
         itemBuy.disabled = !canBuyStation(state, station.id);
         itemBuy.textContent = paid
@@ -1615,7 +1627,8 @@ export function bindHud(root, state, world) {
         expandBuy.textContent = `Place Room · ${formatGold(cost)}g`;
       }
     }
-    for (const type of ['table', 'mannequin', 'shelf']) {
+    for (const item of FURNITURE_SHOP) {
+      const type = item.type;
       const itemStatus = buildModal.querySelector(`[data-${type}-status]`);
       const itemBuy = buildModal.querySelector(`[data-${type}-buy]`);
       if (!itemStatus || !itemBuy) continue;
@@ -1644,9 +1657,11 @@ export function bindHud(root, state, world) {
             ? `First extra ${label.toLowerCase()} costs ${formatGold(cost)}g. Starting pieces do not count.`
             : `Next ${label.toLowerCase()} costs ${formatGold(cost)}g (${bought} bought).`;
         })();
-      itemStatus.textContent = extra;
+      const mats = cost > 0 ? buildMaterialLabel(type) : '';
+      const missing = cost > 0 ? buildMaterialBlock(state, type) : '';
+      itemStatus.textContent = mats ? `${extra} ${mats}.${missing ? ` ${missing}` : ''}` : extra;
       itemStatus.classList.remove('craft-note');
-      itemBuy.disabled = false;
+      itemBuy.disabled = !canBuyFurniture(state, type);
       itemBuy.textContent = cost === 0 ? 'Place · Free' : `Buy · ${formatGold(cost)} gp`;
     }
   }
@@ -1668,7 +1683,11 @@ export function bindHud(root, state, world) {
           ? 'Move the shelf on the wall grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.'
           : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
     }
-    if (costEl) costEl.textContent = `Cost: ${formatGold(pendingPlace.cost)} gp.`;
+    if (costEl) {
+      const mats = pendingPlace.cost > 0 ? buildMaterialLabel(pendingPlace.type) : '';
+      const goldText = pendingPlace.cost > 0 ? `${formatGold(pendingPlace.cost)} gp` : 'Free';
+      costEl.textContent = mats ? `Cost: ${goldText} · ${mats}.` : `Cost: ${goldText}.`;
+    }
     if (note) {
       note.hidden = !pendingPlace.note;
       note.textContent = pendingPlace.note || '';
@@ -1677,7 +1696,7 @@ export function bindHud(root, state, world) {
 
   function startFurniturePlace(type) {
     const cost = nextFurnitureCost(state, type);
-    const need = furnitureNeedGold(state, type);
+    const need = furniturePlaceBlock(state, type);
     const status = buildModal.querySelector(`[data-${type}-status]`);
     if (!canBuyFurniture(state, type) || need) {
       if (status) {
@@ -1760,9 +1779,9 @@ export function bindHud(root, state, world) {
     const label = stationLabel(id).toLowerCase();
     const status = buildModal.querySelector(`[data-${id}-status]`);
     if (!canBuyStation(state, id)) {
-      const msg = cost > 0
+      const msg = stationPlaceBlock(state, id) || (cost > 0
         ? `Need ${formatGold(cost)}g to buy a ${label}. You have ${formatGold(state.gold)}g.`
-        : `A ${label} is already placed.`;
+        : `A ${label} is already placed.`);
       if (status) {
         status.hidden = false;
         status.textContent = msg;
@@ -1801,8 +1820,9 @@ export function bindHud(root, state, world) {
     const pending = pendingPlace;
     if (STATION_UNLOCKS.some((item) => item.id === pending.type)) {
       const cost = stationCost(pending.type);
-      if (state.gold < cost) {
-        pendingPlace.note = `Need ${formatGold(cost)}g. You have ${formatGold(state.gold)}g.`;
+      const block = stationPlaceBlock(state, pending.type);
+      if (block) {
+        pendingPlace.note = block;
         paintPlaceDock();
         pushLog(state, pendingPlace.note);
         render(performance.now() / 1000);
@@ -1814,14 +1834,16 @@ export function bindHud(root, state, world) {
       }
       world.confirmPlaceUnlock();
       closePlace();
+      const mats = cost > 0 ? buildMaterialLabel(pending.type) : '';
+      const name = stationLabel(pending.type).toLowerCase();
       pushLog(state, cost > 0
-        ? `Placed a ${stationLabel(pending.type).toLowerCase()} for ${formatGold(cost)} gp.`
-        : `Placed a ${stationLabel(pending.type).toLowerCase()}.`);
+        ? `Placed a ${name} for ${formatGold(cost)} gp${mats ? ` (${mats})` : ''}.`
+        : `Placed a ${name}.`);
       render(performance.now() / 1000);
       return;
     }
     const cost = nextFurnitureCost(state, pending.type);
-    const need = furnitureNeedGold(state, pending.type);
+    const need = furniturePlaceBlock(state, pending.type);
     if (need) {
       pendingPlace.note = need;
       paintPlaceDock();
@@ -1838,7 +1860,10 @@ export function bindHud(root, state, world) {
     world.refreshSelection(true);
     closePlace();
     const label = furnitureLabelForType(pending.type);
-    pushLog(state, `Placed a ${label.toLowerCase()} for ${formatGold(cost)} gp.`);
+    const mats = cost > 0 ? buildMaterialLabel(pending.type) : '';
+    pushLog(state, cost > 0
+      ? `Placed a ${label.toLowerCase()} for ${formatGold(cost)} gp${mats ? ` (${mats})` : ''}.`
+      : `Placed a ${label.toLowerCase()}.`);
     render(performance.now() / 1000);
   }
 

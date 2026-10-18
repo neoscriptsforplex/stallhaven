@@ -1,0 +1,25 @@
+// Co-op room server for Store of Geilenor. LOCAL PROTOTYPE ONLY.
+// Run with `npm run dev` (wrangler dev, no Cloudflare account needed).
+// Nothing here is deployed; do not run `wrangler deploy` without Luke's OK.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stallhaven-coop",
+  "main": "src/server.js",
+  "compatibility_date": "2026-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "durable_objects": {
+    "bindings": [
+      { "name": "CoopRoom", "class_name": "CoopRoom" },
+      { "name": "JoinGate", "class_name": "JoinGate" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CoopRoom", "JoinGate"] }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173",
+    "ROOM_MAX_PLAYERS": "4",
+    "ROOM_IDLE_TTL_SECONDS": "900"
+  }
+}

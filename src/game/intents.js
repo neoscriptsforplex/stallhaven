@@ -19,6 +19,7 @@ import {
   clearDisplay,
   discardFromChest,
   fillStandFromRecipe,
+  grantCaughtFish,
   grantChoppedLogs,
   grantFountainWater,
   grantMinedMaterial,
@@ -40,6 +41,7 @@ import {
 import {
   GROW_BY_ID,
   CHOP_DURATION,
+  FISH_DURATION,
   FLAX_DURATION,
   FLAX_YIELD,
   FOUNTAIN_DURATION,
@@ -51,7 +53,7 @@ import {
   chopYield,
   mineTiming,
 } from './catalog.js';
-import { meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
+import { meetsGatherLevel, xpForChop, xpForFish, xpForMine, xpForPick } from './skills.js';
 import {
   emptyHeroQuestState,
   collectQuest,
@@ -102,6 +104,7 @@ export function gatherDuration(mode, materialId) {
   if (mode === 'chop') return CHOP_DURATION;
   if (mode === 'pick') return materialId === 'wheat' ? WHEAT_DURATION : FLAX_DURATION;
   if (mode === 'water') return FOUNTAIN_COOLDOWN;
+  if (mode === 'fish') return FISH_DURATION;
   return Infinity;
 }
 
@@ -175,7 +178,7 @@ export function checkIntentShape(intent) {
       if (!okIndex(intent.index)) return 'bad-index';
       return okId(intent.recipeId) && GROW_BY_ID[intent.recipeId] ? null : 'bad-herb';
     case 'gather':
-      if (!['mine', 'chop', 'pick', 'water'].includes(intent.mode)) return 'bad-mode';
+      if (!['mine', 'chop', 'pick', 'water', 'fish'].includes(intent.mode)) return 'bad-mode';
       if (intent.mode !== 'water' && (!okId(intent.materialId) || !has(MATERIALS, intent.materialId))) return 'bad-material';
       return null;
     case 'hireHero':
@@ -211,6 +214,8 @@ function gatherAmount(state, intent) {
         : grantPickedFlax(state, FLAX_YIELD);
     case 'water':
       return grantFountainWater(state, FOUNTAIN_WATER_YIELD);
+    case 'fish':
+      return grantCaughtFish(state, intent.materialId);
     default:
       return 0;
   }
@@ -220,6 +225,7 @@ function gatherXp(state, intent) {
   if (intent.mode === 'pick') state.skills?.addXp('farming', xpForPick(intent.materialId));
   else if (intent.mode === 'chop') state.skills?.addXp('woodcutting', xpForChop(intent.materialId));
   else if (intent.mode === 'mine') state.skills?.addXp('mining', xpForMine(intent.materialId));
+  else if (intent.mode === 'fish') state.skills?.addXp('fishing', xpForFish(intent.materialId));
 }
 
 /**

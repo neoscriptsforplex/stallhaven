@@ -31,10 +31,11 @@ test('OSRS curve matches known values', () => {
   assert.equal(levelForXp(MAX_XP), 99);
 });
 
-test('ten skills, all start at level 1', () => {
+test('eleven skills, all start at level 1', () => {
   const skills = createSkills();
-  assert.equal(SKILL_IDS.length, 10);
-  assert.equal(skills.getTotalLevel(), 10);
+  assert.equal(SKILL_IDS.length, 11);
+  assert.ok(SKILL_IDS.includes('fishing'));
+  assert.equal(skills.getTotalLevel(), 11);
   for (const id of SKILL_IDS) assert.equal(skills.getLevel(id), 1);
 });
 
@@ -54,7 +55,7 @@ test('addXp grants, ignores junk and fires level-up once per gain', () => {
   assert.equal(ups[1].from, 2);
   assert.equal(ups[1].level, 10);
   assert.equal(ups[1].levelsGained, 8);
-  assert.equal(skills.getTotalLevel(), 19);
+  assert.equal(skills.getTotalLevel(), 20);
 });
 
 test('xp caps at 200m', () => {
@@ -87,7 +88,7 @@ test('toJSON / fromJSON round trip keeps listeners', () => {
   assert.equal(skills.getXp('cooking'), 200);
   assert.equal(skills.toJSON().xp.bogus, undefined);
   skills.fromJSON(undefined);
-  assert.equal(skills.getTotalLevel(), 10);
+  assert.equal(skills.getTotalLevel(), 11);
   const before = ups;
   skills.addXp('cooking', 100);
   assert.equal(ups, before + 1);

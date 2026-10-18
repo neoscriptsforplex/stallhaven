@@ -346,7 +346,13 @@ export const MATERIALS = {
   pineapple: { id: 'pineapple', name: 'Pineapple', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   raspberry: { id: 'raspberry', name: 'Raspberry', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   chocolate: { id: 'chocolate', name: 'Chocolate', restock: 6, start: 2, tier: 1, regenEvery: regenEvery(1) },
-  fish: { id: 'fish', name: 'Fish', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
+  // Raw fish come only from the pond (Fishing). The old bought "Fish" is gone;
+  // saves before v13 move it onto Raw salmon (economy.migrateGenericFish).
+  raw_salmon: { id: 'raw_salmon', name: 'Raw salmon', restock: 0, start: 3, tier: 1, regenEvery: 0, fished: true, tint: 0xd98a72 },
+  raw_lobster: { id: 'raw_lobster', name: 'Raw lobster', restock: 0, start: 0, tier: 2, regenEvery: 0, fished: true, tint: 0x3d5a6e },
+  raw_monkfish: { id: 'raw_monkfish', name: 'Raw monkfish', restock: 0, start: 0, tier: 3, regenEvery: 0, fished: true, tint: 0x8c7a62 },
+  raw_shark: { id: 'raw_shark', name: 'Raw shark', restock: 0, start: 0, tier: 4, regenEvery: 0, fished: true, tint: 0x7d8c98 },
+  raw_anglerfish: { id: 'raw_anglerfish', name: 'Raw anglerfish', restock: 0, start: 0, tier: 5, regenEvery: 0, fished: true, tint: 0x6e4038 },
   guam: { id: 'guam', name: 'Guam', restock: 0, start: 8, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x1f6b1f },
   marrentill: { id: 'marrentill', name: 'Marrentill', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x3a8a45 },
   tarromin: { id: 'tarromin', name: 'Tarromin', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x6a9a3a },
@@ -1060,20 +1066,25 @@ const FOOD_LINE = [
   { id: 'pizza', name: 'Pizza', mats: { flour: 1, pineapple: 1, egg: 1, water: 1 }, tint: 0xd4a04a, time: 4, price: 14 },
   { id: 'cake', name: 'Cake', mats: { flour: 1, egg: 1, water: 1 }, tint: 0xe8c8a0, time: 5, price: 20 },
   { id: 'pie', name: 'Pie', mats: { flour: 1, raspberry: 1, egg: 1, water: 1 }, tint: 0xb45a4a, time: 6, price: 26 },
-  { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, fish: 1, egg: 1, water: 1 }, tint: 0xc8b07a, time: 7, price: 32 },
+  { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, raw_salmon: 1, egg: 1, water: 1 }, tint: 0xc8b07a, time: 7, price: 32 },
 ];
 
-/** Grill / feast line. Prices sit around Cake (20g): Salmon below, then Lobster and up. */
+/**
+ * Grill / feast line. Prices sit around Cake (20g): Salmon below, then Lobster and up.
+ * Each fish cooks from one matching raw fish caught at the pond. Fish Pie uses
+ * Raw salmon, the level-1 catch, so it is not locked behind Fishing. Curry
+ * needs no fish (Harralander only).
+ */
 const FEAST_LINE = [
-  { id: 'salmon', name: 'Salmon', mats: { fish: 1 }, tint: 0xe07a4a, time: 3, price: 16 },
-  { id: 'lobster', name: 'Lobster', mats: { fish: 1 }, tint: 0xc45a32, time: 5, price: 28 },
+  { id: 'salmon', name: 'Salmon', mats: { raw_salmon: 1 }, tint: 0xe07a4a, time: 3, price: 16 },
+  { id: 'lobster', name: 'Lobster', mats: { raw_lobster: 1 }, tint: 0xc45a32, time: 5, price: 28 },
   { id: 'chocolate_cake', name: 'Chocolate Cake', mats: { flour: 1, egg: 1, chocolate: 1, water: 1 }, tint: 0x5a3220, time: 6, price: 38 },
-  { id: 'monkfish', name: 'Monkfish', mats: { fish: 2 }, tint: 0xd8c8a0, time: 7, price: 50 },
-  // Harralander, not the starter Guam. Fish stays until the fishing change drops it.
-  { id: 'curry', name: 'Curry', mats: { fish: 1, harralander: 1 }, tint: 0xd48a28, time: 8, price: 64 },
-  { id: 'shark', name: 'Shark', mats: { fish: 2 }, tint: 0x6a7a88, time: 9, price: 80 },
+  { id: 'monkfish', name: 'Monkfish', mats: { raw_monkfish: 1 }, tint: 0xd8c8a0, time: 7, price: 50 },
+  // Harralander, not the starter Guam. Fishing drops the old Fish cost.
+  { id: 'curry', name: 'Curry', mats: { harralander: 1 }, tint: 0xd48a28, time: 8, price: 64 },
+  { id: 'shark', name: 'Shark', mats: { raw_shark: 1 }, tint: 0x6a7a88, time: 9, price: 80 },
   { id: 'summer_pie', name: 'Summer Pie', mats: { flour: 1, pineapple: 1, raspberry: 1, egg: 1, water: 1 }, tint: 0xe8a04a, time: 10, price: 98 },
-  { id: 'anglerfish', name: 'Anglerfish', mats: { fish: 3 }, tint: 0xc8a04a, time: 12, price: 120 },
+  { id: 'anglerfish', name: 'Anglerfish', mats: { raw_anglerfish: 1 }, tint: 0xc8a04a, time: 12, price: 120 },
 ];
 
 /** Bread starts near 50 gp; the top of the feast line sits near 5,000 gp. */
@@ -1685,6 +1696,32 @@ export const WHEAT_ARRIVE = 0.85;
 /** Buckets drawn when one fountain fill bar completes. Same length as mining. */
 export const FOUNTAIN_WATER_YIELD = 5;
 export const FOUNTAIN_DURATION = MINE_DURATION;
+
+/**
+ * Raw fish from one completed catch bar. Same step-down as MINE_YIELDS and
+ * CHOP_YIELDS: the level-1 spot matches bronze / pine, the top spot gives one.
+ */
+export const FISH_YIELDS = {
+  raw_salmon: 5,
+  raw_lobster: 4,
+  raw_monkfish: 3,
+  raw_shark: 2,
+  raw_anglerfish: 1,
+};
+/** Same bar length as mining and woodcutting. */
+export const FISH_DURATION = 3.2;
+
+export function isFishMaterial(materialId) {
+  return Boolean(MATERIALS[materialId]?.fished);
+}
+
+export function fishYield(materialId) {
+  return FISH_YIELDS[materialId] ?? 0;
+}
+
+export function fishTiming(materialId) {
+  return { duration: FISH_DURATION, yield: fishYield(materialId) };
+}
 
 export function mineTiming(materialId) {
   return { duration: MINE_DURATION, yield: mineYield(materialId) };

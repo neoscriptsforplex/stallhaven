@@ -3,6 +3,7 @@ import {
   EXPANSION_PADS,
   FOUNTAIN,
   ORIGIN_FLOOR,
+  POND,
   PATH_HALF_W,
   PATH_START_Z,
   ROOM_D,
@@ -489,6 +490,14 @@ export function drawMinimap(ctx, snap) {
   void PATH_HALF_W;
   void PATH_START_Z;
 
+  // Fishing pond: a blue ellipse on the front-right lawn.
+  const pond = [];
+  for (let k = 0; k < 20; k += 1) {
+    const t = (k / 20) * Math.PI * 2;
+    pond.push(toMap(POND.x + Math.cos(t) * POND.rx, POND.z + Math.sin(t) * POND.rz));
+  }
+  ctx.fillStyle = '#4a7898';
+  fillPoly(ctx, pond);
   const fountain = toMap(FOUNTAIN.x, FOUNTAIN.z);
   drawDot(ctx, fountain, 5, '#6a8aa8', '#d8e8f0', scale);
   const hatch = gardenTrapdoorSpot(snap.expansions ?? []) ?? TRAPDOOR;

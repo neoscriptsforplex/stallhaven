@@ -18,6 +18,7 @@ import {
   MATERIALS,
   CHOP_DURATION,
   chopYield,
+  fishTiming,
   FLAX_ARRIVE,
   FLAX_DURATION,
   FLAX_YIELD,
@@ -37,8 +38,8 @@ import {
   stationForRecipe,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
-import { createFountainFill, gatherFullMessage, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, materialIsFull, miningBarAmount, pushLog, storageCap } from './economy.js';
-import { gatherBlockText, meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
+import { createFountainFill, gatherFullMessage, grantPickedFlax, grantPickedWheat, hasStock, materialIsFull, miningBarAmount, pushLog, storageCap } from './economy.js';
+import { gatherBlockText, meetsGatherLevel } from './skills.js';
 import {
   FURNITURE_FORWARD,
   FURNITURE_SNAP,
@@ -51,6 +52,9 @@ import {
   FLAX_CLICK_RADIUS,
   FLAX_COUNT,
   FLAX_SPACING,
+  FISHING_CLICK_RADIUS,
+  FISHING_SPOTS,
+  fishingSpotById,
   FOUNTAIN,
   keepFountain,
   gardenBox,
@@ -61,6 +65,7 @@ import {
   gardenTrapdoorSpot,
   gardenTreeSpots,
   patchHitsTreeOrRock,
+  rectHitsPond,
   FARMING_PATCH_HALF,
   FLAX_RESPAWN_SEC,
   runeFieldTreeSpots,
@@ -493,6 +498,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   let drawScene = true;
   let riggedPlayerGltf = opts.riggedPlayer ?? null;
+  const fishingRodGltf = opts.fishingRod ?? null;
   let riggedGoblinGltf = opts.riggedGoblin ?? null;
   let riggedRatGltf = opts.riggedRat ?? null;
   let bundledPlayerSource = opts.bundledPlayer ?? null;
@@ -523,6 +529,7 @@ export function createWorld(canvas, state, opts = {}) {
       yaw180,
       height: defaultPlayerWorldHeight(),
       chefHatOn: Boolean(state.chefHat),
+      fishingRod: fishingRodGltf,
     });
     customPlayerSource = model;
     customPlayerYaw = yaw180;
@@ -537,6 +544,7 @@ export function createWorld(canvas, state, opts = {}) {
       try {
         return wrapRiggedShopkeeper(riggedPlayerGltf, {
           chefHatOn: Boolean(state.chefHat),
+          fishingRod: fishingRodGltf,
         });
       } catch (err) {
         console.warn('Rigged player skipped:', err?.message || err);
@@ -1537,6 +1545,7 @@ export function createWorld(canvas, state, opts = {}) {
     architecture?.traverse((child) => {
       if (child.userData?.kind === 'trapdoor') found.push(child);
       if (child.userData?.kind === 'fountain') found.push(child);
+      if (child.userData?.kind === 'fishing_spot') found.push(child);
       if (child.userData?.kind === 'tree' && !child.userData.depleted && !isTreeStump(child.userData.x, child.userData.z)) {
         found.push(child);
       }
@@ -1717,6 +1726,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function barYield(session) {
     if (session?.mode === 'chop') return chopYield(session.materialId);
+    if (session?.mode === 'fish') return session.yield ?? fishTiming(session.materialId).yield;
     if (session?.mode === 'pick') return session.yield ?? FLAX_YIELD;
     if (session?.mode === 'fill') return session.yield ?? FOUNTAIN_WATER_YIELD;
     // Always read the rock table. A stored 0 must not hide bronze's +5.
@@ -1794,6 +1804,29 @@ export function createWorld(canvas, state, opts = {}) {
     faceGather(pose);
     setGatherClip(shopkeeper, 'chop');
     emitLocalActivity('chop');
+  }
+
+  /** Same loop as mining: one bar per catch, fixed yield, level-gated per spot. */
+  function startFishing(pose) {
+    const spot = fishingSpotById(pose?.materialId);
+    if (!spot || refuseGather(spot.materialId) || refuseFull(spot.materialId)) return;
+    const timing = fishTiming(spot.materialId);
+    mining = {
+      materialId: spot.materialId,
+      name: MATERIALS[spot.materialId]?.name ?? 'Fish',
+      mode: 'fish',
+      spotId: spot.id,
+      startedAt: performance.now() / 1000,
+      duration: timing.duration,
+      yield: timing.yield,
+      x: spot.x,
+      z: spot.z,
+      faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : spot.face,
+    };
+    setHeldTool(shopkeeper, 'rod');
+    faceGather({ x: spot.x, z: spot.z, faceYaw: mining.faceYaw });
+    // Rig's player clip named "fish" plays when the rig has one; otherwise the mine loop pose.
+    setGatherClip(shopkeeper, 'fish');
   }
 
   function syncTreeVisuals() {
@@ -1931,7 +1964,7 @@ export function createWorld(canvas, state, opts = {}) {
     }
     const got = intentBus.run({
       type: 'gather',
-      mode: mining.mode === 'chop' ? 'chop' : 'mine',
+      mode: mining.mode === 'chop' ? 'chop' : mining.mode === 'fish' ? 'fish' : 'mine',
       materialId: mining.materialId,
     }) || 0;
     if (got <= 0) {
@@ -1943,9 +1976,13 @@ export function createWorld(canvas, state, opts = {}) {
     }
     if (got > 0) {
       const choppedName = MATERIALS[mining.materialId]?.name ?? 'Logs';
-      pushLog(state, mining.mode === 'chop' ? `Chopped ${got} ${choppedName}.` : `Mined ${got} ${mining.name}.`);
+      pushLog(state, mining.mode === 'chop'
+        ? `Chopped ${got} ${choppedName}.`
+        : mining.mode === 'fish'
+          ? `Caught ${got} ${mining.name}.`
+          : `Mined ${got} ${mining.name}.`);
       pickHandler?.({
-        type: mining.mode === 'chop' ? 'chopped' : 'mined',
+        type: mining.mode === 'chop' ? 'chopped' : mining.mode === 'fish' ? 'caught' : 'mined',
         materialId: mining.materialId,
         amount: got,
       });
@@ -2090,7 +2127,7 @@ export function createWorld(canvas, state, opts = {}) {
         ? 'wheat'
         : type === 'flax'
           ? 'flax'
-          : type === 'boulder'
+          : type === 'boulder' || type === 'fishing_spot'
             ? pose.materialId
             : null;
     if (gatherId && refuseGather(gatherId)) return;
@@ -2117,7 +2154,7 @@ export function createWorld(canvas, state, opts = {}) {
         : playerObstacles(state);
     const canStand = (x, z) => isWalkable(x, z, standBlocks, PLAYER_RADIUS, standFloors);
     const plan = resolveStationUse(from, pose, state, planSceneWalk, type, canStand);
-    const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax' || type === 'wheat';
+    const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax' || type === 'wheat' || type === 'fishing_spot';
     const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'furnace' || type === 'fletch' || type === 'ladder' || gatherKind || type === 'fountain' || type === 'farming_patch';
     const faceYaw = plan.face != null
       ? plan.face
@@ -2172,6 +2209,11 @@ export function createWorld(canvas, state, opts = {}) {
         playClick('ui');
         return;
       }
+      if (type === 'fishing_spot') {
+        startFishing(aimed);
+        playClick('ui');
+        return;
+      }
       if (type === 'flax' || type === 'wheat') {
         startPicking(aimed);
         playClick('ui');
@@ -2221,6 +2263,7 @@ export function createWorld(canvas, state, opts = {}) {
     };
     if (type === 'boulder') startMining(materialId, pose);
     else if (type === 'tree') startChopping(pose);
+    else if (type === 'fishing_spot') startFishing(pose);
     else if (type === 'flax' || type === 'wheat') startPicking(pose);
     else if (type === 'fountain') fillFromFountain(pose);
     else pickHandler?.({ type, element, patchIndex });
@@ -2435,6 +2478,7 @@ export function createWorld(canvas, state, opts = {}) {
     const blocked = patchHitsTreeOrRock(pose, expansions);
     if (blocked === 'tree') return 'That spot overlaps a tree.';
     if (blocked === 'rock') return 'That spot overlaps a rock.';
+    if (blocked === 'pond') return 'That spot overlaps the pond.';
     return null;
   }
 
@@ -2456,6 +2500,10 @@ export function createWorld(canvas, state, opts = {}) {
     }
     const off = kind === 'portal' ? 'That spot is off the grass.' : 'That spot is off the shop floor.';
     if (!pose) return off;
+    if (kind === 'portal') {
+      const { hw, hd } = furnitureHalfSize('portal');
+      if (rectHitsPond(pose.x, pose.z, hw, hd)) return 'That spot overlaps the pond.';
+    }
     const reason = placementBlocked(pose, kind, blocks, floors, {
       checkAisle: kind !== 'counter' && kind !== 'rug',
     });
@@ -2649,6 +2697,10 @@ export function createWorld(canvas, state, opts = {}) {
         queueUse('boulder', { x: data.x, z: data.z, materialId: data.materialId });
         return;
       }
+      if (data.kind === 'fishing_spot') {
+        queueUse('fishing_spot', { x: data.x, z: data.z, materialId: data.materialId });
+        return;
+      }
       if (data.kind === 'tree') {
         if (!(data.depleted || !treeCanChop(data.x, data.z))) {
           queueUse('tree', {
@@ -2734,6 +2786,13 @@ export function createWorld(canvas, state, opts = {}) {
             materialId: tree.materialId ?? 'logs',
             trunkRadius: plantedTrunkRadius(tree.x, tree.z),
           });
+          return;
+        }
+        const fishSpot = FISHING_SPOTS.find((spot) => (
+          Math.hypot(point.x - spot.x, point.z - spot.z) <= FISHING_CLICK_RADIUS
+        ));
+        if (fishSpot) {
+          queueUse('fishing_spot', { x: fishSpot.x, z: fishSpot.z, materialId: fishSpot.materialId });
           return;
         }
         if (keepFountain(state.expansions ?? []) && Math.hypot(point.x - FOUNTAIN.x, point.z - FOUNTAIN.z) <= 1.05) {
@@ -2928,6 +2987,19 @@ export function createWorld(canvas, state, opts = {}) {
       playClick('ui');
       pickHandler?.({
         type: 'boulder-inspect',
+        materialId: data.materialId,
+        name: data.name,
+        x: data.x,
+        z: data.z,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      return;
+    }
+    if (data.kind === 'fishing_spot') {
+      playClick('ui');
+      pickHandler?.({
+        type: 'fishing-inspect',
         materialId: data.materialId,
         name: data.name,
         x: data.x,
@@ -3997,6 +4069,10 @@ export function createWorld(canvas, state, opts = {}) {
         queueUse('wheat', { x: pose.x, z: pose.z, materialId: 'wheat', plantId: pose.plantId });
         return;
       }
+      if (pose.kind === 'fishing_spot') {
+        queueUse('fishing_spot', { x: pose.x, z: pose.z, materialId: pose.materialId });
+        return;
+      }
       if (!pose.materialId) return;
       queueUse('boulder', { x: pose.x, z: pose.z, materialId: pose.materialId });
     },
@@ -4441,6 +4517,7 @@ export function createWorld(canvas, state, opts = {}) {
         mode: mining.mode ?? 'mine',
         verb: mining.verb
           ?? (mining.mode === 'chop' ? 'Chopping'
+            : mining.mode === 'fish' ? 'Fishing'
             : mining.mode === 'pick' ? 'Picking'
               : mining.mode === 'fill' ? 'Filling'
                 : 'Mining'),

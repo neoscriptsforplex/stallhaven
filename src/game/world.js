@@ -165,7 +165,7 @@ import {
   PLAYER_WORLD_SCALE,
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
-import { attachPortalJelly, tickPortalJelly } from './portalJelly.js';
+import { tickPortalJelly } from './portalJelly.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -681,7 +681,6 @@ export function createWorld(canvas, state, opts = {}) {
   const sawmillPick = makePick(STATION_HIT.sawmill.w, STATION_HIT.sawmill.h, STATION_HIT.sawmill.d, 'sawmill');
 
   const portalMesh = buildPortal();
-  attachPortalJelly(portalMesh);
   scene.add(portalMesh);
   const portalPick = makePick(STATION_HIT.portal.w, STATION_HIT.portal.h, STATION_HIT.portal.d, 'portal');
 
@@ -3690,7 +3689,6 @@ export function createWorld(canvas, state, opts = {}) {
   function ensureRuneField() {
     if (runeField) return runeField;
     runeField = buildRuneField();
-    if (runeField.portal) attachPortalJelly(runeField.portal);
     runeField.root.visible = false;
     runeField.grounds.visible = false;
     scene.add(runeField.root);

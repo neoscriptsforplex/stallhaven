@@ -59,6 +59,7 @@ import { applyOsrsScale, getBundledLook, measureVisibleBox, OSRS_MODEL_SCALE, si
 import { prepareDungeonRockMaterials } from './upload.js';
 import { attachSpinner } from './stationSpin.js';
 import { attachFountainWater } from './fountainWater.js';
+import { attachPortalJelly } from './portalJelly.js';
 import { attachFurnaceFx } from './furnaceFx.js';
 import { attachRangeFx } from './rangeFx.js';
 import { attachLoomFx } from './loomFx.js';
@@ -2008,15 +2009,19 @@ function buildProceduralPortal() {
   const jambW = w * 0.16;
   const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(jambW, h * 0.86, d), stone));
   left.position.set(-w / 2 + jambW / 2, h * 0.43, 0);
+  left.userData.skipPortalJelly = true;
   group.add(left);
   const right = left.clone();
   right.position.x = w / 2 - jambW / 2;
+  right.userData.skipPortalJelly = true;
   group.add(right);
   const lintel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w, h * 0.16, d), stone));
   lintel.position.y = h - h * 0.08;
+  lintel.userData.skipPortalJelly = true;
   group.add(lintel);
   const inner = new THREE.Mesh(new THREE.CircleGeometry(Math.min(w, h) * 0.22, 20), glow);
   inner.position.y = h * 0.46;
+  inner.userData.portalSurface = true;
   group.add(inner);
   return group;
 }
@@ -2042,6 +2047,7 @@ export function buildPortal() {
   const box = measureVisibleBox(visual);
   label.position.y = (Number.isFinite(box.max.y) ? box.max.y : PORTAL_TARGET_HEIGHT) + 0.18;
   root.add(label);
+  root.userData.portalJelly = attachPortalJelly(root);
   return root;
 }
 

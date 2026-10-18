@@ -81,7 +81,7 @@ describe('cooking needs the matching raw fish', () => {
 
 describe('save v13 fish migration', () => {
   it('moves old generic fish onto raw salmon and keeps bow strings', () => {
-    assert.equal(SAVE_VERSION, 13);
+    assert.equal(SAVE_VERSION, 14);
     const saved = serializeState(createState());
     saved.version = 12;
     delete saved.materials.raw_salmon; // v12 saves had no raw fish

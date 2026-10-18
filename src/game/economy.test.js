@@ -2710,6 +2710,7 @@ describe('anvil nails', () => {
     assert.equal(state.materials.bronze_bar, 0);
     assert.equal(state.materials.bronze_nails, NAIL_BATCH);
     assert.equal(state.chest.bronze_nails, undefined);
+    state.chestLevel = 2;
     state.materials.bronze_bar = 20;
     for (let i = 0; i < 18; i += 1) finishCraft(state, 'bronze_nails', i + 1);
     assert.equal(isUnlocked(state, 'iron_nails'), false);

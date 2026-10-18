@@ -87,13 +87,87 @@ export function reviveDueTrees(now, rng = Math.random) {
   return revived;
 }
 
+/** Seconds the crown takes to fall and fade before the stump is shown. */
+export const TREE_TOPPLE_SEC = 1;
+
+function toppleMaterials(root) {
+  const mats = [];
+  root.traverse?.((child) => {
+    if (!child.isMesh || !child.material) return;
+    const list = Array.isArray(child.material) ? child.material : [child.material];
+    const cloned = list.map((mat) => {
+      if (!mat || mat.userData?.toppleClone || typeof mat.clone !== 'function') return mat;
+      const next = mat.clone();
+      next.userData = { ...(next.userData || {}), toppleClone: true, toppleOpacity: next.opacity ?? 1 };
+      next.transparent = true;
+      return next;
+    });
+    child.material = Array.isArray(child.material) ? cloned : cloned[0];
+    for (const mat of cloned) {
+      if (mat?.userData?.toppleClone) mats.push(mat);
+    }
+  });
+  return mats;
+}
+
+function restoreTopple(visual) {
+  if (!visual) return;
+  if (Number.isFinite(visual.userData?.toppleBaseX) && visual.rotation) {
+    visual.rotation.x = visual.userData.toppleBaseX;
+  }
+  visual.traverse?.((child) => {
+    if (!child.isMesh || !child.material) return;
+    const list = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of list) {
+      if (mat?.userData?.toppleClone && Number.isFinite(mat.userData.toppleOpacity)) {
+        mat.opacity = mat.userData.toppleOpacity;
+      }
+    }
+  });
+}
+
+/** Start a one-second fall. setTreeFallen still snaps instantly for tests and respawn. */
+export function startTreeTopple(tree, now) {
+  if (!tree || tree.userData?.toppling) return false;
+  const visual = tree.getObjectByName?.('pine-visual');
+  if (!visual) return false;
+  const baseX = visual.rotation?.x ?? 0;
+  visual.userData = visual.userData || {};
+  visual.userData.toppleBaseX = baseX;
+  tree.userData.toppling = {
+    startedAt: now,
+    visual,
+    mats: toppleMaterials(visual),
+    baseX,
+  };
+  return true;
+}
+
+/** Advance one falling crown. Returns true on the frame it becomes a stump. */
+export function tickTreeTopple(tree, now) {
+  const topple = tree?.userData?.toppling;
+  if (!topple) return false;
+  const t = Math.min(1, Math.max(0, (now - topple.startedAt) / TREE_TOPPLE_SEC));
+  if (topple.visual?.rotation) topple.visual.rotation.x = topple.baseX + (Math.PI / 2) * t;
+  for (const mat of topple.mats) {
+    mat.opacity = (mat.userData?.toppleOpacity ?? 1) * (1 - t);
+  }
+  if (t < 1) return false;
+  restoreTopple(topple.visual);
+  delete tree.userData.toppling;
+  setTreeFallen(tree, true);
+  return true;
+}
+
 /** Hide the crown and show the stump, or the reverse. Placement stays put. */
 export function setTreeFallen(tree, fallen) {
   if (!tree) return;
   const visual = tree.getObjectByName('pine-visual');
   const stump = tree.getObjectByName('tree-stump');
+  if (!fallen) restoreTopple(visual);
   if (visual) visual.visible = !fallen;
   if (stump) stump.visible = Boolean(fallen);
+  if (!fallen && tree.userData) delete tree.userData.toppling;
   tree.traverse((child) => {
     if (child.userData?.kind !== 'tree') return;
     child.userData.depleted = Boolean(fallen);

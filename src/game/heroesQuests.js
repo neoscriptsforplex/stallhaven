@@ -108,9 +108,9 @@ export const QUEST_BY_ID = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
 export const NEW_MATERIALS = {
   molten_glass: { id: 'molten_glass', name: 'Molten Glass', restock: 0, start: 0, tier: 2, regenEvery: 0, quest: true, tint: 0xe8a040 },
   green_dhide: { id: 'green_dhide', name: 'Green Dragonhide', restock: 0, start: 0, tier: 4, regenEvery: 0, quest: true, tint: 0x2d6a32 },
-  blue_dhide: { id: 'blue_dhide', name: 'Blue Dragonhide', restock: 0, start: 0, tier: 5, regenEvery: 0, quest: true, tint: 0x2a4a8a },
+  blue_dhide: { id: 'blue_dhide', name: 'Blue Dragonhide', restock: 0, start: 0, tier: 5, regenEvery: 0, quest: true, tint: 0x5b8ee6 },
   red_dhide: { id: 'red_dhide', name: 'Red Dragonhide', restock: 0, start: 0, tier: 6, regenEvery: 0, quest: true, tint: 0x8a2424 },
-  black_dhide: { id: 'black_dhide', name: 'Black Dragonhide', restock: 0, start: 0, tier: 7, regenEvery: 0, quest: true, tint: 0x1c1c1c },
+  black_dhide: { id: 'black_dhide', name: 'Black Dragonhide', restock: 0, start: 0, tier: 7, regenEvery: 0, quest: true, tint: 0x6a6a72 },
 };
 
 // ---------- State ----------

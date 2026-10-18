@@ -3552,7 +3552,7 @@ html.is-booting.is-scene-live #view {
 /* ---------- Quests ---------- */
 #quests-dock { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
 #quests-dock .skills-head { grid-template-columns: 1fr auto auto; gap: 8px; }
-.quest-summary { font-size: 0.78rem; color: #e6d3b2; white-space: nowrap; }
+.quest-summary { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: #e6d3b2; white-space: nowrap; }
 .quest-summary b { color: var(--hq-amber); }
 .quest-heroes { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 0 0 8px; font-size: 0.74rem; color: #cbb48a; }
 .quest-heroes .hq-pill { font-weight: 400; }

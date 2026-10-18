@@ -45,6 +45,17 @@ test('a start time in the future (clock moved back) is capped at now', () => {
   assert.equal(hq.quests.active.imp.endsAt, 5000 + HQ.MIN);
 });
 
+test('recall sends a hero home with no reward', () => {
+  const hq = HQ.emptyHeroQuestState();
+  hq.heroes.adventurer = { npcId: 'buyer-adventurer-bob', name: 'Wren', hiredAt: 1 };
+  assert.equal(HQ.recallQuest(hq, 'cow'), false);
+  assert.ok(HQ.startQuest(hq, 'cow', 'adventurer', 1000));
+  assert.equal(HQ.recallQuest(hq, 'cow'), true);
+  assert.equal(hq.quests.active.cow, undefined);
+  assert.equal(hq.quests.done.cow, undefined);
+  assert.deepEqual(HQ.idleHeroes(hq), ['adventurer']);
+});
+
 test('config covers every quest Luke listed', () => {
   assert.equal(HQ.QUESTS.length, 20);
   assert.deepEqual(HQ.QUEST_BY_ID.vampyre.rewards, { dragon_bar: 50 });
@@ -144,4 +155,33 @@ test('the top bar has Heroes and Quests, and the phone gear menu keeps Help Save
   const panel = readFileSync(join(root, 'heroesPanel.js'), 'utf8');
   assert.match(panel, /let base = '\.\/public\/';/);
   assert.match(panel, /try \{[\s\S]*import\.meta\.env\.BASE_URL/);
+  assert.match(html, /id="away-modal"/);
+  assert.match(html, /While you were away/);
+  assert.match(panel, /localStorage\.getItem\('questTab'\)/);
+  assert.match(panel, /type: 'startQuest'/);
+  assert.match(panel, /type: 'collectQuest'/);
+  assert.match(panel, /type: 'recallQuest'/);
+  assert.match(panel, /game-toast hq-toast/);
+  assert.match(panel, /Collected \$\{n\}/);
+  assert.match(panel, /data-left/);
+  assert.match(panel, /ArrowDown/);
+  assert.match(panel, /new CustomEvent\('rc-save-trigger', \{ detail: \{ trigger: 'quest' \} \}\)/);
+  assert.match(panel, /if \(hired\) saveQuestProgress\(\)/);
+  assert.match(panel, /logRewards\(rows\);\n    saveQuestProgress\(\)/);
+  assert.match(panel, /paintQuests\(now\);\n      saveQuestProgress\(\)/);
+});
+
+test('a co-op patch keeps this browser lastSeenAt', async () => {
+  const { applySharedPatch } = await import('../coop/sharedState.js');
+  const state = createState();
+  state.hq.heroes.adventurer = { npcId: 'buyer-adventurer-bob', name: 'Wren', hiredAt: 1 };
+  state.hq.lastSeenAt = 12345;
+  applySharedPatch(state, {
+    hq: {
+      heroes: state.hq.heroes,
+      quests: { active: { cow: { heroId: 'adventurer', startedAt: 1000, endsAt: 1000 + 60_000 } }, done: {} },
+    },
+  });
+  assert.equal(state.hq.lastSeenAt, 12345);
+  assert.equal(state.hq.quests.active.cow.heroId, 'adventurer');
 });

@@ -309,6 +309,7 @@ async function bootGame() {
       }
       if (await saves.loadSlotInto(choice.slot)) {
         hud.refreshAll?.({ layout: true });
+        hud.showQuestAway?.();
         pushLog(state, 'Welcome back. Your shop was saved in this browser.');
         break;
       }

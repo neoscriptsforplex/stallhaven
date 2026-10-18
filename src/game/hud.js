@@ -2704,6 +2704,7 @@ export function bindHud(root, state, world) {
     toast: (line) => showGameToast(line),
     render: () => render(performance.now() / 1000),
   });
+  heroesPanel.showAway?.();
   skills.onLevelUp((event) => {
     const unlocked = unlockNamesBetween(event.skillId, event.from, event.level, hiddenCraft);
     const extra = unlocked.length
@@ -3246,5 +3247,16 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   }
 
-  return { render, openChest, openTrade, openCraft, openOfferPicker, selectOfferItem, tryStartMusic, refreshAll, paintCrafts };
+  return {
+    render,
+    openChest,
+    openTrade,
+    openCraft,
+    openOfferPicker,
+    selectOfferItem,
+    tryStartMusic,
+    refreshAll,
+    paintCrafts,
+    showQuestAway: () => heroesPanel?.showAway?.(),
+  };
 }

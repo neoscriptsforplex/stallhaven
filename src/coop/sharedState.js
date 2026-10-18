@@ -79,6 +79,8 @@ export function createDiffer() {
 export function applySharedPatch(state, set, toLocal = (t) => t) {
   if (!set || typeof set !== 'object') return [];
   const keys = SHARED_KEYS.filter((k) => Object.hasOwn(set, k));
+  // lastSeenAt is this browser's clock, and serializeState stamps a new one.
+  const seenAt = Number.isFinite(state.hq?.lastSeenAt) ? state.hq.lastSeenAt : null;
   if (keys.length) {
     const base = serializeState(state);
     for (const k of keys) base[k] = set[k];
@@ -97,6 +99,9 @@ export function applySharedPatch(state, set, toLocal = (t) => t) {
       state.ready = temp.ready;
       if (keys.includes('shopXp')) state.shopLevel = temp.shopLevel;
       if (keys.includes('displays') && state.selectedDisplay >= state.displays.length) state.selectedDisplay = 0;
+      if (keys.includes('hq') && state.hq && !Number.isFinite(set.hq?.lastSeenAt) && Number.isFinite(seenAt)) {
+        state.hq.lastSeenAt = seenAt;
+      }
     }
   }
   if (Object.hasOwn(set, 'crafts') && set.crafts && typeof set.crafts === 'object') {

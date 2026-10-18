@@ -141,4 +141,7 @@ test('the top bar has Heroes and Quests, and the phone gear menu keeps Help Save
   assert.match(html, /data-more="help"[\s\S]*data-more="save"[\s\S]*data-more="load"[\s\S]*data-more="fullscreen"/);
   assert.match(css, /#save-bar #help-btn, #save-bar #save-btn, #save-bar #load-btn, #save-bar #expand-btn \{ display: none; \}/);
   assert.match(css, /#settings-dock \.more-quick \{ display: grid; \}/);
+  const panel = readFileSync(join(root, 'heroesPanel.js'), 'utf8');
+  assert.match(panel, /let base = '\.\/public\/';/);
+  assert.match(panel, /try \{[\s\S]*import\.meta\.env\.BASE_URL/);
 });

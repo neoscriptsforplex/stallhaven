@@ -20,9 +20,12 @@ import {
 
 function portraitUrl(npcId, mode) {
   const file = String(npcId ?? '').replace(/^buyer-[a-z]+-/, '');
-  const base = import.meta.env?.BASE_URL ?? './';
-  const root = base.endsWith('/') ? base : `${base}/`;
-  return `${root}portraits/${file}-${mode}.png`;
+  let base = './public/';
+  try {
+    const raw = import.meta.env.BASE_URL;
+    if (raw) base = raw.endsWith('/') ? raw : `${raw}/`;
+  } catch { /* GitHub Pages serves this file unbuilt, where import.meta.env is missing. */ }
+  return `${base}portraits/${file}-${mode}.png`;
 }
 
 function article(label) {

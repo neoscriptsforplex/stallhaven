@@ -69,7 +69,7 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'earth_battlestaff', folder: 'gear/earth-battlestaff' },
   { id: 'energy_potion', folder: 'gear/energy-potion' },
   { id: 'fire_battlestaff', folder: 'gear/mystic-fire-staff' },
-  { id: 'fire_clay', folder: 'materials/clay' },
+  { id: 'soft_clay', folder: 'materials/clay' },
   { id: 'flax', folder: 'materials/flax' },
   { id: 'logs', folder: 'materials/logs' },
   { id: 'oak_logs', folder: 'materials/oak-logs' },

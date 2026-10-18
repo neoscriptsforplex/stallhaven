@@ -3236,7 +3236,7 @@ describe('bundled prop swaps', () => {
       'weave_cloth',
       'flax',
       'orb',
-      'fire_clay',
+      'soft_clay',
       'dragon_kiteshield',
     ];
     for (const recipeId of samples) {

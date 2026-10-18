@@ -21,6 +21,7 @@ import {
   FLAX_ARRIVE,
   FLAX_DURATION,
   FLAX_YIELD,
+  FOUNTAIN_WATER_YIELD,
   WHEAT_ARRIVE,
   WHEAT_DURATION,
   WHEAT_YIELD,
@@ -36,7 +37,7 @@ import {
   stationForRecipe,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
-import { advanceFountainFill, createFountainFill, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, pushLog } from './economy.js';
+import { advanceFountainFill, createFountainFill, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, miningBarAmount, pushLog } from './economy.js';
 import { gatherBlockText, meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
 import {
   FURNITURE_FORWARD,
@@ -1574,7 +1575,8 @@ export function createWorld(canvas, state, opts = {}) {
   function barYield(session) {
     if (session?.mode === 'chop') return chopYield(session.materialId);
     if (session?.mode === 'pick') return session.yield ?? FLAX_YIELD;
-    if (session?.yield != null) return session.yield;
+    if (session?.mode === 'fill') return session.yield ?? FOUNTAIN_WATER_YIELD;
+    // Always read the rock table. A stored 0 must not hide bronze's +5.
     return mineYield(session?.materialId);
   }
 
@@ -4147,7 +4149,10 @@ export function createWorld(canvas, state, opts = {}) {
       const t = Math.min(1, Math.max(0, (now - mining.startedAt) / mining.duration));
       const want = barYield(mining);
       const have = state.materials[mining.materialId] ?? 0;
-      const grant = Math.min(want, Math.max(0, MATERIAL_CAP - have));
+      const mineMode = (mining.mode ?? 'mine') === 'mine';
+      const grant = mineMode
+        ? miningBarAmount(state, mining.materialId, want)
+        : Math.min(want, Math.max(0, MATERIAL_CAP - have));
       return {
         materialId: mining.materialId,
         name: mining.name,

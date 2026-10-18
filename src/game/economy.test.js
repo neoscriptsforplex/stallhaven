@@ -96,6 +96,7 @@ import {
   createFountainFill,
   grantFountainWater,
   grantMinedMaterial,
+  miningBarAmount,
   grantPickedFlax,
   grantPickedWheat,
   FREE_FURNITURE_REPLACE,
@@ -197,6 +198,11 @@ describe('stall economy', () => {
     assert.equal(state.materials.flour, 0);
     assert.equal(MATERIALS.flour.name, 'Pot of flour');
     assert.equal(MATERIALS.flour.crafted, true);
+    assert.equal(state.materials.soft_clay, 0);
+    assert.equal(MATERIALS.soft_clay.crafted, true);
+    assert.equal(MATERIALS.soft_clay.restock, 0);
+    assert.equal(MATERIALS.soft_clay.regenEvery, 0);
+    assert.equal(MATERIALS.hard_clay.crafted, undefined);
     assert.equal(MATERIALS.water.name, 'Bucket of water');
     assert.equal(MATERIALS.water.restock, 0);
     assert.equal(CUSTOMERS.pilgrim.offer, null);
@@ -859,11 +865,18 @@ describe('catalog', () => {
     assert.equal(stationForRecipe(RECIPES.wizard_robe), 'loom');
     assert.equal(stationForRecipe(RECIPES.staff), 'anvil');
     assert.equal(stationForRecipe(RECIPES.weave_cloth), 'loom');
-    assert.equal(stationForRecipe(RECIPES.fire_clay), 'potter');
+    assert.equal(stationForRecipe(RECIPES.soft_clay), 'potter');
     assert.equal(recipeCost(RECIPES.weave_cloth).materials.flax, 1);
     assert.equal(RECIPES.weave_cloth.outputMaterial, 'cloth');
-    assert.equal(recipeCost(RECIPES.fire_clay).materials.soft_clay, 1);
-    assert.equal(RECIPES.fire_clay.outputMaterial, 'hard_clay');
+    assert.equal(RECIPES.fire_clay, undefined);
+    assert.equal(recipesForTab('potter')[0].id, 'soft_clay');
+    assert.equal(recipeCost(RECIPES.soft_clay).materials.hard_clay, 1);
+    assert.equal(recipeCost(RECIPES.soft_clay).materials.water, 1);
+    assert.equal(recipeCost(RECIPES.soft_clay).materials.soft_clay, undefined);
+    assert.equal(RECIPES.soft_clay.outputMaterial, 'soft_clay');
+    assert.equal(RECIPES.soft_clay.requires.skill, 'crafting');
+    assert.equal(RECIPES.soft_clay.requires.level, 1);
+    assert.equal(RECIPES.soft_clay.xp, 5);
     assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Hatchet', 'Pickaxe']);
     assert.equal(anvilSubtabsForTab('magic').some((tab) => tab.id === 'rune'), false);
     assert.equal(recipesForTab('magic', 'rune').some((recipe) => stationForRecipe(recipe) === 'anvil'), false);
@@ -1058,7 +1071,7 @@ describe('material regen', () => {
       iron: 4,
       steel: 3,
       mithril: 3,
-      adamant: 2,
+      adamant: 3,
       runite: 2,
       dragon: 1,
       hard_clay: 1,
@@ -1080,11 +1093,18 @@ describe('material regen', () => {
     assert.deepEqual(mineTiming('essence'), { duration: 3.2, yield: 1 });
     assert.equal(grantMinedMaterial(state, 'bronze'), 5);
     assert.equal(state.materials.bronze, 17);
+    const fresh = createState();
+    fresh.materials.bronze = 0;
+    assert.equal(miningBarAmount(fresh, 'bronze'), 5);
+    assert.equal(grantMinedMaterial(fresh, 'bronze'), 5);
+    fresh.materials.bronze = 250;
+    assert.equal(miningBarAmount(fresh, 'bronze'), 0);
+    assert.equal(grantMinedMaterial(fresh, 'bronze'), 0);
     for (const [id, amount] of [
       ['iron', 4],
       ['steel', 3],
       ['mithril', 3],
-      ['adamant', 2],
+      ['adamant', 3],
       ['runite', 2],
       ['dragon', 1],
     ]) {
@@ -1201,6 +1221,29 @@ describe('material regen', () => {
     assert.equal(state.materials.water, 0);
     assert.equal(canRestock(state, 'water'), false);
     assert.equal(grantFountainWater(state), 5);
+    const clay = createState();
+    assert.equal(canRestock(clay, 'soft_clay'), false);
+    assert.equal(buyFromCustomer(clay, 'soft_clay', 1), false);
+    assert.equal(Object.values(CUSTOMERS).some((buyer) => buyer.offer?.materialId === 'soft_clay'), false);
+    clay.materials.soft_clay = 0;
+    tickMaterials(clay, 240);
+    assert.equal(clay.materials.soft_clay, 0);
+    const kept = createState();
+    assert.equal(applyState(kept, { gold: 40, materials: { soft_clay: 8, hard_clay: 3 } }), true);
+    assert.equal(kept.materials.soft_clay, 8);
+    assert.equal(kept.materials.hard_clay, 3);
+    placeStation(clay, 'potter');
+    clay.materials.hard_clay = 2;
+    clay.materials.water = 2;
+    clay.materials.soft_clay = 0;
+    assert.equal(canCraft(clay, 'soft_clay'), true);
+    assert.equal(startCraft(clay, 'soft_clay', 0), true);
+    assert.equal(clay.materials.hard_clay, 1);
+    assert.equal(clay.materials.water, 1);
+    assert.deepEqual(completeCrafts(clay, 4), ['soft_clay']);
+    assert.equal(clay.materials.soft_clay, 1);
+    assert.equal(clay.chest.soft_clay, undefined);
+    assert.equal(miningBarAmount(clay, 'hard_clay'), 1);
     assert.equal(state.materials.water, 5);
     assert.equal(FOUNTAIN_WATER_YIELD, 5);
     assert.equal(FOUNTAIN_DURATION, MINE_DURATION);

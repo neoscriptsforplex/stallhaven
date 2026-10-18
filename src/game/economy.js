@@ -1327,6 +1327,14 @@ export function grantMinedMaterial(state, materialId, amount = mineYield(materia
   return grantMaterial(state, materialId, minedGrantAmount(state, materialId, amount));
 }
 
+/** Ore one finished mining bar adds. The progress bar shows this same number. */
+export function miningBarAmount(state, materialId, amount = mineYield(materialId)) {
+  if (!isMinedMaterial(materialId)) return 0;
+  const want = minedGrantAmount(state, materialId, amount);
+  const have = Math.max(0, state?.materials?.[materialId] ?? 0);
+  return Math.min(want, Math.max(0, MATERIAL_CAP - have));
+}
+
 export function grantChoppedLogs(state, amount = CHOP_YIELD, materialId = 'logs') {
   const id = MATERIALS[materialId]?.log ? materialId : 'logs';
   return grantMaterial(state, id, amount);

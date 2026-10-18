@@ -39,10 +39,19 @@ import {
   scheduleKingRoald,
 } from './catalog.js';
 import {
+  MAX_XP,
+  SKILL_IDS,
   createSkills,
   levelRequirementText,
   meetsLevelRequirement,
+  skillForRecipe,
   skillLevelOf,
+  xpForBuild,
+  xpForCraft,
+  xpForExpansion,
+  xpForLevel,
+  xpForMine,
+  xpFromCraftHistory,
 } from './skills.js';
 import {
   CAULDRON_COST,
@@ -105,7 +114,7 @@ export {
   DEFAULT_BRIGHTNESS,
 };
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
@@ -215,6 +224,7 @@ export function applyCheat(state, raw) {
       state.materialAcc.flax = 0;
       state.materialAcc.wheat = 0;
     }
+    state.skills?.reset?.();
     return 'noob';
   }
   if (code === 'freshstart') {
@@ -236,6 +246,11 @@ export function applyCheat(state, raw) {
     for (const recipe of recipeList()) {
       const need = Math.max(masteryNeed(recipe), recipe.unlockNeed ?? 0, 80);
       state.craftCounts[recipe.id] = Math.max(state.craftCounts[recipe.id] ?? 0, need);
+    }
+    if (state.skills?.fromJSON) {
+      state.skills.fromJSON({
+        xp: Object.fromEntries(SKILL_IDS.map((id) => [id, xpForLevel(99)])),
+      });
     }
     return 'maxcape';
   }
@@ -367,12 +382,80 @@ export function isUnlocked(state, recipeId) {
   if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) return false;
   if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) return false;
   if (stationForRecipe(recipe) === 'sawmill' && !ownsStation(state, 'sawmill')) return false;
+  return meetsLevelRequirement(recipe, (skillId) => skillLevelOf(state, skillId));
+}
+
+/**
+ * The craft-count ladder from before skills, used only to grandfather old saves.
+ * The multicannon was already Smithing 99, so a save that never made one does
+ * not inherit level 99 from it.
+ */
+function legacyChainUnlocked(state, recipe) {
+  if (!recipe) return false;
+  if (recipe.id === 'dwarven_multicannon' && craftCount(state, recipe.id) < 1) return false;
+  if (recipe.category === 'potion' && !ownsCauldron(state)) return false;
+  if (recipe.category === 'food' && !ownsRange(state)) return false;
+  if (recipe.category === 'smelt' && !ownsFurnace(state)) return false;
+  if (recipe.category === 'spin' && !ownsWheel(state)) return false;
+  if (stationForRecipe(recipe) === 'loom' && !ownsStation(state, 'loom')) return false;
+  if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) return false;
+  if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) return false;
+  if (stationForRecipe(recipe) === 'sawmill' && !ownsStation(state, 'sawmill')) return false;
   if (recipe.unlockAnyOf?.length) {
     const need = recipe.unlockNeed ?? 0;
     return recipe.unlockAnyOf.some((id) => craftCount(state, id) >= need);
   }
   if (!recipe.previousId) return true;
   return craftCount(state, recipe.previousId) >= (recipe.unlockNeed ?? 0);
+}
+
+function planksFor(buildId) {
+  const planks = {};
+  for (const part of furnitureBuildParts(buildId)) {
+    if (part.kind !== 'planks' || !part.count) continue;
+    planks[part.id] = (planks[part.id] ?? 0) + part.count;
+  }
+  return planks;
+}
+
+function constructionXp(kind, gp, buildId = null) {
+  return xpForBuild({
+    kind,
+    gp,
+    planks: buildId ? planksFor(buildId) : null,
+  });
+}
+
+/** XP an old save should have, from crafts, bars smelted, and placements. */
+function skillCatchUp(source) {
+  const seeded = xpFromCraftHistory(source.craftCounts, RECIPES, stationForRecipe);
+  for (const metal of METALS) {
+    const n = Math.max(0, Math.floor(Number(source.craftCounts?.[`smelt_${metal.id}`]) || 0));
+    if (!n) continue;
+    seeded.xp.mining = Math.min(MAX_XP, seeded.xp.mining + n * xpForMine(metal.id));
+  }
+  let construction = seeded.xp.construction ?? 0;
+  const rooms = source.expansions ?? [];
+  for (let i = 0; i < rooms.length; i += 1) construction += xpForExpansion(i);
+  for (const station of STATION_UNLOCKS) {
+    if (!source.furniture?.[station.id]) continue;
+    construction += constructionXp('station', station.cost ?? 0, station.id);
+  }
+  for (const type of ['table', 'mannequin', 'shelf']) {
+    const n = Math.max(0, Math.floor(Number(source.boughtFurniture?.[type]) || 0));
+    for (let i = 0; i < n; i += 1) {
+      construction += constructionXp('item', furnitureBuyCost(i), type);
+    }
+  }
+  seeded.xp.construction = Math.min(MAX_XP, construction);
+  for (const recipe of recipeList()) {
+    if (!legacyChainUnlocked(source, recipe)) continue;
+    const req = recipe.requires;
+    if (!req?.skill || !Object.prototype.hasOwnProperty.call(seeded.xp, req.skill)) continue;
+    const floor = xpForLevel(req.level);
+    if (seeded.xp[req.skill] < floor) seeded.xp[req.skill] = floor;
+  }
+  return seeded;
 }
 
 export function craftBlockReason(state, recipeId) {
@@ -659,9 +742,11 @@ export function canBuyExpansion(state, padId) {
 
 export function buyExpansion(state, padId) {
   if (!canBuyExpansion(state, padId)) return false;
-  const cost = expansionCost((state.expansions ?? []).length);
+  const roomsBefore = (state.expansions ?? []).length;
+  const cost = expansionCost(roomsBefore);
   state.gold -= cost;
   state.expansions = [...(state.expansions ?? []), padId];
+  state.skills?.addXp('construction', xpForExpansion(roomsBefore));
   if (padId === 'back') clearBackWallShelf(state);
   return true;
 }
@@ -730,6 +815,7 @@ export function buyStation(state, id, pose) {
     z: pose.z,
     rot: pose.rot ?? FURNITURE_FORWARD,
   };
+  state.skills?.addXp('construction', constructionXp('station', cost, id));
   return true;
 }
 
@@ -848,6 +934,7 @@ export function buyFurniture(state, type, pose) {
   const paidExtra = cost > 0;
   if (paidExtra) {
     state.boughtFurniture[type] = boughtFurnitureCount(state, type) + 1;
+    state.skills?.addXp('construction', constructionXp('item', cost, type));
   }
   const n = liveFurnitureCount(state, type) + 1;
   const label = furnitureLabelForType(type);
@@ -1039,6 +1126,8 @@ function finishOneCraft(state, recipeId) {
   if (!state.craftCounts) state.craftCounts = {};
   state.craftCounts[recipeId] = craftCount(state, recipeId) + 1;
   grantShopXp(state, recipeId);
+  const skillId = skillForRecipe(recipe, stationForRecipe(recipe));
+  if (skillId) state.skills?.addXp(skillId, xpForCraft(recipe));
 }
 
 export function completeCrafts(state, nowSeconds) {
@@ -1540,7 +1629,17 @@ export function applyState(state, data) {
   refreshShowcases(state);
   if ((state.expansions ?? []).includes('back')) clearBackWallShelf(state);
   if (!state.skills?.fromJSON) state.skills = createSkills();
-  state.skills.fromJSON(data.skills);
+  if (data.skills && typeof data.skills === 'object') {
+    state.skills.fromJSON(data.skills);
+  } else {
+    state.skills.fromJSON(skillCatchUp(next));
+    const earned = state.skills.list()
+      .filter((row) => row.level > 1)
+      .map((row) => `${row.name} ${row.level}`);
+    pushLog(state, earned.length
+      ? `Skills have arrived! Your past work earned you: ${earned.join(', ')}.`
+      : 'Skills have arrived! Every skill starts at level 1.');
+  }
   return true;
 }
 

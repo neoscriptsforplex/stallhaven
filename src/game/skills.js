@@ -18,7 +18,7 @@ export const MAX_XP = 200_000_000;
 
 /** Order here is the panel order (left to right, top to bottom). */
 export const SKILLS = [
-  { id: 'farming', name: 'Farming', trainedBy: 'Picking flax. More crops later.' },
+  { id: 'farming', name: 'Farming', trainedBy: 'Picking flax and wheat.' },
   { id: 'fletching', name: 'Fletching', trainedBy: 'Crafting at the fletching bench.' },
   { id: 'herblore', name: 'Herblore', trainedBy: 'Brewing potions in the cauldron.' },
   { id: 'woodcutting', name: 'Woodcutting', trainedBy: 'Chopping trees.' },
@@ -26,8 +26,8 @@ export const SKILLS = [
   { id: 'mining', name: 'Mining', trainedBy: 'Mining rocks in the dungeon.' },
   { id: 'cooking', name: 'Cooking', trainedBy: 'Cooking on the range.' },
   { id: 'crafting', name: 'Crafting', trainedBy: "Spinning wheel, potter's wheel and loom." },
-  { id: 'construction', name: 'Construction', trainedBy: 'Opening new rooms. A sawmill later.' },
-  { id: 'runecrafting', name: 'Runecrafting', trainedBy: 'Crafting runes.' },
+  { id: 'construction', name: 'Construction', trainedBy: 'Placing rooms and furniture, and sawing planks.' },
+  { id: 'runecrafting', name: 'Runecrafting', trainedBy: 'Crafting runes at the altars.' },
 ];
 
 export const SKILL_IDS = SKILLS.map((skill) => skill.id);
@@ -126,6 +126,8 @@ export const STATION_SKILL = Object.freeze({
  */
 export function skillForRecipe(recipe, station) {
   if (!recipe) return null;
+  if (isSkillId(recipe.skill)) return recipe.skill;
+  if (isSkillId(recipe.requires?.skill)) return recipe.requires.skill;
   if (recipe.category === 'rune') return 'runecrafting';
   return STATION_SKILL[station] ?? null;
 }
@@ -138,31 +140,112 @@ export function skillForRecipe(recipe, station) {
 export const XP_RATES = Object.freeze({
   craftBase: 6,
   craftPerTier: 10,
-  /** One completed chop bar (5 logs). */
-  chop: 25,
-  /** One completed flax pick (1 flax). */
-  pickFlax: 10,
-  /** One completed mining bar, by rock. */
+  /** One completed pine chop, when a recipe has no xp of its own. */
+  chop: 9,
+  /** One completed flax pick. */
+  pickFlax: 12,
+  /** One completed mining bar, by rock. Matches GATHER_NODES. */
   mine: Object.freeze({
-    hard_clay: 5,
-    essence: 5,
-    bronze: 18,
-    iron: 35,
-    steel: 50,
-    mithril: 80,
-    adamant: 95,
-    runite: 125,
-    dragon: 150,
+    hard_clay: 8,
+    essence: 8,
+    bronze: 8,
+    iron: 16,
+    steel: 33,
+    mithril: 89,
+    adamant: 240,
+    runite: 505,
+    dragon: 645,
   }),
 });
 
+/**
+ * Gathering nodes: level lock, XP per completed bar, and the inspect name.
+ * Rocks, trees, flax, and wheat. The fountain is not a skill action.
+ */
+export const GATHER_NODES = Object.freeze([
+  { id: 'flax', name: 'Flax', skill: 'farming', level: 1, xp: 12 },
+  { id: 'wheat', name: 'Wheat', skill: 'farming', level: 5, xp: 15 },
+  { id: 'logs', name: 'Pine tree', skill: 'woodcutting', level: 1, xp: 9 },
+  { id: 'oak_logs', name: 'Oak tree', skill: 'woodcutting', level: 15, xp: 19 },
+  { id: 'willow_logs', name: 'Willow tree', skill: 'woodcutting', level: 30, xp: 39 },
+  { id: 'maple_logs', name: 'Maple tree', skill: 'woodcutting', level: 45, xp: 82 },
+  { id: 'yew_logs', name: 'Yew tree', skill: 'woodcutting', level: 60, xp: 175 },
+  { id: 'magic_logs', name: 'Magic tree', skill: 'woodcutting', level: 75, xp: 365 },
+  { id: 'hard_clay', name: 'Clay rock', skill: 'mining', level: 1, xp: 8 },
+  { id: 'essence', name: 'Essence rock', skill: 'mining', level: 1, xp: 8 },
+  { id: 'bronze', name: 'Bronze rock', skill: 'mining', level: 1, xp: 8 },
+  { id: 'iron', name: 'Iron rock', skill: 'mining', level: 15, xp: 16 },
+  { id: 'steel', name: 'Steel rock', skill: 'mining', level: 30, xp: 33 },
+  { id: 'mithril', name: 'Mithril rock', skill: 'mining', level: 50, xp: 89 },
+  { id: 'adamant', name: 'Adamantite rock', skill: 'mining', level: 70, xp: 240 },
+  { id: 'runite', name: 'Runite rock', skill: 'mining', level: 85, xp: 505 },
+  { id: 'dragon', name: 'Dragon rock', skill: 'mining', level: 90, xp: 645 },
+]);
+
+const GATHER_BY_ID = Object.fromEntries(GATHER_NODES.map((node) => [node.id, node]));
+
 export function xpForCraft(recipe) {
+  if (recipe && Object.prototype.hasOwnProperty.call(recipe, 'xp')) {
+    const explicit = Number(recipe.xp);
+    if (Number.isFinite(explicit)) return Math.max(0, Math.floor(explicit));
+  }
   const tier = Math.max(1, Math.round(Number(recipe?.tier) || 1));
   return XP_RATES.craftBase + tier * XP_RATES.craftPerTier;
 }
 
 export function xpForMine(materialId) {
+  const node = GATHER_BY_ID[materialId];
+  if (node?.skill === 'mining') return node.xp;
   return XP_RATES.mine[materialId] ?? 0;
+}
+
+export function xpForChop(materialId) {
+  const node = GATHER_BY_ID[materialId];
+  return node?.skill === 'woodcutting' ? node.xp : 0;
+}
+
+export function xpForPick(materialId) {
+  const node = GATHER_BY_ID[materialId];
+  return node?.skill === 'farming' ? node.xp : 0;
+}
+
+export function gatherLevelRequirement(materialId) {
+  const node = GATHER_BY_ID[materialId];
+  if (!node) return null;
+  return {
+    skill: node.skill,
+    level: node.level,
+    name: SKILL_BY_ID[node.skill].name,
+    nodeName: node.name,
+  };
+}
+
+export function meetsGatherLevel(state, materialId) {
+  const req = gatherLevelRequirement(materialId);
+  if (!req) return true;
+  return skillLevelOf(state, req.skill) >= req.level;
+}
+
+/** "You need a Mining level of 85 to mine this rock." */
+export function gatherBlockText(materialId) {
+  const req = gatherLevelRequirement(materialId);
+  if (!req) return '';
+  const action = req.skill === 'woodcutting'
+    ? 'chop this tree'
+    : req.skill === 'farming'
+      ? `pick this ${req.nodeName.toLowerCase()}`
+      : 'mine this rock';
+  return `You need a ${req.name} level of ${req.level} to ${action}.`;
+}
+
+/**
+ * Inspect title. Level 1 nodes keep their own name. Higher nodes read
+ * "Runite rock · Requires Mining 85".
+ */
+export function gatherInspectTitle(fallbackName, materialId) {
+  const req = gatherLevelRequirement(materialId);
+  if (!req || req.level <= 1) return fallbackName;
+  return `${req.nodeName} · Requires ${req.name} ${req.level}`;
 }
 
 /**

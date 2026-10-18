@@ -146,8 +146,16 @@ function placeStation(state, id) {
   state.furniture[id] = { x: pose.x, z: pose.z, rot: 0 };
 }
 
+function reachLevel(state, skillId, level) {
+  const need = xpForLevel(level);
+  const have = state.skills?.getXp?.(skillId) ?? 0;
+  if (have < need) state.skills.addXp(skillId, need - have);
+}
+
 function finishCraft(state, recipeId, at = 0) {
   const recipe = RECIPES[recipeId];
+  const req = recipe?.requires;
+  if (req?.skill) reachLevel(state, req.skill, req.level);
   const station = stationForRecipe(recipe);
   if (station !== 'anvil' && !state.furniture[station] && SHOP[station]) placeStation(state, station);
   const cost = recipeCost(recipe);
@@ -321,12 +329,15 @@ describe('unlock lines', () => {
     assert.equal(unlockNeed(6), 70);
   });
 
-  it('keeps bronze, staff, green d hide, and bread unlocked on a new shop', () => {
+  it('keeps level-1 recipes open and locks the rest behind their skill', () => {
     const state = createState();
-    assert.equal(isUnlocked(state, 'bronze_sword'), true);
-    assert.equal(isUnlocked(state, 'staff'), true);
+    assert.equal(isUnlocked(state, 'bronze_dagger'), true);
+    assert.equal(isUnlocked(state, 'bronze_sword'), false);
+    assert.equal(isUnlocked(state, 'staff'), false);
     assert.equal(isUnlocked(state, 'green_dhide_body'), false);
     placeStation(state, 'loom');
+    assert.equal(isUnlocked(state, 'green_dhide_body'), false);
+    reachLevel(state, 'crafting', RECIPES.green_dhide_body.requires.level);
     assert.equal(isUnlocked(state, 'green_dhide_body'), true);
     assert.equal(isUnlocked(state, 'blue_dhide_body'), false);
     assert.equal(isUnlocked(state, 'bread'), false);
@@ -345,27 +356,28 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'salmon'), false);
     assert.equal(isUnlocked(state, 'cake'), false);
     assert.equal(unlockRemaining(state, 'iron_sword'), 20);
+    assert.match(craftBlockReason(state, 'iron_sword'), /Requires level 19 Smithing/);
   });
 
-  it('unlocks iron after 20 bronze crafts of the same line', () => {
+  it('unlocks iron swords at Smithing 19, not after 20 bronze crafts', () => {
     const state = createState();
-    state.materials.bronze = 30;
-    for (let i = 0; i < 19; i += 1) finishCraft(state, 'bronze_sword', i * 10);
-    assert.equal(isUnlocked(state, 'iron_sword'), false);
-    finishCraft(state, 'bronze_sword', 200);
+    state.materials.bronze_bar = 30;
+    for (let i = 0; i < 20; i += 1) finishCraft(state, 'bronze_sword', i * 10);
     assert.equal(state.craftCounts.bronze_sword, 20);
+    assert.equal(isUnlocked(state, 'iron_sword'), false);
+    reachLevel(state, 'smithing', RECIPES.iron_sword.requires.level);
     assert.equal(isUnlocked(state, 'iron_sword'), true);
     state.materials.iron_bar = 1;
     assert.equal(canCraft(state, 'iron_sword'), true);
   });
 
-  it('needs 30 iron crafts to unlock steel in that line', () => {
+  it('unlocks steel swords at Smithing 34', () => {
     const state = createState();
     state.craftCounts.bronze_sword = 20;
     state.craftCounts.iron_sword = 29;
-    state.materials.iron = 5;
+    reachLevel(state, 'smithing', RECIPES.iron_sword.requires.level);
     assert.equal(isUnlocked(state, 'steel_sword'), false);
-    finishCraft(state, 'iron_sword');
+    reachLevel(state, 'smithing', RECIPES.steel_sword.requires.level);
     assert.equal(isUnlocked(state, 'steel_sword'), true);
   });
 });
@@ -431,7 +443,11 @@ describe('save and load', () => {
     assert.equal(state.materials.flour, 2);
     assert.equal(state.materials.wheat, 0);
     assert.equal(state.materials.ancient_plans, 0);
-    assert.equal(state.skills.getLevel('smithing'), 1);
+    assert.equal(state.skills.getLevel('smithing'), RECIPES.bronze_platebody.requires.level);
+    assert.equal(state.skills.getLevel('crafting'), RECIPES.staff.requires.level);
+    assert.match(state.log[0], /Skills have arrived!/);
+    assert.match(state.log[0], /Smithing 19/);
+    assert.match(state.log[0], /Crafting 12/);
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
     assert.equal(ownsFurnace(state), false);
     assert.equal(ownsRange(state), false);
@@ -555,12 +571,11 @@ describe('customer trade', () => {
     assert.equal(food.recipeId, 'bread');
   });
 
-  it('sometimes asks for a higher-tier item that is still locked', () => {
+  it('sometimes asks for an item that is still level-locked', () => {
     const state = createState();
     const melee = decideRequest('mercenary', sequentialRng(0, 0), state);
     assert.equal(isUnlocked(state, melee.recipeId), false);
-    assert.ok((RECIPES[melee.recipeId].tier ?? 1) > 1);
-    assert.ok(RECIPES[melee.recipeId].price > RECIPES.bronze_scimitar.price);
+    assert.ok(RECIPES[melee.recipeId].requires.level > 1);
   });
 
   it('lists chest items as offer choices at a reduced sale price', () => {
@@ -687,6 +702,8 @@ describe('catalog', () => {
       assert.equal(blue.unlockNeed, 20);
       const withLoom = createState();
       placeStation(withLoom, 'loom');
+      assert.equal(isUnlocked(withLoom, green.id), false);
+      reachLevel(withLoom, 'crafting', green.requires.level);
       assert.equal(isUnlocked(withLoom, green.id), true);
       assert.equal(isUnlocked(createState(), green.id), false);
       assert.equal(isUnlocked(withLoom, blue.id), false);
@@ -1263,6 +1280,8 @@ describe('cauldron unlock', () => {
     assert.equal(state.materials.herbs, 7);
     assert.equal(state.materials.water, 11);
     state.craftCounts.attack_potion = 5;
+    assert.equal(isUnlocked(state, 'strength_potion'), false);
+    reachLevel(state, 'herblore', RECIPES.strength_potion.requires.level);
     assert.equal(isUnlocked(state, 'strength_potion'), true);
   });
 });
@@ -1341,19 +1360,24 @@ describe('furnace and spinning wheel', () => {
     assert.equal(canCraft(state, 'bread'), true);
   });
 
-  it('unlocks feast foods after bread without changing the kitchen cake line', () => {
+  it('unlocks feast foods by Cooking level', () => {
     const state = createState();
     placeStation(state, 'range');
     assert.equal(isUnlocked(state, 'salmon'), false);
     assert.equal(isUnlocked(state, 'pizza'), false);
     state.craftCounts.bread = 20;
+    assert.equal(isUnlocked(state, 'salmon'), false);
+    reachLevel(state, 'cooking', RECIPES.salmon.requires.level);
     assert.equal(isUnlocked(state, 'salmon'), true);
+    assert.equal(isUnlocked(state, 'pizza'), false);
+    reachLevel(state, 'cooking', RECIPES.pizza.requires.level);
     assert.equal(isUnlocked(state, 'pizza'), true);
     assert.equal(isUnlocked(state, 'cake'), false);
     assert.equal(isUnlocked(state, 'lobster'), false);
-    state.craftCounts.pizza = 30;
+    reachLevel(state, 'cooking', RECIPES.cake.requires.level);
     assert.equal(isUnlocked(state, 'cake'), true);
-    state.craftCounts.salmon = 20;
+    assert.equal(isUnlocked(state, 'lobster'), false);
+    reachLevel(state, 'cooking', RECIPES.lobster.requires.level);
     assert.equal(isUnlocked(state, 'lobster'), true);
     assert.ok(CUSTOMERS.pilgrim.prefers.includes('salmon'));
     assert.ok(CUSTOMERS.pilgrim.prefers.includes('anglerfish'));
@@ -1606,7 +1630,7 @@ describe('cheat codes', () => {
     const anvilX = state.furniture.anvil.x;
     state.gold = 9000;
     state.chest.bread = 3;
-    state.craftCounts.bronze_sword = 40;
+    reachLevel(state, 'smithing', RECIPES.iron_sword.requires.level);
     state.expansions = ['left'];
     state.chestLevel = 4;
     state.furniture.furnace = { x: 1, z: 2, rot: 0 };
@@ -1619,7 +1643,8 @@ describe('cheat codes', () => {
     assert.equal(state.gold, START_GOLD);
     assert.equal(state.chest.bread, 3);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
-    assert.equal(isUnlocked(state, 'bronze_sword'), true);
+    assert.equal(isUnlocked(state, 'bronze_dagger'), true);
+    assert.equal(isUnlocked(state, 'bronze_sword'), false);
     assert.deepEqual(state.expansions, []);
     assert.equal(state.chestLevel, 1);
     assert.equal(state.furniture.furnace, null);
@@ -1867,22 +1892,18 @@ describe('ores, appearance, king, and chest bin', () => {
 });
 
 describe('furnace bar unlocks', () => {
-  it('unlocks iron after 20 bronze smelts, then steel after 30 iron smelts', () => {
+  it('unlocks iron bars at Smithing 15 and steel bars at Smithing 30', () => {
     const state = createState();
     placeStation(state, 'furnace');
     assert.equal(isUnlocked(state, 'smelt_bronze'), true);
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(unlockRemaining(state, 'smelt_iron'), 20);
-    state.materials.bronze = 40;
-    for (let i = 0; i < 19; i += 1) finishCraft(state, 'smelt_bronze', i);
+    state.craftCounts.smelt_bronze = 20;
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
-    finishCraft(state, 'smelt_bronze', 20);
-    assert.equal(state.craftCounts.smelt_bronze, 20);
+    reachLevel(state, 'smithing', RECIPES.smelt_iron.requires.level);
     assert.equal(isUnlocked(state, 'smelt_iron'), true);
     assert.equal(isUnlocked(state, 'smelt_steel'), false);
-    state.materials.iron = 40;
-    state.craftCounts.smelt_iron = 29;
-    finishCraft(state, 'smelt_iron');
+    reachLevel(state, 'smithing', RECIPES.smelt_steel.requires.level);
     assert.equal(isUnlocked(state, 'smelt_steel'), true);
     const saved = serializeState(state);
     const next = createState();
@@ -1913,10 +1934,14 @@ describe('anvil tools', () => {
       assert.equal(recipeCost(pickaxe).materials[`${metal.id}_bar`], 1, pickaxe.id);
     }
     const state = createState();
+    assert.equal(isUnlocked(state, 'bronze_hatchet'), false);
+    reachLevel(state, 'smithing', RECIPES.bronze_hatchet.requires.level);
     assert.equal(isUnlocked(state, 'bronze_hatchet'), true);
     assert.equal(isUnlocked(state, 'iron_hatchet'), false);
     state.materials.bronze_bar = 25;
     for (let i = 0; i < 20; i += 1) finishCraft(state, 'bronze_hatchet', i);
+    assert.equal(isUnlocked(state, 'iron_hatchet'), false);
+    reachLevel(state, 'smithing', RECIPES.iron_hatchet.requires.level);
     assert.equal(isUnlocked(state, 'iron_hatchet'), true);
     assert.equal(state.chest.bronze_hatchet, 20);
     assert.ok(CUSTOMERS.mercenary.prefers.includes('bronze_scimitar'));
@@ -1962,6 +1987,8 @@ describe('ranged ammo', () => {
     assert.equal(state.craftCounts.bronze_arrows, 1);
     assert.equal(isUnlocked(state, 'iron_arrows'), false);
     state.craftCounts.bronze_arrows = 20;
+    assert.equal(isUnlocked(state, 'iron_arrows'), false);
+    reachLevel(state, 'fletching', RECIPES.iron_arrows.requires.level);
     assert.equal(isUnlocked(state, 'iron_arrows'), true);
     assert.match(costLabel(RECIPES.bronze_arrows), /×20/);
     assert.match(costLabel(RECIPES.bronze_arrows), /sells 900g/);
@@ -1969,7 +1996,7 @@ describe('ranged ammo', () => {
 });
 
 describe('magic runes', () => {
-  it('unlocks Air then Earth then Water then Fire on the weapon craft-count ladder', () => {
+  it('unlocks Air, Earth, Water, then Fire by Runecrafting level', () => {
     const runes = recipesForTab('magic', 'rune');
     assert.deepEqual(runes.map((r) => r.id), ['air_rune', 'earth_rune', 'water_rune', 'fire_rune']);
     assert.equal(anvilSubtabForRecipe(RECIPES.air_rune), 'rune');
@@ -2007,13 +2034,14 @@ describe('magic runes', () => {
     assert.equal(state.materials.essence, 0);
     assert.equal(state.chest.air_rune, 20);
     assert.equal(state.craftCounts.air_rune, 20);
+    assert.equal(isUnlocked(state, 'earth_rune'), false);
+    reachLevel(state, 'runecrafting', RECIPES.earth_rune.requires.level);
     assert.equal(isUnlocked(state, 'earth_rune'), true);
     assert.equal(isUnlocked(state, 'water_rune'), false);
-    state.craftCounts.earth_rune = 29;
-    finishCraft(state, 'earth_rune');
+    reachLevel(state, 'runecrafting', RECIPES.water_rune.requires.level);
     assert.equal(isUnlocked(state, 'water_rune'), true);
     assert.equal(isUnlocked(state, 'fire_rune'), false);
-    state.craftCounts.water_rune = 40;
+    reachLevel(state, 'runecrafting', RECIPES.fire_rune.requires.level);
     assert.equal(isUnlocked(state, 'fire_rune'), true);
     assert.ok(CUSTOMERS.hedgemage.prefers.includes('air_rune'));
     assert.equal(CUSTOMERS.pilgrim.prefers.includes('fire_rune'), false);
@@ -2034,6 +2062,7 @@ describe('magic runes', () => {
     assert.match(costLabel(RECIPES.air_rune), /sells 3,500g/);
     assert.match(costLabel(RECIPES.fire_rune), /sells 42,000g/);
     const state = createState();
+    reachLevel(state, 'runecrafting', RECIPES.fire_rune.requires.level);
     state.craftCounts.air_rune = 20;
     state.craftCounts.earth_rune = 30;
     state.craftCounts.water_rune = 40;
@@ -2125,6 +2154,7 @@ describe('potion sell prices', () => {
 describe('craft batches', () => {
   it('queues five affordable crafts and finishes them in sequence', () => {
     const state = createState();
+    reachLevel(state, 'smithing', RECIPES.bronze_sword.requires.level);
     state.materials.bronze_bar = 8;
     assert.equal(maxCraftActions(state, 'bronze_sword'), 8);
     assert.equal(startCraftBatch(state, 'bronze_sword', 5, 0), 5);
@@ -2159,6 +2189,7 @@ describe('craft batches', () => {
 
   it('cancels a mid-batch craft, refunds leftover actions, and keeps finished items', () => {
     const state = createState();
+    reachLevel(state, 'smithing', RECIPES.bronze_sword.requires.level);
     state.materials.bronze_bar = 5;
     assert.equal(startCraftBatch(state, 'bronze_sword', 5, 0), 5);
     assert.equal(state.materials.bronze_bar, 0);
@@ -2344,7 +2375,7 @@ describe('sawmill', () => {
       assert.equal(recipe.cost.materials[logId], 1);
       assert.equal(stationForRecipe(recipe), 'sawmill');
       assert.equal(MATERIALS[plankId].name.length > 0, true);
-      assert.equal(isUnlocked(state, recipeId), true);
+      assert.equal(isUnlocked(state, recipeId), recipe.requires.level <= 1);
     }
     assert.equal(craftUiForStation('sawmill').tab, 'saw');
     const saved = serializeState(state);
@@ -2437,6 +2468,8 @@ describe('anvil nails', () => {
     for (let i = 0; i < 18; i += 1) finishCraft(state, 'bronze_nails', i + 1);
     assert.equal(isUnlocked(state, 'iron_nails'), false);
     finishCraft(state, 'bronze_nails', 30);
+    assert.equal(isUnlocked(state, 'iron_nails'), false);
+    reachLevel(state, 'smithing', RECIPES.iron_nails.requires.level);
     assert.equal(isUnlocked(state, 'iron_nails'), true);
     assert.match(costLabel(RECIPES.bronze_nails), /Bronze Bar ×1/);
     assert.match(costLabel(RECIPES.bronze_nails), /makes 15/);

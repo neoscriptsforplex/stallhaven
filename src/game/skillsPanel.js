@@ -78,18 +78,23 @@ export function skillsDockHtml({ iconBase = defaultIconBase() } = {}) {
         </dl>
         <span class="xp-bar skill-tip-bar" aria-hidden="true"><i data-tip-bar></i></span>
         <p class="skill-tip-train" data-tip-train></p>
+        <p class="skill-tip-train" data-tip-next-unlock hidden></p>
       </div>
     </div>`;
 }
 
 /** Level-up banner. Put the returned element anywhere; it removes itself. */
-export function levelUpToastHtml({ skillId, name, level }, iconBase = defaultIconBase()) {
+export function levelUpToastHtml({ skillId, name, level, unlocked = [] }, iconBase = defaultIconBase()) {
   const max = level >= MAX_LEVEL;
+  const names = (unlocked ?? []).filter(Boolean);
+  const extra = names.length
+    ? ` New: ${names.slice(0, 4).join(', ')}${names.length > 4 ? '…' : ''}.`
+    : '';
   return `
     <div class="skill-toast" role="status" data-skill-toast="${skillId}">
       <img src="${iconBase}${skillId}.svg" alt="" width="32" height="32" />
       <p><strong>${max ? 'Maxed!' : 'Level up!'}</strong>
-      <span>Your ${name} level is now ${level}.</span></p>
+      <span>Your ${name} level is now ${level}.${extra}</span></p>
     </div>`;
 }
 
@@ -113,6 +118,7 @@ export function bindSkillsPanel({
   iconBase = defaultIconBase(),
   onOpen = null,
   onClose = null,
+  nextUnlock = null,
   portraitQuery = PORTRAIT_QUERY,
 } = {}) {
   if (!dock || !skills) throw new Error('bindSkillsPanel needs a #skills-dock element and a skills tracker');
@@ -170,6 +176,12 @@ export function bindSkillsPanel({
     tip.querySelector('[data-tip-left]').textContent = maxed ? '0' : formatXp(row.toNext);
     tip.querySelector('[data-tip-bar]').style.setProperty('--t', row.t.toFixed(4));
     tip.querySelector('[data-tip-train]').textContent = row.trainedBy;
+    const nextEl = tip.querySelector('[data-tip-next-unlock]');
+    if (nextEl) {
+      const text = typeof nextUnlock === 'function' ? nextUnlock(id, row.level) : '';
+      nextEl.hidden = !text;
+      nextEl.textContent = text;
+    }
     placeTip(tiles.get(id));
   }
 

@@ -37,6 +37,7 @@ import {
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
 import { grantChoppedLogs, grantFountainWater, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, pushLog } from './economy.js';
+import { gatherBlockText, meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
 import {
   FURNITURE_FORWARD,
   FURNITURE_SNAP,
@@ -1428,9 +1429,15 @@ export function createWorld(canvas, state, opts = {}) {
     return mineYield(session?.materialId);
   }
 
+  function refuseGather(materialId) {
+    if (!materialId || meetsGatherLevel(state, materialId)) return false;
+    pushLog(state, gatherBlockText(materialId));
+    return true;
+  }
+
   function startMining(materialId, pose) {
     const mat = MATERIALS[materialId];
-    if (!mat) return;
+    if (!mat || refuseGather(materialId)) return;
     const timing = mineTiming(materialId);
     mining = {
       materialId,
@@ -1452,6 +1459,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pose || !treeCanChop(pose.x, pose.z)) return;
     ensureTreeNode(pose.x, pose.z);
     const materialId = MATERIALS[pose.materialId]?.log ? pose.materialId : 'logs';
+    if (refuseGather(materialId)) return;
     mining = {
       materialId,
       name: MATERIALS[materialId]?.name ?? 'Tree',
@@ -1516,7 +1524,7 @@ export function createWorld(canvas, state, opts = {}) {
   function startPicking(pose) {
     const field = pickCrop(pose?.materialId === 'wheat' ? 'wheat' : 'flax');
     const node = field.nodes.find((item) => item.id === pose?.plantId && item.alive);
-    if (!node) return;
+    if (!node || refuseGather(field.materialId)) return;
     mining = {
       materialId: field.materialId,
       name: field.name,
@@ -1543,6 +1551,7 @@ export function createWorld(canvas, state, opts = {}) {
       const field = pickCrop(mining.crop);
       const got = field.grant(state, field.yield);
       if (got > 0) {
+        state.skills?.addXp('farming', xpForPick(field.materialId));
         pushLog(state, `Picked ${got} ${field.name}.`);
         pickHandler?.({
           type: 'picked',
@@ -1565,6 +1574,8 @@ export function createWorld(canvas, state, opts = {}) {
       ? grantChoppedLogs(state, CHOP_YIELD, mining.materialId)
       : grantMinedMaterial(state, mining.materialId, barYield(mining));
     if (got > 0) {
+      if (mining.mode === 'chop') state.skills?.addXp('woodcutting', xpForChop(mining.materialId));
+      else state.skills?.addXp('mining', xpForMine(mining.materialId));
       const choppedName = MATERIALS[mining.materialId]?.name ?? 'Logs';
       pushLog(state, mining.mode === 'chop' ? `Chopped ${got} ${choppedName}.` : `Mined ${got} ${mining.name}.`);
       pickHandler?.({
@@ -1705,6 +1716,16 @@ export function createWorld(canvas, state, opts = {}) {
   function queueUse(type, pose) {
     if (!pose) return;
     if (type === 'tree' && !treeCanChop(pose.x, pose.z)) return;
+    const gatherId = type === 'tree'
+      ? (pose.materialId ?? 'logs')
+      : type === 'wheat'
+        ? 'wheat'
+        : type === 'flax'
+          ? 'flax'
+          : type === 'boulder'
+            ? pose.materialId
+            : null;
+    if (gatherId && refuseGather(gatherId)) return;
     if (type !== 'counter') servingAtCounter = false;
     const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
     const arrive = type === 'wheat'

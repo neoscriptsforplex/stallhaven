@@ -110,7 +110,7 @@ test('recipe to skill mapping', () => {
 test('suggested xp amounts', () => {
   assert.equal(xpForCraft({ tier: 1 }), 16);
   assert.equal(xpForCraft({ tier: 7 }), 76);
-  assert.equal(xpForMine('bronze'), 18);
+  assert.equal(xpForMine('bronze'), 8);
   assert.equal(xpForMine('wood'), 0);
   assert.equal(xpForExpansion(0), 1914);
   assert.equal(xpForExpansion(4), 13228);

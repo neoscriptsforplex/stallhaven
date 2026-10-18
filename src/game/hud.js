@@ -19,6 +19,7 @@ import {
   materialList,
   offerClassLabel,
   offerClassOf,
+  isCraftHidden,
   recipeMatsLabel,
   recipesForAltar,
   recipesForTab,
@@ -122,8 +123,9 @@ import { clampMapZoom, drawMinimap, mapToWorld, minimapBufferPixels, minimapFram
 import { boulderInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
-import { createSkills, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
-import { bindSkillsPanel } from './skillsPanel.js';
+import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
+import { bindSkillsPanel, showLevelUpToast } from './skillsPanel.js';
+import { nextUnlockLabel, unlockNamesBetween } from './skillLevels.js';
 import {
   brightnessPercent,
   clampBrightness,
@@ -709,7 +711,7 @@ export function bindHud(root, state, world) {
     const nameEl = inspectPop.querySelector('[data-inspect-name]');
     const blurbEl = inspectPop.querySelector('[data-inspect-blurb]');
     const mineBtn = inspectPop.querySelector('[data-inspect-mine]');
-    if (nameEl) nameEl.textContent = info.name;
+    if (nameEl) nameEl.textContent = gatherInspectTitle(info.name, materialId);
     if (blurbEl) blurbEl.textContent = info.blurb;
     if (mineBtn) mineBtn.textContent = kind === 'tree' ? 'Chop' : kind === 'flax' || kind === 'wheat' ? 'Pick' : 'Mine';
     inspectPop.hidden = false;
@@ -2457,8 +2459,10 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   });
 
+  const hiddenCraft = (id) => isCraftHidden(RECIPES[id]);
   skillsPanel = bindSkillsPanel({
     skills,
+    nextUnlock: (skillId, level) => nextUnlockLabel(skillId, level, hiddenCraft),
     onOpen: () => {
       closeBuild();
       closeExpand();
@@ -2466,6 +2470,14 @@ export function bindHud(root, state, world) {
       closeSettingsDock();
       hideFurnMenu();
     },
+  });
+  skills.onLevelUp((event) => {
+    const unlocked = unlockNamesBetween(event.skillId, event.from, event.level, hiddenCraft);
+    const extra = unlocked.length
+      ? ` New: ${unlocked.slice(0, 6).join(', ')}${unlocked.length > 6 ? '…' : ''}.`
+      : '';
+    pushLog(state, `Congratulations, your ${event.name} level is now ${event.level}.${extra}`);
+    showLevelUpToast({ ...event, unlocked });
   });
 
   world.onPick((event) => {

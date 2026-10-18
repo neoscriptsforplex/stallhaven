@@ -1,5 +1,8 @@
 /** Rune Craft catalog: melee, magic, range, and food lines. */
 
+import { meetsLevelRequirement } from './skills.js';
+import { applyRecipeLevels } from './skillLevels.js';
+
 export const START_GOLD = 40;
 
 export const SHOP_MAX_LEVEL = 99;
@@ -1918,15 +1921,7 @@ export function matchingArmourIds(recipeId, ownedIds) {
 
 function recipeUnlocked(state, recipe) {
   if (!recipe) return false;
-  if (recipe.unlockAnyOf?.length) {
-    if (!state) return false;
-    const need = recipe.unlockNeed ?? 0;
-    return recipe.unlockAnyOf.some((id) => (state.craftCounts?.[id] ?? 0) >= need);
-  }
-  if (!recipe.previousId) return true;
-  if (!state) return true;
-  const count = state.craftCounts?.[recipe.previousId] ?? 0;
-  return count >= (recipe.unlockNeed ?? 0);
+  return meetsLevelRequirement(recipe, (skillId) => state?.skills?.getLevel?.(skillId) ?? 1);
 }
 
 function pickWeighted(recipes, rng) {
@@ -1999,3 +1994,5 @@ export function decideRequest(customerId, rng = Math.random, state = null) {
     offer: customer.offer ?? null,
   };
 }
+
+applyRecipeLevels(RECIPES);

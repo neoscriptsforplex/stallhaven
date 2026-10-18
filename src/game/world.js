@@ -21,7 +21,6 @@ import {
   FLAX_ARRIVE,
   FLAX_DURATION,
   FLAX_YIELD,
-  FOUNTAIN_WATER_YIELD,
   WHEAT_ARRIVE,
   WHEAT_DURATION,
   WHEAT_YIELD,
@@ -36,7 +35,7 @@ import {
   SHELF_SLOT_COUNT,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
-import { grantChoppedLogs, grantFountainWater, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, pushLog } from './economy.js';
+import { advanceFountainFill, createFountainFill, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, pushLog } from './economy.js';
 import { gatherBlockText, meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
 import {
   FURNITURE_FORWARD,
@@ -1647,12 +1646,22 @@ export function createWorld(canvas, state, opts = {}) {
     rebuildNav();
   }
 
-  function fillFromFountain() {
-    stopMining();
-    const got = grantFountainWater(state, FOUNTAIN_WATER_YIELD);
-    if (got > 0) pushLog(state, `Filled ${got} Buckets of water.`);
-    else pushLog(state, 'Buckets of water are full.');
-    pickHandler?.({ type: 'drew-water', amount: got });
+  function startFountainFill(pose) {
+    if (mining?.mode === 'pick') releaseHeldFlax(true);
+    const now = performance.now() / 1000;
+    mining = {
+      ...createFountainFill(now),
+      x: pose?.x ?? FOUNTAIN.x,
+      z: pose?.z ?? FOUNTAIN.z,
+      faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : null,
+    };
+    setHeldTool(shopkeeper, null);
+    faceGather(pose ?? { x: FOUNTAIN.x, z: FOUNTAIN.z });
+    setGatherClip(shopkeeper, 'pick');
+  }
+
+  function fillFromFountain(pose) {
+    startFountainFill(pose);
   }
 
   function startPicking(pose) {
@@ -1679,6 +1688,24 @@ export function createWorld(canvas, state, opts = {}) {
 
   function tickMining(now) {
     if (!mining) return;
+    if (mining.mode === 'fill') {
+      const step = advanceFountainFill(state, mining, now);
+      if (!step.ready) return;
+      if (step.full || !step.session) {
+        pushLog(state, 'Buckets of water are full.');
+        stopMining();
+        return;
+      }
+      pushLog(state, `Filled ${step.got} Buckets of water.`);
+      pickHandler?.({ type: 'drew-water', amount: step.got });
+      mining = {
+        ...step.session,
+        x: mining.x,
+        z: mining.z,
+        faceYaw: mining.faceYaw,
+      };
+      return;
+    }
     if (now - mining.startedAt < mining.duration) return;
     if (mining.mode === 'pick') {
       releaseHeldFlax(false);
@@ -1942,7 +1969,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (type === 'fountain') {
-        fillFromFountain();
+        fillFromFountain(aimed);
         playClick('ui');
         return;
       }
@@ -1986,7 +2013,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (type === 'boulder') startMining(materialId, pose);
     else if (type === 'tree') startChopping(pose);
     else if (type === 'flax' || type === 'wheat') startPicking(pose);
-    else if (type === 'fountain') fillFromFountain();
+    else if (type === 'fountain') fillFromFountain(pose);
     else pickHandler?.({ type, element });
   }
 
@@ -4066,7 +4093,11 @@ export function createWorld(canvas, state, opts = {}) {
         materialId: mining.materialId,
         name: mining.name,
         mode: mining.mode ?? 'mine',
-        verb: mining.mode === 'chop' ? 'Chopping' : mining.mode === 'pick' ? 'Picking' : 'Mining',
+        verb: mining.verb
+          ?? (mining.mode === 'chop' ? 'Chopping'
+            : mining.mode === 'pick' ? 'Picking'
+              : mining.mode === 'fill' ? 'Filling'
+                : 'Mining'),
         t,
         yield: grant,
       };

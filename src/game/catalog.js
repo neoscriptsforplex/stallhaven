@@ -1608,8 +1608,9 @@ export const FLAX_ARRIVE = 0.85;
 export const WHEAT_YIELD = 1;
 export const WHEAT_DURATION = 3.2;
 export const WHEAT_ARRIVE = 0.85;
-/** Buckets drawn from the outdoor fountain on one click. */
+/** Buckets drawn when one fountain fill bar completes. Same length as mining. */
 export const FOUNTAIN_WATER_YIELD = 5;
+export const FOUNTAIN_DURATION = MINE_DURATION;
 
 export function mineTiming(materialId) {
   return { duration: MINE_DURATION, yield: mineYield(materialId) };

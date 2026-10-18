@@ -3862,3 +3862,30 @@ describe('rigged buyer looks', () => {
     }
   });
 });
+
+describe('nail preview', () => {
+  it('builds a tinted pile of nails when no nail model is shipped', () => {
+    for (const id of ['bronze_nails', 'dragon_nails']) {
+      const ware = buildWare(id);
+      const colors = [];
+      let meshes = 0;
+      ware.traverse((child) => {
+        if (!child.isMesh) return;
+        meshes += 1;
+        colors.push(child.material?.color?.getHex());
+      });
+      assert.ok(meshes >= 8, id);
+      assert.ok(colors.includes(RECIPES[id].tint), id);
+    }
+    const bronze = [];
+    const dragon = [];
+    buildWare('bronze_nails').traverse((child) => {
+      if (child.isMesh) bronze.push(child.material.color.getHex());
+    });
+    buildWare('dragon_nails').traverse((child) => {
+      if (child.isMesh) dragon.push(child.material.color.getHex());
+    });
+    assert.equal(bronze.includes(RECIPES.dragon_nails.tint), false);
+    assert.equal(dragon.includes(RECIPES.bronze_nails.tint), false);
+  });
+});

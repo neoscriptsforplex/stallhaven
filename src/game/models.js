@@ -1932,6 +1932,7 @@ export function buildWare(recipeId) {
     thrownaxe: () => addThrownaxe(host, tint),
     hatchet: () => addHatchet(host, tint),
     pickaxe: () => addWarePickaxe(host, tint),
+    nails: () => addNails(host, tint),
     arrows: () => addArrows(host, tint),
     cannonballs: () => addCannonballs(host, tint),
     multicannon: () => addMulticannon(host, tint),
@@ -2705,6 +2706,30 @@ function addProceduralRune(group, mark, tint) {
       flame.rotation.z = lean;
       group.add(flame);
     }
+  }
+}
+
+/** Small tinted pile. No nail dump is shipped, so the craft preview uses this. */
+function addNails(group, tint) {
+  const mat = metal(tint);
+  const spots = [
+    [-0.07, 0.03, -0.18],
+    [0.01, -0.02, 0.04],
+    [0.08, 0.05, -0.08],
+    [-0.02, -0.04, 0.16],
+    [0.05, 0.01, 0.1],
+  ];
+  for (const [x, z, lean] of spots) {
+    const nail = new THREE.Group();
+    const shaft = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.009, 0.36, 6), mat));
+    shaft.position.y = 0.18;
+    nail.add(shaft);
+    const head = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.022, 8), mat));
+    head.position.y = 0.37;
+    nail.add(head);
+    nail.position.set(x, 0, z);
+    nail.rotation.z = lean;
+    group.add(nail);
   }
 }
 

@@ -24,6 +24,10 @@ import {
   grantMinedMaterial,
   grantPickedFlax,
   grantPickedWheat,
+  harvestHerb,
+  moveFarmingPatch,
+  plantHerb,
+  removeFarmingPatch,
   offerChoices,
   placeFromChest,
   placeOnDisplay,
@@ -34,6 +38,7 @@ import {
   upgradeChest,
 } from './economy.js';
 import {
+  GROW_BY_ID,
   CHOP_DURATION,
   FLAX_DURATION,
   FLAX_YIELD,
@@ -75,6 +80,10 @@ export const INTENT_TYPES = Object.freeze([
   'buyExpansion',
   'buyStation',
   'buyFurniture',
+  'removePatch',
+  'movePatch',
+  'plantHerb',
+  'harvestHerb',
   'gather',
   'hireHero',
   'startQuest',
@@ -156,6 +165,15 @@ export function checkIntentShape(intent) {
     case 'buyFurniture':
       if (!okId(intent.furnitureType)) return 'bad-furniture';
       return cleanPose(intent.pose) ? null : 'bad-pose';
+    case 'removePatch':
+    case 'harvestHerb':
+      return okIndex(intent.index) ? null : 'bad-index';
+    case 'movePatch':
+      if (!okIndex(intent.index)) return 'bad-index';
+      return cleanPose(intent.pose) ? null : 'bad-pose';
+    case 'plantHerb':
+      if (!okIndex(intent.index)) return 'bad-index';
+      return okId(intent.recipeId) && GROW_BY_ID[intent.recipeId] ? null : 'bad-herb';
     case 'gather':
       if (!['mine', 'chop', 'pick', 'water'].includes(intent.mode)) return 'bad-mode';
       if (intent.mode !== 'water' && (!okId(intent.materialId) || !has(MATERIALS, intent.materialId))) return 'bad-material';
@@ -300,6 +318,18 @@ export function applyIntent(state, intent, ctx = {}) {
       return done(buyStation(state, intent.stationId, coop ? cleanPose(intent.pose) : intent.pose));
     case 'buyFurniture':
       return done(buyFurniture(state, intent.furnitureType, coop ? cleanPose(intent.pose) : intent.pose));
+    case 'removePatch':
+      return done(removeFarmingPatch(state, intent.index));
+    case 'movePatch':
+      return done(moveFarmingPatch(state, intent.index, coop ? cleanPose(intent.pose) : intent.pose));
+    case 'plantHerb':
+    case 'harvestHerb': {
+      const now = Date.now();
+      const value = intent.type === 'plantHerb'
+        ? plantHerb(state, intent.index, intent.recipeId, now)
+        : harvestHerb(state, intent.index, now);
+      return done(value);
+    }
     case 'gather': {
       if (coop) {
         if (intent.mode !== 'water' && !meetsGatherLevel(state, intent.materialId)) return fail('level');

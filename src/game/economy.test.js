@@ -335,7 +335,7 @@ describe('unlock lines', () => {
   it('keeps level-1 recipes open and locks the rest behind their skill', () => {
     const state = createState();
     assert.equal(isUnlocked(state, 'bronze_dagger'), true);
-    assert.equal(isUnlocked(state, 'bronze_sword'), false);
+    assert.equal(isUnlocked(state, 'bronze_sword'), true);
     assert.equal(isUnlocked(state, 'staff'), false);
     assert.equal(isUnlocked(state, 'green_dhide_body'), false);
     placeStation(state, 'loom');
@@ -359,10 +359,10 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'salmon'), false);
     assert.equal(isUnlocked(state, 'cake'), false);
     assert.equal(unlockRemaining(state, 'iron_sword'), 20);
-    assert.match(craftBlockReason(state, 'iron_sword'), /Requires level 19 Smithing/);
+    assert.match(craftBlockReason(state, 'iron_sword'), /Requires level 5 Smithing/);
   });
 
-  it('unlocks iron swords at Smithing 19, not after 20 bronze crafts', () => {
+  it('unlocks iron swords at Smithing 5, not after 20 bronze crafts', () => {
     const state = createState();
     state.materials.bronze_bar = 30;
     for (let i = 0; i < 20; i += 1) finishCraft(state, 'bronze_sword', i * 10);
@@ -374,7 +374,7 @@ describe('unlock lines', () => {
     assert.equal(canCraft(state, 'iron_sword'), true);
   });
 
-  it('unlocks steel swords at Smithing 34', () => {
+  it('unlocks steel swords at the steel smithing level', () => {
     const state = createState();
     state.craftCounts.bronze_sword = 20;
     state.craftCounts.iron_sword = 29;
@@ -446,10 +446,10 @@ describe('save and load', () => {
     assert.equal(state.materials.flour, 2);
     assert.equal(state.materials.wheat, 0);
     assert.equal(state.materials.ancient_plans, 0);
-    assert.equal(state.skills.getLevel('smithing'), RECIPES.bronze_platebody.requires.level);
+    assert.equal(state.skills.getLevel('smithing'), RECIPES.bronze_pickaxe.requires.level);
     assert.equal(state.skills.getLevel('crafting'), RECIPES.staff.requires.level);
     assert.match(state.log[0], /Skills have arrived!/);
-    assert.match(state.log[0], /Smithing 19/);
+    assert.match(state.log[0], /Smithing 7/);
     assert.match(state.log[0], /Crafting 12/);
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
     assert.equal(ownsFurnace(state), false);
@@ -1063,6 +1063,12 @@ describe('material regen', () => {
     assert.equal(isMinedMaterial('flour'), false);
     assert.equal(grantMinedMaterial(state, 'essence'), 1);
     assert.equal(state.materials.essence, 1);
+    const rich = createState();
+    rich.materials.essence = 0;
+    reachLevel(rich, 'mining', 50);
+    assert.equal(grantMinedMaterial(rich, 'essence'), 2);
+    assert.equal(rich.materials.essence, 2);
+    assert.equal(grantMinedMaterial(rich, 'bronze'), 5);
     assert.deepEqual(mineTiming('essence'), { duration: 3.2, yield: 1 });
     assert.equal(grantMinedMaterial(state, 'bronze'), 5);
     assert.equal(state.materials.bronze, 17);
@@ -1647,7 +1653,7 @@ describe('cheat codes', () => {
     assert.equal(state.chest.bread, 3);
     assert.equal(isUnlocked(state, 'iron_sword'), false);
     assert.equal(isUnlocked(state, 'bronze_dagger'), true);
-    assert.equal(isUnlocked(state, 'bronze_sword'), false);
+    assert.equal(isUnlocked(state, 'bronze_sword'), true);
     assert.deepEqual(state.expansions, []);
     assert.equal(state.chestLevel, 1);
     assert.equal(state.furniture.furnace, null);
@@ -2040,8 +2046,6 @@ describe('magic runes', () => {
     assert.equal(isUnlocked(state, 'earth_rune'), false);
     reachLevel(state, 'runecrafting', RECIPES.earth_rune.requires.level);
     assert.equal(isUnlocked(state, 'earth_rune'), true);
-    assert.equal(isUnlocked(state, 'water_rune'), false);
-    reachLevel(state, 'runecrafting', RECIPES.water_rune.requires.level);
     assert.equal(isUnlocked(state, 'water_rune'), true);
     assert.equal(isUnlocked(state, 'fire_rune'), false);
     reachLevel(state, 'runecrafting', RECIPES.fire_rune.requires.level);
@@ -2054,6 +2058,24 @@ describe('magic runes', () => {
     assert.equal(applyState(next, saved), true);
     assert.equal(next.craftCounts.air_rune, 20);
     assert.equal(isUnlocked(next, 'earth_rune'), true);
+  });
+
+  it('gives two runes only when Runecrafting is twice the rune level', () => {
+    const state = createState();
+    state.materials.essence = 500;
+    finishCraft(state, 'air_rune');
+    assert.equal(state.chest.air_rune, 1);
+    reachLevel(state, 'runecrafting', 2);
+    finishCraft(state, 'air_rune', 10);
+    assert.equal(state.chest.air_rune, 3);
+    reachLevel(state, 'runecrafting', 9);
+    finishCraft(state, 'water_rune', 20);
+    assert.equal(state.chest.water_rune, 1);
+    reachLevel(state, 'runecrafting', 10);
+    finishCraft(state, 'water_rune', 30);
+    assert.equal(state.chest.water_rune, 3);
+    finishCraft(state, 'bronze_dagger', 40);
+    assert.equal(state.chest.bronze_dagger, 1);
   });
 
   it('sells Air on the bronze-end of the 5k–60k curve and climbs Earth, Water, then Fire', () => {

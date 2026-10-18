@@ -5,7 +5,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './canvas-mock.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
-import { bundledModelBases, bundledModelRoots, isDungeonRockDump, parseModelBuffer, prepareDungeonRockMaterials, validatePlayerModelFile, PLAYER_MODEL_MAX_BYTES } from './upload.js';
+import { assetQuery, bundledModelBases, bundledModelRoots, isDungeonRockDump, parseModelBuffer, prepareDungeonRockMaterials, validatePlayerModelFile, PLAYER_MODEL_MAX_BYTES } from './upload.js';
+import { MODEL_ASSET_REV } from './modelrev.js';
 import { UPLOADS_CLEARED } from './storage.js';
 
 function file(name) {
@@ -74,6 +75,12 @@ describe('clear uploads copy', () => {
 });
 
 describe('bundled model paths', () => {
+  it('cache-busts model URLs when a rev is set', () => {
+    assert.equal(MODEL_ASSET_REV, '');
+    assert.equal(assetQuery(), '');
+    assert.equal(assetQuery('fountain'), '?v=fountain');
+  });
+
   it('looks under models/ and public/models/ so githack source trees can load dumps', () => {
     const bases = bundledModelBases('player');
     const roots = bundledModelRoots();

@@ -58,6 +58,22 @@ function bandWidth(pts, from, to) {
   return Math.max(...xs) - Math.min(...xs);
 }
 
+/** Sign of the thin-axis side the boss or snout sticks out on. +1 is +Z. */
+function bossSign(pts) {
+  const zs = pts.map((p) => p.z).sort((a, b) => a - b);
+  const mid = zs[Math.floor(zs.length / 2)] ?? 0;
+  let best = pts[0];
+  let dist = -1;
+  for (const p of pts) {
+    const d = Math.abs(p.z - mid);
+    if (d > dist) {
+      dist = d;
+      best = p;
+    }
+  }
+  return Math.sign((best?.z ?? 0) - mid);
+}
+
 function assertUpright(view, label) {
   const size = new THREE.Box3().setFromPoints(worldPoints(view)).getSize(new THREE.Vector3());
   assert.ok(
@@ -92,6 +108,13 @@ describe('dragonfire shield', () => {
       ];
       for (const [label, view] of views) assertUpright(view, label);
       const bronzePts = worldPoints(buildWare('bronze_kiteshield'));
+      const dragonPts = worldPoints(buildWare('dragon_kiteshield'));
+      const bronzeFace = bossSign(bronzePts);
+      const dragonFace = bossSign(dragonPts);
+      assert.notEqual(bronzeFace, 0);
+      assert.equal(dragonFace, bronzeFace, 'dragonfire shield faces the same way as the bronze kiteshield');
+      assert.equal(bossSign(worldPoints(wrapCraftPreviewSpin(buildWare('dragon_kiteshield'), 'dragon_kiteshield'))), bronzeFace);
+      assert.equal(bossSign(worldPoints(mountDisplayBasePose(buildWare('dragon_kiteshield'), 'dragon_kiteshield'))), bronzeFace);
       const bronzeSize = new THREE.Box3().setFromPoints(bronzePts).getSize(new THREE.Vector3());
       assert.ok(bronzeSize.y > bronzeSize.x, 'bronze kiteshield stays upright');
       assert.ok(bronzeSize.y > bronzeSize.z, 'bronze kiteshield stays upright');

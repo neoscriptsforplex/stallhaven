@@ -55,6 +55,14 @@ const NAIL_LEVELS = [
   [90, 480],
 ];
 
+/** Melee smithing unlocks by metal, not by piece. XP stays on the old curve. */
+export const MELEE_SMITH_LEVELS = [1, 5, 10, 20, 30, 40, 60];
+
+const MELEE_SMITH_PIECES = [
+  'dagger', 'mace', 'med_helm', 'sword', 'scimitar', 'full_helm', 'spear',
+  'boots', 'chainbody', 'kiteshield', '2h_sword', 'plateskirt', 'platelegs', 'platebody',
+];
+
 const LEVELS = {
   ...smelt([
     [1, 4], [15, 9], [30, 25], [50, 79], [70, 250], [85, 600], [90, 860],
@@ -234,10 +242,18 @@ const LEVELS = {
   saw_magic_plank: row('construction', 75, 320),
 
   air_rune: row('runecrafting', 1, 4),
-  earth_rune: row('runecrafting', 5, 6),
-  water_rune: row('runecrafting', 9, 9),
+  water_rune: row('runecrafting', 5, 9),
+  earth_rune: row('runecrafting', 9, 6),
   fire_rune: row('runecrafting', 14, 13),
 };
+
+for (const piece of MELEE_SMITH_PIECES) {
+  METALS.forEach((metal, index) => {
+    const entry = LEVELS[`${metal}_${piece}`];
+    if (!entry) return;
+    entry[1] = MELEE_SMITH_LEVELS[index];
+  });
+}
 
 const unlocks = [];
 
@@ -285,7 +301,7 @@ export function unlockNamesBetween(skillId, fromLevel, toLevel, isHidden = () =>
     .map((row) => row.name);
 }
 
-/** "Next unlock: Iron rock (Lv 15)". Empty at 99 or when nothing is left. */
+/** "Next unlock: Iron rock (Lv 5)". Empty at 99 or when nothing is left. */
 export function nextUnlockLabel(skillId, level, isHidden = () => false) {
   const upcoming = unlocks.filter((row) => (
     row.skill === skillId && row.level > level && visible(row, isHidden)

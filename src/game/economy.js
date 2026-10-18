@@ -1132,13 +1132,25 @@ export function takeStock(state, recipeId) {
   return true;
 }
 
+/**
+ * Runecrafting is the only skill that doubles a craft. At twice the rune's
+ * required level the altar gives 2 runes. Air 2, Water 10, Earth 18, Fire 28.
+ */
+export function craftedOutputCount(state, recipe) {
+  const base = Math.max(1, recipe?.outputCount ?? 1);
+  if (recipe?.category !== 'rune') return base;
+  const need = Math.max(1, recipe.requires?.level ?? 1);
+  const level = state.skills?.getLevel?.('runecrafting') ?? 1;
+  return level >= need * 2 ? base * 2 : base;
+}
+
 function finishOneCraft(state, recipeId) {
   const recipe = RECIPES[recipeId];
+  const n = craftedOutputCount(state, recipe);
   if (isMaterialCraft(recipe) && MATERIALS[recipe.outputMaterial]) {
-    const n = recipe.outputCount ?? 1;
     state.materials[recipe.outputMaterial] = (state.materials[recipe.outputMaterial] ?? 0) + n;
   } else {
-    addToChest(state, recipeId, recipe.outputCount ?? 1);
+    addToChest(state, recipeId, n);
   }
   if (!state.craftCounts) state.craftCounts = {};
   state.craftCounts[recipeId] = craftCount(state, recipeId) + 1;
@@ -1293,9 +1305,16 @@ function grantMaterial(state, materialId, amount) {
   return add;
 }
 
+/** Essence rocks give 2 essence once Mining is 50 or higher. Other rocks do not. */
+export function minedGrantAmount(state, materialId, amount = mineYield(materialId)) {
+  const n = Math.max(0, Math.round(Number(amount) || 0));
+  if (materialId === 'essence' && (state.skills?.getLevel?.('mining') ?? 1) >= 50) return n * 2;
+  return n;
+}
+
 export function grantMinedMaterial(state, materialId, amount = mineYield(materialId)) {
   if (!isMinedMaterial(materialId)) return 0;
-  return grantMaterial(state, materialId, amount);
+  return grantMaterial(state, materialId, minedGrantAmount(state, materialId, amount));
 }
 
 export function grantChoppedLogs(state, amount = CHOP_YIELD, materialId = 'logs') {

@@ -5,6 +5,7 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, recipeList } from './catalog.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
+import { MODEL_ASSET_REV } from './modelrev.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
 import { UPLOADS_CLEARED, clearModels, saveModel } from './storage.js';
 import { normalizeImported, RIGGED_BUYER_MODELS } from './models.js';
@@ -495,7 +496,7 @@ export function resolveBundledModelRoot() {
     resolveRootPromise = (async () => {
       for (const root of bundledModelRoots()) {
         try {
-          const res = await fetch(`${root}player/player.obj`);
+          const res = await fetch(`${root}player/player.obj${assetQuery()}`);
           if (!res.ok) continue;
           assertObjPayload(await res.arrayBuffer(), `${root}player/player.obj`);
           cachedModelsRoot = root;
@@ -517,8 +518,14 @@ function missingModel(label) {
   return err;
 }
 
-function assetQuery(rev) {
-  return rev ? `?v=${encodeURIComponent(rev)}` : '';
+/**
+ * Cache-bust OBJ/MTL/GLB fetches. A folder may pass its own rev (the fountain
+ * dump). Pages deploys also stamp MODEL_ASSET_REV with the commit sha so a
+ * replaced gear file is not stuck in the browser cache.
+ */
+export function assetQuery(rev) {
+  const token = [MODEL_ASSET_REV, rev].filter(Boolean).join('-');
+  return token ? `?v=${encodeURIComponent(token)}` : '';
 }
 
 async function fetchObjMtl(folder, objFile, mtlFile, rev) {
@@ -589,7 +596,7 @@ async function loadBundledGltf(file) {
   let lastMissing = missingModel(`models/${file}`);
   for (const root of roots) {
     try {
-      const res = await fetch(`${root}${file}`);
+      const res = await fetch(`${root}${file}${assetQuery()}`);
       if (!res.ok) {
         lastMissing = missingModel(`models/${file}`);
         continue;

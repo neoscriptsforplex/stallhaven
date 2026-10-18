@@ -68,6 +68,30 @@ async function loadFolder(folder) {
   );
 }
 
+function sideCounts(root) {
+  const pts = [];
+  root.updateMatrixWorld(true);
+  root.traverse((child) => {
+    if (!child.isMesh || !child.geometry?.getAttribute?.('position')) return;
+    const pos = child.geometry.getAttribute('position');
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i += 1) {
+      v.fromBufferAttribute(pos, i);
+      child.localToWorld(v);
+      pts.push(v.z);
+    }
+  });
+  const sorted = [...pts].sort((a, b) => a - b);
+  const mid = sorted[Math.floor(sorted.length / 2)] ?? 0;
+  let front = 0;
+  let back = 0;
+  for (const z of pts) {
+    if (z >= mid) front += 1;
+    else back += 1;
+  }
+  return { front, back };
+}
+
 describe('mannequin body and leg fit', () => {
   it('keeps the scale clamp sane and leaves other displays at mount scale', () => {
     assert.equal(MANNEQUIN_WEAR_LIMITS.scaleMin, 0.5);
@@ -148,6 +172,21 @@ describe('mannequin body and leg fit', () => {
         const center = box.getCenter(new THREE.Vector3());
         assert.ok(Math.abs(center.x) < 1e-3, `${id} center x ${center.x}`);
         assert.ok(Math.abs(center.z) < 1e-3, `${id} center z ${center.z}`);
+      } finally {
+        setBundledLook(id, null);
+      }
+    }
+  });
+
+  it('faces chain mail toward +Z and leaves the dragon chainbody as dumped', async () => {
+    const ids = ['bronze_chainbody', 'runite_chainbody', 'dragon_chainbody'];
+    for (const id of ids) {
+      setBundledLook(id, await loadFolder(`gear/${id.replaceAll('_', '-')}`));
+      try {
+        const mounted = mountDisplayBasePose(buildWare(id), id, { mannequin: true });
+        assert.equal(fitMannequinWear(mounted, id), true, id);
+        const { front, back } = sideCounts(mounted);
+        assert.ok(front > back, `${id} chain should face +Z (front ${front}, back ${back})`);
       } finally {
         setBundledLook(id, null);
       }

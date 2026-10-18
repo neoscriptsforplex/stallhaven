@@ -33,6 +33,7 @@ import {
   customerName,
   shelfSlotPoses,
   SHELF_SLOT_COUNT,
+  stationForRecipe,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
 import { advanceFountainFill, createFountainFill, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, pushLog } from './economy.js';
@@ -3406,16 +3407,42 @@ export function createWorld(canvas, state, opts = {}) {
         updateWalkPose(rat, moving, dt, now);
       });
     }
-    const wheel = fixtureMeshes.wheel?.mesh?.userData.spinWheel;
-    if (wheel) {
-      const spinning = Object.keys(state.crafts ?? {}).some((id) => RECIPES[id]?.category === 'spin');
-      if (spinning) wheel.rotation.z += dt * 9.5;
+    const craftIds = Object.keys(state.crafts ?? {});
+    const spinning = craftIds.some((id) => RECIPES[id]?.category === 'spin');
+    const sawing = craftIds.some((id) => RECIPES[id]?.category === 'saw');
+    const wheelMesh = fixtureMeshes.wheel?.mesh;
+    if (wheelMesh?.userData.spinner) {
+      wheelMesh.userData.spinner.setActive(spinning);
+      wheelMesh.userData.spinner.update(dt);
+    } else if (wheelMesh?.userData.spinWheel && spinning) {
+      wheelMesh.userData.spinWheel.rotation.z += dt * 9.5;
     }
-    const sawing = Object.keys(state.crafts ?? {}).some((id) => RECIPES[id]?.category === 'saw');
     const sawSpinner = fixtureMeshes.sawmill?.mesh?.userData.spinner;
     if (sawSpinner) {
       sawSpinner.setActive(sawing);
       sawSpinner.update(dt);
+    }
+    // Station animations run only while a craft for that station is in state.crafts.
+    const potterSpinner = fixtureMeshes.potter?.mesh?.userData.spinner;
+    if (potterSpinner) {
+      potterSpinner.setActive(craftIds.some((id) => RECIPES[id] && stationForRecipe(RECIPES[id]) === 'potter'));
+      potterSpinner.update(dt);
+    }
+    const furnaceFx = fixtureMeshes.furnace?.mesh?.userData.furnaceFx;
+    if (furnaceFx) {
+      const smelt = craftIds.map((id) => RECIPES[id]).find((r) => r && stationForRecipe(r) === 'furnace');
+      furnaceFx.setActive(Boolean(smelt), smelt?.tint);
+      furnaceFx.update(dt);
+    }
+    const rangeFx = fixtureMeshes.range?.mesh?.userData.rangeFx;
+    if (rangeFx) {
+      rangeFx.setActive(craftIds.some((id) => RECIPES[id] && stationForRecipe(RECIPES[id]) === 'range'));
+      rangeFx.update(dt);
+    }
+    const loomFx = fixtureMeshes.loom?.mesh?.userData.loomFx;
+    if (loomFx) {
+      loomFx.setActive(craftIds.some((id) => RECIPES[id] && stationForRecipe(RECIPES[id]) === 'loom'));
+      loomFx.update(dt);
     }
     for (const fx of magicSparkles) fx.update(dt);
     if (drawScene) renderer.render(scene, camera);

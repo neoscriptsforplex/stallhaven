@@ -37,6 +37,7 @@ import {
   buildShopkeeper,
   measureVisibleBox,
   measureVisibleMeshHeight,
+  dumpStandEuler,
   proceduralPlayerFitHeight,
   setHeldTool,
   setGatherClip,
@@ -3993,10 +3994,22 @@ describe('nail dumps, magic sparkles, and the saw blade', () => {
     setBundledLook('sawmill', bundled);
     try {
       const { buildSawmill } = await import('./shopbuild.js');
+      const raw = new THREE.Box3().setFromObject(bundled).getSize(new THREE.Vector3());
+      const upright = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2, 0.4));
+      const tipped = dumpStandEuler(bundled, new THREE.Box3().setFromObject(upright));
+      assert.deepEqual(tipped, { rotateX: 0, rotateY: 0, rotateZ: 0 });
       const bench = buildSawmill();
+      const got = measureVisibleBox(bench).getSize(new THREE.Vector3());
+      const s = OSRS_MODEL_SCALE;
+      assert.ok(Math.abs(got.y - raw.y * s) < 0.03, `height ${got.y} vs ${raw.y * s}`);
+      assert.ok(Math.abs(got.x - raw.x * s * 0.5) < 0.03, `length ${got.x} vs ${raw.x * s * 0.5}`);
+      assert.ok(Math.abs(got.z - raw.z * s * 0.5) < 0.03, `depth ${got.z} vs ${raw.z * s * 0.5}`);
+      assert.ok(Math.abs(bench.rotation.x) < 1e-6 && Math.abs(bench.rotation.z) < 1e-6);
       const spin = bench.userData.spinner;
       assert.ok(spin, 'bundled sawmill should attach the blade');
       assert.equal(spin.part.name, 'saw_blade');
+      const axle = spin.axis.clone().transformDirection(spin.pivot.parent.matrixWorld);
+      assert.ok(Math.abs(axle.z) > 0.9, `blade axle ${axle.toArray()}`);
       const still = spin.angle();
       spin.setActive(false);
       spin.update(0.1);

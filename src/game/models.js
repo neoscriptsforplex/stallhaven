@@ -1867,6 +1867,9 @@ export function bundledWareEuler(recipeId, source, targetBox) {
 /** Stand a flat dump upright when the procedural mesh is taller than it is wide. */
 export function dumpStandEuler(source, targetBox) {
   const none = { rotateX: 0, rotateY: 0, rotateZ: 0 };
+  // The sawmill is a long bench. Halving its length and depth must not trip
+  // this rule, which would lay the bench on its side.
+  if (source?.userData?.exemptDumpStand || source?.getObjectByName?.('saw_blade')) return none;
   if (!source || !targetBox || targetBox.isEmpty()) return none;
   const tsize = targetBox.getSize(new THREE.Vector3());
   const upright = tsize.y >= Math.max(tsize.x, tsize.z) * 0.95;

@@ -653,7 +653,7 @@ export function furnitureHalfSize(kind) {
   if (kind === 'loom') return { hw: 0.48, hd: 0.36 };
   if (kind === 'fletch') return { hw: 0.55, hd: 0.4 };
   if (kind === 'potter') return { hw: 0.4, hd: 0.4 };
-  if (kind === 'sawmill') return { hw: 1.44, hd: 0.72 };
+  if (kind === 'sawmill') return { hw: 0.72, hd: 0.36 };
   if (kind === 'patch' || kind === 'farming_patch') return { hw: FARMING_PATCH_HALF, hd: FARMING_PATCH_HALF };
   if (kind === 'portal') return { hw: PORTAL_TARGET_WIDTH / 2, hd: PORTAL_TARGET_DEPTH / 2 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };

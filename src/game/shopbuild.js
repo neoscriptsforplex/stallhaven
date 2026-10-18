@@ -58,6 +58,10 @@ import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
 import { applyOsrsScale, getBundledLook, measureVisibleBox, OSRS_MODEL_SCALE, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
 import { prepareDungeonRockMaterials } from './upload.js';
 import { attachSpinner } from './stationSpin.js';
+import { attachFountainWater } from './fountainWater.js';
+import { attachFurnaceFx } from './furnaceFx.js';
+import { attachRangeFx } from './rangeFx.js';
+import { attachLoomFx } from './loomFx.js';
 
 export { DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT } from './upload.js';
 
@@ -1500,12 +1504,16 @@ export function buildRange() {
   const bundled = getBundledLook('range');
   const target = applyRangeWorldScale(buildProceduralRange());
   if (bundled) {
-    return sinkRangePlate(wrapBundledProp(bundled, target, {
+    const range = sinkRangePlate(wrapBundledProp(bundled, target, {
       name: 'range',
       fit: 'height',
       label: 'Range',
       wareY: 'top',
     }));
+    // Stew, bobbing food and steam in the pot while cooking.
+    const fx = attachRangeFx(range);
+    if (fx) range.userData.rangeFx = fx;
+    return range;
   }
   return target;
 }
@@ -1618,6 +1626,9 @@ export function buildFurnace() {
     root.name = 'furnace';
     root.add(fitted);
     root.userData.wareY = fitted.userData.wareY;
+    // Bars slide into the oven mouth and the chamber glows while smelting.
+    const fx = attachFurnaceFx(fitted);
+    if (fx) root.userData.furnaceFx = fx;
     return root;
   }
   return buildProceduralFurnace();
@@ -1722,7 +1733,11 @@ function buildProceduralLoom() {
 }
 
 export function buildLoom() {
-  return fitBundledStation('loom', buildProceduralLoom());
+  const loom = fitBundledStation('loom', buildProceduralLoom());
+  // The bundled OBJ carries loom_beater / loom_shuttle / loom_heddle_a|b / loom_cloth_roll.
+  const fx = attachLoomFx(loom);
+  if (fx) loom.userData.loomFx = fx;
+  return loom;
 }
 
 function buildProceduralFletchingBench() {
@@ -1762,7 +1777,12 @@ function buildProceduralPotterWheel() {
 }
 
 export function buildPotterWheel() {
-  return fitBundledStation('potter', buildProceduralPotterWheel());
+  const wheel = fitBundledStation('potter', buildProceduralPotterWheel());
+  // The bundled OBJ carries the wheel head, clay, shaft and kick wheel as `o pottery_plate`
+  // (vertical axle); spin it while pottery is crafting.
+  const spinner = attachSpinner(wheel, { partName: 'pottery_plate' });
+  if (spinner) wheel.userData.spinner = spinner;
+  return wheel;
 }
 
 function buildProceduralSawmill() {
@@ -1797,15 +1817,24 @@ function buildProceduralSawmill() {
 }
 
 /**
- * Luke's sawmill dump at the true OSRS unit scale (256×128 → 2.88×1.44 m).
- * The procedural bench is only the fallback when the dump is missing.
+ * Luke's sawmill dump, then half the length and depth (X and Z) with the
+ * height left alone. The procedural bench is only the fallback when the dump
+ * is missing. dumpStandEuler must not lay this bench on its side.
  */
 export function buildSawmill() {
   const bundled = getBundledLook('sawmill');
-  const bench = bundled
-    ? wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'sawmill', fit: 'max' })
-    : buildProceduralSawmill();
-  if (bundled) sitVisibleOnY(bench, 0);
+  let bench;
+  if (bundled) {
+    const source = bundled.clone(true);
+    source.userData.exemptDumpStand = true;
+    bench = wrapBundledProp(source, osrsFitHost(bundled), { name: 'sawmill', fit: 'max' });
+    bench.scale.x *= 0.5;
+    bench.scale.z *= 0.5;
+    bench.updateMatrixWorld(true);
+    sitVisibleOnY(bench, 0);
+  } else {
+    bench = buildProceduralSawmill();
+  }
   // Bundled OBJ splits the blade into `o saw_blade`. Spin it on the Z axle while sawing.
   const spinner = attachSpinner(bench, { partName: 'saw_blade' });
   if (spinner) bench.userData.spinner = spinner;
@@ -1848,10 +1877,17 @@ export function buildSpinningWheel() {
       wareY: 'top',
     });
     sitVisibleOnY(fitted, 0);
-    const spinner = new THREE.Group();
-    spinner.name = 'spin-wheel';
-    fitted.add(spinner);
-    fitted.userData.spinWheel = spinner;
+    // The bundled OBJ carries the wheel as `o spin_wheel` (axle along X).
+    const spinner = attachSpinner(fitted, { partName: 'spin_wheel' });
+    if (spinner) {
+      fitted.userData.spinner = spinner;
+      fitted.userData.spinWheel = spinner.pivot;
+    } else {
+      const empty = new THREE.Group();
+      empty.name = 'spin-wheel';
+      fitted.add(empty);
+      fitted.userData.spinWheel = empty;
+    }
     return fitted;
   }
   return applyWheelWorldScale(buildProceduralSpinningWheel());
@@ -2434,6 +2470,12 @@ export function tickFountainWater(root, now) {
   root.traverse((child) => {
     const fx = child.userData?.fountainWater;
     if (fx) stepFountainWater(fx, now);
+    const flow = child.userData?.fountainFlow;
+    if (flow) {
+      const dt = flow.lastNow == null ? 0 : now - flow.lastNow;
+      flow.lastNow = now;
+      flow.fx.update(dt);
+    }
   });
 }
 
@@ -2451,6 +2493,8 @@ export function buildFountain() {
     }
   }
   mountFountainWater(group);
+  // Jets from the finial, overflow streams between the bowls, ripples and bobbing pools.
+  group.userData.fountainFlow = { fx: attachFountainWater(group), lastNow: null };
   return group;
 }
 

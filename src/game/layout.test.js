@@ -843,7 +843,7 @@ describe('garden tree guarantee and sawmill footprint', () => {
   });
 
   it('sizes the sawmill and farming patch footprints', () => {
-    assert.deepEqual(furnitureHalfSize('sawmill'), { hw: 1.44, hd: 0.72 });
+    assert.deepEqual(furnitureHalfSize('sawmill'), { hw: 0.72, hd: 0.36 });
     assert.deepEqual(furnitureHalfSize('patch'), { hw: 1.44, hd: 1.44 });
     assert.deepEqual(furnitureHalfSize('farming_patch'), { hw: 1.44, hd: 1.44 });
   });

@@ -56,14 +56,14 @@ describe('storage cap', () => {
 
   it('restocks only up to the chest cap', () => {
     const state = createState();
-    state.materials.herbs = 250;
+    state.materials.hide = 250;
     state.materialAcc = {};
     tickMaterials(state, 80);
-    assert.equal(state.materials.herbs, 250);
+    assert.equal(state.materials.hide, 250);
     state.chestLevel = 2;
     tickMaterials(state, 8);
-    assert.ok(state.materials.herbs > 250);
-    assert.ok(state.materials.herbs <= 500);
+    assert.ok(state.materials.hide > 250);
+    assert.ok(state.materials.hide <= 500);
   });
 
   it('blocks a material craft at the cap and refunds a batch that no longer fits', () => {

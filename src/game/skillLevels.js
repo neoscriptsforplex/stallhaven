@@ -259,6 +259,17 @@ for (const piece of MELEE_SMITH_PIECES) {
   });
 }
 
+/** Same levels as GROW_RECIPES. Kept here so this file does not import the catalog. */
+const FARMING_HERBS = [
+  { id: 'grow_guam', name: 'Guam', level: 9 },
+  { id: 'grow_marrentill', name: 'Marrentill', level: 14 },
+  { id: 'grow_tarromin', name: 'Tarromin', level: 19 },
+  { id: 'grow_harralander', name: 'Harralander', level: 26 },
+  { id: 'grow_ranarr', name: 'Ranarr', level: 32 },
+  { id: 'grow_lantadyme', name: 'Lantadyme', level: 73 },
+  { id: 'grow_dwarf_weed', name: 'Dwarf weed', level: 79 },
+];
+
 const unlocks = [];
 
 export function applyRecipeLevels(recipes) {
@@ -287,6 +298,15 @@ export function applyRecipeLevels(recipes) {
       kind: 'gather',
     });
   }
+  for (const herb of FARMING_HERBS) {
+    unlocks.push({
+      id: herb.id,
+      name: herb.name,
+      skill: 'farming',
+      level: herb.level,
+      kind: 'gather',
+    });
+  }
 }
 
 /** Unique unlock levels per skill, after melee metals share one level. Includes gather nodes. */
@@ -297,6 +317,9 @@ export function unlockLevelsBySkill() {
   }
   for (const node of GATHER_NODES) {
     (bySkill[node.skill] ??= new Set()).add(node.level);
+  }
+  for (const herb of FARMING_HERBS) {
+    (bySkill.farming ??= new Set()).add(herb.level);
   }
   return Object.fromEntries(
     Object.entries(bySkill).map(([skill, levels]) => [skill, [...levels].sort((a, b) => a - b)]),

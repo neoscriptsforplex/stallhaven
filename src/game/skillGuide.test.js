@@ -69,7 +69,9 @@ describe('skill guide', () => {
     assert.equal(nextUnlockLevel(smithing, 1), 2);
     assert.equal(defaultTab(smithing, 1), 'bars');
     const herbs = SKILL_GUIDES.farming.tabs.find((tab) => tab.id === 'herbs');
-    assert.ok(herbs.rows.every((row) => row.soon));
+    const realHerbs = new Set(['Guam', 'Marrentill', 'Tarromin', 'Harralander', 'Ranarr', 'Lantadyme', 'Dwarf weed']);
+    assert.ok(herbs.rows.filter((row) => realHerbs.has(row.name)).every((row) => !row.soon));
+    assert.ok(herbs.rows.filter((row) => !realHerbs.has(row.name)).every((row) => row.soon));
     const ordered = sortedRows({
       rows: [{ lv: 5, perk: true, name: 'perk' }, { lv: 5, name: 'item' }, { lv: 1, name: 'first' }],
     });

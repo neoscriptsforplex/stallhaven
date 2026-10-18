@@ -77,8 +77,9 @@ const each = (ids, n) => Object.fromEntries(ids.map((id) => [id, n]));
 
 /**
  * Rewards are material ids -> amount. Ids marked NEW in SPEC.md do not exist in MATERIALS yet.
- * `herbs` is one material today; "10 of each herb" becomes 10 Herbs until herbs are split (open question).
+ * Moss Giant pays 10 of each real herb.
  */
+const HERB_IDS = ['guam', 'marrentill', 'tarromin', 'harralander', 'ranarr', 'lantadyme', 'dwarf_weed'];
 export const QUESTS = [
   { id: 'imp', tab: 'min1', enemy: 'Imp', icon: 'horns', tint: '#c4462e', duration: 1 * MIN, rewards: { molten_glass: 5 } },
   { id: 'chicken', tab: 'min1', enemy: 'Chicken', icon: 'beak', tint: '#e8dcc0', duration: 1 * MIN, rewards: { egg: 5 } },
@@ -90,7 +91,7 @@ export const QUESTS = [
   { id: 'skeleton', tab: 'min30', enemy: 'Skeleton', icon: 'skull', tint: '#e6dcc4', duration: 30 * MIN, rewards: { orb: 5 } },
   { id: 'scorpion', tab: 'min30', enemy: 'Scorpion', icon: 'claw', tint: '#b8862f', duration: 30 * MIN, rewards: { steel_bar: 50 } },
   { id: 'ghost', tab: 'hr1', enemy: 'Ghost', icon: 'ghost', tint: '#b7e3f5', duration: 1 * HOUR, rewards: { orb: 20 } },
-  { id: 'moss_giant', tab: 'hr1', enemy: 'Moss Giant', icon: 'head', tint: '#3a8a45', duration: 1 * HOUR, rewards: { herbs: 10 } },
+  { id: 'moss_giant', tab: 'hr1', enemy: 'Moss Giant', icon: 'head', tint: '#3a8a45', duration: 1 * HOUR, rewards: each(HERB_IDS, 10) },
   { id: 'pirate', tab: 'hr1', enemy: 'Pirate', icon: 'head', tint: '#8a2424', duration: 1 * HOUR, rewards: each(ORES, 20) },
   { id: 'dark_wizard', tab: 'day1', enemy: 'Dark Wizard', icon: 'hat', tint: '#3a2a52', duration: 1 * DAY, rewards: { essence: 500 } },
   { id: 'vampyre', tab: 'day1', enemy: 'Vampyre', icon: 'fangs', tint: '#6a1c28', duration: 1 * DAY, rewards: { dragon_bar: 50 } },

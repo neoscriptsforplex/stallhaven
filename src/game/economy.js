@@ -16,6 +16,8 @@ import {
   FOUNTAIN_WATER_YIELD,
   WHEAT_YIELD,
   mineYield,
+  GROW_BY_ID,
+  HERB_GROW_YIELD,
   SHOP,
   SHELF_SLOT_COUNT,
   SHOP_MAX_LEVEL,
@@ -1008,6 +1010,8 @@ export function buyFurniture(state, type, pose) {
       x: pose.x,
       z: pose.z,
       rot: pose.rot ?? FURNITURE_FORWARD,
+      paid: paidExtra,
+      crop: null,
     });
     return true;
   }
@@ -1085,6 +1089,82 @@ export function removePlacedFurniture(state, index) {
     state.selectedDisplay = next >= 0 ? next : 0;
   }
   return true;
+}
+
+/**
+ * Delete one farming patch.
+ * A paid patch refunds the current top tier (gold, nails, and planks, uncapped)
+ * and frees that tier for the next buy. A free-credit patch refunds nothing and
+ * restores one free place. Anything growing on it is lost.
+ */
+export function removeFarmingPatch(state, index) {
+  const patches = state.furniture?.patches;
+  if (!Array.isArray(patches) || !Number.isInteger(index) || index < 0 || index >= patches.length) return false;
+  const pose = patches[index];
+  if (pose?.paid === false) {
+    if (!state.freeFurnitureReplace) state.freeFurnitureReplace = emptyFreeFurnitureReplace();
+    const room = Math.max(0, FARMING_PATCH_CAP - (patches.length - 1));
+    state.freeFurnitureReplace.farming_patch = Math.min(
+      room,
+      (state.freeFurnitureReplace.farming_patch ?? 0) + 1,
+    );
+  } else {
+    if (!state.boughtFurniture) state.boughtFurniture = emptyBoughtFurniture();
+    const bought = boughtFurnitureCount(state, 'farming_patch');
+    const tier = Math.max(0, Math.min(FARMING_PATCH_COSTS.length - 1, bought - 1));
+    state.gold = (state.gold ?? 0) + (FARMING_PATCH_COSTS[tier] ?? 0);
+    for (const part of furnitureBuildParts('farming_patch', tier)) {
+      state.materials[part.id] = (state.materials[part.id] ?? 0) + part.count;
+    }
+    state.boughtFurniture.farming_patch = Math.max(0, bought - 1);
+  }
+  patches.splice(index, 1);
+  return true;
+}
+
+/** Move a placed patch. The crop stays on the same object. */
+export function moveFarmingPatch(state, index, pose) {
+  const patch = state.furniture?.patches?.[index];
+  if (!patch || !pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) return false;
+  patch.x = pose.x;
+  patch.z = pose.z;
+  if (Number.isFinite(pose.rot)) patch.rot = pose.rot;
+  return true;
+}
+
+/** Plant one herb. `now` is wall-clock milliseconds, not the room clock. */
+export function plantHerb(state, index, recipeId, now = Date.now()) {
+  const recipe = GROW_BY_ID[recipeId];
+  const patch = state.furniture?.patches?.[index];
+  if (!patch || !recipe || patch.crop) return false;
+  const level = state.skills?.getLevel?.('farming') ?? 1;
+  if (level < recipe.level) return false;
+  const start = Number.isFinite(now) ? now : Date.now();
+  patch.crop = {
+    id: recipe.id,
+    startedAt: start,
+    endsAt: start + recipe.seconds * 1000,
+  };
+  return true;
+}
+
+/**
+ * Harvest a finished crop. Returns how many herbs landed.
+ * A full chest leaves the crop in the ground. A short stack grants what fits and clears it.
+ */
+export function harvestHerb(state, index, now = Date.now()) {
+  const patch = state.furniture?.patches?.[index];
+  const crop = patch?.crop;
+  if (!crop) return 0;
+  const when = Number.isFinite(now) ? now : Date.now();
+  if (when < crop.endsAt) return 0;
+  const recipe = GROW_BY_ID[crop.id];
+  if (!recipe) return 0;
+  const got = grantMaterial(state, recipe.product, HERB_GROW_YIELD);
+  if (got <= 0) return 0;
+  state.skills?.addXp('farming', recipe.xp);
+  patch.crop = null;
+  return got;
 }
 
 export function reducedSalePrice(listPrice) {
@@ -1569,6 +1649,11 @@ export function applyState(state, data) {
       }
     }
     migrateLegacyMetalBars(next, data);
+    if (typeof data.materials.herbs === 'number' && Number.isFinite(data.materials.herbs)) {
+      const extra = Math.max(0, Math.round(data.materials.herbs));
+      if (data.materials.guam == null) next.materials.guam = extra;
+      else next.materials.guam = (next.materials.guam ?? 0) + extra;
+    }
   }
   if (data.chest && typeof data.chest === 'object') {
     for (const [id, count] of Object.entries(data.chest)) {
@@ -1699,6 +1784,20 @@ export function applyState(state, data) {
       const rot = typeof saved.rot === 'number' && Number.isFinite(saved.rot) ? saved.rot : fallback.rot;
       return { x, z, rot };
     };
+    const readPatch = (pose) => {
+      const base = readPose(pose, { x: pose.x, z: pose.z, rot: FURNITURE_FORWARD });
+      const paid = pose.paid === false ? false : true;
+      let crop = null;
+      if (
+        pose.crop
+        && typeof pose.crop.id === 'string'
+        && Number.isFinite(pose.crop.startedAt)
+        && Number.isFinite(pose.crop.endsAt)
+      ) {
+        crop = { id: pose.crop.id, startedAt: pose.crop.startedAt, endsAt: pose.crop.endsAt };
+      }
+      return { ...base, paid, crop };
+    };
     next.furniture = {
       counter: readPose(data.furniture.counter, defaults.counter),
       anvil: readPose(data.furniture.anvil, defaults.anvil),
@@ -1746,7 +1845,7 @@ export function applyState(state, data) {
       patches: Array.isArray(data.furniture.patches)
         ? data.furniture.patches.filter((pose) => (
           pose && typeof pose.x === 'number' && typeof pose.z === 'number'
-        )).slice(0, FARMING_PATCH_CAP).map((pose) => readPose(pose, { x: pose.x, z: pose.z, rot: FURNITURE_FORWARD }))
+        )).slice(0, FARMING_PATCH_CAP).map((pose) => readPatch(pose))
         : [],
       displays: migrateStarterMannequins(next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {

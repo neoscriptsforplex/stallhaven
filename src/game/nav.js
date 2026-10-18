@@ -152,6 +152,11 @@ export function liveObstacles(state, shop = SHOP, skip = null) {
   if (skip?.id === 'anvil') furniture.anvil = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'chest') furniture.chest = { x: 999, z: 999, rot: 0 };
   if (skip?.id === 'counter') furniture.counter = { x: 999, z: 999, rot: 0 };
+  if (skip?.id === 'farming_patch' && skip.index != null) {
+    const patches = [...(furniture.patches ?? [])];
+    if (patches[skip.index]) patches[skip.index] = { x: 999, z: 999, rot: 0 };
+    furniture.patches = patches;
+  }
   if (skip?.id === 'display' && skip.index != null) {
     const displays = [...(furniture.displays ?? [])];
     displays[skip.index] = { x: 999, z: 999, rot: 0 };

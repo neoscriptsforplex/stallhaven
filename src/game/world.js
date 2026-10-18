@@ -808,9 +808,12 @@ export function createWorld(canvas, state, opts = {}) {
   function poseOf(target) {
     if (!target) return null;
     if (placeDraft && target.id === placeDraft.id) {
-      if (target.id !== 'display' || target.index === placeDraft.index) return placeDraft;
+      const indexOk = (target.id !== 'display' && target.id !== 'farming_patch')
+        || target.index === placeDraft.index
+        || (target.id === 'farming_patch' && placeDraft.index == null);
+      if (indexOk) return placeDraft;
     }
-    if (target.id === 'farming_patch') return null;
+    if (target.id === 'farming_patch') return state.furniture.patches?.[target.index] ?? null;
     return target.id === 'display'
       ? state.furniture.displays[target.index]
       : state.furniture[target.id];
@@ -924,6 +927,7 @@ export function createWorld(canvas, state, opts = {}) {
     placeDraft = null;
     setSnapGridVisible(false);
     if (refreshGrid) rebuildSnapGrid();
+    if (kind === 'farming_patch' && patchesReady) syncPatchMeshes();
   }
 
   function discardPlaceDisplay() {
@@ -1372,10 +1376,14 @@ export function createWorld(canvas, state, opts = {}) {
       releasePatchObject(child);
     }
     const poses = state.furniture?.patches ?? [];
+    const movingIndex = placeDraft?.id === 'farming_patch' && placeDraft.index != null
+      ? placeDraft.index
+      : -1;
     poses.forEach((pose, index) => {
       const mesh = buildFarmingPatch();
       placeFarmingPatchMesh(mesh, pose, OUTDOOR_GROUND_Y);
       mesh.rotation.y = furnitureVisualYaw('farming_patch', pose.rot);
+      if (index === movingIndex) mesh.visible = false;
       patchGroup.add(mesh);
       const { hw, hd } = furnitureHalfSize('patch');
       const pick = new THREE.Mesh(
@@ -1392,6 +1400,7 @@ export function createWorld(canvas, state, opts = {}) {
       pick.userData.index = index;
       pick.userData.x = pose.x;
       pick.userData.z = pose.z;
+      if (index === movingIndex) pick.visible = false;
       patchGroup.add(pick);
     });
   }
@@ -2139,6 +2148,7 @@ export function createWorld(canvas, state, opts = {}) {
         nodeX: pose.x,
         nodeZ: pose.z,
         releaseTree: dest?.releaseTree ?? null,
+        patchIndex: pose.index,
       };
     };
     if (atStation) {
@@ -2173,7 +2183,7 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       stopMining();
-      pickHandler?.({ type, element: pose.element });
+      pickHandler?.({ type, element: pose.element, patchIndex: pose.index });
       playClick('ui');
       return;
     }
@@ -2196,7 +2206,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function finishPendingUse() {
     if (!pendingUse) return;
-    const { type, materialId, x, z, plantId, faceYaw, nodeX, nodeZ, element } = pendingUse;
+    const { type, materialId, x, z, plantId, faceYaw, nodeX, nodeZ, element, patchIndex } = pendingUse;
     pendingUse = null;
     if (type === 'counter') {
       servingAtCounter = true;
@@ -2213,7 +2223,7 @@ export function createWorld(canvas, state, opts = {}) {
     else if (type === 'tree') startChopping(pose);
     else if (type === 'flax' || type === 'wheat') startPicking(pose);
     else if (type === 'fountain') fillFromFountain(pose);
-    else pickHandler?.({ type, element });
+    else pickHandler?.({ type, element, patchIndex });
   }
 
   function updatePlayer(dt, now) {
@@ -2380,6 +2390,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function furnitureIdFromKind(kind, displayIndex) {
     if (kind === 'display') return { id: 'display', index: displayIndex };
+    if (kind === 'farming_patch') return { id: 'farming_patch', index: displayIndex };
     if (kind === 'chest' || kind === 'anvil' || kind === 'range' || kind === 'counter' || UNLOCK_STATIONS.includes(kind)) {
       return { id: kind };
     }
@@ -2430,7 +2441,9 @@ export function createWorld(canvas, state, opts = {}) {
   function blockedPlaceReason(pose, target = moveTarget) {
     if (!pose || !target) return 'That spot is off the shop floor.';
     const kind = placeKindOf(target);
-    const skip = target.id === 'display' ? { id: 'display', index: target.index } : { id: target.id };
+    const skip = target.id === 'display' || target.id === 'farming_patch'
+      ? { id: target.id, index: target.index }
+      : { id: target.id };
     const blocks = liveObstacles(state, SHOP, skip);
     const floors = activePlaceRects(target);
     if (kind === 'farming_patch' || kind === 'patch') {
@@ -2657,7 +2670,7 @@ export function createWorld(canvas, state, opts = {}) {
       }
       if (data.kind === 'farming_patch') {
         const pose = state.furniture.patches?.[data.index];
-        if (pose) queueUse('farming_patch', pose);
+        if (pose) queueUse('farming_patch', { ...pose, index: data.index });
         return;
       }
       if (data.kind === 'fountain') {
@@ -2742,11 +2755,12 @@ export function createWorld(canvas, state, opts = {}) {
           return;
         }
         const { hw, hd } = furnitureHalfSize('patch');
-        const patch = (state.furniture.patches ?? []).find((pose) => (
+        const patchIndex = (state.furniture.patches ?? []).findIndex((pose) => (
           Math.abs(point.x - pose.x) <= hw + 0.12 && Math.abs(point.z - pose.z) <= hd + 0.12
         ));
+        const patch = state.furniture.patches?.[patchIndex];
         if (patch) {
-          queueUse('farming_patch', patch);
+          queueUse('farming_patch', { ...patch, index: patchIndex });
           return;
         }
       }
@@ -2965,7 +2979,10 @@ export function createWorld(canvas, state, opts = {}) {
       });
       return;
     }
-    const furn = furnitureIdFromKind(data.kind, data.displayIndex);
+    const furn = furnitureIdFromKind(
+      data.kind,
+      data.kind === 'farming_patch' ? data.index : data.displayIndex,
+    );
     if (!furn) return;
     playClick('ui');
     if (data.kind === 'display') {
@@ -3898,6 +3915,24 @@ export function createWorld(canvas, state, opts = {}) {
     };
   }
 
+  function beginMovePatch(index) {
+    const saved = state.furniture?.patches?.[index];
+    if (!saved) return false;
+    const rot = saved.rot ?? FURNITURE_FORWARD;
+    placeDraft = { id: 'farming_patch', index, x: saved.x, z: saved.z, rot };
+    moveTarget = { id: 'farming_patch', index, moving: true };
+    placeNeedsConfirm = true;
+    expandMode = false;
+    if (padGroup) padGroup.visible = false;
+    moveOrigin = null;
+    applyPatchGhost();
+    rebuildSnapGrid();
+    setSnapGridVisible(true);
+    highlightSnapCell(saved.x, saved.z);
+    if (patchesReady) syncPatchMeshes();
+    return true;
+  }
+
   return {
     tick,
     warmScene,
@@ -4104,6 +4139,10 @@ export function createWorld(canvas, state, opts = {}) {
       dismissCustomer(actor, false, 'Sold.');
     },
     beginMoveFurniture(target) {
+      if (target?.id === 'farming_patch') {
+        beginMovePatch(target.index);
+        return;
+      }
       moveTarget = target;
       placeNeedsConfirm = false;
       placeDraft = null;
@@ -4182,6 +4221,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (target.id === 'farming_patch') shiftPlantsOffPatch(pose);
       return pose;
     },
+    beginMovePatch,
     beginPlacePatch() {
       const grass = gardenBox(state.expansions ?? []);
       const rects = patchPlaceFloors(state.expansions ?? []);

@@ -23,6 +23,10 @@ describe('player look UI', () => {
     assert.match(help, /middle mouse button or arrow keys/);
     assert.match(help, /Controls:/);
     assert.match(help, /The Goal:/);
+    assert.match(help, /Play from your Home Screen:/);
+    assert.match(help, /Add to Home Screen/);
+    assert.match(help, /Safari/);
+    assert.match(help, /Add to Home screen/);
   });
 
   it('holds the RuneCraft loading art on a play prompt until the first gesture', () => {

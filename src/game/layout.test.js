@@ -28,6 +28,8 @@ import {
   chestSlots,
   chestUpgradeCost,
   defaultFurniture,
+  migrateStarterMannequins,
+  STARTER_MANNEQUIN_YAW,
   expansionCost,
   furnitureBuyCost,
   gardenTreeSpots,
@@ -184,8 +186,9 @@ describe('layout numbers', () => {
     assert.equal(furniture.anvil.rot, FURNITURE_FORWARD);
     assert.equal(furniture.chest.rot, FURNITURE_FORWARD);
     assert.equal(furniture.range, null);
-    for (const pose of furniture.displays) {
-      assert.equal(pose.rot, FURNITURE_FORWARD);
+    for (const [index, pose] of furniture.displays.entries()) {
+      const spot = SHOP.displays[index];
+      assert.equal(pose.rot, spot.kind === 'stand' ? Math.PI : FURNITURE_FORWARD);
     }
     assert.equal(furniture.cauldron, null);
     assert.equal(furniture.furnace, null);
@@ -196,6 +199,21 @@ describe('layout numbers', () => {
     assert.equal(furniture.sawmill, null);
     assert.equal(furniture.portal, null);
     assert.equal(furniture.rug.rot, FURNITURE_FORWARD);
+    const left = SHOP.displays.findIndex((spot) => spot.id === 'stand-left');
+    const right = SHOP.displays.findIndex((spot) => spot.id === 'stand-right');
+    assert.equal(furniture.displays[left].rot, STARTER_MANNEQUIN_YAW);
+    assert.equal(furniture.displays[right].rot, STARTER_MANNEQUIN_YAW);
+    const saved = furniture.displays.map((pose) => ({ ...pose }));
+    saved[left] = { x: SHOP.displays[left].x, z: SHOP.displays[left].z, rot: 0 };
+    saved[right] = { ...saved[right], x: saved[right].x + 1.2 };
+    saved.push({ x: 0.2, z: 0.4, rot: 0 });
+    const migrated = migrateStarterMannequins(saved);
+    assert.equal(migrated[left].rot, STARTER_MANNEQUIN_YAW);
+    assert.equal(migrated[right].rot, saved[right].rot);
+    assert.equal(migrated[right].x, saved[right].x);
+    assert.equal(migrated.at(-1).rot, 0);
+    const table = SHOP.displays.findIndex((spot) => spot.kind === 'table');
+    assert.equal(migrated[table].rot, FURNITURE_FORWARD);
     assert.equal(furniture.rug.x, shopRugPose().x);
     assert.equal(furniture.rug.z, shopRugPose().z);
     assert.deepEqual(furnitureHalfSize('rug'), { hw: SHOP_RUG.w / 2, hd: SHOP_RUG.d / 2 });

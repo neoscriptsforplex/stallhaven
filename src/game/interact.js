@@ -176,6 +176,57 @@ function sawmillStandCandidates(pose) {
 }
 
 /**
+ * Furnace stand in the fitted pottery oven's own XZ. The mouth opens on local
+ * −Z (the dump's mouth, after the height fit). The face sits near z = −0.31
+ * and one step out is 0.72m past that face, centred on the mouth.
+ */
+export const FURNACE_MOUTH_FACE_Z = -0.31;
+export const FURNACE_STAND_STEP = 0.72;
+export const FURNACE_STAND_LOCAL = { x: 0, z: FURNACE_MOUTH_FACE_Z - FURNACE_STAND_STEP };
+
+const FURNACE_STAND_TRIES = [
+  FURNACE_STAND_LOCAL,
+  { x: 0, z: FURNACE_MOUTH_FACE_Z - 0.48 },
+  { x: 0, z: FURNACE_MOUTH_FACE_Z - 0.28 },
+];
+
+export function furnaceStandWorld(pose, local = FURNACE_STAND_LOCAL) {
+  const yaw = furnitureVisualYaw('furnace', pose?.rot ?? 0);
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  const x = local.x;
+  const z = local.z;
+  return {
+    x: (pose?.x ?? 0) + x * c + z * s,
+    z: (pose?.z ?? 0) - x * s + z * c,
+  };
+}
+
+/** Face the mouth from the stand. rotation.y 0 looks along world +Z. */
+export function furnaceFaceYaw(pose, stand = null) {
+  const spot = stand ?? furnaceStandWorld(pose);
+  return Math.atan2((pose?.x ?? 0) - spot.x, (pose?.z ?? 0) - spot.z);
+}
+
+function furnaceStandCandidates(pose) {
+  return FURNACE_STAND_TRIES.map((local) => furnaceStandWorld(pose, local));
+}
+
+/** A ground click this far from the node is a walk, not another swing. */
+export const GATHER_LEAVE_RADIUS = 0.55;
+
+const GATHER_CLICK_KINDS = new Set(['tree', 'boulder', 'flax', 'wheat', 'fountain']);
+
+/** True when this click should leave an active gather and walk. Stations stay clicks. */
+export function clickLeavesGather(mining, point, pickedKind = null) {
+  if (!mining || !point) return false;
+  if (pickedKind && !GATHER_CLICK_KINDS.has(pickedKind)) return false;
+  if (!Number.isFinite(mining.x) || !Number.isFinite(mining.z)) return false;
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.z)) return false;
+  return Math.hypot(point.x - mining.x, point.z - mining.z) > GATHER_LEAVE_RADIUS;
+}
+
+/**
  * Gathering contacts. Rock and tree are world metres at the 0.863 player
  * scale, player-local, facing +Z. Flax is still character-local units and is
  * multiplied by GATHER_MODEL_SCALE. The v2 rig hits these points: the pick
@@ -489,6 +540,17 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
     for (const dest of spots) {
       const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
       if (path.length) return { action: 'walk', path, dest, face: sawmillFaceYaw(pose, dest) };
+    }
+    return { action: 'blocked', dest: stand, face };
+  }
+  if (kind === 'furnace') {
+    const spots = furnaceStandCandidates(pose);
+    const stand = spots[0];
+    const face = furnaceFaceYaw(pose, stand);
+    if (isNearPoint(from, stand, 0.45)) return { action: 'open', dest: stand, face };
+    for (const dest of spots) {
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      if (path.length) return { action: 'walk', path, dest, face: furnaceFaceYaw(pose, dest) };
     }
     return { action: 'blocked', dest: stand, face };
   }

@@ -152,7 +152,7 @@ function giveBuildMats(state, id, times = 1) {
 }
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS, flaxInspect, treeInspect } from './shopbuild.js';
-import { xpForLevel } from './skills.js';
+import { levelRequirementText, xpForLevel } from './skills.js';
 
 function placeStation(state, id) {
   const pose = SHOP[id];
@@ -2120,6 +2120,11 @@ describe('furnace bar unlocks', () => {
   it('unlocks iron bars at Smithing 15 and steel bars at Smithing 30', () => {
     const state = createState();
     placeStation(state, 'furnace');
+    assert.equal(RECIPES.smelt_iron.requires.level, 15);
+    assert.equal(RECIPES.smelt_steel.requires.level, 30);
+    assert.equal(RECIPES.smelt_bronze.requires.level, 1);
+    assert.equal(RECIPES.smelt_mithril.requires.level, 50);
+    assert.match(levelRequirementText(RECIPES.smelt_iron), /level 15 Smithing/);
     assert.equal(isUnlocked(state, 'smelt_bronze'), true);
     assert.equal(isUnlocked(state, 'smelt_iron'), false);
     assert.equal(unlockRemaining(state, 'smelt_iron'), 20);

@@ -113,6 +113,8 @@ test('keep this device overwrites the cloud; keep both copies cloud into an empt
   assert.deepEqual(r, { ok: true, copySlot: 2 });
   assert.equal((await b.store.read(1)).gold, 2);
   assert.equal((await b.store.read(2)).gold, 1);
+  assert.equal(b.store.meta.slots['2'].name, 'Shop (cloud copy)');
+  assert.equal(b.store.meta.lastSlot, 1, 'the copy does not become last played');
   const rows = Object.fromEntries([...cloud.rows.values()].map((x) => [x.slot, x.data.gold]));
   assert.deepEqual(rows, { 1: 2, 2: 1 });
   // A now sees its slot 1 replaced (it hadn't changed) and slot 2 as new.

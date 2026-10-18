@@ -162,7 +162,10 @@ export function createCloudSync({
     emit('cloud_sync_started', { slot });
     setStatus(slot, 'syncing');
     const data = { ...row.data, shopName: row.name || row.data?.shopName };
+    const last = store.meta.lastSlot;
     const { savedAt } = await store.write(slot, data, row.name || undefined);
+    // A background download is not "playing" that slot.
+    if (last && last !== slot) await store.setLastSlot(last);
     markSynced(slot, row, savedAt);
     emit('cloud_sync_ok', { slot, revision: row.revision, downloaded: true });
     return 'downloaded';
@@ -337,8 +340,11 @@ export function createCloudSync({
           if (choice === 'both') {
             copySlot = SLOTS.find((n) => !store.meta.slots[String(n)]) ?? null;
             if (!copySlot || !c.cloud) return { ok: false };
-            const data = { ...c.cloud.data, shopName: c.cloud.name || c.cloud.data?.shopName };
-            await store.write(copySlot, data, c.cloud.name || undefined);
+            const copyName = `${(c.cloud.name || c.cloud.data?.shopName || `Slot ${slot}`).slice(0, 19)} (cloud copy)`;
+            const data = { ...c.cloud.data, shopName: copyName };
+            const last = store.meta.lastSlot;
+            await store.write(copySlot, data, copyName);
+            if (last) await store.setLastSlot(last);
           }
           await upload(slot, { force: true });
           if (copySlot) {

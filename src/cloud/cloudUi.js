@@ -110,6 +110,9 @@ export function mountCloud({ saves, store, autosave, sync, client, backup, emit,
   dock?.querySelector('[data-savefiles-close]')?.addEventListener('click', () => closeDock(false));
   document.querySelector('#settings-btn')?.addEventListener('click', () => {
     if (dock && !dock.hidden) dock.hidden = true;
+    // Settings and the Saves panel share the same corner; only one is open at a time.
+    const savesDock = document.querySelector('#saves-dock');
+    if (savesDock && !savesDock.hidden) document.querySelector('[data-saves-close]')?.click();
   }, true);
 
   /* ---------------- online backup block ---------------- */

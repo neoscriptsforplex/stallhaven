@@ -907,6 +907,17 @@ const GATHER_EVENTS = {
   chop: [['hit', 0.867]],
   pick: [['close', 0.54], ['lift', 0.705], ['vanish', 1.4]],
 };
+/** Water surface in character-local units. World metres are this times the player scale. */
+const FISHING_WATER_Y = -0.05;
+const FISHING_CAST_SPLASH = 1.12;
+const FISHING_TUG_START = 2.48;
+const FISHING_TUG_END = 2.72;
+/** Grip that seats Luke's rod across the palm. Fish and Cast assume this quaternion. */
+export const FISHING_ROD_GRIP = new THREE.Quaternion(0.335602, 0.144723, -0.36859, 0.854732);
+const _lineQ = new THREE.Quaternion();
+const _lineTip = new THREE.Vector3();
+const _lineScale = new THREE.Vector3();
+const _lineWater = new THREE.Vector3();
 
 function clipByMode(loco, mode) {
   if (mode === 'walk') return loco.walk ?? null;
@@ -923,11 +934,21 @@ function emitGatherEvents(loco, prev, t) {
   if (wrapped && loco.gather === 'pick') loco.onEvent?.('wrap', 'pick');
 }
 
+function activeGather(loco) {
+  if (!loco?.gather) return null;
+  if (loco.gather === 'fish' && loco.castPending && loco.actions?.cast) {
+    return { action: loco.actions.cast, mode: 'cast' };
+  }
+  const action = loco.actions?.[loco.gather] ?? null;
+  return action ? { action, mode: loco.gather } : null;
+}
+
 function updateClipLocomotion(mesh, moving, dt) {
   const loco = mesh?.userData?.clipLocomotion;
   if (!loco) return;
-  const gatherAction = loco.gather ? loco.actions?.[loco.gather] : null;
-  const want = gatherAction ? loco.gather : (moving ? 'walk' : 'idle');
+  const playing = activeGather(loco);
+  const gatherAction = playing?.action ?? null;
+  const want = playing ? playing.mode : (moving ? 'walk' : 'idle');
   if (loco.mode !== want) {
     const next = gatherAction || (want === 'walk' ? loco.walk : loco.idle);
     const prev = clipByMode(loco, loco.mode);
@@ -936,7 +957,8 @@ function updateClipLocomotion(mesh, moving, dt) {
       next.setEffectiveWeight(1);
       if (gatherAction) next.timeScale = 1;
       next.reset().play();
-      if (prev && prev !== next) prev.crossFadeTo(next, RIGGED_CLIP_FADE, false);
+      const fade = loco.mode === 'cast' && want === 'fish' ? 0.05 : RIGGED_CLIP_FADE;
+      if (prev && prev !== next) prev.crossFadeTo(next, fade, false);
     }
     loco.mode = want;
     loco.eventPrev = gatherAction ? 0 : null;
@@ -949,11 +971,87 @@ function updateClipLocomotion(mesh, moving, dt) {
   if (!loco.mixer) return;
   const prevTime = loco.eventPrev;
   loco.mixer.update(dt);
-  if (gatherAction && want === loco.gather && prevTime != null) {
+  if (gatherAction && (want === loco.gather || want === 'cast') && prevTime != null) {
     const t = gatherAction.time;
     emitGatherEvents(loco, prevTime, t);
     loco.eventPrev = t;
   }
+  updateFishingLine(mesh);
+}
+
+function bindCastFinish(group) {
+  const loco = group?.userData?.clipLocomotion;
+  if (!loco?.mixer || loco.castBound) return;
+  loco.castBound = true;
+  loco.mixer.addEventListener('finished', (event) => {
+    if (!loco.castPending || event.action !== loco.actions?.cast) return;
+    loco.castPending = false;
+    loco.mode = 'cast';
+  });
+}
+
+/** Parent Rig's rod to Hand_R. Hidden until setHeldTool(mesh, 'rod'). */
+export function mountFishingRod(mesh, gltf) {
+  const source = gltf?.scene?.getObjectByName?.('FishingRodGrip');
+  const hand = mesh?.getObjectByName?.('Hand_R');
+  if (!source || !hand || mesh.userData?.rod) return mesh?.userData?.rod ?? null;
+  const rod = source.clone(true);
+  rod.name = 'FishingRodGrip';
+  rod.position.set(RIGGED_FIST.x, RIGGED_FIST.y, RIGGED_FIST.z);
+  rod.quaternion.copy(FISHING_ROD_GRIP);
+  rod.scale.set(1, 1, 1);
+  rod.visible = false;
+  const line = rod.getObjectByName('FishingLine');
+  const bob = rod.getObjectByName('FishingBob');
+  if (line) line.visible = false;
+  if (bob) bob.visible = false;
+  hand.add(rod);
+  mesh.userData.rod = rod;
+  mesh.userData.fishingLine = line ?? null;
+  mesh.userData.fishingBob = bob ?? null;
+  return rod;
+}
+
+/** Hang the line from the rod tip down to the water. The bob dips on the Fish tug. */
+export function updateFishingLine(mesh) {
+  const rod = mesh?.userData?.rod;
+  const line = mesh?.userData?.fishingLine;
+  const bob = mesh?.userData?.fishingBob;
+  if (!rod?.visible || !line || !bob) return;
+  const loco = mesh.userData?.clipLocomotion;
+  const casting = Boolean(loco?.castPending && loco.actions?.cast);
+  if (casting && (loco.actions.cast.time ?? 0) < FISHING_CAST_SPLASH) {
+    line.visible = false;
+    bob.visible = false;
+    return;
+  }
+  line.visible = true;
+  bob.visible = true;
+  const parent = line.parent;
+  if (!parent) return;
+  parent.updateWorldMatrix(true, false);
+  parent.getWorldQuaternion(_lineQ);
+  line.quaternion.copy(_lineQ).invert();
+  line.updateWorldMatrix(true, false);
+  line.getWorldPosition(_lineTip);
+  const scale = loco?.modelScale || mesh.scale?.y || 1;
+  let waterY = mesh.position.y + FISHING_WATER_Y * scale;
+  const fish = loco?.actions?.fish;
+  if (!casting && fish && loco.gather === 'fish') {
+    const dur = Math.max(fish.getClip?.().duration ?? 4, 0.001);
+    const t = ((fish.time % dur) + dur) % dur;
+    if (t >= FISHING_TUG_START && t <= FISHING_TUG_END) {
+      const u = (t - FISHING_TUG_START) / (FISHING_TUG_END - FISHING_TUG_START);
+      waterY -= Math.sin(u * Math.PI) * 0.06 * scale;
+    }
+  }
+  const len = Math.max(_lineTip.y - waterY, 0.01);
+  parent.getWorldScale(_lineScale);
+  const sy = Math.abs(_lineScale.y) > 1e-6 ? _lineScale.y : 1;
+  line.scale.set(1, len / sy, 1);
+  _lineWater.copy(_lineTip);
+  _lineWater.y = _lineTip.y - len;
+  bob.position.copy(parent.worldToLocal(_lineWater));
 }
 
 /** Play Mine, Chop, or Pick on the rig. Null returns to Idle/Walk. No-op without those clips. */
@@ -962,9 +1060,16 @@ export function setGatherClip(mesh, mode) {
   if (!loco) return false;
   if (mode && !loco.actions?.[mode]) {
     loco.gather = null;
+    loco.castPending = false;
     return false;
   }
   loco.gather = mode || null;
+  loco.castPending = mode === 'fish' && Boolean(loco.actions?.cast);
+  if (loco.castPending) {
+    const cast = loco.actions.cast;
+    cast.setLoop(THREE.LoopOnce, 1);
+    cast.clampWhenFinished = true;
+  }
   if (!mode) loco.eventPrev = null;
   return true;
 }
@@ -1346,6 +1451,8 @@ export function setHeldTool(mesh, tool) {
   }
   if (mesh?.userData?.pickaxe) mesh.userData.pickaxe.visible = tool === 'pickaxe';
   if (mesh?.userData?.hatchet) mesh.userData.hatchet.visible = tool === 'hatchet';
+  // Fishing rod: shown once a rod is mounted on the hand (Rig's fishing pass).
+  if (mesh?.userData?.rod) mesh.userData.rod.visible = tool === 'rod';
 }
 
 export function updateMinePose(mesh, dt = 0.016, now = 0) {
@@ -4455,7 +4562,7 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
   const walk = mixer.clipAction(walkClip);
   const idle = mixer.clipAction(idleClip);
   const actions = {};
-  for (const name of ['Mine', 'Chop', 'Pick']) {
+  for (const name of ['Mine', 'Chop', 'Pick', 'Fish']) {
     const clip = THREE.AnimationClip.findByName(gltf.animations ?? [], name);
     if (!clip) continue;
     const action = mixer.clipAction(clip);
@@ -4463,6 +4570,14 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
     action.clampWhenFinished = false;
     action.enabled = false;
     actions[name.toLowerCase()] = action;
+  }
+  const castClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Cast');
+  if (castClip) {
+    const cast = mixer.clipAction(castClip);
+    cast.setLoop(THREE.LoopOnce, 1);
+    cast.clampWhenFinished = true;
+    cast.enabled = false;
+    actions.cast = cast;
   }
   for (const action of [walk, idle]) {
     action.setLoop(THREE.LoopRepeat, Infinity);
@@ -4524,6 +4639,8 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
   group.userData.chefHat = chefHat;
   group.userData.customMesh = true;
   group.userData.walkPhase = 0;
+  bindCastFinish(group);
+  if (opts.fishingRod) mountFishingRod(group, opts.fishingRod);
   return group;
 }
 
@@ -4720,11 +4837,16 @@ export function wrapUploadedPlayer(source, opts = {}) {
     const walk = playClip(mixer, walkClip);
     const idle = playClip(mixer, idleClip);
     const actions = {};
-    for (const name of ['mine', 'chop', 'pick']) {
+    // 'fish' is optional: Rig's fishing clip plays at the pond when the upload has one.
+    for (const name of ['mine', 'chop', 'pick', 'fish', 'cast']) {
       const clip = findNamedClip(animations, [name], used);
       const action = playClip(mixer, clip);
       if (!action) continue;
       action.enabled = false;
+      if (name === 'cast') {
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+      }
       actions[name] = action;
     }
     if (idle) idle.play();
@@ -4741,6 +4863,8 @@ export function wrapUploadedPlayer(source, opts = {}) {
       eventPrev: null,
       onEvent: null,
     };
+    bindCastFinish(group);
+    if (opts.fishingRod) mountFishingRod(group, opts.fishingRod);
   }
 
   group.userData.modelScale = modelScale;

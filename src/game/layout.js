@@ -214,7 +214,7 @@ export function spotOnFarmingPatch(x, z, furniture = null, pad = 0) {
   ));
 }
 
-/** 'tree', 'rock', or null when a patch rectangle meets a trunk or boulder. */
+/** 'tree', 'rock', 'pond', or null when a patch rectangle meets a trunk, boulder, or the fishing pond. */
 export function patchHitsTreeOrRock(pose, expansionIds = []) {
   if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z)) return null;
   const hw = FARMING_PATCH_HALF;
@@ -231,6 +231,7 @@ export function patchHitsTreeOrRock(pose, expansionIds = []) {
   for (const rock of gardenRockSpots(expansionIds)) {
     if (hits(rock.x, rock.z, gardenRockRadius(rock.scale ?? 1))) return 'rock';
   }
+  if (rectHitsPond(pose.x, pose.z, hw, hd)) return 'pond';
   return null;
 }
 
@@ -319,6 +320,134 @@ export function plantedTrunkRadius(x, z) {
 
 export const GRASS_PAD = 9;
 export const FOUNTAIN = { x: 0, z: 8.85, radius: 0.7, apron: 1.42 };
+
+/**
+ * Fishing pond on the front-right lawn. +X is screen-right from the default
+ * camera (it sits on +Z looking toward −Z), so this is the shop's right side.
+ *
+ * It never touches an expansion pad: the Right room's front wall is z = 3.65
+ * and the Behind Right room is further back, so the pond (z 6.5 to 10.7) keeps
+ * a 2.85 m lawn strip in front of a built Right room. No pad has gz = +1, so
+ * nothing will ever be built on this patch of lawn. Ellipse in world metres.
+ */
+export const POND = Object.freeze({ x: 8.9, z: 8.6, rx: 2.7, rz: 2.1 });
+/** Decor (trees, rocks, flax, flowers, grass tufts) stays this far off the water. */
+export const POND_DECOR_CLEAR = 0.6;
+/**
+ * Plank dock on the west shore, toward the path. Walkable: feet ride up onto
+ * the deck over `ramp` metres at the shore end. Rect in world metres.
+ */
+export const POND_DOCK = Object.freeze({
+  minX: 5.75, maxX: 7.55, minZ: 8.12, maxZ: 9.08, top: 0.1, ramp: 0.4,
+});
+
+function fishingSpot(id, materialId, name, water, stand) {
+  return Object.freeze({
+    id,
+    materialId,
+    name,
+    x: water.x,
+    z: water.z,
+    stand: Object.freeze({ ...stand }),
+    face: Math.atan2(water.x - stand.x, water.z - stand.z),
+  });
+}
+
+/**
+ * Five fishing spots, one fish each, like one rock per ore. `x/z` is the
+ * bubbling water the line drops into; `stand` is where the feet go (shore or
+ * dock end) and `face` the yaw toward the water. Levels live in skills.js.
+ */
+export const FISHING_SPOTS = Object.freeze([
+  fishingSpot('salmon', 'raw_salmon', 'Salmon fishing spot', { x: 8.05, z: 8.6 }, { x: 7.25, z: 8.6 }),
+  fishingSpot('lobster', 'raw_lobster', 'Lobster fishing spot', { x: 9.7, z: 7.25 }, { x: 9.7, z: 6.02 }),
+  fishingSpot('monkfish', 'raw_monkfish', 'Monkfish fishing spot', { x: 10.85, z: 8.2 }, { x: 12.05, z: 8.2 }),
+  fishingSpot('shark', 'raw_shark', 'Shark fishing spot', { x: 9.95, z: 9.85 }, { x: 9.95, z: 11.08 }),
+  fishingSpot('anglerfish', 'raw_anglerfish', 'Anglerfish fishing spot', { x: 7.45, z: 9.75 }, { x: 7.45, z: 10.95 }),
+]);
+
+/** Floor-click reach around a spot's water marker. */
+export const FISHING_CLICK_RADIUS = 0.75;
+
+export function fishingSpotById(id) {
+  return FISHING_SPOTS.find((spot) => spot.id === id || spot.materialId === id) ?? null;
+}
+
+/** True inside the pond ellipse grown by `pad` metres. */
+export function pointInPond(x, z, pad = 0) {
+  const rx = POND.rx + pad;
+  const rz = POND.rz + pad;
+  if (rx <= 0 || rz <= 0) return false;
+  const dx = (x - POND.x) / rx;
+  const dz = (z - POND.z) / rz;
+  return dx * dx + dz * dz <= 1;
+}
+
+export function pointOnDock(x, z, pad = 0) {
+  return x >= POND_DOCK.minX - pad && x <= POND_DOCK.maxX + pad
+    && z >= POND_DOCK.minZ - pad && z <= POND_DOCK.maxZ + pad;
+}
+
+/** Water, dock, or a fishing stand within `pad` (stands get a body-sized extra). */
+export function pondBlocksSpot(x, z, pad = POND_DECOR_CLEAR) {
+  if (pointInPond(x, z, pad)) return true;
+  if (pointOnDock(x, z, pad)) return true;
+  return FISHING_SPOTS.some((spot) => Math.hypot(x - spot.stand.x, z - spot.stand.z) < pad + 0.55);
+}
+
+/** True when an axis-aligned rect (centre, half sizes) meets the pond, dock, or a fishing stand. */
+export function rectHitsPond(cx, cz, hw, hd, pad = 0.1) {
+  const steps = 6;
+  for (let i = 0; i <= steps; i += 1) {
+    for (let j = 0; j <= steps; j += 1) {
+      const x = cx - hw + (2 * hw * i) / steps;
+      const z = cz - hd + (2 * hd * j) / steps;
+      if (pondBlocksSpot(x, z, pad)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Walk blocks for the water: horizontal strips under the ellipse, inset a
+ * little so the rim stones stay walkable, with the dock lane cut out.
+ */
+export function pondWaterBlocks(inset = 0.18, band = 0.3) {
+  const blocks = [];
+  const rx = POND.rx - inset;
+  const rz = POND.rz - inset;
+  for (let z0 = POND.z - rz; z0 < POND.z + rz - 1e-6; z0 += band) {
+    const z1 = Math.min(POND.z + rz, z0 + band);
+    const mid = Math.min(Math.abs(z0 - POND.z), Math.abs(z1 - POND.z));
+    const near = (z0 <= POND.z && z1 >= POND.z) ? 0 : mid;
+    const t = near / rz;
+    const half = rx * Math.sqrt(Math.max(0, 1 - t * t));
+    if (half < 0.05) continue;
+    const minX = POND.x - half;
+    const maxX = POND.x + half;
+    const crossesDock = z1 > POND_DOCK.minZ && z0 < POND_DOCK.maxZ;
+    if (crossesDock && minX < POND_DOCK.maxX) {
+      // Water south and north of the dock lane, then the open water past its end.
+      if (z0 < POND_DOCK.minZ) blocks.push({ minX, maxX, minZ: z0, maxZ: POND_DOCK.minZ });
+      if (z1 > POND_DOCK.maxZ) blocks.push({ minX, maxX, minZ: POND_DOCK.maxZ, maxZ: z1 });
+      const laneMinZ = Math.max(z0, POND_DOCK.minZ);
+      const laneMaxZ = Math.min(z1, POND_DOCK.maxZ);
+      if (maxX > POND_DOCK.maxX) blocks.push({ minX: POND_DOCK.maxX, maxX, minZ: laneMinZ, maxZ: laneMaxZ });
+      continue;
+    }
+    blocks.push({ minX, maxX, minZ: z0, maxZ: z1 });
+  }
+  return blocks.filter((rect) => rect.maxZ - rect.minZ > 0.02 && rect.maxX - rect.minX > 0.02);
+}
+
+/** Deck height under (x, z), easing up from the lawn over the ramp. Null off the dock. */
+export function dockGroundY(x, z) {
+  if (!pointOnDock(x, z)) return null;
+  const fromShore = x - POND_DOCK.minX;
+  if (fromShore >= POND_DOCK.ramp) return POND_DOCK.top;
+  const t = Math.max(0, fromShore / POND_DOCK.ramp);
+  return POND_DOCK.top * t * t * (3 - 2 * t);
+}
 export const PATH_HALF_W = 0.72;
 export const PATH_START_Z = 4.22;
 export const TRAPDOOR = { x: 3.35, z: 9.55 };
@@ -646,6 +775,8 @@ export function characterGroundY(
     stand = stand == null ? piece.top : Math.max(stand, piece.top);
   }
   if (stand != null) return stand;
+  const dock = dockGroundY(x, z);
+  if (dock != null) return outdoorY + dock;
   const front = shopFloorFootprint(0, 0).maxZ;
   const beyond = z - front;
   const inDoor = Math.abs(x - SHOP.door.x) <= DOOR_HALF;
@@ -973,6 +1104,7 @@ export function keepGardenSpot(spot, expansionIds = []) {
   if (spot.side === 'front-right' && hasRight) return false;
   if (pointHitsShop(spot.x, spot.z, expansionIds, 1.15)) return false;
   if (pointOnPath(spot.x, spot.z, expansionIds, 0.55)) return false;
+  if (pondBlocksSpot(spot.x, spot.z)) return false;
   const dx = spot.x - FOUNTAIN.x;
   const dz = spot.z - FOUNTAIN.z;
   if ((dx * dx + dz * dz) < 1.55 ** 2) return false;
@@ -1133,6 +1265,7 @@ function treeSpotFree(x, z, spot, kept, expansionIds, rocks, grass, furniture) {
   if (pointOnPath(x, z, expansionIds, crown)) return false;
   if (!gardenSpotClearOfBeds({ x, z }, expansionIds, crown + 0.4)) return false;
   if (patchBlocksTree(x, z, crown, furniture)) return false;
+  if (pondBlocksSpot(x, z, crown * 0.8)) return false;
   for (const rock of rocks) {
     if (Math.hypot(x - rock.x, z - rock.z) < gardenRockRadius(rock.scale ?? 1) + crown) return false;
   }
@@ -1216,6 +1349,7 @@ export function gardenTreeSpots(expansionIds = [], opts = {}) {
   for (const spot of spots) {
     const settled = settleGardenTree(spot, kept, rocks, grass, expansionIds);
     if (!keepGardenSpot(settled, expansionIds)) continue;
+    if (pondBlocksSpot(settled.x, settled.z, treeSitRadius(settled) * 0.8)) continue;
     if (!gardenSpotClearOfBeds(settled, expansionIds)) continue;
     const stillInRock = rocks.some((rock) => (
       Math.hypot(settled.x - rock.x, settled.z - rock.z) < gardenRockRadius(rock.scale ?? 1) + 0.45
@@ -1246,6 +1380,8 @@ export function farmingPatchPoseKept(pose, expansionIds = []) {
   if (pose.x - hw < lawn.minX - 0.05 || pose.x + hw > lawn.maxX + 0.05) return false;
   if (pose.z - hd < lawn.minZ - 0.05 || pose.z + hd > lawn.maxZ + 0.05) return false;
   if (pointHitsShop(pose.x, pose.z, expansionIds, 0.15)) return false;
+  // A patch saved on the lawn before the pond existed goes back to a free re-place.
+  if (rectHitsPond(pose.x, pose.z, hw, hd, 0)) return false;
   return true;
 }
 
@@ -1260,7 +1396,8 @@ export function gardenRockSpots(expansionIds = []) {
     { x: -7.4, z: 2.2, scale: 0.95, side: 'left' },
     { x: 7.6, z: 1.6, scale: 1.1, side: 'right' },
     { x: -8.35, z: 7.85, scale: 2.35, side: 'left' },
-    { x: 8.55, z: 8.35, scale: 2.8, side: 'right' },
+    // Moved off the pond (was 8.55, 8.35 at 2.8x) to its front-right corner.
+    { x: 11.9, z: 11.45, scale: 2.4, side: 'right' },
     { x: 0.2, z: -7.35, scale: 2.95, side: 'rear' },
   ];
   return spots.filter((spot) => (
@@ -1560,6 +1697,7 @@ function flowerBlocked(x, z, expansionIds, trees, rocks) {
   if (pointOnPath(x, z, expansionIds, 0.48)) return true;
   if (Math.hypot(x - FOUNTAIN.x, z - FOUNTAIN.z) < (FOUNTAIN.apron ?? 1.42) + 0.3) return true;
   if (pointHitsTrapdoor(x, z, TRAPDOOR_HOLE_CLEAR + 0.28)) return true;
+  if (pondBlocksSpot(x, z, 0.35)) return true;
   const front = shopFloorFootprint(0, 0).maxZ;
   if (Math.abs(x - SHOP.door.x) <= DOOR_HALF + 0.45 && z > front - 0.05 && z < PATH_START_Z + 0.05) {
     return true;

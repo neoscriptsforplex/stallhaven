@@ -129,7 +129,7 @@ import {
   STATION_UNLOCKS,
 } from './layout.js';
 import { clampMapZoom, compassAssetUrl, compassNeedleDegrees, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
-import { boulderInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
+import { boulderInspect, fishingInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
 import { intentBus } from './intents.js';
 import { createCraftPreview } from './craftpreview.js';
 import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
@@ -683,6 +683,8 @@ export function bindHud(root, state, world) {
             ? '<span class="mat-crafted">Mined</span>'
             : mat.gathered
               ? '<span class="mat-crafted">Picked</span>'
+              : mat.fished
+                ? '<span class="mat-crafted">Caught</span>'
               : mat.drawn
                 ? '<span class="mat-crafted">Fountain</span>'
                 : mat.quest
@@ -985,7 +987,9 @@ export function bindHud(root, state, world) {
         ? 'flax'
         : pose?.kind === 'wheat'
           ? 'wheat'
-          : 'boulder';
+          : pose?.kind === 'fishing_spot'
+            ? 'fishing_spot'
+            : 'boulder';
     inspectTarget = materialId
       ? { materialId, x: pose?.x, z: pose?.z, kind, plantId: pose?.plantId }
       : null;
@@ -995,7 +999,9 @@ export function bindHud(root, state, world) {
         ? flaxInspect()
         : kind === 'wheat'
           ? wheatInspect()
-          : boulderInspect(materialId);
+          : kind === 'fishing_spot'
+            ? fishingInspect(materialId)
+            : boulderInspect(materialId);
     const nameEl = inspectPop.querySelector('[data-inspect-name]');
     const blurbEl = inspectPop.querySelector('[data-inspect-blurb]');
     const mineBtn = inspectPop.querySelector('[data-inspect-mine]');
@@ -1008,7 +1014,9 @@ export function bindHud(root, state, world) {
           ? 'Pick Flax'
           : kind === 'wheat'
             ? 'Pick Wheat'
-            : 'Mine';
+            : kind === 'fishing_spot'
+              ? 'Fish'
+              : 'Mine';
     }
     inspectPop.hidden = false;
     const x = Math.min(window.innerWidth - 250, Math.max(8, clientX ?? 24));
@@ -2939,8 +2947,11 @@ export function bindHud(root, state, world) {
     if (event.type === 'wheat-inspect') {
       showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'wheat' });
     }
+    if (event.type === 'fishing-inspect') {
+      showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'fishing_spot' });
+    }
     if (event.type === 'player-move') closeHeroesDock();
-    if (event.type === 'mined' || event.type === 'chopped' || event.type === 'picked') {
+    if (event.type === 'mined' || event.type === 'chopped' || event.type === 'picked' || event.type === 'caught') {
       if (activeCraftYield) {
         activeCraftYield.classList.add('is-grant');
         window.setTimeout(() => activeCraftYield.classList.remove('is-grant'), 280);

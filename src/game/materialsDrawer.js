@@ -26,7 +26,6 @@ const EXTRA_TINT = {
   pineapple: 0xe2b13a,
   raspberry: 0xc43a52,
   chocolate: 0x6a3a28,
-  fish: 0x7aa8c4,
   guam: 0x1f6b1f,
   marrentill: 0x3a8a45,
   tarromin: 0x6a9a3a,

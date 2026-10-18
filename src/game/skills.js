@@ -1,7 +1,7 @@
 /**
  * Stallhaven skills: data and logic only (no DOM).
  *
- * Ten skills on the OSRS XP curve, levels 1 to 99. Everyone starts at level 1 (0 XP).
+ * Eleven skills on the OSRS XP curve, levels 1 to 99. Everyone starts at level 1 (0 XP).
  * A skills tracker is a small object that lives at `state.skills`:
  *
  *   const skills = createSkills();
@@ -24,6 +24,7 @@ export const SKILLS = [
   { id: 'woodcutting', name: 'Woodcutting', trainedBy: 'Chopping trees.' },
   { id: 'smithing', name: 'Smithing', trainedBy: 'Smelting at the furnace and working the anvil.' },
   { id: 'mining', name: 'Mining', trainedBy: 'Mining rocks in the dungeon.' },
+  { id: 'fishing', name: 'Fishing', trainedBy: 'Fishing at the pond.' },
   { id: 'cooking', name: 'Cooking', trainedBy: 'Cooking on the range.' },
   { id: 'crafting', name: 'Crafting', trainedBy: "Spinning wheel, potter's wheel and loom." },
   { id: 'construction', name: 'Construction', trainedBy: 'Placing rooms and furniture, and sawing planks.' },
@@ -180,6 +181,18 @@ export const WOODCUTTING_LEVELS = Object.freeze({
 /** Essence rocks grant two essence once Mining reaches this level. */
 export const ESSENCE_DOUBLE_LEVEL = 50;
 
+/**
+ * Fishing spot unlocks at the pond. Salmon has no requirement (Luke's "lvl 0";
+ * skills start at 1).
+ */
+export const FISHING_LEVELS = Object.freeze({
+  raw_salmon: 1,
+  raw_lobster: 20,
+  raw_monkfish: 40,
+  raw_shark: 60,
+  raw_anglerfish: 80,
+});
+
 /** Mining rock unlocks. Clay and essence stay at 1. XP is unchanged. */
 export const MINING_LEVELS = Object.freeze({
   hard_clay: 1,
@@ -211,6 +224,13 @@ export const GATHER_NODES = Object.freeze([
   { id: 'adamant', name: 'Adamantite rock', skill: 'mining', level: MINING_LEVELS.adamant, xp: 240 },
   { id: 'runite', name: 'Runite rock', skill: 'mining', level: MINING_LEVELS.runite, xp: 505 },
   { id: 'dragon', name: 'Dragon rock', skill: 'mining', level: MINING_LEVELS.dragon, xp: 645 },
+  // XP per completed catch bar, on the woodcutting curve by unlock level
+  // (pine 9 @1, yew 175 @60, magic 365 @75). Yields step down like the rocks.
+  { id: 'raw_salmon', name: 'Salmon fishing spot', skill: 'fishing', level: FISHING_LEVELS.raw_salmon, xp: 10 },
+  { id: 'raw_lobster', name: 'Lobster fishing spot', skill: 'fishing', level: FISHING_LEVELS.raw_lobster, xp: 26 },
+  { id: 'raw_monkfish', name: 'Monkfish fishing spot', skill: 'fishing', level: FISHING_LEVELS.raw_monkfish, xp: 70 },
+  { id: 'raw_shark', name: 'Shark fishing spot', skill: 'fishing', level: FISHING_LEVELS.raw_shark, xp: 175 },
+  { id: 'raw_anglerfish', name: 'Anglerfish fishing spot', skill: 'fishing', level: FISHING_LEVELS.raw_anglerfish, xp: 420 },
 ]);
 
 const GATHER_BY_ID = Object.fromEntries(GATHER_NODES.map((node) => [node.id, node]));
@@ -233,6 +253,11 @@ export function xpForMine(materialId) {
 export function xpForChop(materialId) {
   const node = GATHER_BY_ID[materialId];
   return node?.skill === 'woodcutting' ? node.xp : 0;
+}
+
+export function xpForFish(materialId) {
+  const node = GATHER_BY_ID[materialId];
+  return node?.skill === 'fishing' ? node.xp : 0;
 }
 
 export function xpForPick(materialId) {
@@ -265,7 +290,9 @@ export function gatherBlockText(materialId) {
     ? `chop this ${req.nodeName}`
     : req.skill === 'farming'
       ? `pick this ${req.nodeName.toLowerCase()}`
-      : 'mine this rock';
+      : req.skill === 'fishing'
+        ? 'fish here'
+        : 'mine this rock';
   return `You need a ${req.name} level of ${req.level} to ${action}.`;
 }
 
@@ -391,7 +418,7 @@ export function createSkills(saved = null) {
       return progressForXp(api.getXp(skillId));
     },
 
-    /** Sum of every base level. 10 at the start, 990 when everything is 99. */
+    /** Sum of every base level. 11 at the start, 1089 when everything is 99. */
     getTotalLevel() {
       return SKILL_IDS.reduce((sum, id) => sum + levelForXp(xp[id]), 0);
     },

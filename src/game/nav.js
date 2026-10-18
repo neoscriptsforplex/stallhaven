@@ -19,6 +19,7 @@ import {
   TREE_TRUNK_RADIUS,
   treeWalkBlock,
   keepFountain,
+  pondWaterBlocks,
   neighborsOf,
   occupiedCells,
   playerWalkFloors,
@@ -183,6 +184,8 @@ export function gardenObstacles(expansionIds = []) {
     const s = 0.45 * (rock.scale ?? 1);
     blocks.push(rectFromCenter(rock.x, rock.z, s, s));
   }
+  // Fishing pond water. The dock lane stays open so the salmon stand is reachable.
+  blocks.push(...pondWaterBlocks());
   return blocks;
 }
 

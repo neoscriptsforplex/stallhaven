@@ -2882,3 +2882,523 @@ html.is-booting.is-scene-live #view {
   .craft-preview-pane canvas { width: 64px; height: 64px; flex: none; }
   .craft-qty button { min-width: 40px; min-height: 32px; }
 }
+
+/*
+ * Stallhaven skill guide. Load after style.css (uses --panel, --line, --gold, --parchment,
+ * .panel, .xp-bar, .skills-close, .skill-sr and --skill-yellow from the Skills panel CSS).
+ * Phone portrait rules sit inside @media (orientation: portrait) and (pointer: coarse).
+ */
+
+:root {
+  --guide-row-open: rgba(64, 40, 22, 0.55);
+  --guide-row-alt: rgba(52, 32, 18, 0.55);
+  --guide-check: #7fcf6a;
+  --guide-perk: #c9a2ff;
+}
+
+/* ---------- Window (desktop / landscape) ---------- */
+
+.guide-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  background: rgba(8, 5, 3, 0.45);
+}
+
+.guide-backdrop[hidden],
+.skill-guide[hidden] {
+  display: none;
+}
+
+.skill-guide {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 42;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 32px));
+  height: min(620px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  padding: 12px 14px 12px;
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  background: rgba(36, 22, 12, 0.97);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(227, 179, 74, 0.12);
+  color: var(--parchment);
+}
+
+.guide-head { grid-row: 1; }
+.guide-tabs { grid-row: 2; }
+.guide-list { grid-row: 3; }
+.guide-foot { grid-row: 4; }
+
+.guide-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(227, 179, 74, 0.28);
+}
+
+.guide-back {
+  display: none;
+}
+
+.guide-icon {
+  grid-column: 2;
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid #1c120c;
+  border-radius: 6px;
+  background: linear-gradient(var(--skill-tile-top, #4e321d), var(--skill-tile-bottom, #2c1b0f));
+  box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.18);
+}
+
+.guide-title-wrap {
+  grid-column: 3;
+  min-width: 0;
+}
+
+.skill-guide h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #f3e2c0;
+}
+
+.guide-sub {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: #cbb48a;
+}
+
+.guide-level {
+  grid-column: 4;
+  margin: 0;
+  display: grid;
+  justify-items: end;
+  line-height: 1;
+}
+
+.guide-level span {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #cbb48a;
+}
+
+.guide-level b {
+  font-size: 1.7rem;
+  color: var(--skill-yellow, #ffd94a);
+  text-shadow: 1px 1px 0 #000;
+  font-variant-numeric: tabular-nums;
+}
+
+.guide-close {
+  grid-column: 5;
+  align-self: start;
+}
+
+.guide-xp {
+  grid-column: 1 / -1;
+}
+
+.guide-bar {
+  height: 10px;
+}
+
+.guide-xp-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: #d9c4a0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Tabs ---------- */
+
+.guide-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 0 0;
+  border-bottom: 1px solid rgba(227, 179, 74, 0.35);
+}
+
+.guide-tabs[hidden] {
+  display: none;
+}
+
+.guide-tab {
+  flex: 0 1 auto;
+  min-height: 32px;
+  margin-bottom: -1px;
+  padding: 5px 12px;
+  border-radius: 6px 6px 0 0;
+  border-color: rgba(227, 179, 74, 0.35);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #d9c4a0;
+  background: linear-gradient(#4a2e1a, #2e1c10);
+}
+
+.guide-tab.is-on {
+  color: #fff3d6;
+  border-color: var(--gold);
+  border-bottom-color: rgba(36, 22, 12, 0.97);
+  background: linear-gradient(#8a5a30, #5a3518);
+}
+
+/* ---------- Rows ---------- */
+
+.guide-list {
+  margin: 8px 0 0;
+  padding: 3px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #1c120c;
+  border-radius: 6px;
+  background: rgba(16, 10, 6, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.14);
+  scroll-behavior: smooth;
+}
+
+.guide-row {
+  display: grid;
+  grid-template-columns: 2.6rem 34px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 5px 10px 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--guide-row-open);
+}
+
+.guide-row:nth-child(even) {
+  background: var(--guide-row-alt);
+}
+
+.guide-row + .guide-row {
+  margin-top: 3px;
+}
+
+.guide-lv {
+  justify-self: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--skill-yellow, #ffd94a);
+  text-shadow: 1px 1px 0 #000;
+  font-variant-numeric: tabular-nums;
+}
+
+.guide-item {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 5px;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 240, 210, 0.12), rgba(0, 0, 0, 0.25));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.guide-glyph {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6));
+}
+
+.guide-text {
+  display: grid;
+  min-width: 0;
+}
+
+.guide-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f3e2c0;
+}
+
+.guide-desc {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: #cbb48a;
+}
+
+.guide-state {
+  width: 20px;
+  height: 20px;
+}
+
+.guide-state.is-check {
+  fill: var(--guide-check);
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6));
+}
+
+.guide-state.is-lock {
+  fill: #b39a74;
+}
+
+/* Locked: dim but readable. */
+.guide-row.is-locked .guide-lv,
+.guide-row.is-locked .guide-item,
+.guide-row.is-locked .guide-text {
+  opacity: 0.55;
+}
+
+.guide-row.is-locked .guide-lv {
+  color: #c9b48c;
+}
+
+.guide-row.is-locked .guide-item {
+  filter: grayscale(0.7);
+}
+
+/* Next unlock: the one to aim for. */
+.guide-row.is-next {
+  border-color: var(--gold);
+  background: linear-gradient(90deg, rgba(227, 179, 74, 0.26), rgba(227, 179, 74, 0.08));
+  box-shadow: 0 0 0 1px rgba(227, 179, 74, 0.25);
+}
+
+.guide-row.is-next .guide-lv,
+.guide-row.is-next .guide-item,
+.guide-row.is-next .guide-text {
+  opacity: 1;
+}
+
+.guide-row.is-next .guide-lv {
+  color: var(--skill-yellow, #ffd94a);
+}
+
+.guide-row.is-next .guide-item {
+  filter: none;
+}
+
+/* Perk rows: a special band, not a recipe. */
+.guide-row.is-perk {
+  background: linear-gradient(90deg, rgba(120, 80, 170, 0.32), rgba(64, 40, 22, 0.55));
+  border-color: rgba(201, 162, 255, 0.35);
+}
+
+.guide-row.is-perk .guide-item {
+  color: var(--guide-perk) !important;
+}
+
+.guide-badge {
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.guide-badge.is-next {
+  color: #2a1a0c;
+  background: var(--gold);
+}
+
+.guide-badge.is-perk {
+  color: #1e1230;
+  background: var(--guide-perk);
+}
+
+.guide-badge.is-soon {
+  color: #f3e2c0;
+  background: rgba(120, 96, 64, 0.85);
+  border: 1px solid rgba(236, 214, 176, 0.35);
+}
+
+.guide-row.is-soon .guide-text {
+  font-style: italic;
+}
+
+.guide-foot {
+  margin: 8px 2px 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: #cbb48a;
+}
+
+.guide-foot[hidden] {
+  display: none;
+}
+
+/* Desktop hover on rows only (no layout change). */
+@media (hover: hover) {
+  .guide-row:hover {
+    border-color: rgba(227, 179, 74, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-list {
+    scroll-behavior: auto;
+  }
+  .skill-guide.is-sheet {
+    animation: none !important;
+  }
+}
+
+/* ---------- Phone portrait: full-height bottom sheet ---------- */
+
+@media (orientation: portrait) and (pointer: coarse) {
+  /* Guide mode: tapping a tile opens the guide, so the empty detail card shrinks to a one-line hint. */
+  .skills-dock.has-guide .skill-tip,
+  .skills-dock.has-guide:not(.has-tip) .skill-tip {
+    min-height: 0;
+    padding: 8px 12px;
+  }
+
+  .skills-dock.has-guide .skill-tip-hint {
+    min-height: 0;
+    font-size: 0.86rem;
+  }
+
+  .guide-backdrop {
+    background: rgba(8, 5, 3, 0.35);
+  }
+
+  .skill-guide {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: auto;
+    height: calc(100vh - 8px);
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - 8px);
+    padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    animation: guide-sheet-up 0.22s ease-out;
+  }
+
+  .guide-head {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+
+  .guide-back {
+    display: block;
+    grid-column: 1 / -1;
+    justify-self: start;
+    min-height: 44px;
+    padding: 6px 14px 6px 10px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .guide-close {
+    display: none;
+  }
+
+  .guide-icon {
+    grid-column: 1;
+    width: 48px;
+    height: 48px;
+  }
+
+  .guide-title-wrap {
+    grid-column: 2 / 4;
+  }
+
+  .skill-guide h2 {
+    font-size: 1.25rem;
+  }
+
+  .guide-sub {
+    font-size: 0.86rem;
+  }
+
+  .guide-level {
+    grid-column: 4;
+  }
+
+  .guide-level b {
+    font-size: 2rem;
+  }
+
+  .guide-bar {
+    height: 12px;
+  }
+
+  .guide-xp-text {
+    font-size: 0.88rem;
+  }
+
+  .guide-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .guide-tab {
+    flex: 1 0 auto;
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
+
+  .guide-row {
+    grid-template-columns: 2.6rem 40px minmax(0, 1fr) 24px;
+    min-height: 56px;
+    padding: 6px 10px 6px 6px;
+  }
+
+  .guide-item {
+    width: 40px;
+    height: 40px;
+  }
+
+  .guide-glyph {
+    width: 28px;
+    height: 28px;
+  }
+
+  .guide-lv {
+    font-size: 1.3rem;
+  }
+
+  .guide-name {
+    font-size: 1.02rem;
+  }
+
+  .guide-desc {
+    font-size: 0.86rem;
+  }
+
+  .guide-badge {
+    font-size: 0.7rem;
+  }
+
+  .guide-foot {
+    font-size: 0.86rem;
+  }
+}
+
+@keyframes guide-sheet-up {
+  from { transform: translateY(24px); opacity: 0.6; }
+  to { transform: none; opacity: 1; }
+}
+
+/* Level-up toasts (z-index 30 in the Skills CSS) must stay above the guide. */
+.guide-open .skill-toast {
+  z-index: 44;
+}

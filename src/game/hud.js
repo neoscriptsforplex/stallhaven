@@ -128,6 +128,7 @@ import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
 import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
 import { bindSkillsPanel, showLevelUpToast } from './skillsPanel.js';
+import { bindSkillGuide } from './skillGuide.js';
 import { nextUnlockLabel, unlockNamesBetween } from './skillLevels.js';
 import {
   brightnessPercent,
@@ -177,6 +178,7 @@ export function bindHud(root, state, world) {
   const settingsDock = document.querySelector('#settings-dock');
   const settingsBtn = document.querySelector('#settings-btn');
   let skillsPanel = null;
+  let skillGuide = null;
   const skills = state.skills?.getLevel ? state.skills : createSkills();
   if (!state.skills) state.skills = skills;
   const furnMenu = document.querySelector('#furn-menu');
@@ -883,6 +885,7 @@ export function bindHud(root, state, world) {
   }
 
   function closeSkillsDock() {
+    skillGuide?.close();
     skillsPanel?.close();
   }
 
@@ -2635,6 +2638,8 @@ export function bindHud(root, state, world) {
   skillsPanel = bindSkillsPanel({
     skills,
     nextUnlock: (skillId, level) => nextUnlockLabel(skillId, level, hiddenCraft),
+    onSkillClick: (id) => skillGuide?.open(id),
+    onClose: () => skillGuide?.close(),
     onOpen: () => {
       closeBuild();
       closeExpand();
@@ -2643,6 +2648,7 @@ export function bindHud(root, state, world) {
       hideFurnMenu();
     },
   });
+  skillGuide = bindSkillGuide({ skills, panel: skillsPanel });
   skills.onLevelUp((event) => {
     const unlocked = unlockNamesBetween(event.skillId, event.from, event.level, hiddenCraft);
     const extra = unlocked.length

@@ -53,7 +53,9 @@ import {
   xpForLevel,
   xpForMine,
   xpFromCraftHistory,
+  ESSENCE_DOUBLE_LEVEL,
 } from './skills.js';
+import { RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
 import {
   CAULDRON_COST,
   WHEEL_COST,
@@ -1172,7 +1174,7 @@ export function craftedOutputCount(state, recipe) {
   if (recipe?.category !== 'rune') return base;
   const need = Math.max(1, recipe.requires?.level ?? 1);
   const level = state.skills?.getLevel?.('runecrafting') ?? 1;
-  return level >= need * 2 ? base * 2 : base;
+  return level >= need * RUNE_DOUBLE_LEVEL_MULT ? base * 2 : base;
 }
 
 function finishOneCraft(state, recipeId) {
@@ -1339,7 +1341,7 @@ function grantMaterial(state, materialId, amount) {
 /** Essence rocks give 2 essence once Mining is 50 or higher. Other rocks do not. */
 export function minedGrantAmount(state, materialId, amount = mineYield(materialId)) {
   const n = Math.max(0, Math.round(Number(amount) || 0));
-  if (materialId === 'essence' && (state.skills?.getLevel?.('mining') ?? 1) >= 50) return n * 2;
+  if (materialId === 'essence' && (state.skills?.getLevel?.('mining') ?? 1) >= ESSENCE_DOUBLE_LEVEL) return n * 2;
   return n;
 }
 

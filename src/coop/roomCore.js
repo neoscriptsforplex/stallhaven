@@ -87,6 +87,7 @@ export function createRoomCore({
       connected: Boolean(p.connId),
       ms: p.ms ?? null,
       pos: p.pos ?? null,
+      act: p.act ?? null,
     };
   }
   const playerList = () => [...players.values()].sort((a, b) => a.slot - b.slot).map(publicPlayer);
@@ -308,9 +309,18 @@ export function createRoomCore({
         if (finite(msg.x) && finite(msg.z) && Math.abs(msg.x) < 200 && Math.abs(msg.z) < 200) {
           const scene = ['shop', 'dungeon', 'runefield'].includes(msg.scene) ? msg.scene : 'shop';
           player.pos = { x: msg.x, z: msg.z, scene };
+          player.act = null;
           broadcast({ t: 'move', id: player.id, x: msg.x, z: msg.z, scene }, connId);
         }
         break;
+      case 'act': {
+        // Gathering animation cue only; the gather itself is an intent.
+        const mode = ['mine', 'chop', 'pick'].includes(msg.mode) ? msg.mode : null;
+        const yaw = finite(msg.yaw) && Math.abs(msg.yaw) < 100 ? Math.round(msg.yaw * 1000) / 1000 : null;
+        player.act = mode ? { mode, yaw } : null;
+        broadcast({ t: 'act', id: player.id, mode, yaw }, connId);
+        break;
+      }
       case 'ping':
         if (finite(msg.ms) && msg.ms >= 0 && msg.ms < 60000) player.ms = Math.round(msg.ms);
         send(connId, { t: 'pong', c: finite(msg.c) ? msg.c : null, serverNow: t });

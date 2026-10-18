@@ -155,6 +155,20 @@ test('a guest action changes the shared gold for everyone', async () => {
   for (const c of [host, g, g2]) c.close();
 });
 
+test('moves and gather activity reach the other players', async () => {
+  const { code, host } = await hostRoom();
+  const g = await join(code, 'Sam');
+  const { you } = await g.wait('join_ok');
+  await g.send({ t: 'move', x: 1.5, z: -2, scene: 'shop' });
+  const mv = await host.wait('move', (m) => m.id === you.id);
+  assert.deepEqual([mv.x, mv.z, mv.scene], [1.5, -2, 'shop']);
+  await g.send({ t: 'act', mode: 'chop', yaw: 0.75 });
+  const act = await host.wait('act', (m) => m.id === you.id);
+  assert.deepEqual([act.mode, act.yaw], ['chop', 0.75]);
+  host.close();
+  g.close();
+});
+
 test('pings arrive about every 2 seconds', async () => {
   const { host } = await hostRoom();
   await host.send({ t: 'ping', c: Date.now() });

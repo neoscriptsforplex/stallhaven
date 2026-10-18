@@ -56,6 +56,9 @@ Env vars: `VITE_ROOM_SERVER_URL` (client), `ALLOWED_ORIGINS`, `ROOM_MAX_PLAYERS`
 * After each change, the room sends a `patch` with the whole top-level keys that changed (`gold`, `chest`, `displays`, `furniture`, …, `crafts`).
   Craft times are room seconds; the client converts them with a clock offset measured by ping.
 * Movement sends only click destinations (`move`); each client walks the other keepers along its own nav mesh.
+* Other players use the same model as your own keeper (the game's default path: bundled rigged player, then the bundled OBJ, then the procedural keeper),
+  with the same Walk/Idle clips and the Mine/Chop/Pick clips from `act`. Their party colour is shown by a ring at their feet and their name tag colour.
+  If the local model changes (e.g. the bundled player finishes loading), the remote keepers are rebuilt with it. Uploaded custom player models stay local to the uploader.
 * The host's browser keeps autosaving the shop, so the host keeps their progress. A guest's autosave is paused while they're in a party, and their own save is loaded again when it ends.
 
 ### Client → server
@@ -65,6 +68,7 @@ Env vars: `VITE_ROOM_SERVER_URL` (client), `ALLOWED_ORIGINS`, `ROOM_MAX_PLAYERS`
 | `hello` | `v, name, hostKey?, token?, save?` | First message. The host sends the `hostKey` from `POST /api/rooms` plus its autosave. A rejoin sends `token`. |
 | `intent` | `n, intent` | `intent` is the same object as `applyIntent()` takes. |
 | `move` | `x, z, scene` | Click destination. |
+| `act` | `mode, yaw` | Gather animation cue: `mine`, `chop`, `pick` or `null`. A move clears it. |
 | `ping` | `c, ms?` | `c`: client clock. `ms`: last measured RTT (shown to others). |
 | `resync` | | Ask for a full patch. |
 | `kick` | `id` | Host only. Bans that player's token (and IP when it differs) from the room. |
@@ -81,8 +85,9 @@ Env vars: `VITE_ROOM_SERVER_URL` (client), `ALLOWED_ORIGINS`, `ROOM_MAX_PLAYERS`
 | `patch` | `set{key: value}, serverNow, full?` |
 | `cust` | `op: 'add', customer` or `op: 'leave', id, reason, by?` |
 | `move` | `id, x, z, scene` |
+| `act` | `id, mode, yaw` |
 | `evt` | `kind, by, text` (log line, e.g. "Sam sold Bread.") |
-| `player_joined`, `player_left`, `player_dropped`, `player_reconnected` | `player{id,name,color,host,connected,ms,pos}` |
+| `player_joined`, `player_left`, `player_dropped`, `player_reconnected` | `player{id,name,color,host,connected,ms,pos,act}` |
 | `pings` | `list[{id, ms}]` every 2 s |
 | `pong` | `c, serverNow` |
 | `host_waiting` | `secondsLeft` (120 when the host drops, then every 15 s) |

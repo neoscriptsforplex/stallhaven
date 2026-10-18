@@ -241,3 +241,19 @@ test('room state survives a save and reload (Durable Object eviction)', () => {
   assert.equal(again._state().gold, 500);
   assert.equal(again.playerCount(), 2);
 });
+
+test('gather activity is relayed to the others and cleared by a move', () => {
+  const t = setup();
+  hostAndGuest(t);
+  t.say('g', { t: 'act', mode: 'chop', yaw: 1.25 });
+  const act = t.last('h', 'act');
+  assert.deepEqual({ mode: act.mode, yaw: act.yaw }, { mode: 'chop', yaw: 1.25 });
+  t.open('late');
+  t.say('late', { t: 'hello', name: 'Ana' });
+  assert.equal(t.last('late', 'join_ok').players.find((p) => p.name === 'Sam').act.mode, 'chop');
+  t.say('g', { t: 'act', mode: 'dance' });
+  assert.equal(t.last('h', 'act').mode, null);
+  t.say('g', { t: 'act', mode: 'mine' });
+  t.say('g', { t: 'move', x: 1, z: 1 });
+  assert.equal(t.room._players().get(t.last('g', 'join_ok').you.id).act, null);
+});

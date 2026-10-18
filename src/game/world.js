@@ -294,6 +294,8 @@ export function createWorld(canvas, state, opts = {}) {
   // 'local': this browser runs travellers (solo). 'remote': a co-op room sends them.
   let customerAuthority = 'local';
   let localMoveListener = null;
+  let localActivityListener = null;
+  let rebuildRemoteKeepers = null;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -963,11 +965,17 @@ export function createWorld(canvas, state, opts = {}) {
   const remoteKeepers = createRemoteKeepers({
     scene,
     speed: PLAYER_SPEED,
-    buildMesh: (player) => {
-      const mesh = buildShopkeeper({ appearance: player.appearance ?? state.appearance });
-      // Drop the built-in "You" tag; remote keepers get their own coloured name tag.
-      for (const child of [...mesh.children]) if (child.isSprite) mesh.remove(child);
-      mesh.scale.setScalar(PLAYER_WORLD_SCALE);
+    // Same model path as the local player (bundled rigged player, then the bundled
+    // OBJ, then the procedural keeper), so other players look and animate the same.
+    buildMesh: () => {
+      const mesh = makeDefaultKeeper();
+      mesh.name = 'coop-keeper';
+      // Drop the built-in "You" tag; remote keepers get a name tag in their party colour.
+      const tags = [];
+      mesh.traverse((child) => {
+        if (child.isSprite) tags.push(child);
+      });
+      for (const tag of tags) tag.parent?.remove(tag);
       return mesh;
     },
     planWalk: (from, to, scene) => (scene === 'shop' ? planPlayerWalk(from, to, state, PLAYER_RADIUS) : [to]),
@@ -976,7 +984,19 @@ export function createWorld(canvas, state, opts = {}) {
       syncStance(actor.mesh);
       updateWalkPose(actor.mesh, false, dt, now);
     },
+    setGather: (actor, mode) => {
+      setHeldTool(actor.mesh, mode === 'mine' ? 'pickaxe' : mode === 'chop' ? 'hatchet' : null);
+      setGatherClip(actor.mesh, mode || null);
+    },
+    gather: (actor, dt, now) => {
+      syncStance(actor.mesh);
+      updateMinePose(actor.mesh, dt, now);
+    },
   });
+  rebuildRemoteKeepers = () => remoteKeepers.api.rebuildAll();
+  function emitLocalActivity(mode) {
+    localActivityListener?.({ mode: mode || null, yaw: shopkeeper.rotation.y });
+  }
   let nextSpawnAt = FIRST_CUSTOMER_DELAY;
   let firstSpawn = true;
   let customerSerial = 1;
@@ -1577,6 +1597,7 @@ export function createWorld(canvas, state, opts = {}) {
     mining = null;
     setHeldTool(shopkeeper, null);
     setGatherClip(shopkeeper, null);
+    emitLocalActivity(null);
   }
 
   function barYield(session) {
@@ -1612,6 +1633,7 @@ export function createWorld(canvas, state, opts = {}) {
     setHeldTool(shopkeeper, 'pickaxe');
     faceGather(pose);
     setGatherClip(shopkeeper, 'mine');
+    emitLocalActivity('mine');
   }
 
   function startChopping(pose) {
@@ -1633,6 +1655,7 @@ export function createWorld(canvas, state, opts = {}) {
     setHeldTool(shopkeeper, 'hatchet');
     faceGather(pose);
     setGatherClip(shopkeeper, 'chop');
+    emitLocalActivity('chop');
   }
 
   function syncTreeVisuals() {
@@ -1700,6 +1723,7 @@ export function createWorld(canvas, state, opts = {}) {
     setHeldTool(shopkeeper, null);
     faceGather({ x: node.x, z: node.z, faceYaw: pose?.faceYaw });
     setGatherClip(shopkeeper, 'pick');
+    emitLocalActivity('pick');
   }
 
   function tickMining(now) {
@@ -3409,6 +3433,8 @@ export function createWorld(canvas, state, opts = {}) {
     scene.remove(shopkeeper);
     shopkeeper = next;
     bindGatherEvents(shopkeeper);
+    // Co-op: other players follow the local player's model.
+    rebuildRemoteKeepers?.();
   }
 
   function bindGatherEvents(mesh) {
@@ -3741,6 +3767,10 @@ export function createWorld(canvas, state, opts = {}) {
     /** Co-op: called with { x, z, scene } whenever the local keeper starts a walk. */
     onLocalMove(fn) {
       localMoveListener = typeof fn === 'function' ? fn : null;
+    },
+    /** Co-op: called with { mode: 'mine'|'chop'|'pick'|null, yaw } when local gathering starts or stops. */
+    onLocalActivity(fn) {
+      localActivityListener = typeof fn === 'function' ? fn : null;
     },
     getLocalKeeperPose() {
       return { x: shopkeeper.position.x, z: shopkeeper.position.z, scene: sceneMode };

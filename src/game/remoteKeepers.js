@@ -65,7 +65,16 @@ export function createRemoteKeepers(deps) {
     mesh.add(ring);
     const label = nameSprite(player.name ?? 'Player', color);
     if (label) {
-      label.position.y = (deps.labelHeight ?? 2.05) * inv;
+      // Put the tag just over the model's head, whatever model the game is using.
+      let height = deps.labelHeight ?? 2.05;
+      try {
+        mesh.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(mesh);
+        if (Number.isFinite(box.max.y) && box.max.y > 0.2) height = box.max.y - Math.min(0, box.min.y) + 0.12;
+      } catch {
+        /* keep the default */
+      }
+      label.position.y = height * inv;
       label.scale.multiplyScalar(inv);
       mesh.add(label);
     }
@@ -81,10 +90,27 @@ export function createRemoteKeepers(deps) {
       mesh: holder,
       path: [],
       scene: start.scene ?? 'shop',
+      activity: null,
+      yaw: null,
     };
     keepers.set(player.id, actor);
     holder.visible = actor.scene === viewerScene;
+    if (player.act?.mode) setActivity(player.id, player.act.mode, player.act.yaw);
     return actor;
+  }
+
+  /** Rebuild every remote keeper with the current model (e.g. after the bundled player loads). */
+  function rebuildAll() {
+    for (const actor of [...keepers.values()]) {
+      const pose = { x: actor.holder.position.x, z: actor.holder.position.z, scene: actor.scene };
+      const keep = { path: actor.path, activity: actor.activity, yaw: actor.yaw, rotY: actor.holder.rotation.y };
+      remove(actor.id);
+      const next = add({ id: actor.id, name: actor.name, color: actor.color, pos: pose });
+      if (!next) continue;
+      next.path = keep.path;
+      next.holder.rotation.y = keep.rotY;
+      if (keep.activity) setActivity(actor.id, keep.activity, keep.yaw);
+    }
   }
 
   function remove(id) {
@@ -95,9 +121,21 @@ export function createRemoteKeepers(deps) {
     return true;
   }
 
+  /** Mine / chop / pick (the same clips as the local player), or null to stop. */
+  function setActivity(id, mode, yaw = null) {
+    const actor = keepers.get(id);
+    if (!actor) return false;
+    const next = ['mine', 'chop', 'pick'].includes(mode) ? mode : null;
+    actor.activity = next;
+    actor.yaw = Number.isFinite(yaw) ? yaw : null;
+    deps.setGather?.(actor, next);
+    return true;
+  }
+
   function moveTo(id, x, z, scene = 'shop') {
     const actor = keepers.get(id);
     if (!actor || !Number.isFinite(x) || !Number.isFinite(z)) return false;
+    if (actor.activity) setActivity(id, null);
     if (scene !== actor.scene) {
       // Changing scene (shop <-> dungeon): appear at the goal.
       actor.scene = scene;
@@ -116,7 +154,12 @@ export function createRemoteKeepers(deps) {
     for (const actor of keepers.values()) {
       actor.holder.visible = actor.scene === viewerScene;
       if (!actor.path.length) {
-        deps.idle?.(actor, dt, now);
+        if (actor.activity && deps.gather) {
+          if (actor.yaw != null) actor.holder.rotation.y = actor.yaw;
+          deps.gather(actor, dt, now);
+        } else {
+          deps.idle?.(actor, dt, now);
+        }
         continue;
       }
       if (deps.walkToward(actor, actor.path[0], dt, speed)) actor.path.shift();
@@ -133,6 +176,8 @@ export function createRemoteKeepers(deps) {
       add,
       remove,
       moveTo,
+      setActivity,
+      rebuildAll,
       clear,
       list: () => [...keepers.values()].map((a) => ({
         id: a.id,
@@ -142,6 +187,8 @@ export function createRemoteKeepers(deps) {
         x: a.holder.position.x,
         z: a.holder.position.z,
         walking: a.path.length > 0,
+        activity: a.activity,
+        model: a.holder.userData?.clipLocomotion ? 'rigged' : 'basic',
       })),
       has: (id) => keepers.has(id),
     },

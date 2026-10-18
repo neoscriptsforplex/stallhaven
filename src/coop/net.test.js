@@ -134,7 +134,19 @@ function makeClient(server, gold) {
     removeRemoteCustomer(id) {
       this.customers.delete(id);
     },
-    remoteKeepers: { add: (p) => keepers.add(p.id), remove: (id) => keepers.delete(id), moveTo() {}, clear: () => keepers.clear() },
+    acts: [],
+    remoteKeepers: {
+      add: (p) => keepers.add(p.id),
+      remove: (id) => keepers.delete(id),
+      moveTo() {},
+      setActivity(id, mode) {
+        world.acts.push({ id, mode });
+      },
+      clear: () => keepers.clear(),
+    },
+    onLocalActivity(fn) {
+      this.act = fn;
+    },
     onLocalMove(fn) {
       this.move = fn;
     },
@@ -241,4 +253,11 @@ test('a kicked guest is told and goes back to solo', async () => {
   assert.equal(guest.seen('room_ended').reason, 'kicked');
   assert.equal(guest.state.gold, 77);
   await until(() => host.seen('player_left'));
+});
+
+test('gathering on one client plays the gather clip on the other', async () => {
+  const { host, guest } = await party();
+  guest.world.act({ mode: 'mine', yaw: 0.4 });
+  await until(() => host.world.acts.length);
+  assert.deepEqual(host.world.acts[0], { id: guest.net.you.id, mode: 'mine' });
 });

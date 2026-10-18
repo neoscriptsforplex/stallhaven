@@ -251,6 +251,9 @@ export function createNet(deps) {
       case 'move':
         safe(() => world.remoteKeepers?.moveTo(msg.id, msg.x, msg.z, msg.scene));
         return undefined;
+      case 'act':
+        safe(() => world.remoteKeepers?.setActivity?.(msg.id, msg.mode, msg.yaw));
+        return undefined;
       case 'evt':
         if (typeof msg.text === 'string') {
           pushLog(state, msg.text.slice(0, 160));
@@ -335,6 +338,7 @@ export function createNet(deps) {
       send({ t: 'intent', n: intentSerial, intent });
     });
     world.onLocalMove?.((pose) => send({ t: 'move', x: pose.x, z: pose.z, scene: pose.scene }));
+    world.onLocalActivity?.((act) => send({ t: 'act', mode: act.mode, yaw: act.yaw }));
     refresh(keys.length ? keys : ['furniture']);
     const pose = safe(() => world.getLocalKeeperPose?.());
     if (pose) send({ t: 'move', x: pose.x, z: pose.z, scene: pose.scene });
@@ -361,6 +365,7 @@ export function createNet(deps) {
     closeSocket();
     bus.setRemote(null);
     safe(() => world.onLocalMove?.(null));
+    safe(() => world.onLocalActivity?.(null));
     safe(() => world.remoteKeepers?.clear());
     safe(() => world.setCustomerAuthority('local'));
   }

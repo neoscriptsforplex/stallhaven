@@ -120,6 +120,33 @@ test('solo gathering grants material and XP like the old world code', () => {
   assert.ok(xp1 > xp0);
 });
 
+test('quest intents start, collect past the cap, and recall with no reward', () => {
+  const state = createState();
+  state.gold = 80_000;
+  assert.equal(applyIntent(state, { type: 'hireHero', classId: 'adventurer', npcId: 'buyer-adventurer-bob' }).value, true);
+  assert.equal(applyIntent(state, { type: 'startQuest', questId: 'cow', heroId: 'adventurer' }).value, true);
+  assert.equal(state.hq.quests.active.cow.endsAt - state.hq.quests.active.cow.startedAt, 60_000);
+  assert.equal(applyIntent(state, { type: 'startQuest', questId: 'imp', heroId: 'adventurer' }).value, false);
+  assert.equal(applyIntent(state, { type: 'collectQuest', questId: 'cow' }).value, false);
+  state.hq.quests.active.cow.endsAt = Date.now() - 1000;
+  const hideBefore = state.materials.hide;
+  const collected = applyIntent(state, { type: 'collectQuest', questId: 'cow' });
+  assert.equal(collected.ok, true);
+  assert.equal(collected.value[0].questId, 'cow');
+  assert.equal(state.materials.hide, hideBefore + 5);
+  assert.equal(state.hq.quests.done.cow, 1);
+  assert.equal(applyIntent(state, { type: 'startQuest', questId: 'chicken', heroId: 'adventurer' }).value, true);
+  assert.equal(applyIntent(state, { type: 'recallQuest', questId: 'chicken' }).value, true);
+  assert.equal(state.hq.quests.active.chicken, undefined);
+  assert.equal(state.hq.quests.done.chicken, undefined);
+  assert.equal(checkIntentShape({ type: 'startQuest', questId: 'cow' }), 'bad-quest');
+  assert.equal(checkIntentShape({ type: 'collectQuest', questId: 'all' }), null);
+  state.materials.essence = 250;
+  state.hq.quests.active.dark_wizard = { heroId: 'adventurer', startedAt: 1, endsAt: 1 };
+  assert.equal(applyIntent(state, { type: 'collectQuest', questId: 'dark_wizard' }).ok, true);
+  assert.equal(state.materials.essence, 750);
+});
+
 test('intent bus returns plain values and forwards only accepted intents in co-op', () => {
   const state = createState();
   const bus = createIntentBus({ now: () => 1 });

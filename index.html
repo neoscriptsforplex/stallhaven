@@ -489,9 +489,25 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
     </aside>
 
     <aside id="quests-dock" class="expand-dock hq-dock" role="dialog" aria-label="Quests" hidden>
-      <div class="skills-head"><span class="skills-grip" aria-hidden="true"></span><h2>Quests</h2><button type="button" class="skills-close" data-quests-close aria-label="Close quests">✕</button></div>
-      <div class="quest-list" data-quest-list></div>
+      <div class="skills-head"><span class="skills-grip" aria-hidden="true"></span><h2>Quests</h2><span class="quest-summary" data-quest-summary></span><button type="button" class="skills-close" data-quests-close aria-label="Close quests">✕</button></div>
+      <div class="quest-heroes" data-quest-heroes></div>
+      <div class="quest-body">
+        <div class="craft-sidetabs" data-quest-tabs role="tablist" aria-label="Quest lengths"></div>
+        <div class="quest-list" data-quest-list></div>
+      </div>
     </aside>
+
+    <div id="away-modal" class="modal" hidden>
+      <div class="sheet away-sheet" role="dialog" aria-labelledby="away-title">
+        <h2 id="away-title">While you were away</h2>
+        <p class="meta">Your heroes came back. Collect their loot, or leave it until you open Quests.</p>
+        <div class="away-list" data-away-list></div>
+        <div class="away-actions">
+          <button type="button" data-away-later>Later</button>
+          <button type="button" class="hq-gold-btn" data-away-collect>Collect all</button>
+        </div>
+      </div>
+    </div>
 
     <div id="hero-picker" class="modal" hidden>
       <div class="sheet hero-picker-sheet" role="dialog" aria-labelledby="hero-picker-title">

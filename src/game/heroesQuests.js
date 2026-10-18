@@ -226,6 +226,13 @@ export function collectQuest(hq, questId, grant, now = Date.now()) {
   return quest.rewards;
 }
 
+/** Sends the hero home with no reward and no completion. Works while the fight is still running. */
+export function recallQuest(hq, questId) {
+  if (!hq?.quests?.active?.[questId]) return false;
+  delete hq.quests.active[questId];
+  return true;
+}
+
 export function readyQuests(hq, now = Date.now()) {
   return Object.keys(hq.quests.active).filter((id) => questStatus(hq, id, now) === 'ready');
 }

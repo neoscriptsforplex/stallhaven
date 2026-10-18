@@ -47,7 +47,15 @@ import {
   mineTiming,
 } from './catalog.js';
 import { meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
-import { emptyHeroQuestState, hireHero } from './heroesQuests.js';
+import {
+  emptyHeroQuestState,
+  collectQuest,
+  grantQuestReward,
+  hireHero,
+  readyQuests,
+  recallQuest,
+  startQuest,
+} from './heroesQuests.js';
 
 export const INTENT_TYPES = Object.freeze([
   'craft',
@@ -69,6 +77,9 @@ export const INTENT_TYPES = Object.freeze([
   'buyFurniture',
   'gather',
   'hireHero',
+  'startQuest',
+  'collectQuest',
+  'recallQuest',
   'cheat',
 ]);
 
@@ -151,6 +162,12 @@ export function checkIntentShape(intent) {
       return null;
     case 'hireHero':
       return okId(intent.classId) && okId(intent.npcId) ? null : 'bad-hero';
+    case 'startQuest':
+      return okId(intent.questId) && okId(intent.heroId) ? null : 'bad-quest';
+    case 'collectQuest':
+      return intent.questId === 'all' || okId(intent.questId) ? null : 'bad-quest';
+    case 'recallQuest':
+      return okId(intent.questId) ? null : 'bad-quest';
     case 'cheat':
       return typeof intent.code === 'string' && intent.code.length <= 40 ? null : 'bad-code';
     default:
@@ -185,6 +202,26 @@ function gatherXp(state, intent) {
   if (intent.mode === 'pick') state.skills?.addXp('farming', xpForPick(intent.materialId));
   else if (intent.mode === 'chop') state.skills?.addXp('woodcutting', xpForChop(intent.materialId));
   else if (intent.mode === 'mine') state.skills?.addXp('mining', xpForMine(intent.materialId));
+}
+
+/**
+ * Quest timers are wall-clock milliseconds. The room clock and the intent bus
+ * clock are seconds, so these always use Date.now() on the machine applying them.
+ */
+function applyQuestIntent(state, intent) {
+  if (!state.hq) state.hq = emptyHeroQuestState();
+  const now = Date.now();
+  if (intent.type === 'startQuest') return done(startQuest(state.hq, intent.questId, intent.heroId, now));
+  if (intent.type === 'recallQuest') return done(recallQuest(state.hq, intent.questId));
+  const ids = intent.questId === 'all' ? readyQuests(state.hq, now) : [intent.questId];
+  const rows = [];
+  for (const id of ids) {
+    const rewards = collectQuest(state.hq, id, (materialId, amount) => {
+      grantQuestReward(state.materials, materialId, amount);
+    }, now);
+    if (rewards) rows.push({ questId: id, rewards });
+  }
+  return done(rows.length ? rows : false);
 }
 
 /**
@@ -282,6 +319,10 @@ export function applyIntent(state, intent, ctx = {}) {
     case 'hireHero':
       if (!state.hq) state.hq = emptyHeroQuestState();
       return done(hireHero(state, state.hq, intent.classId, intent.npcId, ctx.rng ?? Math.random));
+    case 'startQuest':
+    case 'collectQuest':
+    case 'recallQuest':
+      return applyQuestIntent(state, intent);
     case 'cheat':
       if (coop) return fail('cheats-off');
       return done(applyCheat(state, intent.code));

@@ -5,6 +5,7 @@
  */
 // coop.css is linked from index.html (the live site serves src/ as plain ES modules, so no CSS imports).
 import { CODE_ALPHABET, DEFAULT_NAME, NAME_MAX, RECONNECT_DELAYS } from './protocol.js';
+import { coopAvailable } from './config.js';
 
 const SWATCH = { red: 'var(--coop-p1)', blue: 'var(--coop-p2)', green: 'var(--coop-p3)', purple: 'var(--coop-p4)' };
 const NAME_KEY = 'stallhaven-coop-name';
@@ -92,6 +93,8 @@ const DOCK_HTML = `
 
 export function mountCoop({ state, world, hud, autosave } = {}) {
   if (typeof document === 'undefined') return null;
+  // No room server configured and not running locally (e.g. the live site today): no Co-op button at all.
+  if (!coopAvailable()) return null;
   const saveBar = document.querySelector('#save-bar');
   const hudRoot = document.querySelector('#hud');
   if (!saveBar) return null;

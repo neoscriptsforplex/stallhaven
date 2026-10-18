@@ -18,8 +18,20 @@ npm run dev                         # terminal 2: game on http://localhost:5173/
 3. Buy or craft something in either window: coins, chest and materials change in both. Travellers come from the room.
 4. Host: **End party** asks for confirmation, then the guest sees "Party ended" and gets their own shop back.
 
-To point the game at another room server, build with `VITE_ROOM_SERVER_URL=https://…`. The live Pages site serves
-`src/` unbundled, so it can't read `import.meta.env`; add `<meta name="stallhaven-room-server" content="https://…">` to `index.html` instead.
+### When the Co-op button shows (important for the live site)
+
+The **Co-op** button only appears when:
+
+1. a room server is configured, either `VITE_ROOM_SERVER_URL=https://…` at Vite build time, **or**
+   `<meta name="stallhaven-room-server" content="https://…">` in `index.html`. The live Pages site serves
+   `src/` unbundled, so it can't read `import.meta.env`; use the meta tag there. **Or:**
+2. the game runs on this machine (`localhost`, `127.0.0.1`, `::1`, `*.localhost`). In that case it talks to
+   `http://127.0.0.1:8787`, the server from `npm run coop:server`.
+
+Otherwise (the live site today, with no public room server) the button and all co-op UI are left out entirely,
+and solo play is unchanged. Logic and tests: `src/coop/config.js`, `src/coop/config.test.js`.
+To switch co-op on for the live site later: deploy the room server, add its origin to `ALLOWED_ORIGINS`,
+then add the meta tag to `index.html`.
 
 ## Tests
 

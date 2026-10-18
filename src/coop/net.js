@@ -20,22 +20,15 @@ import {
   normalizeCode,
 } from './protocol.js';
 import { LAYOUT_KEYS, applySharedPatch } from './sharedState.js';
+import { roomServerUrl } from './config.js';
 
 export const LAST_NAME_KEY = 'stallhaven-coop-name';
 const TOKEN_KEY = (code) => `stallhaven-coop-token-${code}`;
 const LIGHT_KEYS = new Set(['gold', 'materials', 'crafts', 'shopXp', 'skills', 'craftCounts']);
 
-/**
- * Room server URL: VITE_ROOM_SERVER_URL when built with Vite, else a
- * <meta name="stallhaven-room-server" content="https://..."> tag (the live
- * site serves src/ unbundled, so it has no import.meta.env), else local dev.
- */
+/** Room server URL (see config.js). */
 export function defaultServerUrl() {
-  const env = import.meta.env;
-  const meta = typeof document !== 'undefined'
-    ? document.querySelector('meta[name="stallhaven-room-server"]')?.getAttribute('content')
-    : null;
-  return (env?.VITE_ROOM_SERVER_URL || meta || 'http://127.0.0.1:8787').replace(/\/+$/, '');
+  return roomServerUrl();
 }
 
 export function lastName(store = globalThis.localStorage) {

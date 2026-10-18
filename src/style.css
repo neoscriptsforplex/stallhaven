@@ -894,7 +894,7 @@ button:disabled {
 
 #craft-modal,
 #potion-modal {
-  background: rgba(16, 10, 6, 0.18);
+  background: transparent;
 }
 
 #offer-modal {

@@ -3940,6 +3940,25 @@ describe('nail dumps, magic sparkles, and the saw blade', () => {
     }
   });
 
+  it('draws Rune nails from the 18 Oct dump at the OSRS scale', async () => {
+    const objText = readFileSync(join(modelsRoot, 'nails/rune/rune.obj'), 'utf8');
+    assert.match(objText, /o Item Rune nails 2026-10-18/);
+    assert.match(objText, /^mtllib rune\.mtl/m);
+    const raw = await loadFolder('nails/rune');
+    const rawSize = measureVisibleBox(raw).getSize(new THREE.Vector3());
+    const rawMax = Math.max(rawSize.x, rawSize.y, rawSize.z);
+    setBundledLook('nails-rune', raw);
+    try {
+      const ware = buildWare('runite_nails');
+      assert.ok(ware.getObjectByName('dump'), 'Rune nails should use the bundled dump');
+      const size = measureVisibleBox(ware).getSize(new THREE.Vector3());
+      const max = Math.max(size.x, size.y, size.z);
+      assert.ok(Math.abs(max - rawMax * OSRS_MODEL_SCALE) / (rawMax * OSRS_MODEL_SCALE) < 0.08, `max ${max}`);
+    } finally {
+      setBundledLook('nails-rune', null);
+    }
+  });
+
   it('draws a loaded nail pile at the OSRS scale', async () => {
     const raw = await loadFolder('nails/bronze');
     const rawSize = measureVisibleBox(raw).getSize(new THREE.Vector3());

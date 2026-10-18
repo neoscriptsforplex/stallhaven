@@ -189,6 +189,12 @@ describe('player look UI', () => {
     assert.match(pop, />Mine</);
   });
 
+  it('leaves crafting station screens undimmed and still clickable outside the panel', () => {
+    assert.match(css, /#craft-modal,\s*#potion-modal\s*\{\s*background:\s*transparent;/);
+    assert.match(hud, /if \(event\.target === craftModal\) closeCraft\(\)/);
+    assert.match(css, /\.modal\s*\{[^}]*pointer-events:\s*auto;/);
+  });
+
   it('shows a +N yield under the gather progress bar', () => {
     const hudBar = slice(html, 'id="active-craft"', 'id="help-modal"');
     const bar = hudBar.indexOf('data-active-craft-bar');

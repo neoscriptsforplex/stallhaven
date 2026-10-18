@@ -2016,7 +2016,7 @@ const NAIL_LOOK_ORDER = [
   'steel_nails',
   'mithril_nails',
   'adamant_nails',
-  'rune_nails',
+  'runite_nails',
   'dragon_nails',
 ];
 
@@ -2026,7 +2026,7 @@ const NAIL_LOOK = {
   steel_nails: 'nails-steel',
   mithril_nails: 'nails-mithril',
   adamant_nails: 'nails-adamant',
-  rune_nails: 'nails-rune',
+  runite_nails: 'nails-rune',
   dragon_nails: 'nails-dragon',
 };
 

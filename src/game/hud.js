@@ -92,6 +92,7 @@ import {
   ownsStation,
   placeFromChest,
   pushLog,
+  visibleLog,
   clearDisplay,
   removePlacedFurniture,
   restock,
@@ -2785,7 +2786,7 @@ export function bindHud(root, state, world) {
   function paintGameLog() {
     const el = document.querySelector('#game-log');
     if (!el) return;
-    const lines = state.log ?? [];
+    const lines = visibleLog(state);
     const next = lines.map((line) => `<li>${escapeLog(line)}</li>`).join('');
     if (el.innerHTML !== next) el.innerHTML = next;
   }

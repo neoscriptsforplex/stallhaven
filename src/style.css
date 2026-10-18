@@ -378,7 +378,9 @@ body {
 }
 
 /* Materials drawer. Desktop: tab at the bottom centre, list slides up (max 25vh).
-   Phones and narrow portrait: tab on the left edge, list slides out (max 25vw). */
+   Phones and narrow portrait: tab on the left edge, list slides out (max 25vw).
+   Coarse pointers (portrait and landscape) open that side list at double width,
+   capped at 90vw so the tab stays on screen. */
 .materials-drawer {
   position: fixed;
   left: 50%;
@@ -593,6 +595,34 @@ body {
   .materials-drawer.is-open {
     top: calc(env(safe-area-inset-top, 0px) + 165px);
     bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 8px);
+  }
+}
+
+/* Phones: the open side list is twice the 25vw panel, and never wider than 90vw.
+   The 26px tab stays in the row so it can still be tapped. Desktop is untouched. */
+@media (pointer: coarse) {
+  .materials-drawer.is-open {
+    max-width: min(
+      calc(2 * (25vw - env(safe-area-inset-left, 0px))),
+      calc(90vw - env(safe-area-inset-left, 0px))
+    );
+  }
+
+  .materials-drawer.is-open .materials-clip {
+    width: min(
+      calc(2 * (25vw - env(safe-area-inset-left, 0px)) - 26px),
+      calc(90vw - env(safe-area-inset-left, 0px) - 26px)
+    );
+    max-width: min(
+      calc(2 * (25vw - env(safe-area-inset-left, 0px)) - 26px),
+      calc(90vw - env(safe-area-inset-left, 0px) - 26px)
+    );
+  }
+
+  .materials-drawer.is-open .materials-toggle {
+    pointer-events: auto;
+    flex: none;
+    width: 26px;
   }
 }
 

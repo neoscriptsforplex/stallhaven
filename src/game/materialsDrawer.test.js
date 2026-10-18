@@ -5,7 +5,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MATERIALS, METALS } from './catalog.js';
 import {
+  MATERIALS_DRAWER_SIDE_CAP,
   MATERIALS_DRAWER_SIDE_QUERY,
+  MATERIALS_DRAWER_SIDE_SHARE,
   materialTint,
   materialsDrawerHtml,
   materialsDrawerPointerPlan,
@@ -84,7 +86,7 @@ describe('materials drawer', () => {
     });
     assert.equal(phone.top, 175);
     assert.equal(phone.bottom, 72);
-    assert.equal(phone.maxWidth, 100);
+    assert.equal(phone.maxWidth, 200);
     assert.equal(phone.maxHeight, 800 - 175 - 72);
 
     const desk = materialsDrawerSideBox({
@@ -97,10 +99,16 @@ describe('materials drawer', () => {
     });
     assert.equal(desk.top, 308);
     assert.equal(desk.bottom, null);
-    assert.equal(desk.maxWidth, 300);
+    assert.equal(desk.maxWidth, 600);
+    assert.equal(MATERIALS_DRAWER_SIDE_SHARE, 0.5);
+    assert.equal(MATERIALS_DRAWER_SIDE_CAP, 0.9);
+    assert.equal(
+      materialsDrawerSideBox({ viewportWidth: 1000, viewportHeight: 400 }).maxWidth,
+      Math.min(1000 * MATERIALS_DRAWER_SIDE_SHARE, 1000 * MATERIALS_DRAWER_SIDE_CAP),
+    );
   });
 
-  it('wires a non-blocking drawer that stays within a quarter of the screen', () => {
+  it('wires a non-blocking drawer that doubles on phones and stays within 90% of the screen', () => {
     const html = readFileSync(join(root, 'index.html'), 'utf8');
     const css = readFileSync(join(root, 'src/style.css'), 'utf8');
     const hud = readFileSync(join(root, 'src/game/hud.js'), 'utf8');
@@ -114,6 +122,11 @@ describe('materials drawer', () => {
     assert.match(css, /\.materials-toggle \{[^}]*pointer-events:\s*auto/);
     assert.match(css, /max-height:\s*25dvh/);
     assert.match(css, /max-width:\s*calc\(25vw - env\(safe-area-inset-left, 0px\)\)/);
+    assert.match(css, /@media \(pointer: coarse\)/);
+    assert.match(css, /calc\(2 \* \(25vw - env\(safe-area-inset-left, 0px\)\)\)/);
+    assert.match(css, /calc\(90vw - env\(safe-area-inset-left, 0px\)\)/);
+    assert.match(css, /\.materials-drawer\.is-open \.materials-toggle \{[^}]*pointer-events:\s*auto/);
+    assert.match(css, /\.materials-drawer\.is-open \.materials-toggle \{[^}]*width:\s*26px/);
     assert.match(css, /\.materials-drawer \{[^}]*env\(safe-area-inset-bottom/);
     assert.match(css, /env\(safe-area-inset-top, 0px\) \+ 165px/);
     assert.match(css, /64px \+ env\(safe-area-inset-bottom, 0px\)/);

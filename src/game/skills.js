@@ -117,6 +117,7 @@ export const STATION_SKILL = Object.freeze({
   wheel: 'crafting',
   potter: 'crafting',
   loom: 'crafting',
+  sawmill: 'construction',
 });
 
 /**
@@ -381,7 +382,10 @@ export function xpFromCraftHistory(craftCounts, recipes, stationFor) {
     const skillId = skillForRecipe(recipe, stationFor?.(recipe));
     const n = Math.max(0, Math.floor(Number(count) || 0));
     if (!skillId || !n) continue;
-    out[skillId] = Math.min(MAX_XP, out[skillId] + n * xpForCraft(recipe));
+    const gain = recipe.category === 'saw'
+      ? xpForSaw(recipe.outputMaterial, n * (recipe.outputCount ?? 1))
+      : n * xpForCraft(recipe);
+    out[skillId] = Math.min(MAX_XP, out[skillId] + gain);
   }
   return { xp: out };
 }

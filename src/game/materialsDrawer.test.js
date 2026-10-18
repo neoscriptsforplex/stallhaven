@@ -35,6 +35,10 @@ describe('materials drawer', () => {
     assert.equal(rows.find((row) => row.id === 'bronze_bar').name, 'Bronze Bar');
     assert.equal(rows.find((row) => row.id === 'bow_string').name, MATERIALS.bow_string.name);
     assert.equal(ownedMaterials({}).length, 0);
+    assert.equal(ownedMaterials({ oak_logs: 0, plank: 0, magic_plank: 0 }).length, 0);
+    const woods = ownedMaterials({ logs: 1, oak_logs: 2, willow_plank: 3, magic_logs: 1 });
+    assert.deepEqual(woods.map((row) => row.id), ['logs', 'oak_logs', 'magic_logs', 'willow_plank']);
+    assert.equal(woods.find((row) => row.id === 'oak_logs').name, 'Oak Logs');
     assert.equal(ownedMaterials({ essence: 0.4 }).length, 0);
   });
 

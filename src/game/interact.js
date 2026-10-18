@@ -2,7 +2,7 @@ import { FLAX_ARRIVE } from './catalog.js';
 import { PLAYER_RADIUS, isWalkable, planPlayerWalk, playerObstacles } from './nav.js';
 import { FOUNTAIN, furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, PORTAL_TARGET_HEIGHT, TREE_TRUNK_RADIUS } from './layout.js';
 
-export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'portal'];
+export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'sawmill', 'portal'];
 export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder', 'fountain']);
 
 function stationHit(kind, height, pickY) {
@@ -28,6 +28,7 @@ export const STATION_HIT = {
   loom: stationHit('loom', 1.2, 0.6),
   fletch: stationHit('fletch', 1.05, 0.52),
   potter: stationHit('potter', 1.1, 0.55),
+  sawmill: stationHit('sawmill', 1.15, 0.58),
   portal: stationHit('portal', PORTAL_TARGET_HEIGHT, PORTAL_TARGET_HEIGHT / 2),
   boulder: { w: 1.4, h: 1.2, d: 1.4, pickY: 0.52, floorR: 1.15 },
 };

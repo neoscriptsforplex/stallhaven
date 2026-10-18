@@ -10,6 +10,7 @@ import {
   pickMercenaryPlate,
   pickPilgrimCiv,
   pickRangerHide,
+  MATERIALS,
   RECIPES,
   SHOP,
   appearanceColor,
@@ -1884,6 +1885,16 @@ export function buildWare(recipeId) {
     group.userData.recipeId = recipeId;
     return group;
   }
+  if (!recipe && (LOG_WARE_LOOK[recipeId] || PLANK_WARE_LOOK[recipeId])) {
+    const host = new THREE.Group();
+    const tint = MATERIALS[recipeId]?.tint ?? 0x8a5a32;
+    if (PLANK_WARE_LOOK[recipeId]) addPlank(host, tint);
+    else addLogBundle(host, tint);
+    const lookId = PLANK_WARE_LOOK[recipeId] ?? LOG_WARE_LOOK[recipeId];
+    attachBundledWare(group, host, woodBundledLook(lookId), lookId);
+    group.userData.recipeId = recipeId;
+    return group;
+  }
   const shape = recipe?.shape;
   const tint = recipe?.tint ?? 0x888888;
   const host = new THREE.Group();
@@ -1933,6 +1944,8 @@ export function buildWare(recipeId) {
     potion: () => addPotion(host, tint),
     bar: () => addMetalBar(host, tint),
     bow_string: () => addBowStringCoil(host, tint),
+    plank: () => addPlank(host, tint),
+    logs: () => addLogBundle(host, tint),
   };
   if (recipe?.category === 'food') addFoodWare(group, recipe);
   else if (builders[shape]) builders[shape]();
@@ -1945,12 +1958,90 @@ export function buildWare(recipeId) {
     host.add(lump);
   }
   if (recipe?.category !== 'food') {
-    const bundled = recipe ? getBundledLook(recipe.id) : null;
+    const bundled = recipe ? woodBundledLook(recipe.id) : null;
     attachBundledWare(group, host, bundled, recipe?.id);
   }
   if (isShelfItem(recipe)) group.scale.setScalar(0.55);
   group.userData.recipeId = recipeId;
   return group;
+}
+
+const LOG_WARE_LOOK = {
+  logs: 'logs',
+  oak_logs: 'oak_logs',
+  willow_logs: 'willow_logs',
+  maple_logs: 'maple_logs',
+  yew_logs: 'yew_logs',
+  magic_logs: 'magic_logs',
+};
+
+const PLANK_WARE_LOOK = {
+  plank: 'saw_plank',
+  oak_plank: 'saw_oak_plank',
+  willow_plank: 'saw_willow_plank',
+  maple_plank: 'saw_maple_plank',
+  yew_plank: 'saw_yew_plank',
+  magic_plank: 'saw_magic_plank',
+};
+
+/** Missing dumps reuse a shipped log or plank and shift hue, keeping lightness. */
+const WOOD_TINT_LOOK = {
+  willow_logs: { source: 'logs', tint: 0x6a8a4a },
+  saw_willow_plank: { source: 'saw_plank', tint: 0x7a9a58 },
+  saw_maple_plank: { source: 'saw_plank', tint: 0xc4a05a },
+  saw_yew_plank: { source: 'saw_plank', tint: 0x6a3a48 },
+  saw_magic_plank: { source: 'saw_plank', tint: 0x3a6ec8 },
+};
+
+function woodBundledLook(id) {
+  const direct = getBundledLook(id);
+  if (direct) return direct;
+  const tinted = WOOD_TINT_LOOK[id];
+  if (!tinted) return null;
+  return tintedBundledLook(tinted.source, tinted.tint);
+}
+
+function tintedBundledLook(sourceId, hex) {
+  const source = getBundledLook(sourceId);
+  if (!source || hex == null) return null;
+  const clone = source.clone(true);
+  const target = new THREE.Color(hex);
+  const hue = { h: 0, s: 0, l: 0 };
+  target.getHSL(hue);
+  clone.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    const next = mats.map((mat) => {
+      const copy = mat.clone();
+      if (copy.color) {
+        const hsl = { h: 0, s: 0, l: 0 };
+        copy.color.getHSL(hsl);
+        copy.color.setHSL(hue.h, hue.s, hsl.l);
+      }
+      return copy;
+    });
+    child.material = Array.isArray(child.material) ? next : next[0];
+  });
+  return clone;
+}
+
+function addPlank(group, tint) {
+  const mesh = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(0.37, 0.09, 1.35),
+    wood(tint, 0.72),
+  ));
+  mesh.position.y = 0.045;
+  group.add(mesh);
+}
+
+function addLogBundle(group, tint) {
+  const mesh = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.13, 0.55, 8),
+    wood(tint, 0.86),
+  ));
+  mesh.rotation.z = Math.PI / 2;
+  mesh.position.y = 0.14;
+  group.add(mesh);
 }
 
 function addMaterialToken(host, tint) {

@@ -32,6 +32,7 @@ import {
   PORTAL_TARGET_WIDTH,
   PORTAL_TARGET_DEPTH,
   notePlantedTrunk,
+  WOOD_TREE_SPECS,
   OUTDOOR_GROUND_Y,
   OUTDOOR_TREE_SCALE,
   resetPlantedTrunks,
@@ -49,7 +50,7 @@ import {
   doorwayFloor,
   wallVineMounts,
 } from './layout.js';
-import { METALS } from './catalog.js';
+import { MATERIALS, METALS } from './catalog.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
@@ -1762,6 +1763,42 @@ export function buildPotterWheel() {
   return fitBundledStation('potter', buildProceduralPotterWheel());
 }
 
+function buildProceduralSawmill() {
+  const group = new THREE.Group();
+  group.name = 'sawmill';
+  const top = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(2.05, 0.07, 0.42),
+    wood(0x8a6238, 0.78),
+  ));
+  top.position.y = 0.72;
+  group.add(top);
+  for (const [x, z] of [[-0.92, -0.14], [0.92, -0.14], [-0.92, 0.14], [0.92, 0.14]]) {
+    const leg = addShadow(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.72, 0.07), wood(0x3e2616, 0.9)));
+    leg.position.set(x, 0.36, z);
+    group.add(leg);
+  }
+  const blade = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 0.018, 24),
+    metal(0xc8ccd2),
+  ));
+  blade.rotation.x = Math.PI / 2;
+  blade.position.set(0, 0.78, 0);
+  group.add(blade);
+  const hub = addShadow(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10),
+    metal(0x6a6e74),
+  ));
+  hub.rotation.x = Math.PI / 2;
+  hub.position.set(0, 0.78, 0);
+  group.add(hub);
+  return group;
+}
+
+/** Long bench with a circular blade. A bundled `sawmill` folder replaces this. */
+export function buildSawmill() {
+  return fitBundledStation('sawmill', buildProceduralSawmill());
+}
+
 export function buildSpinningWheel() {
   const bundled = getBundledLook('wheel');
   if (bundled) {
@@ -1967,6 +2004,43 @@ export function buildTree(scale = 1) {
   return mountOutdoorTree(fitted);
 }
 
+/** Host whose longest side is the dump's longest side times the OSRS unit scale. */
+function osrsFitHost(bundled) {
+  const probe = bundled.clone(true);
+  probe.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(probe).getSize(new THREE.Vector3());
+  const host = new THREE.Group();
+  const sx = Math.max(size.x * OSRS_MODEL_SCALE, 0.0001);
+  const sy = Math.max(size.y * OSRS_MODEL_SCALE, 0.0001);
+  const sz = Math.max(size.z * OSRS_MODEL_SCALE, 0.0001);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz));
+  box.position.y = sy / 2;
+  host.add(box);
+  return host;
+}
+
+/**
+ * Oak, willow, maple, yew, or magic. The dump is fit through wrapBundledProp
+ * at ×0.01125. Missing dumps fall back to the pine so the garden still chops.
+ */
+export function buildWoodTree(woodId, scale = 1) {
+  const spec = WOOD_TREE_SPECS[woodId];
+  const bundled = spec ? getBundledLook(spec.lookId) : null;
+  if (!bundled) {
+    const tree = buildTree(scale);
+    tree.userData.wood = woodId ?? 'logs';
+    if (spec?.canopy) tree.userData.canopy = spec.canopy;
+    return tree;
+  }
+  const fitted = wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'pine', fit: 'max' });
+  if (Math.abs(scale - 1) > 1e-6) fitted.scale.multiplyScalar(scale);
+  const tree = mountOutdoorTree(fitted);
+  tree.userData.wood = woodId;
+  tree.userData.osrsScale = true;
+  tree.userData.canopy = spec.canopy;
+  return tree;
+}
+
 /**
  * Sit the uniformly scaled pine on the grass.
  * The visual lives under a placement group so the garden can pin the group
@@ -2003,15 +2077,17 @@ export function seatTreeOnGround(tree, surfaceY = GRASS_PLANE_Y) {
 }
 
 /** Bark radius above the root fins, in world metres. Falls back to the 2× column. */
-export function measureTrunkRadius(tree) {
+export function measureTrunkRadius(tree, band = null) {
   if (!tree) return TREE_TRUNK_RADIUS;
   tree.updateMatrixWorld(true);
   const origin = new THREE.Vector3();
   tree.getWorldPosition(origin);
   const box = measureVisibleBox(tree);
   const height = Math.max(0.01, box.max.y - box.min.y);
-  const y0 = box.min.y + height * 0.14;
-  const y1 = box.min.y + height * 0.24;
+  const yLo = Number.isFinite(band?.y0) ? band.y0 : 0.14;
+  const yHi = Number.isFinite(band?.y1) ? band.y1 : 0.24;
+  const y0 = box.min.y + height * yLo;
+  const y1 = box.min.y + height * yHi;
   const v = new THREE.Vector3();
   let maxR = 0;
   let n = 0;
@@ -2027,7 +2103,11 @@ export function measureTrunkRadius(tree) {
       n += 1;
     }
   });
-  return n ? maxR : TREE_TRUNK_RADIUS;
+  let radius = n ? maxR : TREE_TRUNK_RADIUS;
+  if (Array.isArray(band?.clamp) && band.clamp.length === 2) {
+    radius = Math.min(band.clamp[1], Math.max(band.clamp[0], radius));
+  }
+  return radius;
 }
 
 /** Knee-high next to the shopkeeper. The uploaded dump is a wide flat spray. */
@@ -2522,11 +2602,15 @@ function addGarden(root, cells, expansionIds = []) {
   resetPlantedTrunks();
   for (const spot of gardenTreeSpots(expansionIds)) {
     const vary = 1 + (rand() * 2 - 1) * TREE_SCALE_SPREAD;
-    const tree = buildTree(vary);
+    const tree = spot.wood && spot.wood !== 'logs'
+      ? buildWoodTree(spot.wood, vary)
+      : buildTree(vary);
     tree.position.set(spot.x, OUTDOOR_GROUND_Y, spot.z);
     tree.rotation.y = rand() * Math.PI * 2;
     seatTreeOnGround(tree);
-    const trunkRadius = measureTrunkRadius(tree);
+    const trunkRadius = tree.userData.osrsScale
+      ? measureTrunkRadius(tree, { y0: 0.02, y1: 0.1, clamp: [0.12, 0.55] })
+      : measureTrunkRadius(tree);
     tree.userData.gardenSide = spot.side;
     tree.userData.uniformScale = vary;
     tree.userData.trunkRadius = trunkRadius;
@@ -2966,8 +3050,13 @@ export const DUNGEON_BOULDERS = [
   { id: 'clay', materialId: 'hard_clay', name: 'Clay', x: 1.9, z: 3.15, rot: 0.55, rock: 0x8a6230, vein: 0xc48a4a },
 ];
 
-export function treeInspect() {
-  return { name: 'Tree', blurb: 'An outdoor pine. Chop it for 5 Logs.' };
+export function treeInspect(materialId = 'logs') {
+  const mat = MATERIALS[materialId];
+  if (!mat?.log || materialId === 'logs') {
+    return { name: 'Tree', blurb: 'An outdoor pine. Chop it for 5 Logs.' };
+  }
+  const wood = mat.name.replace(/ Logs$/, '');
+  return { name: `${wood} tree`, blurb: `An outdoor ${wood.toLowerCase()}. Chop it for 5 ${mat.name}.` };
 }
 
 export function flaxInspect() {
@@ -3004,11 +3093,15 @@ function attachTreePick(tree, spot) {
   const scaleY = Math.abs(tree.scale.y) || 1;
   const localBase = (base - tree.position.y) / scaleY;
   const height = Math.max(1.7, (top - base) / scaleY);
-  const pick = new THREE.Mesh(new THREE.BoxGeometry(TREE_PICK_XZ, height, TREE_PICK_XZ), pickMat());
+  const canopy = Number(spot.canopy ?? tree.userData.canopy);
+  const pickW = tree.userData.osrsScale && Number.isFinite(canopy)
+    ? Math.max(TREE_PICK_XZ, canopy * 1.6)
+    : TREE_PICK_XZ;
+  const pick = new THREE.Mesh(new THREE.BoxGeometry(pickW, height, pickW), pickMat());
   pick.position.y = localBase + height / 2;
   pick.userData.kind = 'tree';
-  pick.userData.materialId = 'logs';
-  pick.userData.name = 'Tree';
+  pick.userData.materialId = spot.materialId ?? 'logs';
+  pick.userData.name = spot.name ?? 'Tree';
   pick.userData.x = spot.x;
   pick.userData.z = spot.z;
   pick.userData.trunkRadius = tree.userData.trunkRadius;

@@ -77,6 +77,7 @@ import {
   canCraft,
   CAULDRON_COST,
   PORTAL_COST,
+  SAWMILL_COST,
   WHEEL_COST,
   chestCapacity,
   chestCount,
@@ -1079,6 +1080,13 @@ describe('material regen', () => {
     assert.equal(state.materials.logs, 5);
     assert.equal(grantChoppedLogs(state, CHOP_YIELD), 5);
     assert.equal(state.materials.logs, 10);
+    assert.equal(grantChoppedLogs(state, 5, 'oak_logs'), 5);
+    assert.equal(state.materials.oak_logs, 5);
+    assert.equal(state.materials.logs, 10);
+    assert.equal(grantChoppedLogs(state, 3, 'not-a-log'), 3);
+    assert.equal(state.materials.logs, 13);
+    assert.match(treeInspect('oak_logs').blurb, /5 Oak Logs/);
+    assert.match(treeInspect().blurb, /5 Logs/);
   });
 
   it('does not regenerate or restock metal bars or bow string', () => {
@@ -2270,6 +2278,66 @@ describe('craft station UI', () => {
     const backToAnvil = craftUiForStation('anvil', { tab: 'magic', subtab: 'rune' });
     assert.equal(backToAnvil.tab, 'magic');
     assert.equal(backToAnvil.subtab, 'weapon');
+  });
+});
+
+describe('sawmill', () => {
+  it('sells one sawmill for 20000 gp and saws each log into its plank', () => {
+    const state = createState();
+    assert.equal(SAWMILL_COST, 20000);
+    assert.equal(ownsStation(state, 'sawmill'), false);
+    assert.equal(canBuyStation(state, 'sawmill'), false);
+    state.gold = SAWMILL_COST - 1;
+    assert.equal(buyStation(state, 'sawmill', { x: 0.35, z: 1.35, rot: 0 }), false);
+    state.gold = SAWMILL_COST;
+    assert.equal(buyStation(state, 'sawmill', { x: 0.35, z: 1.35, rot: 0 }), true);
+    assert.equal(state.gold, 0);
+    assert.equal(state.furniture.sawmill.z, 1.35);
+    const pairs = [
+      ['logs', 'plank', 'saw_plank'],
+      ['oak_logs', 'oak_plank', 'saw_oak_plank'],
+      ['willow_logs', 'willow_plank', 'saw_willow_plank'],
+      ['maple_logs', 'maple_plank', 'saw_maple_plank'],
+      ['yew_logs', 'yew_plank', 'saw_yew_plank'],
+      ['magic_logs', 'magic_plank', 'saw_magic_plank'],
+    ];
+    const saws = recipesForTab('saw');
+    assert.equal(saws.length, pairs.length);
+    for (const [logId, plankId, recipeId] of pairs) {
+      const recipe = RECIPES[recipeId];
+      assert.equal(recipe.outputMaterial, plankId);
+      assert.equal(recipe.cost.materials[logId], 1);
+      assert.equal(stationForRecipe(recipe), 'sawmill');
+      assert.equal(MATERIALS[plankId].name.length > 0, true);
+      assert.equal(isUnlocked(state, recipeId), true);
+    }
+    assert.equal(craftUiForStation('sawmill').tab, 'saw');
+    const saved = serializeState(state);
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.furniture.sawmill.x, 0.35);
+  });
+
+  it('keeps an old save that has no sawmill and no new woods', () => {
+    const state = createState();
+    state.gold = 40;
+    state.materials.logs = 7;
+    const saved = serializeState(state);
+    delete saved.furniture.sawmill;
+    delete saved.materials.oak_logs;
+    delete saved.materials.willow_logs;
+    delete saved.materials.plank;
+    delete saved.materials.magic_plank;
+    const next = createState();
+    next.gold = 1;
+    next.materials.logs = 1;
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.gold, 40);
+    assert.equal(next.materials.logs, 7);
+    assert.equal(next.furniture.sawmill, null);
+    assert.equal(next.materials.oak_logs, 0);
+    assert.equal(next.materials.plank, 0);
+    assert.equal(next.materials.magic_logs, 0);
   });
 });
 

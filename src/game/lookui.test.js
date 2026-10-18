@@ -96,7 +96,7 @@ describe('player look UI', () => {
 
   it('lists Build cards furnace-first and names the extra room Shop Expansion', () => {
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
-    const order = ['Furnace', 'Cooking Range', 'Loom', 'Fletching Bench', 'Potter Wheel', 'Spinning Wheel', 'Cauldron', 'Portal', 'Table', 'Shelf', 'Mannequin', 'Shop Expansion'];
+    const order = ['Furnace', 'Cooking Range', 'Loom', 'Fletching Bench', 'Potter Wheel', 'Sawmill', 'Spinning Wheel', 'Cauldron', 'Portal', 'Table', 'Shelf', 'Mannequin', 'Shop Expansion'];
     let last = -1;
     for (const label of order) {
       const at = build.indexOf(`<h3>${label}</h3>`);

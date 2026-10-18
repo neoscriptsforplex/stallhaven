@@ -70,8 +70,13 @@
     "sha": "9a339c57615ce1e574f11f4c29893896896894d3"
   },
   {
+    "slug": "2026-10-18",
+    "label": "Oct 18, farming patch, new trees, skill levels, armour fixes",
+    "sha": "443256ddb4d3bba7d9251b0f42f7a14ed96e0e9f"
+  },
+  {
     "slug": "latest",
-    "label": "Oct 8 / Latest (live main)",
+    "label": "Latest (live main)",
     "sha": null
   }
 ]

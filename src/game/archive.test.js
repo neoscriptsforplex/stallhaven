@@ -134,12 +134,15 @@ describe('version archive', () => {
 
   it('lists milestones newest first, with Latest at the live root', () => {
     const html = renderVersionsIndex(MILESTONES.map((entry) => ({ ...entry, status: 'playable' })));
-    const latest = html.indexOf('Oct 8 / Latest (live main)');
-    const recent = html.indexOf('Oct 6, big polish day (fountain cobble)');
+    const latest = html.indexOf('Latest (live main)');
+    const recent = html.indexOf('Oct 18, farming patch, new trees, skill levels, armour fixes');
+    const older = html.indexOf('Oct 6, big polish day (fountain cobble)');
     const oldest = html.indexOf('Sep 3, first build');
-    assert.ok(latest >= 0 && latest < recent && recent < oldest);
+    assert.ok(latest >= 0 && latest < recent && recent < older && older < oldest);
     assert.match(html, /href="\.\.\/"/);
+    assert.match(html, /href="\.\/2026-10-18\/"/);
     assert.match(html, /href="\.\/2026-10-06\/"/);
+    assert.match(html, /commit\/443256ddb4d3bba7d9251b0f42f7a14ed96e0e9f/);
     assert.match(html, /href="\.\/2026-09-03\/"/);
     assert.match(html, /commit\/9a339c57615ce1e574f11f4c29893896896894d3/);
     assert.match(html, /commit\/e8e6e3b87ba6ab7e0ea8eb90f41d1bcc610e7b11/);

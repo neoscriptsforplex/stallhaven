@@ -94,6 +94,7 @@ import {
   runeFieldMoveObstacles,
   floorsForState,
   isWalkable,
+  firstOpenFurniturePose,
   liveObstacles,
   moveWithCollision,
   placementBlocked,
@@ -3808,9 +3809,7 @@ export function createWorld(canvas, state, opts = {}) {
       pickHandler?.({ type: 'furniture-place-start', furniture: { id } });
     },
     beginPlaceFurniture(kind) {
-      const start = kind === 'shelf'
-        ? snapToWallGrid(0, -3.11, state.expansions ?? [])
-        : snapToFloor(SHOP.cauldron.x, SHOP.cauldron.z, placeRects);
+      const start = firstOpenFurniturePose(state, kind);
       const index = displays.length;
       const spot = {
         id: `new-${kind}-${index}`,

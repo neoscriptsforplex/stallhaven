@@ -53,6 +53,8 @@
     <aside id="save-bar" aria-label="Save and load">
       <button type="button" id="skills-btn" title="Skills" aria-label="Skills" aria-controls="skills-dock" aria-expanded="false">Skills</button>
       <button type="button" id="build-btn" title="Build" aria-label="Build" aria-controls="build-dock" aria-expanded="false">Build</button>
+      <button type="button" id="heroes-btn" title="Heroes" aria-label="Heroes" aria-controls="heroes-dock" aria-expanded="false"><svg class="hq-btn-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2.5l7.5 2.8v6.2c0 4.6-3.1 7.8-7.5 9.5-4.4-1.7-7.5-4.9-7.5-9.5V5.3z"/></svg><span class="hq-btn-label">Heroes</span></button>
+      <button type="button" id="quests-btn" title="Quests" aria-label="Quests" aria-controls="quests-dock" aria-expanded="false"><svg class="hq-btn-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6 3h8.2L19 7.8V21H6z"/><path d="M14 3.5V8h4.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span class="hq-btn-label">Quests</span><span class="hq-badge" data-quest-badge hidden>0</span></button>
       <button type="button" id="help-btn" title="Help" aria-label="Help">Help</button>
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
@@ -397,6 +399,12 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
     </div>
 
     <aside id="settings-dock" class="expand-dock" hidden>
+      <div class="more-quick">
+        <button type="button" data-more="help">Help</button>
+        <button type="button" data-more="save">Save</button>
+        <button type="button" data-more="load">Load</button>
+        <button type="button" data-more="fullscreen">Fullscreen</button>
+      </div>
       <h2>Settings</h2>
       <h3>Skybox colour</h3>
       <p class="meta">Fake white clouds sit in every sky. Default is Blue.</p>
@@ -450,6 +458,27 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
     </aside>
 
     <aside id="skills-dock" class="expand-dock skills-dock" role="dialog" aria-label="Skills" hidden></aside>
+
+    <aside id="heroes-dock" class="expand-dock hq-dock" role="dialog" aria-label="Heroes" hidden>
+      <div class="skills-head"><span class="skills-grip" aria-hidden="true"></span><h2>Heroes</h2><button type="button" class="skills-close" data-heroes-close aria-label="Close heroes">✕</button></div>
+      <p class="hq-sub">Hire one hero of each class, in order. Send them to fight on <b>Quests</b> for materials.</p>
+      <div class="hero-grid" data-hero-grid></div>
+      <p class="hq-foot" data-hero-foot></p>
+    </aside>
+
+    <aside id="quests-dock" class="expand-dock hq-dock" role="dialog" aria-label="Quests" hidden>
+      <div class="skills-head"><span class="skills-grip" aria-hidden="true"></span><h2>Quests</h2><button type="button" class="skills-close" data-quests-close aria-label="Close quests">✕</button></div>
+      <div class="quest-list" data-quest-list></div>
+    </aside>
+
+    <div id="hero-picker" class="modal" hidden>
+      <div class="sheet hero-picker-sheet" role="dialog" aria-labelledby="hero-picker-title">
+        <div class="hero-picker-head"><h2 id="hero-picker-title" data-picker-title>Hire an Adventurer</h2><button type="button" class="skills-close" data-picker-close aria-label="Close hire picker">✕</button></div>
+        <p class="meta" data-picker-sub>Pick how your hero looks. They get a random hero name when hired.</p>
+        <div class="npc-grid" role="radiogroup" aria-label="Hero look" data-picker-grid></div>
+        <div class="hero-picker-foot"><p class="meta" data-picker-note></p><button type="button" class="hq-gold-btn" data-picker-hire>Hire</button></div>
+      </div>
+    </div>
 
     <aside id="music-dock" class="expand-dock" hidden>
       <h2>Music</h2>

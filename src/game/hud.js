@@ -129,6 +129,7 @@ import { createCraftPreview } from './craftpreview.js';
 import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
 import { bindSkillsPanel, showLevelUpToast } from './skillsPanel.js';
 import { bindSkillGuide } from './skillGuide.js';
+import { bindHeroesPanel } from './heroesPanel.js';
 import { nextUnlockLabel, unlockNamesBetween } from './skillLevels.js';
 import {
   brightnessPercent,
@@ -179,6 +180,7 @@ export function bindHud(root, state, world) {
   const settingsBtn = document.querySelector('#settings-btn');
   let skillsPanel = null;
   let skillGuide = null;
+  let heroesPanel = null;
   const skills = state.skills?.getLevel ? state.skills : createSkills();
   if (!state.skills) state.skills = skills;
   const furnMenu = document.querySelector('#furn-menu');
@@ -891,6 +893,10 @@ export function bindHud(root, state, world) {
     skillsPanel?.close();
   }
 
+  function closeHeroesDock() {
+    heroesPanel?.close();
+  }
+
   function openCraft(station = 'anvil', options = {}) {
     closeChest();
     closeTrade();
@@ -899,6 +905,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     closeDisplayPicker();
     if (!helpModal.hidden) closeHelp();
@@ -1159,6 +1166,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     if (!helpModal.hidden) closeHelp();
     displayTarget = target;
     state.selectedDisplay = target?.index ?? state.selectedDisplay;
@@ -1514,6 +1522,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     closeDisplayPicker();
     closeBuild();
@@ -1655,6 +1664,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     if (!helpModal.hidden) closeHelp();
     closeBuild();
@@ -1912,6 +1922,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     if (!helpModal.hidden) closeHelp();
     closeExpand();
@@ -2291,6 +2302,7 @@ export function bindHud(root, state, world) {
 
   function openMusic() {
     closeSkillsDock();
+    closeHeroesDock();
     closeBuild();
     closeExpand();
     closeSettingsDock();
@@ -2440,6 +2452,7 @@ export function bindHud(root, state, world) {
     closeExpand();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     hideFurnMenu();
     paintSettings();
     if (settingsDock) settingsDock.hidden = false;
@@ -2651,6 +2664,28 @@ export function bindHud(root, state, world) {
     },
   });
   skillGuide = bindSkillGuide({ skills, panel: skillsPanel });
+  heroesPanel = bindHeroesPanel({
+    state,
+    offerFullscreen: shouldOfferFullscreen(fullscreenEnv()),
+    onFullscreen: () => toggleFullscreen(),
+    onOpen: () => {
+      closeBuild();
+      closeExpand();
+      closeMusicDock();
+      closeSkillsDock();
+      closeSettingsDock();
+      hideFurnMenu();
+      if (!helpModal.hidden) closeHelp();
+      closeCraft();
+      closeTrade();
+      closeChest();
+      closeUpgrade();
+      closePotion();
+    },
+    log: (line) => pushLog(state, line),
+    toast: (line) => showGameToast(line),
+    render: () => render(performance.now() / 1000),
+  });
   skills.onLevelUp((event) => {
     const unlocked = unlockNamesBetween(event.skillId, event.from, event.level, hiddenCraft);
     const extra = unlocked.length
@@ -2746,6 +2781,7 @@ export function bindHud(root, state, world) {
     hideFurnMenu();
     closeMusicDock();
     closeSkillsDock();
+    closeHeroesDock();
     closeSettingsDock();
     closeDisplayPicker();
     closeBuild();

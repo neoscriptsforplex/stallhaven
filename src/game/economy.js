@@ -56,6 +56,7 @@ import {
   ESSENCE_DOUBLE_LEVEL,
 } from './skills.js';
 import { RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
+import { emptyHeroQuestState, normalizeHeroQuestState } from './heroesQuests.js';
 import {
   CAULDRON_COST,
   WHEEL_COST,
@@ -120,7 +121,9 @@ export {
   DEFAULT_BRIGHTNESS,
 };
 
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
+/** Ore counts were copied onto bars before save version 11. Later saves must not run that again. */
+const ORE_BAR_MIGRATION_VERSION = 11;
 export const OLD_DEFAULT_DISPLAYS = 8;
 export const DEFAULT_MUSIC_VOLUME = 0.75;
 
@@ -137,7 +140,7 @@ function emptyFreeFurnitureReplace() {
 /** Old saves used ores for smithing. Copy ore counts onto bars so progress is not bricked. */
 function migrateLegacyMetalBars(next, data) {
   const version = data.version ?? 0;
-  if (version >= SAVE_VERSION) return;
+  if (version >= ORE_BAR_MIGRATION_VERSION) return;
   for (const metal of METALS) {
     const barId = `${metal.id}_bar`;
     const savedBar = data.materials?.[barId];
@@ -351,6 +354,7 @@ export function createState() {
     kingRoaldAt: scheduleKingRoald(0),
     log: [],
     skills: createSkills(),
+    hq: emptyHeroQuestState(),
   };
 }
 
@@ -1487,6 +1491,7 @@ export function serializeState(state) {
     playTime: Math.max(0, Number(state.playTime) || 0),
     kingRoaldAt: Number.isFinite(state.kingRoaldAt) ? state.kingRoaldAt : scheduleKingRoald(Math.max(0, Number(state.playTime) || 0)),
     skills: state.skills?.toJSON?.() ?? createSkills().toJSON(),
+    hq: savedHeroQuest(state),
     displays: state.displays.map((display, index) => ({
       ware: display.ware ? { recipeId: display.ware.recipeId } : null,
       furnitureId: display.furnitureId ?? null,
@@ -1769,8 +1774,17 @@ export function applyState(state, data) {
       ? `Skills have arrived! Your past work earned you: ${earned.join(', ')}.`
       : 'Skills have arrived! Every skill starts at level 1.');
   }
+  state.hq = normalizeHeroQuestState(data.hq, Date.now());
   repairFarmingPatches(state);
   return true;
+}
+
+/** Heroes and quests ride along in every save, including Net's autosave. */
+function savedHeroQuest(state, now = Date.now()) {
+  const hq = normalizeHeroQuestState(state?.hq, now);
+  hq.lastSeenAt = now;
+  if (state) state.hq = hq;
+  return hq;
 }
 
 /**

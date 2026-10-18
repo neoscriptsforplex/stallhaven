@@ -3402,3 +3402,301 @@ html.is-booting.is-scene-live #view {
 .guide-open .skill-toast {
   z-index: 44;
 }
+
+/*
+ * Heroes + Quests UI (draft). Load after src/style.css.
+ * Tokens come from the game: --panel, --line, --gold, --parchment, --skill-yellow.
+ * Phone rules live only inside @media (orientation: portrait) and (pointer: coarse).
+ */
+:root {
+  --hq-green: #7fd46a;
+  --hq-amber: #ffd94a;
+  --hq-red: #f0a07a;
+  --hq-card-top: #4e321d;
+  --hq-card-bottom: #2c1b0f;
+}
+
+/* ---------- Top bar ---------- */
+/* Icon buttons were stretched to 4.5rem by `#save-bar button`. Narrowing them pays for Heroes + Quests. */
+#save-bar #music-btn,
+#save-bar #coop-btn,
+#save-bar #expand-btn,
+#save-bar #settings-btn { min-width: 2.6rem; }
+#save-bar #coop-btn svg { width: 1.15rem; height: 1.15rem; vertical-align: -3px; }
+#heroes-btn, #quests-btn { position: relative; min-width: 4.5rem; }
+#heroes-btn.is-on, #quests-btn.is-on { border-color: var(--gold); background: linear-gradient(#8a5a30, #5a3518); }
+.hq-btn-icon { display: none; width: 1.2rem; height: 1.2rem; }
+.hq-badge {
+  position: absolute; top: -7px; right: -7px; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 99px; border: 1px solid #3a240e; background: radial-gradient(circle at 30% 30%, #ffe58a, #c8902a);
+  color: #2a1a08; font: 700 0.72rem/18px Palatino, Georgia, serif; text-align: center;
+  box-shadow: 0 0 0 2px rgba(255, 217, 74, 0.35), 0 2px 6px rgba(0, 0, 0, 0.5);
+  animation: hq-badge-pulse 1.6s ease-in-out infinite;
+}
+@keyframes hq-badge-pulse { 50% { box-shadow: 0 0 0 5px rgba(255, 217, 74, 0.12), 0 2px 6px rgba(0, 0, 0, 0.5); } }
+/* Narrow desktop windows: Heroes + Quests drop to icons before the bar can reach the ledger. */
+@media (max-width: 1040px) and (pointer: fine) {
+  #save-bar #heroes-btn, #save-bar #quests-btn { min-width: 2.6rem; }
+  #heroes-btn .hq-btn-label, #quests-btn .hq-btn-label { display: none; }
+  #heroes-btn .hq-btn-icon, #quests-btn .hq-btn-icon { display: inline-block; vertical-align: -3px; }
+}
+
+/* ---------- Shared dock shell (same head as #skills-dock) ---------- */
+.hq-dock { padding: 10px 12px 12px; }
+.hq-dock .skills-head { margin-bottom: 6px; }
+.hq-sub { margin: 0 0 8px; font-size: 0.8rem; color: #e6d3b2; }
+.hq-sub b { color: var(--hq-amber); }
+
+/* ---------- Heroes ---------- */
+#heroes-dock { width: min(470px, calc(100vw - 32px)); }
+.hero-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 6px;
+  border: 1px solid #1c120c; border-radius: 6px; background: rgba(16, 10, 6, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.18);
+}
+.hero-card {
+  display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 4px 10px; align-items: start;
+  padding: 8px; border: 1px solid #6a4a2a; border-radius: 6px;
+  background: linear-gradient(var(--hq-card-top), var(--hq-card-bottom));
+}
+.hero-card.is-next { border-color: var(--gold); box-shadow: inset 0 0 0 1px rgba(227, 179, 74, 0.35); }
+.hero-card.is-locked { opacity: 0.78; }
+.hero-portrait {
+  grid-row: span 4; width: 76px; height: 92px; border-radius: 6px; overflow: hidden; position: relative;
+  border: 1px solid rgba(227, 179, 74, 0.5);
+  background: radial-gradient(circle at 50% 35%, #6b4a2c, #24160c 75%);
+}
+.hero-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; }
+.hero-portrait.is-empty::after {
+  content: "?"; position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 2.2rem; font-weight: 700; color: rgba(227, 179, 74, 0.55);
+}
+.hero-portrait.is-locked::after { content: "🔒︎"; font-size: 1.4rem; color: rgba(240, 217, 168, 0.6); }
+.hero-card .hero-class { margin: 0; font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: #cbb48a; }
+.hero-card .hero-name { margin: 0; font-size: 0.98rem; font-weight: 700; color: #f3e2c0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hero-card .hero-look { margin: -2px 0 2px; font-size: 0.68rem; color: #bfa57c; }
+.hero-card .hero-name.is-empty { color: #bfa57c; font-weight: 400; font-style: italic; }
+.hq-pill {
+  justify-self: start; display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px;
+  border-radius: 99px; font-size: 0.72rem; font-weight: 700; border: 1px solid currentColor; white-space: nowrap;
+}
+.hq-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.hq-pill.is-idle { color: var(--hq-green); }
+.hq-pill.is-busy { color: var(--hq-amber); }
+.hq-pill.is-ready { color: #2a1a08; background: var(--hq-amber); border-color: var(--hq-amber); }
+.hq-pill.is-ready::before { background: #2a1a08; }
+.hq-pill.is-locked { color: #a8957a; }
+.hq-pill.is-hire { color: var(--gold); }
+.hero-actions { display: grid; gap: 4px; align-self: end; }
+.hero-actions button { padding: 4px 8px; font-size: 0.78rem; }
+.hero-card .hero-price { margin: 0; font-size: 0.8rem; color: var(--gold); font-weight: 700; }
+.hero-card .hero-lock-note { margin: 0; font-size: 0.72rem; color: var(--hq-red); }
+.hq-gold-btn {
+  border-color: #f0d27a; color: #2a1a08; font-weight: 700;
+  background: linear-gradient(#f0d27a, #b8862f);
+}
+@media (hover: hover) { .hq-gold-btn:hover:not(:disabled) { background: linear-gradient(#ffe58a, #c8902a); } }
+.hq-foot { margin: 8px 0 0; font-size: 0.74rem; color: #cbb48a; }
+
+/* ---------- Hero picker (sheet over the dock; no dim, like crafting screens after Luke's change) ---------- */
+#hero-picker.modal { background: transparent; z-index: 24; }
+.hero-picker-sheet { width: min(560px, calc(100vw - 24px)); padding: 16px 18px 14px; }
+.hero-picker-head { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
+.hero-picker-head h2 { margin: 0; }
+.npc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin: 10px 0; }
+.npc-card {
+  display: grid; justify-items: center; gap: 2px; padding: 6px 4px 6px; text-align: center;
+  background: linear-gradient(var(--hq-card-top), var(--hq-card-bottom)); border-color: #6a4a2a;
+}
+.npc-card img { width: 84px; height: 110px; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0,0,0,.45)); }
+.npc-card span { font-size: 0.76rem; line-height: 1.15; min-height: 2.3em; display: grid; place-items: center; }
+.npc-card.is-on { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold), 0 0 12px rgba(227,179,74,.35); background: linear-gradient(#7a5030, #3e2616); }
+.npc-card.is-on span { color: var(--hq-amber); font-weight: 700; }
+.hero-picker-foot { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+.hero-picker-foot .meta { margin: 0; }
+.hero-picker-foot .hq-gold-btn { padding: 8px 16px; }
+
+/* ---------- Quests ---------- */
+#quests-dock { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
+#quests-dock .skills-head { grid-template-columns: 1fr auto auto; gap: 8px; }
+.quest-summary { font-size: 0.78rem; color: #e6d3b2; white-space: nowrap; }
+.quest-summary b { color: var(--hq-amber); }
+.quest-heroes { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 0 0 8px; font-size: 0.74rem; color: #cbb48a; }
+.quest-heroes .hq-pill { font-weight: 400; }
+.quest-body { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 8px; min-height: 0; flex: 1; }
+/* Side tabs: same look as the crafting side tabs (stallhaven-craft-tabs). */
+.craft-sidetabs { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; padding-right: 2px; }
+.sidetab { display: flex; justify-content: space-between; align-items: center; text-align: left; padding: 6px 8px; font-size: 0.8rem; border-left: 3px solid transparent; gap: 4px; }
+.sidetab small { font-size: 0.66rem; color: #cbb48a; }
+.sidetab.is-on { background: linear-gradient(90deg, #8a5a30, #5a3518); border-color: var(--gold); border-left-color: var(--gold); }
+.sidetab .tab-dot { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px; font-size: 0.64rem; line-height: 16px; text-align: center; font-weight: 700; }
+.tab-dot.is-ready { background: var(--hq-amber); color: #2a1a08; }
+.tab-dot.is-busy { border: 1px solid var(--hq-amber); color: var(--hq-amber); line-height: 14px; }
+.quest-list { overflow-y: auto; padding-right: 4px; display: grid; gap: 6px; align-content: start; min-height: 0; max-height: 560px; }
+.quest-card {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center;
+  padding: 8px 10px; border: 1px solid #6a4a2a; border-radius: 6px;
+  background: linear-gradient(var(--hq-card-top), var(--hq-card-bottom));
+}
+.quest-card.is-running { border-color: rgba(255, 217, 74, 0.55); }
+.quest-card.is-ready { border-color: var(--hq-amber); box-shadow: 0 0 0 1px rgba(255, 217, 74, 0.4), 0 0 16px rgba(255, 217, 74, 0.28); background: linear-gradient(#5e3e20, #2c1b0f); }
+.quest-icon {
+  grid-row: span 2; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  border: 2px solid #c4a05a; background: radial-gradient(circle at 35% 30%, var(--tint), #1a100a 85%);
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,.45), 0 2px 5px rgba(0,0,0,.4);
+}
+.quest-icon svg { width: 28px; height: 28px; fill: #f3e2c0; stroke: #2a1a10; stroke-width: 0.8; filter: drop-shadow(0 1px 0 rgba(0,0,0,.6)); }
+.quest-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.quest-title strong { font-size: 0.95rem; color: #f3e2c0; white-space: nowrap; }
+.quest-title .meta { font-size: 0.72rem; color: #cbb48a; white-space: nowrap; }
+.quest-rewards { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.quest-rewards .mat { padding: 1px 7px; font-size: 0.72rem; border-radius: 99px; gap: 5px; }
+.quest-rewards .mat-count { font-weight: 700; color: var(--hq-amber); }
+.mat.is-new { border-style: dashed; border-color: rgba(240, 160, 122, 0.7); }
+.mat-new-tag { font-size: 0.58rem; letter-spacing: 0.08em; color: var(--hq-red); font-weight: 700; }
+.quest-side { grid-row: span 2; display: grid; gap: 5px; justify-items: end; align-self: center; }
+.quest-assign { display: flex; gap: 4px; }
+.hero-chip {
+  position: relative; width: 34px; height: 34px; padding: 0; border-radius: 50%; overflow: hidden;
+  border: 2px solid #6a4a2a; background: radial-gradient(circle at 50% 35%, #6b4a2c, #24160c 75%);
+}
+.hero-chip img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+.hero-chip.is-on { border-color: var(--hq-amber); box-shadow: 0 0 0 2px rgba(255,217,74,.35); }
+.hero-chip:disabled { opacity: 0.4; filter: grayscale(0.8); }
+.hero-chip:disabled::after { content: "⏳︎"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.8rem; background: rgba(0,0,0,.35); }
+.quest-side .hq-start { min-width: 6.5rem; padding: 5px 10px; font-weight: 700; }
+.quest-side .hq-collect { min-width: 6.5rem; padding: 6px 12px; font-size: 0.9rem; }
+.quest-hint { font-size: 0.7rem; color: #bfa57c; text-align: right; max-width: 11rem; }
+/* Assign: face + hero name pills (radio group) */
+.hero-pick { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 2px; border-radius: 99px; border: 2px solid #6a4a2a; font-size: 0.74rem; white-space: nowrap; }
+.hero-pick img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; object-position: 50% 30%; background: radial-gradient(circle at 50% 35%, #6b4a2c, #24160c 75%); }
+.hero-pick.is-on { border-color: var(--hq-amber); color: var(--hq-amber); font-weight: 700; box-shadow: 0 0 0 2px rgba(255,217,74,.3); }
+.hero-pick:disabled { opacity: 0.45; text-decoration: line-through; }
+.quest-who { font-weight: 700; color: #f3e2c0; white-space: nowrap; }
+/* Running + ready rows */
+.quest-run { grid-column: 2 / 3; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 0.76rem; color: #e6d3b2; }
+.quest-run .hero-chip { width: 26px; height: 26px; border-width: 1px; pointer-events: none; }
+.quest-bar { display: block; height: 9px; border-radius: 99px; background: rgba(16, 10, 6, 0.6); border: 1px solid rgba(227, 179, 74, 0.35); overflow: hidden; }
+.quest-bar i { display: block; height: 100%; width: calc(var(--t, 0) * 100%); background: linear-gradient(90deg, #b8862f, #ffd94a); transition: width 1s linear; }
+.quest-left { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--hq-amber); white-space: nowrap; }
+.quest-card.is-ready .quest-bar i { background: linear-gradient(90deg, #7fd46a, #ffd94a); }
+.quest-recall { padding: 2px 8px; font-size: 0.7rem; width: auto; }
+.quest-empty { padding: 18px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; color: #e6d3b2; font-size: 0.86rem; }
+.quest-collect-all { margin-left: auto; padding: 4px 10px; font-size: 0.78rem; }
+
+/* ---------- While you were away ---------- */
+#away-modal.modal { background: rgba(16, 10, 6, 0.35); }
+.away-sheet { width: min(440px, calc(100vw - 24px)); }
+.away-sheet h2 { margin-bottom: 2px; }
+.away-list { display: grid; gap: 6px; margin: 10px 0 12px; max-height: 48vh; overflow: auto; }
+.away-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 4px 10px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: rgba(16, 10, 6, 0.45); }
+.away-row .hero-chip { width: 36px; height: 36px; grid-row: span 2; }
+.away-row p { margin: 0; font-size: 0.84rem; }
+.away-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.away-actions .hq-gold-btn { padding: 8px; }
+
+/* ---------- Toast on completion (reuses .game-toast) ---------- */
+.game-toast.hq-toast { border-color: var(--hq-amber); }
+.game-toast.hq-toast b { color: var(--hq-amber); }
+
+/* ---------- Storage full (materials at or over the cap) ---------- */
+.sf-full {
+  display: inline-block; padding: 0 5px; border: 1px solid #ff8a6a; border-radius: 4px; width: auto; min-width: 0;
+  background: linear-gradient(#b8321e, #7a1c10); color: #fff1e0; font: 700 0.6rem/1.5 Palatino, Georgia, serif; letter-spacing: 0.08em;
+  vertical-align: 1px; cursor: pointer;
+}
+.materials-row.is-full { border-color: rgba(255, 138, 106, 0.7); background: rgba(120, 28, 16, 0.35); }
+.materials-row.is-full .mat-count { color: #ffb49a; font-weight: 700; }
+.materials-row .sf-full { margin-left: auto; flex: none; }
+.craft-row.is-full .craft { border-color: rgba(255, 138, 106, 0.6); }
+.craft-row.is-full .meta { color: #ffb49a; }
+.sf-link { color: var(--hq-amber); font-weight: 700; }
+.sf-pop {
+  position: fixed; z-index: 45; width: 270px; padding: 10px 12px; border: 1px solid #ff8a6a; border-radius: 8px;
+  background: rgba(36, 22, 12, 0.97); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45); color: #e6d3b2; font-size: 0.8rem;
+}
+.sf-pop::after { content: ""; position: absolute; left: var(--arrow-x, 50%); bottom: -7px; width: 12px; height: 12px; margin-left: -6px; transform: rotate(45deg); background: inherit; border: solid #ff8a6a; border-width: 0 1px 1px 0; }
+.sf-pop p { margin: 0 0 6px; line-height: 1.35; }
+.sf-pop-title b { color: #f3e2c0; }
+.sf-pop-title span:last-child { color: #ffb49a; font-weight: 700; }
+.sf-upgrade { width: 100%; padding: 6px; }
+.sf-pop .sf-pop-meta { margin: 5px 0 0; font-size: 0.7rem; color: #cbb48a; text-align: center; }
+.sf-toast { display: block; top: 64px; white-space: nowrap; border-color: #ff8a6a; }
+.sf-toast b { color: var(--hq-amber); }
+/* Preview only: keep the Furnace sheet clear of the open drawer. */
+.sf-craft.modal { background: transparent; place-items: start center; padding-top: 112px; }
+.sf-craft .sheet.craft-sheet { width: min(560px, calc(100vw - 24px)); }
+
+/* ---------- Phone portrait: bottom sheets ---------- */
+@media (orientation: portrait) and (pointer: coarse) {
+  /* 7 slots on the bar: Skills, Build, Heroes, Quests, Music, Co-op, More. Help/Save/Load/Fullscreen move into More. */
+  #save-bar #help-btn, #save-bar #save-btn, #save-bar #load-btn, #save-bar #expand-btn { display: none; }
+  #save-bar #heroes-btn, #save-bar #quests-btn, #save-bar #coop-btn { min-width: 0; }
+  #save-bar #heroes-btn .hq-btn-icon, #save-bar #quests-btn .hq-btn-icon { display: block; margin: 0 auto 1px; width: 1.1rem; height: 1.1rem; }
+  #save-bar #heroes-btn, #save-bar #quests-btn { font-size: 0.66rem; display: grid; place-content: center; }
+  .hq-badge { top: -4px; right: 2px; }
+  .more-quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0 0 10px; }
+  .more-quick button { min-height: 44px; font-size: 0.8rem; }
+
+  #heroes-dock.hq-dock, #quests-dock.hq-dock {
+    position: fixed; top: auto; right: 0; bottom: var(--portrait-thumb, 64px); left: 0; z-index: 18; width: auto;
+    max-height: calc(100dvh - var(--portrait-thumb, 64px) - env(safe-area-inset-top, 0px) - 16px);
+    overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+    padding: 6px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px));
+    border-width: 1px 0 0; border-radius: 16px 16px 0 0; background: rgba(36, 22, 12, 0.96);
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.4); animation: skills-sheet-up 0.22s ease-out;
+  }
+  #quests-dock.hq-dock { display: flex; height: calc(100dvh - var(--portrait-thumb, 64px) - env(safe-area-inset-top, 0px) - 96px); }
+  #quests-dock .skills-head { grid-template-columns: 1fr auto; }
+  #quests-dock .skills-head .skills-grip { grid-column: 1 / -1; }
+  .quest-summary { grid-column: 1 / -1; grid-row: 3; }
+  .hq-sub { font-size: 0.86rem; }
+
+  .hero-grid { gap: 6px; }
+  .hero-card { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; padding: 8px 6px; }
+  .hero-portrait { grid-row: auto; width: 84px; height: 96px; }
+  .hq-pill, .hero-actions { justify-self: stretch; justify-content: center; }
+  .hero-actions button { min-height: 40px; font-size: 0.84rem; }
+
+  .hero-picker-sheet { position: fixed; left: 0; right: 0; bottom: var(--portrait-thumb, 64px); width: auto; border-radius: 16px 16px 0 0; max-height: calc(100dvh - var(--portrait-thumb, 64px) - 40px); }
+  #hero-picker.modal { place-items: end stretch; padding-bottom: 0 !important; }
+  .npc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hero-picker-foot { grid-template-columns: 1fr; }
+  .hero-picker-foot .hq-gold-btn { min-height: 48px; font-size: 1rem; }
+
+  .quest-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .craft-sidetabs { flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 6px; padding-bottom: 4px; scroll-snap-type: x proximity; }
+  .sidetab { flex: none; border-radius: 16px; border-left: 1px solid #8a6238; padding: 7px 12px; min-height: 36px; scroll-snap-align: start; }
+  .sidetab.is-on { border-left-color: var(--gold); }
+  .sidetab small { display: none; }
+  .quest-list { max-height: none; }
+  .quest-card { grid-template-columns: 40px minmax(0, 1fr); padding: 8px; }
+  .quest-icon { width: 40px; height: 40px; }
+  .quest-side { grid-column: 1 / -1; grid-row: auto; grid-template-columns: 1fr auto; justify-items: stretch; align-items: center; }
+  .quest-hint { text-align: left; max-width: none; }
+  .hero-chip { width: 40px; height: 40px; }
+  .quest-assign { flex-wrap: wrap; }
+  .hero-pick { min-height: 40px; font-size: 0.8rem; }
+  .hero-pick img { width: 32px; height: 32px; }
+  .quest-side .hq-start, .quest-side .hq-collect { min-height: 44px; }
+  .quest-run { grid-column: 1 / -1; }
+  .quest-card.is-running .quest-side, .quest-card.is-ready .quest-side { order: 5; grid-template-columns: 1fr; }
+  .quest-card.is-running .quest-recall { justify-self: end; min-height: 36px; padding: 4px 14px; }
+  .quest-card .quest-rewards { grid-column: 1 / -1 !important; }
+  .away-sheet { position: fixed; left: 0; right: 0; bottom: var(--portrait-thumb, 64px); width: auto; border-radius: 16px 16px 0 0; }
+  #away-modal.modal { place-items: end stretch; }
+  .away-actions button { min-height: 48px; }
+  /* Storage full: the left drawer is narrow, so the tag sits under the name and taps open the popover. */
+  .materials-row.is-full { flex-wrap: wrap; }
+  .materials-row .sf-full { margin-left: 0; font-size: 0.64rem; padding: 2px 6px; }
+  .sf-pop { width: min(300px, calc(100vw - 24px)); }
+  .sf-craft.modal { padding-top: 104px; }
+  .sf-toast { white-space: normal; width: calc(100vw - 24px); text-align: center; }
+  .sf-craft .craft-qty button { min-height: 36px; }
+}
+
+.more-quick { display: none; }
+#heroes-dock.hq-dock[hidden], #quests-dock.hq-dock[hidden], #hero-picker[hidden] { display: none; }
+@media (orientation: portrait) and (pointer: coarse) {
+  #settings-dock .more-quick { display: grid; }
+}

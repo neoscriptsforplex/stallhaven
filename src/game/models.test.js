@@ -68,7 +68,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { ALTAR_CLICK, ALTAR_OSRS_SCALE, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, RUNE_ALTAR_SPOTS, RUNE_PORTAL_GRASS_CLEAR, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildAltar, buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRat, buildRuneField, buildShop, buildSpinningWheel, buildTorch, buildTree, buildWheatPlant, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_FLOOR_TILE_M, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonFloorTextureUrls, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, generalStoreSignTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildAltar, buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRat, buildRuneField, buildShop, buildSpinningWheel, buildTorch, buildTree, buildWheatPlant, buildWoodTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_FLOOR_TILE_M, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonFloorTextureUrls, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, generalStoreSignTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -1858,7 +1858,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'flax-plant', 'wheat-plant', 'rock', 'fountain', 'skeleton', 'portal', 'altar-air', 'altar-earth', 'altar-water', 'altar-fire']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'tree-oak', 'tree-willow', 'tree-maple', 'tree-yew', 'tree-magic', 'sawmill', 'flowers', 'flax-plant', 'wheat-plant', 'rock', 'fountain', 'skeleton', 'portal', 'altar-air', 'altar-earth', 'altar-water', 'altar-fire']) {
       assert.ok(ids.includes(id), id);
     }
     for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-runite', 'ore-dragon', 'ore-essence', 'ore-clay']) {
@@ -2465,11 +2465,16 @@ describe('bundled prop swaps', () => {
       if (child.userData?.kind !== 'tree') return;
       picks += 1;
       const params = child.geometry?.parameters;
-      assert.ok(params, 'chop pick should stay a box');
-      assert.ok(Math.abs(params.width - 0.85 * OUTDOOR_TREE_SCALE) < 1e-6, `pick width ${params.width}`);
-      assert.ok(Math.abs(params.depth - 0.85 * OUTDOOR_TREE_SCALE) < 1e-6, `pick depth ${params.depth}`);
-      assert.ok(params.height > 2.8, `pick should cover the taller crown, height=${params.height}`);
       const pine = child.parent;
+      assert.ok(params, 'chop pick should stay a box');
+      if (!pine?.userData?.osrsScale) {
+        assert.ok(Math.abs(params.width - 0.85 * OUTDOOR_TREE_SCALE) < 1e-6, `pick width ${params.width}`);
+        assert.ok(Math.abs(params.depth - 0.85 * OUTDOOR_TREE_SCALE) < 1e-6, `pick depth ${params.depth}`);
+      } else {
+        assert.ok(params.width + 1e-6 >= 0.85 * OUTDOOR_TREE_SCALE, `osrs pick width ${params.width}`);
+        assert.ok(Math.abs(params.width - params.depth) < 1e-6);
+      }
+      assert.ok(params.height > 2.8, `pick should cover the taller crown, height=${params.height}`);
       const yaw = pine.rotation.y;
       pine.rotation.y = 0;
       pine.updateMatrixWorld(true);
@@ -2501,7 +2506,37 @@ describe('bundled prop swaps', () => {
       const d = block.maxZ - block.minZ;
       const want = treeWalkBlock(plantedTrunkRadius(spot.x, spot.z));
       assert.ok(Math.abs(w - want) < 1e-6 && Math.abs(d - want) < 1e-6, `tree block ${w}x${d} vs ${want}`);
-      assert.ok(Math.abs(want - TREE_WALK_BLOCK) / TREE_WALK_BLOCK <= TREE_SCALE_SPREAD + 0.02, `block ${want} drifted from the 2× trunk`);
+      const standard = (spot.wood ?? spot.materialId ?? 'logs') === 'logs';
+      if (standard) {
+        assert.ok(Math.abs(want - TREE_WALK_BLOCK) / TREE_WALK_BLOCK <= TREE_SCALE_SPREAD + 0.02, `block ${want} drifted from the 2× trunk`);
+      } else {
+        assert.ok(want >= 0.12 * 2 && want <= 0.55 * 2 + 0.3, `wood block ${want} left the trunk column`);
+      }
+    }
+  });
+
+  it('fits a wood dump at the OSRS scale and sits the trunk on the grass', async () => {
+    const bundled = await loadFolder('trees/oak');
+    setBundledLook('tree-oak', bundled);
+    try {
+      const tree = buildWoodTree('oak', 1);
+      const visual = tree.getObjectByName('pine-visual');
+      assert.ok(visual, 'oak visual should sit under the pine group');
+      assert.equal(tree.name, 'pine');
+      assert.equal(tree.userData.wood, 'oak');
+      assert.equal(tree.userData.osrsScale, true);
+      assert.ok(Math.abs(visual.scale.x - OSRS_MODEL_SCALE) < 1e-4, `scale ${visual.scale.x}`);
+      assert.ok(Math.abs(visual.scale.x - visual.scale.y) < 1e-6);
+      assert.ok(Math.abs(visual.scale.y - visual.scale.z) < 1e-6);
+      tree.position.set(4.2, 0, -3.4);
+      tree.rotation.y = 0.4;
+      seatTreeOnGround(tree);
+      const box = measureVisibleBox(tree);
+      assert.ok(box.min.y < -0.02 && box.min.y > -0.05, `oak roots should sink into the grass, minY=${box.min.y}`);
+      const size = box.getSize(new THREE.Vector3());
+      assert.ok(size.y > 4 && size.y < 6, `oak height ${size.y}`);
+    } finally {
+      setBundledLook('tree-oak', null);
     }
   });
 
@@ -3132,7 +3167,7 @@ describe('bundled prop swaps', () => {
 
   it('fits bundled weapon, armour, ammo, and tool dumps to the current mesh size', async () => {
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
-    assert.equal(LUKE_MODEL_FOLDERS.length, 197);
+    assert.equal(LUKE_MODEL_FOLDERS.length, 204);
     for (const item of LUKE_MODEL_FOLDERS) {
       assert.equal(byId[item.id], item.folder, item.id);
       const slug = item.folder.split('/').pop();

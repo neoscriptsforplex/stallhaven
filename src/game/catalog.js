@@ -272,7 +272,18 @@ export const MATERIALS = {
   adamant: { id: 'adamant', name: 'Adamantite', restock: 0, start: 0, tier: 5, regenEvery: 0 },
   runite: { id: 'runite', name: 'Runite Ore', restock: 0, start: 0, tier: 6, regenEvery: 0 },
   dragon: { id: 'dragon', name: 'Dragon Ore', restock: 0, start: 0, tier: 7, regenEvery: 0 },
-  logs: { id: 'logs', name: 'Logs', restock: 0, start: 0, tier: 1, regenEvery: 0 },
+  logs: { id: 'logs', name: 'Logs', restock: 0, start: 0, tier: 1, regenEvery: 0, log: true },
+  oak_logs: { id: 'oak_logs', name: 'Oak Logs', restock: 0, start: 0, tier: 2, regenEvery: 0, log: true, tint: 0xa67c52 },
+  willow_logs: { id: 'willow_logs', name: 'Willow Logs', restock: 0, start: 0, tier: 3, regenEvery: 0, log: true, tint: 0x6a8a4a },
+  maple_logs: { id: 'maple_logs', name: 'Maple Logs', restock: 0, start: 0, tier: 4, regenEvery: 0, log: true, tint: 0xc4a05a },
+  yew_logs: { id: 'yew_logs', name: 'Yew Logs', restock: 0, start: 0, tier: 5, regenEvery: 0, log: true, tint: 0x6a3a48 },
+  magic_logs: { id: 'magic_logs', name: 'Magic Logs', restock: 0, start: 0, tier: 6, regenEvery: 0, log: true, tint: 0x3a6ec8 },
+  plank: { id: 'plank', name: 'Plank', restock: 0, start: 0, tier: 1, regenEvery: 0, crafted: true, tint: 0xc4a882 },
+  oak_plank: { id: 'oak_plank', name: 'Oak Plank', restock: 0, start: 0, tier: 2, regenEvery: 0, crafted: true, tint: 0xc4a882 },
+  willow_plank: { id: 'willow_plank', name: 'Willow Plank', restock: 0, start: 0, tier: 3, regenEvery: 0, crafted: true, tint: 0x7a9a58 },
+  maple_plank: { id: 'maple_plank', name: 'Maple Plank', restock: 0, start: 0, tier: 4, regenEvery: 0, crafted: true, tint: 0xc4a05a },
+  yew_plank: { id: 'yew_plank', name: 'Yew Plank', restock: 0, start: 0, tier: 5, regenEvery: 0, crafted: true, tint: 0x6a3a48 },
+  magic_plank: { id: 'magic_plank', name: 'Magic Plank', restock: 0, start: 0, tier: 6, regenEvery: 0, crafted: true, tint: 0x3a6ec8 },
   flax: { id: 'flax', name: 'Flax', restock: 0, start: 5, tier: 1, regenEvery: 0, gathered: true },
   wheat: { id: 'wheat', name: 'Wheat', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true },
   bow_string: {
@@ -1170,6 +1181,40 @@ addRecipe({
   outputCount: 1,
 });
 
+const SAWMILL_PLANKS = [
+  { log: 'logs', plank: 'plank', name: 'Plank', tint: 0xc4a882 },
+  { log: 'oak_logs', plank: 'oak_plank', name: 'Oak Plank', tint: 0xc4a882 },
+  { log: 'willow_logs', plank: 'willow_plank', name: 'Willow Plank', tint: 0x7a9a58 },
+  { log: 'maple_logs', plank: 'maple_plank', name: 'Maple Plank', tint: 0xc4a05a },
+  { log: 'yew_logs', plank: 'yew_plank', name: 'Yew Plank', tint: 0x6a3a48 },
+  { log: 'magic_logs', plank: 'magic_plank', name: 'Magic Plank', tint: 0x3a6ec8 },
+];
+
+SAWMILL_PLANKS.forEach((wood, index) => {
+  addRecipe({
+    id: wood.plank === 'plank' ? 'saw_plank' : `saw_${wood.plank}`,
+    name: wood.name,
+    category: 'saw',
+    combatClass: null,
+    slot: 'plank',
+    shape: 'plank',
+    setKey: 'saw',
+    lineId: 'saw-planks',
+    lineName: 'Planks',
+    lineIndex: index,
+    previousId: null,
+    unlockNeed: 0,
+    tier: index + 1,
+    cost: { materials: { [wood.log]: 1 }, gold: 0 },
+    time: 3 + index * 0.4,
+    price: 0,
+    buyers: [],
+    tint: wood.tint,
+    outputMaterial: wood.plank,
+    outputCount: 1,
+  });
+});
+
 /** Low-poly robe sets for magic-class buyers. Original names — colour variants, not product lines. */
 export const MAGE_ROBE_SETS = [
   { id: 'azure', robe: 0x6a8fd4, trim: 0xf4f4f0, hat: 0x5a7ec8, orb: 0x9ad4ff, style: 'hat' },
@@ -1408,6 +1453,7 @@ export const SHOP = {
   loom: { x: -1.7, z: 1.15 },
   fletch: { x: 1.9, z: 1.15 },
   potter: { x: -1.7, z: 0.2 },
+  sawmill: { x: 0.35, z: 1.35 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [
     { id: 'left-front', name: 'Left Front Table', x: -2.95, z: 2.08, kind: 'table' },
@@ -1505,6 +1551,10 @@ export function isMinedMaterial(materialId) {
     || METALS.some((metal) => metal.id === materialId);
 }
 
+export function isLogMaterial(materialId) {
+  return Boolean(MATERIALS[materialId]?.log);
+}
+
 /** Craft/inventory/smelt preview dumps for ore items — not dungeon rock props. */
 export function isCraftOreId(materialId) {
   return METALS.some((metal) => metal.id === materialId);
@@ -1573,6 +1623,7 @@ export function stationForRecipe(recipe) {
   if (recipe.category === 'spin') return 'wheel';
   if (recipe.category === 'weave') return 'loom';
   if (recipe.category === 'potter') return 'potter';
+  if (recipe.category === 'saw') return 'sawmill';
   if (recipe.category === 'ammo') return 'fletch';
   if (recipe.category === 'rune') return `altar-${recipe.runeMark}`;
   if (recipe.combatClass === 'range' && recipe.category === 'weapon') return 'fletch';
@@ -1628,6 +1679,7 @@ export function craftUiForStation(station, prev = {}, recipe = null) {
   if (station === 'furnace') return { tab: 'smelt', subtab: prev.subtab ?? 'weapon' };
   if (station === 'wheel') return { tab: 'spin', subtab: prev.subtab ?? 'weapon' };
   if (station === 'potter') return { tab: 'potter', subtab: prev.subtab ?? 'weapon' };
+  if (station === 'sawmill') return { tab: 'saw', subtab: prev.subtab ?? 'weapon' };
   if (station === 'loom') {
     const tab = recipe?.category === 'armour'
       ? (recipe.combatClass === 'range' ? 'ranged' : 'magic')
@@ -1698,6 +1750,10 @@ export function recipesForTab(tabId, subtabId = null) {
   if (tabId === 'spin') return shown(recipeList().filter((recipe) => recipe.category === 'spin'));
   if (tabId === 'weave' || tabId === 'cloth') return shown(recipeList().filter((recipe) => recipe.category === 'weave'));
   if (tabId === 'potter') return shown(recipeList().filter((recipe) => recipe.category === 'potter'));
+  if (tabId === 'saw') {
+    return shown(recipeList().filter((recipe) => recipe.category === 'saw'))
+      .sort((a, b) => a.lineIndex - b.lineIndex);
+  }
   const combatClass = tabId === 'ranged' ? 'range' : tabId;
   const list = recipeList().filter((recipe) => recipe.combatClass === combatClass && !isCraftHidden(recipe));
   if (subtabId === 'weapon' || subtabId === 'armour' || subtabId === 'ammo' || subtabId === 'rune' || subtabId === 'hatchet' || subtabId === 'pickaxe') {

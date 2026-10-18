@@ -50,6 +50,7 @@ import {
   FURNACE_COST,
   RANGE_COST,
   PORTAL_COST,
+  SAWMILL_COST,
   STATION_UNLOCKS,
   CHEST_MAX_LEVEL,
   FURNITURE_FORWARD,
@@ -88,6 +89,7 @@ export {
   FURNACE_COST,
   RANGE_COST,
   PORTAL_COST,
+  SAWMILL_COST,
   STATION_UNLOCKS,
   furnitureBuyCost,
   masteryNeed,
@@ -362,6 +364,7 @@ export function isUnlocked(state, recipeId) {
   if (stationForRecipe(recipe) === 'loom' && !ownsStation(state, 'loom')) return false;
   if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) return false;
   if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) return false;
+  if (stationForRecipe(recipe) === 'sawmill' && !ownsStation(state, 'sawmill')) return false;
   if (recipe.unlockAnyOf?.length) {
     const need = recipe.unlockNeed ?? 0;
     return recipe.unlockAnyOf.some((id) => craftCount(state, id) >= need);
@@ -394,6 +397,9 @@ export function craftBlockReason(state, recipeId) {
   }
   if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) {
     return 'Place a Potter Wheel from Build to turn soft clay into clay.';
+  }
+  if (stationForRecipe(recipe) === 'sawmill' && !ownsStation(state, 'sawmill')) {
+    return 'Place a sawmill from Build to saw logs into planks.';
   }
   if (!meetsLevelRequirement(recipe, (skillId) => skillLevelOf(state, skillId))) {
     return levelRequirementText(recipe);
@@ -1131,8 +1137,9 @@ export function grantMinedMaterial(state, materialId, amount = mineYield(materia
   return grantMaterial(state, materialId, amount);
 }
 
-export function grantChoppedLogs(state, amount = CHOP_YIELD) {
-  return grantMaterial(state, 'logs', amount);
+export function grantChoppedLogs(state, amount = CHOP_YIELD, materialId = 'logs') {
+  const id = MATERIALS[materialId]?.log ? materialId : 'logs';
+  return grantMaterial(state, id, amount);
 }
 
 export function grantPickedFlax(state, amount = FLAX_YIELD) {
@@ -1423,6 +1430,9 @@ export function applyState(state, data) {
         : null,
       potter: data.furniture.potter
         ? readPose(data.furniture.potter, { ...SHOP.potter, rot: FURNITURE_FORWARD })
+        : null,
+      sawmill: data.furniture.sawmill
+        ? readPose(data.furniture.sawmill, { ...SHOP.sawmill, rot: FURNITURE_FORWARD })
         : null,
       portal: data.furniture.portal
         ? readPose(data.furniture.portal, { x: 0, z: 0, rot: FURNITURE_FORWARD })

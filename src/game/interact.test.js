@@ -29,7 +29,7 @@ function hit(kind, distance, x = 0, z = 0) {
 
 describe('station walk-then-open', () => {
   it('keeps station click boxes on the visible footprint', () => {
-    for (const id of ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter']) {
+    for (const id of ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'sawmill']) {
       const { hw, hd } = furnitureHalfSize(id);
       const hit = STATION_HIT[id];
       assert.ok(hit.w <= hw * 2 + 0.2, `${id} click width`);

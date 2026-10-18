@@ -190,6 +190,7 @@ describe('layout numbers', () => {
     assert.equal(furniture.loom, null);
     assert.equal(furniture.fletch, null);
     assert.equal(furniture.potter, null);
+    assert.equal(furniture.sawmill, null);
     assert.equal(furniture.portal, null);
     assert.equal(furniture.rug.rot, FURNITURE_FORWARD);
     assert.equal(furniture.rug.x, shopRugPose().x);
@@ -270,6 +271,16 @@ describe('layout numbers', () => {
     assert.ok(right.some((spot) => spot.side === 'left'));
     assert.equal(WHEEL_COST, 100000);
     assert.equal(CAULDRON_COST, 1000000);
+    const woods = ['oak', 'willow', 'maple', 'yew', 'magic'];
+    for (const wood of woods) {
+      assert.equal(origin.filter((spot) => spot.wood === wood).length, 2, wood);
+    }
+    assert.ok(origin.some((spot) => !spot.wood));
+    assert.ok(origin.filter((spot) => !spot.wood).length < origin.filter((spot) => spot.wood).length);
+    for (const spot of origin) {
+      assert.equal(pointOnPath(spot.x, spot.z, [], 0.55), false, `${spot.wood ?? 'pine'} ${spot.x},${spot.z}`);
+      assert.equal(pointHitsShop(spot.x, spot.z, [], 1.15), false);
+    }
   });
 
   it('keeps the cobble path on the grass tile and puts the fountain mid-path', () => {

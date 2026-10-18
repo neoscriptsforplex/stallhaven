@@ -64,7 +64,7 @@ import {
   PORTAL_HOME,
   portalPlaceFloors,
   plantedTrunkRadius,
-  TREE_CLICK_RADIUS,
+  treeClickRadius,
   pickFlaxNode,
   rollFlaxSpots,
   rollWheatSpots,
@@ -153,7 +153,7 @@ import {
   defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
 } from './models.js';
-import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
+import { buildCauldron, buildDungeon, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, tickFountainWater } from './shopbuild.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -626,11 +626,15 @@ export function createWorld(canvas, state, opts = {}) {
   scene.add(potterMesh);
   const potterPick = makePick(STATION_HIT.potter.w, STATION_HIT.potter.h, STATION_HIT.potter.d, 'potter');
 
+  const sawmillMesh = buildSawmill();
+  scene.add(sawmillMesh);
+  const sawmillPick = makePick(STATION_HIT.sawmill.w, STATION_HIT.sawmill.h, STATION_HIT.sawmill.d, 'sawmill');
+
   const portalMesh = buildPortal();
   scene.add(portalMesh);
   const portalPick = makePick(STATION_HIT.portal.w, STATION_HIT.portal.h, STATION_HIT.portal.d, 'portal');
 
-  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel', 'loom', 'fletch', 'potter', 'portal'];
+  const UNLOCK_STATIONS = ['cauldron', 'furnace', 'range', 'wheel', 'loom', 'fletch', 'potter', 'sawmill', 'portal'];
 
   const fixtureMeshes = {
     counter: { mesh: counterMesh, pick: counterPick, glow: counterGlow, pickY: 0.55 },
@@ -643,6 +647,7 @@ export function createWorld(canvas, state, opts = {}) {
     loom: { mesh: loomMesh, pick: loomPick, glow: null, pickY: STATION_HIT.loom.pickY },
     fletch: { mesh: fletchMesh, pick: fletchPick, glow: null, pickY: STATION_HIT.fletch.pickY },
     potter: { mesh: potterMesh, pick: potterPick, glow: null, pickY: STATION_HIT.potter.pickY },
+    sawmill: { mesh: sawmillMesh, pick: sawmillPick, glow: null, pickY: STATION_HIT.sawmill.pickY },
     portal: { mesh: portalMesh, pick: portalPick, glow: null, pickY: STATION_HIT.portal.pickY },
     rug: { mesh: rugMesh, pick: rugPick, glow: null, pickY: 0.18 },
   };
@@ -1446,9 +1451,10 @@ export function createWorld(canvas, state, opts = {}) {
   function startChopping(pose) {
     if (!pose || !treeCanChop(pose.x, pose.z)) return;
     ensureTreeNode(pose.x, pose.z);
+    const materialId = MATERIALS[pose.materialId]?.log ? pose.materialId : 'logs';
     mining = {
-      materialId: 'logs',
-      name: 'Tree',
+      materialId,
+      name: MATERIALS[materialId]?.name ?? 'Tree',
       mode: 'chop',
       startedAt: performance.now() / 1000,
       duration: CHOP_DURATION,
@@ -1556,10 +1562,11 @@ export function createWorld(canvas, state, opts = {}) {
       return;
     }
     const got = mining.mode === 'chop'
-      ? grantChoppedLogs(state, CHOP_YIELD)
+      ? grantChoppedLogs(state, CHOP_YIELD, mining.materialId)
       : grantMinedMaterial(state, mining.materialId, barYield(mining));
     if (got > 0) {
-      pushLog(state, mining.mode === 'chop' ? `Chopped ${got} Logs.` : `Mined ${got} ${mining.name}.`);
+      const choppedName = MATERIALS[mining.materialId]?.name ?? 'Logs';
+      pushLog(state, mining.mode === 'chop' ? `Chopped ${got} ${choppedName}.` : `Mined ${got} ${mining.name}.`);
       pickHandler?.({
         type: mining.mode === 'chop' ? 'chopped' : 'mined',
         materialId: mining.materialId,
@@ -2193,7 +2200,7 @@ export function createWorld(canvas, state, opts = {}) {
         queueUse('tree', {
           x: data.x,
           z: data.z,
-          materialId: 'logs',
+          materialId: data.materialId ?? 'logs',
           trunkRadius: data.trunkRadius ?? plantedTrunkRadius(data.x, data.z),
         });
         return;
@@ -2258,13 +2265,13 @@ export function createWorld(canvas, state, opts = {}) {
         }
         const tree = gardenTreeSpots(state.expansions ?? []).find((spot) => (
           treeCanChop(spot.x, spot.z)
-          && Math.hypot(point.x - spot.x, point.z - spot.z) <= TREE_CLICK_RADIUS
+          && Math.hypot(point.x - spot.x, point.z - spot.z) <= treeClickRadius(spot)
         ));
         if (tree) {
           queueUse('tree', {
             x: tree.x,
             z: tree.z,
-            materialId: 'logs',
+            materialId: tree.materialId ?? 'logs',
             trunkRadius: plantedTrunkRadius(tree.x, tree.z),
           });
           return;
@@ -2311,13 +2318,13 @@ export function createWorld(canvas, state, opts = {}) {
         }
         const tree = runeFieldTreeSpots().find((spot) => (
           treeCanChop(spot.x, spot.z)
-          && Math.hypot(point.x - spot.x, point.z - spot.z) <= TREE_CLICK_RADIUS
+          && Math.hypot(point.x - spot.x, point.z - spot.z) <= treeClickRadius(spot)
         ));
         if (tree) {
           queueUse('tree', {
             x: tree.x,
             z: tree.z,
-            materialId: 'logs',
+            materialId: tree.materialId ?? 'logs',
             trunkRadius: plantedTrunkRadius(tree.x, tree.z),
           });
           return;
@@ -2466,8 +2473,8 @@ export function createWorld(canvas, state, opts = {}) {
       playClick('ui');
       pickHandler?.({
         type: 'tree-inspect',
-        materialId: 'logs',
-        name: 'Tree',
+        materialId: data.materialId ?? 'logs',
+        name: data.name ?? 'Tree',
         x: data.x,
         z: data.z,
         clientX: event.clientX,
@@ -3459,7 +3466,7 @@ export function createWorld(canvas, state, opts = {}) {
         queueUse('tree', {
           x: pose.x,
           z: pose.z,
-          materialId: 'logs',
+          materialId: pose.materialId ?? 'logs',
           trunkRadius: pose.trunkRadius ?? plantedTrunkRadius(pose.x, pose.z),
         });
         return;
@@ -3922,6 +3929,7 @@ export function createWorld(canvas, state, opts = {}) {
       replaceFixture('loom', buildLoom);
       replaceFixture('fletch', buildFletchingBench);
       replaceFixture('potter', buildPotterWheel);
+      replaceFixture('sawmill', buildSawmill);
       replaceFixture('rug', buildRug);
       try {
         const nextDoor = buildShopDoor();

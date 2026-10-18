@@ -70,6 +70,8 @@ export const WHEEL_COST = 100000;
 export const LOOM_COST = 50000;
 export const FLETCH_COST = 50000;
 export const POTTER_COST = 50000;
+/** Saw logs into planks. Luke's model replaces the procedural bench later. */
+export const SAWMILL_COST = 20000;
 export const FURNACE_COST = 0;
 export const RANGE_COST = 0;
 /** One portal. Opens the outdoor rune field. */
@@ -91,6 +93,7 @@ export const STATION_UNLOCKS = [
   { id: 'loom', label: 'Loom', cost: LOOM_COST },
   { id: 'fletch', label: 'Fletching Bench', cost: FLETCH_COST },
   { id: 'potter', label: 'Potter Wheel', cost: POTTER_COST },
+  { id: 'sawmill', label: 'Sawmill', cost: SAWMILL_COST },
   { id: 'wheel', label: 'Spinning Wheel', cost: WHEEL_COST },
   { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
   { id: 'portal', label: 'Portal', cost: PORTAL_COST },
@@ -146,6 +149,25 @@ export const TREE_SCALE_SPREAD = 0.15;
 export function treeCanopyRadius(side = 'left') {
   void side;
   return TREE_CANOPY_UNIT * (1 + TREE_SCALE_SPREAD) * OUTDOOR_TREE_SCALE;
+}
+
+/**
+ * Outdoor wood trees. Canopy is the horizontal radius at the 0.01125 dump
+ * scale, before the ±15% garden roll. Teak is not used.
+ */
+export const WOOD_TREE_SPECS = Object.freeze({
+  oak: { id: 'oak', materialId: 'oak_logs', name: 'Oak', canopy: 2.15, lookId: 'tree-oak' },
+  willow: { id: 'willow', materialId: 'willow_logs', name: 'Willow', canopy: 1.55, lookId: 'tree-willow' },
+  maple: { id: 'maple', materialId: 'maple_logs', name: 'Maple', canopy: 1.45, lookId: 'tree-maple' },
+  yew: { id: 'yew', materialId: 'yew_logs', name: 'Yew', canopy: 2.05, lookId: 'tree-yew' },
+  magic: { id: 'magic', materialId: 'magic_logs', name: 'Magic', canopy: 1.65, lookId: 'tree-magic' },
+});
+
+/** Grass-click radius. Wider crowns reach past the pine click box. */
+export function treeClickRadius(spot) {
+  const canopy = Number(spot?.canopy);
+  if (Number.isFinite(canopy) && canopy > 0) return Math.max(TREE_CLICK_RADIUS, canopy + 0.4);
+  return TREE_CLICK_RADIUS;
 }
 
 /** Block width for a pine whose trunk column has this radius. */
@@ -564,6 +586,7 @@ export function furnitureHalfSize(kind) {
   if (kind === 'loom') return { hw: 0.48, hd: 0.36 };
   if (kind === 'fletch') return { hw: 0.55, hd: 0.4 };
   if (kind === 'potter') return { hw: 0.4, hd: 0.4 };
+  if (kind === 'sawmill') return { hw: 1.08, hd: 0.24 };
   if (kind === 'portal') return { hw: PORTAL_TARGET_WIDTH / 2, hd: PORTAL_TARGET_DEPTH / 2 };
   if (kind === 'counter') return { hw: 1.09, hd: 0.26 };
   if (kind === 'shelf') return { hw: 0.75, hd: 0.25 };
@@ -627,6 +650,7 @@ export function defaultFurniture() {
     loom: null,
     fletch: null,
     potter: null,
+    sawmill: null,
     portal: null,
     rug: { x: shopRugPose().x, z: shopRugPose().z, rot: FURNITURE_FORWARD },
     displays: SHOP.displays.map((spot) => (
@@ -654,6 +678,7 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     loom: clonePose(furniture.loom),
     fletch: clonePose(furniture.fletch),
     potter: clonePose(furniture.potter),
+    sawmill: clonePose(furniture.sawmill),
     portal: clonePose(furniture.portal),
     rug: { ...(furniture.rug ?? defaults.rug) },
     displays: (furniture.displays ?? defaults.displays).map((pose) => ({ ...pose })),
@@ -804,13 +829,16 @@ export function gardenSpotClearOfBeds(spot, expansionIds = [], minDist = TREE_BE
   ));
 }
 
-function treeSitRadius(side = 'left') {
-  return side === 'edge' ? treeCanopyRadius('edge') : treeCanopyRadius('left');
+function treeSitRadius(spotOrSide) {
+  const spot = typeof spotOrSide === 'string' ? { side: spotOrSide } : (spotOrSide ?? {});
+  const canopy = Number(spot.canopy);
+  if (Number.isFinite(canopy) && canopy > 0) return canopy * (1 + TREE_SCALE_SPREAD);
+  return treeCanopyRadius(spot.side);
 }
 
 /** Push a pine off boulders and neighbouring crowns. Loops are capped. */
 function settleGardenTree(spot, others, rocks, grass) {
-  const inset = treeSitRadius(spot.side);
+  const inset = treeSitRadius(spot);
   let x = spot.x;
   let z = spot.z;
   const clamp = () => {
@@ -836,9 +864,9 @@ function settleGardenTree(spot, others, rocks, grass) {
       z += (dz / len) * push;
       moved = true;
     }
-    const mine = treeSitRadius(spot.side);
+    const mine = treeSitRadius(spot);
     for (const other of others) {
-      const need = (mine + treeSitRadius(other.side)) * 0.86;
+      const need = (mine + treeSitRadius(other)) * 0.86;
       let dx = x - other.x;
       let dz = z - other.z;
       const dist = Math.hypot(dx, dz);
@@ -864,32 +892,37 @@ export function gardenTreeSpots(expansionIds = []) {
   const grass = gardenBox(expansionIds);
   const cx = (box.minX + box.maxX) / 2;
   const cz = (box.minZ + box.maxZ) / 2;
+  const woodSpot = (x, z, side, wood) => {
+    const spec = WOOD_TREE_SPECS[wood];
+    return {
+      x,
+      z,
+      side,
+      wood,
+      materialId: spec.materialId,
+      name: `${spec.name} tree`,
+      canopy: spec.canopy,
+    };
+  };
   const spots = [
     { x: box.minX - 2.45, z: box.minZ + 1.5, side: 'left' },
-    { x: box.minX - 2.9, z: cz - 0.2, side: 'left' },
-    { x: box.minX - 2.2, z: box.maxZ - 0.45, side: 'left' },
     { x: box.maxX + 2.45, z: box.minZ + 1.35, side: 'right' },
-    { x: box.maxX + 2.85, z: cz + 0.45, side: 'right' },
-    { x: box.maxX + 2.2, z: box.maxZ - 0.7, side: 'right' },
-    { x: cx - 3.6, z: box.minZ - 5.0, side: 'rear' },
-    { x: cx + 3.6, z: box.minZ - 4.8, side: 'rear' },
     { x: cx, z: box.minZ - 3.15, side: 'rear' },
     { x: box.minX - 3.4, z: box.maxZ + 1.55, side: 'front-left' },
     { x: box.maxX + 3.4, z: box.maxZ + 1.7, side: 'front-right' },
-    { x: -4.7, z: 6.2, side: 'path' },
-    { x: 5.0, z: 6.0, side: 'path' },
     { x: -6.5, z: 8.7, side: 'path' },
-    { x: 6.2, z: 8.2, side: 'path' },
-    { x: -4.85, z: 10.45, side: 'path' },
-    { x: 5.1, z: 10.5, side: 'path' },
     { x: grass.minX + 2.25, z: grass.minZ + 2.4, side: 'edge' },
-    { x: grass.maxX - 2.25, z: grass.minZ + 2.55, side: 'edge' },
-    { x: grass.minX + 2.25, z: grass.maxZ - 2.4, side: 'edge' },
-    { x: grass.maxX - 2.25, z: grass.maxZ - 2.55, side: 'edge' },
-    { x: grass.minX + 2.25, z: cz - 3.5, side: 'edge' },
     { x: grass.maxX - 2.25, z: cz + 3.3, side: 'edge' },
-    { x: cx - 7.5, z: grass.minZ + 2.4, side: 'edge' },
-    { x: cx + 7.7, z: grass.minZ + 2.5, side: 'edge' },
+    woodSpot(cx - 7.2, box.minZ - 5.6, 'rear', 'oak'),
+    woodSpot(box.maxX + 6.4, cz - 2.8, 'right', 'oak'),
+    woodSpot(cx + 7.0, box.minZ - 5.4, 'rear', 'willow'),
+    woodSpot(box.minX - 6.2, cz + 1.2, 'left', 'willow'),
+    woodSpot(cx - 3.8, box.minZ - 6.6, 'rear', 'maple'),
+    woodSpot(box.maxX + 5.8, cz + 2.6, 'right', 'maple'),
+    woodSpot(cx + 3.4, box.minZ - 6.4, 'rear', 'yew'),
+    woodSpot(box.minX - 6.6, cz - 2.4, 'left', 'yew'),
+    woodSpot(grass.minX + 3.6, grass.maxZ - 3.4, 'edge', 'magic'),
+    woodSpot(grass.maxX - 3.6, grass.minZ + 4.0, 'edge', 'magic'),
   ];
   const rocks = gardenRockSpots(expansionIds);
   const kept = [];
@@ -1068,7 +1101,7 @@ const FLAX_FLOWER_CLEAR = 0.34;
 const FLAX_STATION_CLEAR = 1.45;
 const FLAX_DISPLAY_CLEAR = 1.2;
 const FLAX_TRAP_CLEAR = 1.25;
-const FLAX_STATION_IDS = ['counter', 'anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'portal'];
+const FLAX_STATION_IDS = ['counter', 'anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'sawmill', 'portal'];
 
 export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furniture = null, spacing = FLAX_SPACING } = {}) {
   const grass = gardenBox(expansionIds);

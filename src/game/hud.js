@@ -244,6 +244,7 @@ export function bindHud(root, state, world) {
     if (craftStation === 'furnace') return recipesForTab('smelt');
     if (craftStation === 'wheel') return recipesForTab('spin');
     if (craftStation === 'potter') return recipesForTab('potter');
+    if (craftStation === 'sawmill') return recipesForTab('saw');
     if (craftStation === 'loom') {
       if (craftTab === 'ranged') {
         return recipesForTab('ranged', 'armour');
@@ -384,9 +385,10 @@ export function bindHud(root, state, world) {
     const loomMode = craftStation === 'loom';
     const fletchMode = craftStation === 'fletch';
     const potterMode = craftStation === 'potter';
+    const sawmillMode = craftStation === 'sawmill';
     const altarMode = typeof craftStation === 'string' && craftStation.startsWith('altar-');
     const altarMark = altarMode ? craftStation.slice('altar-'.length) : '';
-    const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode || potterMode || altarMode;
+    const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode || potterMode || sawmillMode || altarMode;
     ensureCraftTabs();
     tabsEl.hidden = simpleStation;
     subtabsEl.hidden = simpleStation || loomMode || fletchMode;
@@ -407,7 +409,9 @@ export function bindHud(root, state, world) {
                   ? 'Fletching Bench'
                   : potterMode
                     ? 'Potter Wheel'
-                    : altarMode
+                    : sawmillMode
+                      ? 'Sawmill'
+                      : altarMode
                       ? `${altarMark.charAt(0).toUpperCase()}${altarMark.slice(1)} Altar`
                       : 'Anvil';
     }
@@ -424,9 +428,11 @@ export function bindHud(root, state, world) {
                 ? 'Weave flax into cloth, then ranged and magic armour. Cloth is not restocked for free.'
                 : fletchMode
                   ? 'Fletch ranged weapons and ammo. Arrows still make 20 per craft action.'
-                  : potterMode
+                    : potterMode
                     ? 'Turn soft clay into clay. This wheel does not make ranged gear.'
-                    : altarMode
+                    : sawmillMode
+                      ? 'Saw logs into planks. Finished planks stay in your materials.'
+                      : altarMode
                       ? 'Bind rune essence into this element. Finished runes land in the chest.'
                       : 'Work a ware here. 1× / 5× / Max are craft actions. Finished pieces land in the chest. Melee gear and tools use metal bars. Magic weapons stay here; ranged weapons go to the fletching bench, and cloth armour goes to the loom.';
     }
@@ -688,7 +694,7 @@ export function bindHud(root, state, world) {
       ? { materialId, x: pose?.x, z: pose?.z, kind, plantId: pose?.plantId }
       : null;
     const info = kind === 'tree'
-      ? treeInspect()
+      ? treeInspect(materialId)
       : kind === 'flax'
         ? flaxInspect()
         : kind === 'wheat'
@@ -1368,6 +1374,7 @@ export function bindHud(root, state, world) {
                   : target.id === 'loom' ? 'Loom'
                   : target.id === 'fletch' ? 'Fletching Bench'
                   : target.id === 'potter' ? 'Potter Wheel'
+                  : target.id === 'sawmill' ? 'Sawmill'
                   : target.id === 'portal' ? 'Portal'
                   : target.id === 'rug' ? 'Rug'
                   : target.id === 'counter' ? 'Counter'
@@ -1378,7 +1385,7 @@ export function bindHud(root, state, world) {
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
     const upgradeBtn = furnMenu.querySelector('[data-furn-upgrade]');
-    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel' || target.id === 'loom' || target.id === 'fletch' || target.id === 'potter' || target.id === 'portal') {
+    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel' || target.id === 'loom' || target.id === 'fletch' || target.id === 'potter' || target.id === 'sawmill' || target.id === 'portal') {
       useBtn.hidden = false;
       useBtn.textContent = target.id === 'chest' ? 'Open Chest'
         : target.id === 'range' ? 'Cook'
@@ -1388,6 +1395,7 @@ export function bindHud(root, state, world) {
                 : target.id === 'loom' ? 'Weave'
                   : target.id === 'fletch' ? 'Fletch'
                     : target.id === 'potter' ? 'Shape'
+                      : target.id === 'sawmill' ? 'Saw'
                       : target.id === 'portal' ? 'Enter'
                         : 'Craft';
     } else {
@@ -1909,6 +1917,7 @@ export function bindHud(root, state, world) {
     if (target?.id === 'loom') openCraft('loom');
     if (target?.id === 'fletch') openCraft('fletch');
     if (target?.id === 'potter') openCraft('potter');
+    if (target?.id === 'sawmill') openCraft('sawmill');
     if (target?.id === 'portal') world.useFixture?.('portal');
   });
 
@@ -2463,6 +2472,7 @@ export function bindHud(root, state, world) {
     if (event.type === 'loom') openCraft('loom');
     if (event.type === 'fletch') openCraft('fletch');
     if (event.type === 'potter') openCraft('potter');
+    if (event.type === 'sawmill') openCraft('sawmill');
     if (event.type === 'portal') {
       fadeShop(() => world.enterRuneField?.());
     }

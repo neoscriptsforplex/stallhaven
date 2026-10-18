@@ -103,6 +103,7 @@ test('recipe to skill mapping', () => {
   assert.equal(skillForRecipe({ category: 'spin' }, 'wheel'), 'crafting');
   assert.equal(skillForRecipe({ category: 'potter' }, 'potter'), 'crafting');
   assert.equal(skillForRecipe({ category: 'weave' }, 'loom'), 'crafting');
+  assert.equal(skillForRecipe({ category: 'saw' }, 'sawmill'), 'construction');
   assert.equal(skillForRecipe(null, 'anvil'), null);
 });
 

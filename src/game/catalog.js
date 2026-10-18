@@ -111,6 +111,7 @@ export const ANVIL_TABS = [
   { id: 'melee', label: 'Melee' },
   { id: 'magic', label: 'Magic' },
   { id: 'tools', label: 'Tools' },
+  { id: 'misc', label: 'Misc' },
 ];
 
 /** Loom: cloth, then ranged and magic armour moved off the anvil. */
@@ -310,7 +311,16 @@ export const MATERIALS = {
     regenEvery: 0,
     crafted: true,
   },
-  soft_clay: { id: 'soft_clay', name: 'Soft Clay', restock: 4, start: 8, tier: 1, regenEvery: regenEvery(1) },
+  soft_clay: {
+    id: 'soft_clay',
+    name: 'Soft Clay',
+    restock: 0,
+    start: 0,
+    tier: 1,
+    regenEvery: 0,
+    crafted: true,
+    tint: 0xc4845a,
+  },
   hard_clay: {
     id: 'hard_clay',
     name: 'Hard clay',
@@ -318,10 +328,18 @@ export const MATERIALS = {
     start: 0,
     tier: 1,
     regenEvery: 0,
-    crafted: true,
     tint: 0xb56a3a,
   },
-  orb: { id: 'orb', name: 'Unpowered Orb', restock: 6, start: 4, tier: 2, regenEvery: regenEvery(2) },
+  orb: {
+    id: 'orb',
+    name: 'Unpowered Orb',
+    restock: 0,
+    start: 0,
+    tier: 2,
+    regenEvery: 0,
+    crafted: true,
+    tint: 0xc8d8e8,
+  },
   hide: { id: 'hide', name: 'Hide', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   egg: { id: 'egg', name: 'Egg', restock: 4, start: 4, tier: 1, regenEvery: regenEvery(1) },
   flour: { id: 'flour', name: 'Pot of flour', restock: 0, start: 0, tier: 1, regenEvery: 0, crafted: true },
@@ -349,6 +367,16 @@ export const MATERIALS = {
     tier: 5,
     regenEvery: 0,
     quest: true,
+  },
+  molten_glass: {
+    id: 'molten_glass',
+    name: 'Molten Glass',
+    restock: 0,
+    start: 0,
+    tier: 2,
+    regenEvery: 0,
+    quest: true,
+    tint: 0xe8a040,
   },
 };
 
@@ -1211,25 +1239,49 @@ addRecipe({
 });
 
 addRecipe({
-  id: 'fire_clay',
-  name: 'Clay',
-  category: 'potter',
+  id: 'unpowered_orb',
+  name: 'Unpowered Orb',
+  category: 'misc',
   combatClass: null,
-  slot: 'clay',
-  shape: 'hard_clay',
-  setKey: 'potter',
-  lineId: 'potter-clay',
-  lineName: 'Clay',
+  slot: null,
+  shape: 'orb',
+  setKey: 'orb',
+  lineId: 'misc-unpowered-orb',
+  lineName: 'Unpowered Orb',
   lineIndex: 0,
   previousId: null,
   unlockNeed: 0,
   tier: 1,
-  cost: { materials: { soft_clay: 1 }, gold: 0 },
+  cost: { materials: { molten_glass: 1 }, gold: 0 },
+  time: 3,
+  price: 250,
+  buyers: [],
+  tint: 0xc8d8e8,
+  outputMaterial: 'orb',
+  outputCount: 1,
+});
+
+// First potter recipe. Hard clay is mined; a bucket of water softens it.
+addRecipe({
+  id: 'soft_clay',
+  name: 'Soft Clay',
+  category: 'potter',
+  combatClass: null,
+  slot: 'clay',
+  shape: 'soft_clay',
+  setKey: 'potter',
+  lineId: 'potter-soft-clay',
+  lineName: 'Soft Clay',
+  lineIndex: 0,
+  previousId: null,
+  unlockNeed: 0,
+  tier: 1,
+  cost: { materials: { hard_clay: 1, water: 1 }, gold: 0 },
   time: 4,
   price: 0,
   buyers: [],
-  tint: 0xb56a3a,
-  outputMaterial: 'hard_clay',
+  tint: 0xc4845a,
+  outputMaterial: 'soft_clay',
   outputCount: 1,
 });
 
@@ -1561,7 +1613,7 @@ export const MINE_YIELDS = {
   iron: 4,
   steel: 3,
   mithril: 3,
-  adamant: 2,
+  adamant: 3,
   runite: 2,
   dragon: 1,
   hard_clay: 1,
@@ -1728,6 +1780,7 @@ export function isMaterialCraft(recipe) {
 }
 
 export function anvilTabForRecipe(recipe) {
+  if (recipe?.category === 'misc') return 'misc';
   if (isToolRecipe(recipe)) return 'tools';
   if (recipe?.combatClass === 'magic') return 'magic';
   if (recipe?.combatClass === 'range') return 'ranged';
@@ -1745,6 +1798,7 @@ export function anvilSubtabForRecipe(recipe) {
 }
 
 export function anvilSubtabsForTab(tabId) {
+  if (tabId === 'misc') return [];
   if (tabId === 'tools') return TOOL_SUBTABS;
   return ANVIL_SUBTABS.filter((tab) => {
     if (tab.id === 'hatchet' || tab.id === 'pickaxe' || tab.id === 'ammo' || tab.id === 'rune') return false;
@@ -1794,6 +1848,7 @@ export function craftUiForStation(station, prev = {}, recipe = null) {
   if (subtab === 'rune') subtab = 'weapon';
   if (tab !== 'tools' && TOOL_SUBTAB_IDS.has(subtab)) subtab = 'weapon';
   if (tab === 'tools' && !TOOL_SUBTAB_IDS.has(subtab)) subtab = 'hatchet';
+  if (tab === 'misc') subtab = 'weapon';
   return { tab, subtab };
 }
 
@@ -1843,6 +1898,7 @@ export function recipesForTab(tabId, subtabId = null) {
   if (tabId === 'spin') return shown(recipeList().filter((recipe) => recipe.category === 'spin'));
   if (tabId === 'weave' || tabId === 'cloth') return shown(recipeList().filter((recipe) => recipe.category === 'weave'));
   if (tabId === 'potter') return shown(recipeList().filter((recipe) => recipe.category === 'potter'));
+  if (tabId === 'misc') return shown(recipeList().filter((recipe) => recipe.category === 'misc'));
   if (tabId === 'saw') {
     return shown(recipeList().filter((recipe) => recipe.category === 'saw'))
       .sort((a, b) => a.lineIndex - b.lineIndex);

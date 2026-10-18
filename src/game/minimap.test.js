@@ -21,6 +21,7 @@ import {
   shopMapBounds,
   trapdoorMarkerUrls,
   worldToMap,
+  compassNeedleDegrees,
 } from './minimap.js';
 import { SHOP } from './catalog.js';
 import { FOUNTAIN, PATH_HALF_W, TRAPDOOR, furnitureVisualYaw } from './layout.js';
@@ -28,6 +29,13 @@ import { DUNGEON_BOULDERS } from './shopbuild.js';
 import { PLAYER_RADIUS, dungeonMoveObstacles, isWalkable, planWalk } from './nav.js';
 
 describe('minimap', () => {
+  it('keeps the compass needle on world north as the camera yaws', () => {
+    assert.equal(compassNeedleDegrees(0), 0);
+    assert.equal(compassNeedleDegrees(Math.PI / 2), 90);
+    assert.equal(compassNeedleDegrees(Math.PI), 180);
+    assert.equal(compassNeedleDegrees(-Math.PI / 2), -90);
+  });
+
   it('round-trips world points through canvas pixels, including yaw and zoom', () => {
     const bounds = shopMapBounds([]);
     const size = 196;

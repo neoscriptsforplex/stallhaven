@@ -409,6 +409,34 @@ export function firstOpenFurniturePose(state, kind) {
   return { x: home.x, z: home.z, rot: 0, open: false };
 }
 
+/**
+ * A confirm re-check runs after the patch is already stored on this pose.
+ * Drop that one block so the plot does not collide with itself. Other
+ * patches and furniture stay in the way. Before the pose is recorded, the
+ * list is unchanged.
+ */
+export function dropRecordedPatchObstacle(obstacles, patches, pose) {
+  const list = obstacles ?? [];
+  if (!pose || !list.length) return list;
+  const recorded = (patches ?? []).some((patch) => (
+    Number.isFinite(patch?.x)
+    && Number.isFinite(patch?.z)
+    && Math.hypot(patch.x - pose.x, patch.z - pose.z) < 0.05
+  ));
+  if (!recorded) return list;
+  let dropped = false;
+  return list.filter((block) => {
+    if (dropped || !block) return true;
+    const cx = ((block.minX ?? 0) + (block.maxX ?? 0)) / 2;
+    const cz = ((block.minZ ?? 0) + (block.maxZ ?? 0)) / 2;
+    if (Math.hypot(cx - pose.x, cz - pose.z) < 0.2) {
+      dropped = true;
+      return false;
+    }
+    return true;
+  });
+}
+
 export function placementBlocked(pose, kind, obstacles, floors, { checkAisle = true } = {}) {
   if (!pose) return 'That spot is off the shop floor.';
   const { hw, hd } = furnitureHalfSize(kind);

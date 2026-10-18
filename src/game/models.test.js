@@ -3197,7 +3197,7 @@ describe('bundled prop swaps', () => {
 
   it('fits bundled weapon, armour, ammo, and tool dumps to the current mesh size', async () => {
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
-    assert.equal(LUKE_MODEL_FOLDERS.length, 204);
+    assert.equal(LUKE_MODEL_FOLDERS.length, 205);
     for (const item of LUKE_MODEL_FOLDERS) {
       assert.equal(byId[item.id], item.folder, item.id);
       const slug = item.folder.split('/').pop();
@@ -3236,7 +3236,7 @@ describe('bundled prop swaps', () => {
       'weave_cloth',
       'flax',
       'orb',
-      'fire_clay',
+      'soft_clay',
       'dragon_kiteshield',
     ];
     for (const recipeId of samples) {

@@ -147,6 +147,35 @@ function fletchStandCandidates(pose) {
 }
 
 /**
+ * Sawmill stand on the long front (local +Z). The halved footprint is 1.44m
+ * along X and 0.72m along Z, so the front face sits at z = 0.36 and one step
+ * out is about 0.72m past that face.
+ */
+export const SAWMILL_STAND_LOCAL = { x: 0, z: 0.36 + 0.72 };
+
+export function sawmillStandWorld(pose, local = SAWMILL_STAND_LOCAL) {
+  const yaw = furnitureVisualYaw('sawmill', pose?.rot ?? 0);
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  const x = local.x;
+  const z = local.z;
+  return {
+    x: (pose?.x ?? 0) + x * c + z * s,
+    z: (pose?.z ?? 0) - x * s + z * c,
+  };
+}
+
+/** Face the saw from the stand. rotation.y 0 looks along world +Z. */
+export function sawmillFaceYaw(pose, stand = null) {
+  const spot = stand ?? sawmillStandWorld(pose);
+  return Math.atan2((pose?.x ?? 0) - spot.x, (pose?.z ?? 0) - spot.z);
+}
+
+function sawmillStandCandidates(pose) {
+  return [-0.48, 0, 0.48].map((x) => sawmillStandWorld(pose, { x, z: SAWMILL_STAND_LOCAL.z }));
+}
+
+/**
  * Gathering contacts. Rock and tree are world metres at the 0.863 player
  * scale, player-local, facing +Z. Flax is still character-local units and is
  * multiplied by GATHER_MODEL_SCALE. The v2 rig hits these points: the pick
@@ -449,6 +478,17 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
     for (const dest of spots) {
       const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
       if (path.length) return { action: 'walk', path, dest, face };
+    }
+    return { action: 'blocked', dest: stand, face };
+  }
+  if (kind === 'sawmill') {
+    const spots = sawmillStandCandidates(pose);
+    const stand = spots[1] ?? spots[0];
+    const face = sawmillFaceYaw(pose, stand);
+    if (isNearPoint(from, stand, 0.45)) return { action: 'open', dest: stand, face };
+    for (const dest of spots) {
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      if (path.length) return { action: 'walk', path, dest, face: sawmillFaceYaw(pose, dest) };
     }
     return { action: 'blocked', dest: stand, face };
   }

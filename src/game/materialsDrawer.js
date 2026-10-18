@@ -8,6 +8,10 @@ import { METALS, formatGold, materialList } from './catalog.js';
 export const MATERIALS_DRAWER_SIDE_QUERY =
   '(pointer: coarse), (orientation: portrait) and (max-width: 720px)';
 
+/** Open phone panel is double the old quarter-screen, and never past 90% of the width. */
+export const MATERIALS_DRAWER_SIDE_SHARE = 0.5;
+export const MATERIALS_DRAWER_SIDE_CAP = 0.9;
+
 const EXTRA_TINT = {
   logs: 0x8a5a32,
   flax: 0x6a9a3a,
@@ -115,7 +119,7 @@ export function materialsDrawerSideBox({
   return {
     top: topPx,
     bottom: bottomPx,
-    maxWidth: width * 0.25,
+    maxWidth: Math.min(width * MATERIALS_DRAWER_SIDE_SHARE, width * MATERIALS_DRAWER_SIDE_CAP),
     maxHeight: Math.max(0, maxHeight),
   };
 }

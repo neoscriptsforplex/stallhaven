@@ -61,12 +61,46 @@ v 17 4 24
 v 15 1 25
 v 11 -1 27
 v 0 0 -17
+# back panel (closed back behind the mannequin stand), appended; original vertices above are unchanged
+v 10.971 9.843 27.221
+v 14.118 9.843 25.414
+v 17.126 9.843 -2.557
+v 16.808 9.843 -15.129
+v 19.8 9.843 -15.443
+v 19.8 9.843 -20.786
+v 8.394 9.843 -21.1
+v 6.509 9.843 -23.064
+v -10.714 9.843 27.221
+v -14.14 9.843 25.414
+v -17.268 9.843 -2.557
+v -16.671 9.843 -15.129
+v -19.8 9.843 -15.443
+v -19.8 9.843 -20.786
+v -8.451 9.843 -21.1
+v -6.566 9.843 -23.064
+v 10.971 9.214 27.221
+v 14.118 6.755 25.414
+v 17.126 7.526 -2.557
+v 16.808 6.407 -15.129
+v 19.8 9.843 -15.443
+v 19.8 9.843 -20.786
+v 8.394 7.848 -21.1
+v 6.509 7.219 -23.064
+v -10.714 9.282 27.221
+v -14.14 6.963 25.414
+v -17.268 7.506 -2.557
+v -16.671 6.616 -15.129
+v -19.8 9.843 -15.443
+v -19.8 9.843 -20.786
+v -8.451 7.848 -21.1
+v -6.566 7.219 -23.064
 usemtl c0
 f 1 2 3
 usemtl c1
 f 1 3 4
 usemtl c2
 f 1 4 5
+usemtl c2
 f 1 5 6
 usemtl c3
 f 1 6 7
@@ -82,9 +116,11 @@ usemtl c8
 f 3 9 10
 usemtl c9
 f 3 10 11
+usemtl c9
 f 3 11 12
 usemtl c10
 f 3 12 4
+usemtl c10
 f 4 12 13
 usemtl c11
 f 4 13 14
@@ -102,7 +138,9 @@ usemtl c14
 f 6 12 7
 usemtl c15
 f 7 12 11
+usemtl c15
 f 7 11 10
+usemtl c15
 f 7 10 16
 usemtl c16
 f 7 16 8
@@ -186,6 +224,7 @@ usemtl c50
 f 38 33 36
 usemtl c51
 f 38 36 39
+usemtl c51
 f 38 39 36
 usemtl c50
 f 38 36 33
@@ -193,6 +232,7 @@ usemtl c52
 f 38 33 41
 usemtl c53
 f 38 41 42
+usemtl c53
 f 38 42 39
 usemtl c54
 f 39 42 43
@@ -208,11 +248,13 @@ usemtl c58
 f 15 5 1
 usemtl c59
 f 15 1 6
+usemtl c59
 f 15 6 44
 usemtl c60
 f 15 44 45
 usemtl c50
 f 15 45 5
+usemtl c50
 f 5 45 46
 usemtl c58
 f 5 46 1
@@ -274,10 +316,310 @@ usemtl c77
 f 47 60 59
 usemtl c78
 f 47 59 55
+usemtl c78
 f 47 55 51
+usemtl c78
 f 47 51 50
+usemtl c78
 f 47 50 48
+usemtl c78
 f 48 50 49
+usemtl c78
 f 58 56 55
+usemtl c78
 f 58 55 59
+usemtl c78
 f 56 58 57
+usemtl c79
+f 1 3 2
+usemtl c80
+f 1 4 3
+usemtl c81
+f 1 5 4
+usemtl c81
+f 1 6 5
+usemtl c82
+f 1 7 6
+usemtl c83
+f 1 2 7
+usemtl c84
+f 2 8 7
+usemtl c85
+f 2 3 8
+usemtl c86
+f 3 9 8
+usemtl c87
+f 3 10 9
+usemtl c88
+f 3 11 10
+usemtl c88
+f 3 12 11
+usemtl c89
+f 3 4 12
+usemtl c89
+f 4 13 12
+usemtl c90
+f 4 14 13
+usemtl c91
+f 4 5 14
+usemtl c92
+f 5 15 14
+usemtl c91
+f 5 6 15
+usemtl c90
+f 6 13 15
+usemtl c89
+f 6 12 13
+usemtl c93
+f 6 7 12
+usemtl c94
+f 7 11 12
+usemtl c94
+f 7 10 11
+usemtl c94
+f 7 16 10
+usemtl c95
+f 7 8 16
+usemtl c96
+f 8 17 16
+usemtl c97
+f 8 18 17
+usemtl c98
+f 8 9 18
+usemtl c99
+f 9 19 18
+usemtl c100
+f 9 10 19
+usemtl c101
+f 10 20 19
+usemtl c102
+f 10 16 20
+usemtl c103
+f 16 17 20
+usemtl c104
+f 15 13 14
+usemtl c105
+f 21 23 22
+usemtl c106
+f 21 24 23
+usemtl c102
+f 21 25 24
+usemtl c107
+f 25 26 24
+usemtl c99
+f 25 27 26
+usemtl c108
+f 27 28 26
+usemtl c109
+f 27 22 28
+usemtl c110
+f 22 23 28
+usemtl c111
+f 23 29 28
+usemtl c112
+f 23 30 29
+usemtl c113
+f 23 31 30
+usemtl c114
+f 23 24 31
+usemtl c100
+f 24 26 31
+usemtl c115
+f 26 32 31
+usemtl c116
+f 26 29 32
+usemtl c117
+f 26 28 29
+usemtl c118
+f 29 33 32
+usemtl c119
+f 29 34 33
+usemtl c120
+f 29 35 34
+usemtl c121
+f 29 30 35
+usemtl c91
+f 30 31 35
+usemtl c122
+f 31 36 35
+usemtl c113
+f 31 33 36
+usemtl c123
+f 31 32 33
+usemtl c124
+f 37 39 38
+usemtl c125
+f 37 40 39
+usemtl c126
+f 37 34 40
+usemtl c127
+f 37 38 34
+usemtl c128
+f 38 33 34
+usemtl c129
+f 38 36 33
+usemtl c130
+f 38 39 36
+usemtl c130
+f 38 36 39
+usemtl c129
+f 38 33 36
+usemtl c131
+f 38 41 33
+usemtl c132
+f 38 42 41
+usemtl c132
+f 38 39 42
+usemtl c133
+f 39 43 42
+usemtl c134
+f 39 36 43
+usemtl c135
+f 39 40 36
+usemtl c136
+f 40 35 36
+usemtl c120
+f 40 34 35
+usemtl c137
+f 15 1 5
+usemtl c138
+f 15 6 1
+usemtl c138
+f 15 44 6
+usemtl c139
+f 15 45 44
+usemtl c129
+f 15 5 45
+usemtl c129
+f 5 46 45
+usemtl c137
+f 5 1 46
+usemtl c140
+f 1 47 46
+usemtl c141
+f 1 48 47
+usemtl c142
+f 1 49 48
+usemtl c107
+f 1 6 49
+usemtl c143
+f 6 50 49
+usemtl c144
+f 6 51 50
+usemtl c145
+f 6 44 51
+usemtl c146
+f 44 52 51
+usemtl c147
+f 44 53 52
+usemtl c139
+f 44 45 53
+usemtl c92
+f 54 52 53
+usemtl c148
+f 54 43 52
+usemtl c149
+f 54 42 43
+usemtl c145
+f 51 52 55
+usemtl c147
+f 52 43 55
+usemtl c91
+f 43 36 55
+usemtl c122
+f 36 56 55
+usemtl c150
+f 36 57 56
+usemtl c129
+f 36 33 57
+usemtl c151
+f 33 58 57
+usemtl c152
+f 33 59 58
+usemtl c148
+f 33 41 59
+usemtl c153
+f 41 60 59
+usemtl c133
+f 41 42 60
+usemtl c149
+f 42 45 60
+usemtl c154
+f 45 46 60
+usemtl c155
+f 46 47 60
+usemtl c156
+f 47 59 60
+usemtl c157
+f 47 55 59
+usemtl c157
+f 47 51 55
+usemtl c157
+f 47 50 51
+usemtl c157
+f 47 48 50
+usemtl c157
+f 48 49 50
+usemtl c157
+f 58 55 56
+usemtl c157
+f 58 59 55
+usemtl c157
+f 56 57 58
+# back panel faces
+usemtl c158
+f 61 70 69
+usemtl c158
+f 61 62 70
+usemtl c159
+f 61 69 70
+usemtl c159
+f 61 70 62
+usemtl c160
+f 62 71 70
+usemtl c160
+f 62 63 71
+usemtl c161
+f 62 70 71
+usemtl c161
+f 62 71 63
+usemtl c162
+f 63 72 71
+usemtl c162
+f 63 64 72
+usemtl c163
+f 63 71 72
+usemtl c163
+f 63 72 64
+usemtl c164
+f 64 73 72
+usemtl c164
+f 64 65 73
+usemtl c165
+f 64 72 73
+usemtl c165
+f 64 73 65
+usemtl c166
+f 65 74 73
+usemtl c166
+f 65 66 74
+usemtl c167
+f 65 73 74
+usemtl c167
+f 65 74 66
+usemtl c168
+f 66 75 74
+usemtl c168
+f 66 67 75
+usemtl c169
+f 66 74 75
+usemtl c169
+f 66 75 67
+usemtl c170
+f 67 76 75
+usemtl c170
+f 67 68 76
+usemtl c171
+f 67 75 76
+usemtl c171
+f 67 76 68

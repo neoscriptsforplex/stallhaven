@@ -57,9 +57,6 @@
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
       <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
-      <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
-        <span class="expand-icon" aria-hidden="true">⛶</span>
-      </button>
       <button type="button" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
       <input id="music-file" type="file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav" multiple hidden />
@@ -73,7 +70,7 @@
           <button type="button" class="minimap-toggle" data-map-toggle aria-expanded="false">Map</button>
           <button type="button" class="minimap-close" data-map-close aria-label="Close map">Close</button>
           <div class="minimap-compass">
-            <button type="button" data-map-north aria-label="Reset camera">N</button>
+            <button type="button" data-map-north aria-label="Look North" title="Look North"><span class="minimap-needle"></span></button>
           </div>
           <div class="minimap-zoom">
             <button type="button" data-map-zoom="out" aria-label="Zoom map out">−</button>
@@ -165,12 +162,19 @@ This will allow you to load it back again.
 
     <div id="craft-modal" class="modal" hidden>
       <div class="sheet craft-sheet">
-        <h2 data-craft-title>Anvil</h2>
-        <p data-craft-blurb>Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
-        <div id="craft-tabs" class="tabs"></div>
-        <div id="craft-subtabs" class="tabs subtabs" hidden></div>
+        <div class="craft-head">
+          <h2 data-craft-title>Anvil</h2>
+          <button type="button" class="craft-info" aria-label="About this station" title="About this station">i</button>
+          <p data-craft-blurb class="craft-info-tip" role="tooltip">Work a ware here. Finished pieces land in the chest. Higher tiers stay locked until you craft enough of the previous item in that line.</p>
+          <button type="button" class="ghost craft-x" data-craft-close aria-label="Close">✕</button>
+        </div>
+        <div class="tabbar">
+          <div id="craft-tabs" class="tabs" role="tablist"></div>
+          <div id="craft-subtabs" class="tabs subtabs" role="tablist" hidden></div>
+        </div>
         <p data-craft-note class="craft-note" hidden></p>
-        <div class="craft-body">
+        <div class="craft-body no-side">
+          <nav id="craft-sidetabs" class="craft-sidetabs" role="tablist" aria-label="Recipe types" hidden></nav>
           <div id="crafts"></div>
           <aside class="craft-preview-pane">
             <canvas data-craft-preview width="220" height="220" aria-label="Item preview"></canvas>
@@ -181,7 +185,6 @@ This will allow you to load it back again.
           </aside>
         </div>
         <div id="materials" class="craft-mats" aria-label="Materials"></div>
-        <button type="button" class="ghost" data-craft-close>Close</button>
       </div>
     </div>
 
@@ -331,7 +334,9 @@ This will allow you to load it back again.
       <article class="build-item">
         <h3>Farming Patch</h3>
         <p>An outdoor 2×2 plot. You can own four. Place it on open grass, clear of the path and flower beds, then confirm. Click a placed patch to grow herbs.</p>
-        <p data-farming_patch-status class="meta">First patch costs 1,000,000 gp. Iron Nails ×6 · Oak Plank ×2.</p>
+        <p data-farming_patch-status class="meta">You can own six farming patches.
+Cost: 1,000,000 gp
+Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
         <button type="button" data-farming_patch-buy>Buy · 1,000,000 gp</button>
       </article>
       <article class="build-item">
@@ -415,6 +420,10 @@ This will allow you to load it back again.
         <span data-dungeon-brightness-label>150%</span>
       </label>
       <p class="meta">Cave lighting only. 100% is the dungeon baseline; new shops and a saved 100% start at 150% (slider max). Other saved levels stay. Does not change the shop.</p>
+      <label class="settings-check" data-fullscreen-row>
+        <input type="checkbox" data-fullscreen />
+        Fullscreen
+      </label>
       <label class="settings-check">
         <input type="checkbox" data-photo-mode />
         Photo mode

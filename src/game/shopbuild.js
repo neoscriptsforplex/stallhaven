@@ -59,6 +59,7 @@ import { applyOsrsScale, getBundledLook, measureVisibleBox, OSRS_MODEL_SCALE, si
 import { prepareDungeonRockMaterials } from './upload.js';
 import { attachSpinner } from './stationSpin.js';
 import { attachFountainWater } from './fountainWater.js';
+import { attachPortalJelly } from './portalJelly.js';
 import { attachFurnaceFx } from './furnaceFx.js';
 import { attachRangeFx } from './rangeFx.js';
 import { attachLoomFx } from './loomFx.js';
@@ -1268,8 +1269,6 @@ function addRoomTorches(root, center, neigh) {
 }
 
 function addOriginDecor(root, center) {
-  addWallVines(root, center);
-
   addWallTorch(root, center.x - ROOM_W / 2 + 0.18, 1.62, center.z - 1.85, Math.PI / 2);
   addWallTorch(root, center.x - ROOM_W / 2 + 0.18, 1.62, center.z + 1.85, Math.PI / 2);
   addWallTorch(root, center.x + ROOM_W / 2 - 0.18, 1.62, center.z - 1.85, -Math.PI / 2);
@@ -1841,21 +1840,17 @@ export function buildSawmill() {
   return bench;
 }
 
-/** 2×2 outdoor soil. Origin at the centre, y = 0 on the grass. */
-export function buildFarmingPatch() {
-  const bundled = getBundledLook('farming-patch');
-  if (bundled) {
-    const fitted = wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'farming-patch', fit: 'max' });
-    sitVisibleOnY(fitted, 0);
-    return fitted;
-  }
+/** Brown 2×2-tile soil used when the dump is missing, tiny, or buried. */
+function buildProceduralFarmingPatch() {
   const group = new THREE.Group();
   group.name = 'farming-patch';
+  group.userData.farmingPatchFallback = true;
   const soil = addShadow(new THREE.Mesh(
-    new THREE.BoxGeometry(2.88, 0.08, 2.88),
+    new THREE.BoxGeometry(2.88, 0.1, 2.88),
     new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.95 }),
   ));
-  soil.position.y = 0.04;
+  soil.name = 'farming-patch-soil';
+  soil.position.y = 0.05;
   group.add(soil);
   const rim = addShadow(new THREE.Mesh(
     new THREE.BoxGeometry(2.88, 0.1, 0.08),
@@ -1864,6 +1859,42 @@ export function buildFarmingPatch() {
   rim.position.set(0, 0.08, 1.4);
   group.add(rim);
   return group;
+}
+
+/** A plot you can see on the grass: about two tiles across, sitting on y = 0. */
+export function farmingPatchVisible(mesh) {
+  if (!mesh) return false;
+  const box = measureVisibleBox(mesh);
+  if (!box || box.isEmpty()) return false;
+  const size = box.getSize(new THREE.Vector3());
+  if (size.x < 1.6 || size.z < 1.6) return false;
+  if (size.x > 6 || size.z > 6) return false;
+  if (!(box.max.y > 0.04)) return false;
+  if (box.min.y < -0.05) return false;
+  return true;
+}
+
+/** Put the plot on the confirmed ground point. groundY is the lawn plane. */
+export function placeFarmingPatchMesh(mesh, pose, groundY = 0) {
+  if (!mesh || !pose) return mesh;
+  mesh.position.set(pose.x, groundY, pose.z);
+  if (pose.rot != null) mesh.rotation.y = pose.rot;
+  return mesh;
+}
+
+/** 2×2 outdoor soil. Origin at the centre, y = 0 on the grass. */
+export function buildFarmingPatch() {
+  const bundled = getBundledLook('farming-patch');
+  if (bundled) {
+    try {
+      const fitted = wrapBundledProp(bundled, osrsFitHost(bundled), { name: 'farming-patch', fit: 'max' });
+      sitVisibleOnY(fitted, 0);
+      if (farmingPatchVisible(fitted)) return fitted;
+    } catch (err) {
+      console.warn('Farming patch model skipped:', err?.message || err);
+    }
+  }
+  return buildProceduralFarmingPatch();
 }
 
 export function buildSpinningWheel() {
@@ -1978,15 +2009,19 @@ function buildProceduralPortal() {
   const jambW = w * 0.16;
   const left = addShadow(new THREE.Mesh(new THREE.BoxGeometry(jambW, h * 0.86, d), stone));
   left.position.set(-w / 2 + jambW / 2, h * 0.43, 0);
+  left.userData.skipPortalJelly = true;
   group.add(left);
   const right = left.clone();
   right.position.x = w / 2 - jambW / 2;
+  right.userData.skipPortalJelly = true;
   group.add(right);
   const lintel = addShadow(new THREE.Mesh(new THREE.BoxGeometry(w, h * 0.16, d), stone));
   lintel.position.y = h - h * 0.08;
+  lintel.userData.skipPortalJelly = true;
   group.add(lintel);
   const inner = new THREE.Mesh(new THREE.CircleGeometry(Math.min(w, h) * 0.22, 20), glow);
   inner.position.y = h * 0.46;
+  inner.userData.portalSurface = true;
   group.add(inner);
   return group;
 }
@@ -2012,6 +2047,7 @@ export function buildPortal() {
   const box = measureVisibleBox(visual);
   label.position.y = (Number.isFinite(box.max.y) ? box.max.y : PORTAL_TARGET_HEIGHT) + 0.18;
   root.add(label);
+  root.userData.portalJelly = attachPortalJelly(root);
   return root;
 }
 
@@ -2619,8 +2655,8 @@ function flowerGeometry(rand) {
   return merged;
 }
 
-function addGrassFlowers(root, expansionIds) {
-  const spots = gardenFlowerSpots(expansionIds);
+function addGrassFlowers(root, expansionIds, furniture = null) {
+  const spots = gardenFlowerSpots(expansionIds, furniture);
   const geometry = flowerGeometry(randAt(8801));
   if (!spots.length || !geometry) return;
   const material = new THREE.MeshStandardMaterial({
@@ -2727,8 +2763,8 @@ function addGarden(root, cells, expansionIds = [], furniture = null) {
     door.position.set(hatch.x, 0, hatch.z);
     root.add(door);
   }
-  addLushGrass(root, grass, expansionIds, rand);
-  addGrassFlowers(root, expansionIds);
+  addLushGrass(root, grass, expansionIds, rand, furniture);
+  addGrassFlowers(root, expansionIds, furniture);
 }
 
 /** Metres of ground covered by one seamless fountain_cobble tile. */
@@ -2951,8 +2987,8 @@ function buildProceduralTrapdoor() {
   return group;
 }
 
-function addLushGrass(root, grass, expansionIds, rand) {
-  const clusters = gardenGrassClusters(expansionIds);
+function addLushGrass(root, grass, expansionIds, rand, furniture = null) {
+  const clusters = gardenGrassClusters(expansionIds, furniture);
   const bladeGeo = new THREE.ConeGeometry(0.016, 1, 4);
   bladeGeo.translate(0, 0.5, 0);
   const greens = [

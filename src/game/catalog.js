@@ -234,10 +234,10 @@ export const METALS = [
 ];
 
 export const DHIDE = [
-  { id: 'blue', name: 'Blue', tint: 0x2a4a8a },
+  { id: 'blue', name: 'Blue', tint: 0x5b8ee6 },
   { id: 'green', name: 'Green', tint: 0x2d6a32 },
   { id: 'red', name: 'Red', tint: 0x8a2424 },
-  { id: 'black', name: 'Black', tint: 0x1c1c1c },
+  { id: 'black', name: 'Black', tint: 0x6a6a72 },
 ];
 
 export const MAGIC_SETS = [
@@ -378,6 +378,10 @@ export const MATERIALS = {
     quest: true,
     tint: 0xe8a040,
   },
+  green_dhide: { id: 'green_dhide', name: 'Green Dragonhide', restock: 0, start: 0, tier: 4, regenEvery: 0, quest: true, tint: 0x2d6a32 },
+  blue_dhide: { id: 'blue_dhide', name: 'Blue Dragonhide', restock: 0, start: 0, tier: 5, regenEvery: 0, quest: true, tint: 0x5b8ee6 },
+  red_dhide: { id: 'red_dhide', name: 'Red Dragonhide', restock: 0, start: 0, tier: 6, regenEvery: 0, quest: true, tint: 0x8a2424 },
+  black_dhide: { id: 'black_dhide', name: 'Black Dragonhide', restock: 0, start: 0, tier: 7, regenEvery: 0, quest: true, tint: 0x6a6a72 },
 };
 
 METALS.forEach((metal, index) => {
@@ -626,9 +630,9 @@ const DHIDE_PIECES = [
 
 const DRAGON_MASKS = [
   { id: 'green', name: 'Green', tint: 0x2d6a32 },
-  { id: 'blue', name: 'Blue', tint: 0x2a4a8a },
+  { id: 'blue', name: 'Blue', tint: 0x5b8ee6 },
   { id: 'red', name: 'Red', tint: 0x8a2424 },
-  { id: 'black', name: 'Black', tint: 0x1c1c1c },
+  { id: 'black', name: 'Black', tint: 0x6a6a72 },
 ];
 
 DRAGON_MASKS.forEach((color, index) => {
@@ -648,7 +652,7 @@ DRAGON_MASKS.forEach((color, index) => {
     previousId,
     unlockNeed: unlockNeed(index),
     tier: index + 1,
-    cost: { materials: { hide: 1 }, gold: index * 2 },
+    cost: { materials: { [`${color.id}_dhide`]: 1 }, gold: index * 2 },
     time: 4 + index,
     price: tierSellPrice(index, { count: DRAGON_MASKS.length, weight: DHIDE_PIECE_WEIGHT.coif ?? 1 }),
     buyers: ['ranger'],
@@ -678,7 +682,7 @@ for (const piece of DHIDE_PIECES) {
       previousId,
       unlockNeed: unlockNeed(index),
       tier: index + 1,
-      cost: { materials: { hide: 1 }, gold: index * 2 },
+      cost: { materials: { [`${color.id}_dhide`]: 1 }, gold: index * 2 },
       time: 4 + index,
       price: tierSellPrice(index, { count: DHIDE.length, weight: DHIDE_PIECE_WEIGHT[piece.id] ?? 1 }),
       buyers: ['ranger'],

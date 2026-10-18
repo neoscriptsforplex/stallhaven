@@ -1692,6 +1692,9 @@ export const MANNEQUIN_WEAR_LIMITS = {
   scaleMax: 3,
 };
 
+/** Closes the gap where the mystic robe bottom sits off the top on a mannequin. */
+export const MYSTIC_ROBE_LIFT = 0.1;
+
 /**
  * Depth thinner than this fraction of the wider axis is a sheet, not a
  * torso. It keeps the uniform scale instead of stretching to the wood.
@@ -1821,6 +1824,7 @@ export function fitMannequinWear(mesh, recipeId) {
       need.center.z - center.z * scale.z,
     );
   }
+  if (recipeId === 'mystic_robe_bottom') mesh.position.y += MYSTIC_ROBE_LIFT;
   return true;
 }
 

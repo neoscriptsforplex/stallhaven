@@ -17,6 +17,8 @@ import {
   rollTreeChopBudget,
   rollTreeRespawnDelay,
   setTreeFallen,
+  startTreeTopple,
+  tickTreeTopple,
   treeCanChop,
   treeSpotKey,
 } from './trees.js';
@@ -144,5 +146,39 @@ describe('felled pine collision and look', () => {
     assert.equal(pine.position.x, placed.x);
     assert.equal(pine.rotation.y, placed.rot);
     assert.equal(pine.scale.x, placed.sx);
+  });
+
+  it('topples the crown for a second, then shows the stump', () => {
+    const shop = buildShop([]).root;
+    const pines = [];
+    shop.traverse((child) => {
+      if (child.name === 'pine' && child.userData?.gardenSide) pines.push(child);
+    });
+    assert.ok(pines.length >= 2, 'need two pines to check shared materials');
+    const pine = pines[0];
+    const other = pines[1];
+    const visual = pine.getObjectByName('pine-visual');
+    const stump = pine.getObjectByName('tree-stump');
+    let otherMat = null;
+    other.getObjectByName('pine-visual')?.traverse((child) => {
+      if (!otherMat && child.isMesh && child.material && !Array.isArray(child.material)) otherMat = child.material;
+    });
+    const otherOpacity = otherMat?.opacity ?? 1;
+    const baseX = visual.rotation.x;
+    assert.equal(startTreeTopple(pine, 10), true);
+    assert.equal(tickTreeTopple(pine, 10.5), false);
+    assert.ok(visual.rotation.x > baseX + 0.5, 'the trunk tips during the fall');
+    assert.equal(visual.visible, true);
+    assert.equal(stump.visible, false);
+    assert.equal(tickTreeTopple(pine, 11), true);
+    assert.equal(pine.userData.toppling, undefined);
+    assert.equal(visual.visible, false);
+    assert.equal(stump.visible, true);
+    assert.equal(visual.rotation.x, baseX);
+    if (otherMat) assert.equal(otherMat.opacity, otherOpacity, 'a shared material must not fade every tree');
+    setTreeFallen(pine, false);
+    assert.equal(visual.visible, true);
+    assert.equal(stump.visible, false);
+    assert.equal(visual.rotation.x, baseX);
   });
 });

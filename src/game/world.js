@@ -37,12 +37,11 @@ import {
   stationForRecipe,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
-import { createFountainFill, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, miningBarAmount, pushLog } from './economy.js';
+import { createFountainFill, gatherFullMessage, grantChoppedLogs, grantMinedMaterial, grantPickedFlax, grantPickedWheat, hasStock, materialIsFull, miningBarAmount, pushLog, storageCap } from './economy.js';
 import { gatherBlockText, meetsGatherLevel, xpForChop, xpForMine, xpForPick } from './skills.js';
 import {
   FURNITURE_FORWARD,
   FURNITURE_SNAP,
-  MATERIAL_CAP,
   furnitureRotateDelta,
   snapGridLines,
   cloneFurniture,
@@ -117,7 +116,10 @@ import {
   isTreeStump,
   reviveDueTrees,
   setTreeFallen,
+  startTreeTopple,
+  tickTreeTopple,
   treeCanChop,
+  treeSpotKey,
 } from './trees.js';
 import {
   LADDER_STAND,
@@ -1720,9 +1722,31 @@ export function createWorld(canvas, state, opts = {}) {
     return true;
   }
 
+  function refuseFull(materialId) {
+    if (!materialId || !materialIsFull(state, materialId)) return false;
+    const text = gatherFullMessage(materialId);
+    pushLog(state, text);
+    pickHandler?.({ type: 'gather-block', text });
+    return true;
+  }
+
+  function findGardenPine(x, z) {
+    const key = treeSpotKey(x, z);
+    let found = null;
+    const visit = (root) => {
+      root?.traverse((child) => {
+        if (found || child.name !== 'pine') return;
+        if (treeSpotKey(child.position.x, child.position.z) === key) found = child;
+      });
+    };
+    visit(architecture);
+    visit(runeField?.root);
+    return found;
+  }
+
   function startMining(materialId, pose) {
     const mat = MATERIALS[materialId];
-    if (!mat || refuseGather(materialId)) return;
+    if (!mat || refuseGather(materialId) || refuseFull(materialId)) return;
     const timing = mineTiming(materialId);
     mining = {
       materialId,
@@ -1745,7 +1769,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pose || !treeCanChop(pose.x, pose.z)) return;
     ensureTreeNode(pose.x, pose.z);
     const materialId = MATERIALS[pose.materialId]?.log ? pose.materialId : 'logs';
-    if (refuseGather(materialId)) return;
+    if (refuseGather(materialId) || refuseFull(materialId)) return;
     mining = {
       materialId,
       name: MATERIALS[materialId]?.name ?? 'Tree',
@@ -1767,6 +1791,7 @@ export function createWorld(canvas, state, opts = {}) {
     const visit = (root) => {
       root?.traverse((child) => {
         if (child.name !== 'pine' || child.userData?.gardenSide == null) return;
+        if (child.userData?.toppling) return;
         const node = ensureTreeNode(child.position.x, child.position.z);
         setTreeFallen(child, !node.alive);
       });
@@ -1778,6 +1803,7 @@ export function createWorld(canvas, state, opts = {}) {
   function fellChoppedTree(x, z, now) {
     const result = completeTreeChop(x, z, now);
     if (!result.felled) return false;
+    startTreeTopple(findGardenPine(x, z), now);
     syncTreeVisuals();
     rebuildNav();
     if (
@@ -1800,7 +1826,19 @@ export function createWorld(canvas, state, opts = {}) {
     rebuildNav();
   }
 
+  function tickTopples(now) {
+    const visit = (root) => {
+      root?.traverse((child) => {
+        if (child.name !== 'pine' || !child.userData?.toppling) return;
+        tickTreeTopple(child, now);
+      });
+    };
+    visit(architecture);
+    visit(runeField?.root);
+  }
+
   function startFountainFill(pose) {
+    if (refuseFull('water')) return;
     if (mining?.mode === 'pick') releaseHeldFlax(true);
     const now = performance.now() / 1000;
     mining = {
@@ -1822,7 +1860,7 @@ export function createWorld(canvas, state, opts = {}) {
   function startPicking(pose) {
     const field = pickCrop(pose?.materialId === 'wheat' ? 'wheat' : 'flax');
     const node = field.nodes.find((item) => item.id === pose?.plantId && item.alive);
-    if (!node || refuseGather(field.materialId)) return;
+    if (!node || refuseGather(field.materialId) || refuseFull(field.materialId)) return;
     mining = {
       materialId: field.materialId,
       name: field.name,
@@ -1849,7 +1887,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (now - mining.startedAt < mining.duration) return;
       const got = intentBus.run({ type: 'gather', mode: 'water' }) || 0;
       if (got <= 0) {
-        pushLog(state, 'Buckets of water are full.');
+        pushLog(state, gatherFullMessage('water'));
         stopMining();
         return;
       }
@@ -1873,7 +1911,7 @@ export function createWorld(canvas, state, opts = {}) {
         pickFlaxNode(field.nodes, mining.plantId, now);
         field.sync();
       } else {
-        pushLog(state, `${field.name} is full.`);
+        pushLog(state, gatherFullMessage(field.materialId));
       }
       stopMining();
       return;
@@ -1887,6 +1925,13 @@ export function createWorld(canvas, state, opts = {}) {
       mode: mining.mode === 'chop' ? 'chop' : 'mine',
       materialId: mining.materialId,
     }) || 0;
+    if (got <= 0) {
+      const text = gatherFullMessage(mining.materialId);
+      pushLog(state, text);
+      pickHandler?.({ type: 'gather-block', text });
+      stopMining();
+      return;
+    }
     if (got > 0) {
       const choppedName = MATERIALS[mining.materialId]?.name ?? 'Logs';
       pushLog(state, mining.mode === 'chop' ? `Chopped ${got} ${choppedName}.` : `Mined ${got} ${mining.name}.`);
@@ -3541,6 +3586,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (puff.position.x > 28) puff.position.x = -28;
     }
     tickTrees(now);
+    tickTopples(now);
     syncDisplays();
     refreshSelection();
     const selected = displays[state.selectedDisplay];
@@ -4348,7 +4394,7 @@ export function createWorld(canvas, state, opts = {}) {
       const mineMode = (mining.mode ?? 'mine') === 'mine';
       const grant = mineMode
         ? miningBarAmount(state, mining.materialId, want)
-        : Math.min(want, Math.max(0, MATERIAL_CAP - have));
+        : Math.min(want, Math.max(0, storageCap(state) - have));
       return {
         materialId: mining.materialId,
         name: mining.name,

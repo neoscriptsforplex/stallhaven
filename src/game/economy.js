@@ -56,7 +56,7 @@ import {
   ESSENCE_DOUBLE_LEVEL,
 } from './skills.js';
 import { RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
-import { emptyHeroQuestState, normalizeHeroQuestState } from './heroesQuests.js';
+import { emptyHeroQuestState, isMaterialFull, materialCap, normalizeHeroQuestState } from './heroesQuests.js';
 import {
   CAULDRON_COST,
   WHEEL_COST,
@@ -67,7 +67,6 @@ import {
   STATION_UNLOCKS,
   CHEST_MAX_LEVEL,
   FURNITURE_FORWARD,
-  MATERIAL_CAP,
   SWAP_PRICE_RATIO,
   chestSlots,
   chestUpgradeCost,
@@ -469,6 +468,21 @@ function skillCatchUp(source) {
   return seeded;
 }
 
+/** Per-material storage cap. Chest level 1 keeps the old flat 250. */
+export function storageCap(state) {
+  return materialCap(state?.chestLevel);
+}
+
+export function materialIsFull(state, materialId) {
+  return isMaterialFull(state?.materials, materialId, storageCap(state));
+}
+
+/** "Logs full." / "Bucket of water full." Shared by chop, mine, pick, fountain, and later fishing. */
+export function gatherFullMessage(materialId) {
+  const name = MATERIALS[materialId]?.name ?? 'Storage';
+  return `${name} full.`;
+}
+
 export function craftBlockReason(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return 'Unknown recipe.';
@@ -507,6 +521,7 @@ export function craftBlockReason(state, recipeId) {
   }
   if (state.crafts[recipeId]) return `${recipe.name} is already in progress.`;
   if (!isMaterialCraft(recipe) && !chestHasSpace(state, recipe.outputCount ?? 1)) return 'The chest is full.';
+  if (isMaterialCraft(recipe) && materialIsFull(state, recipe.outputMaterial)) return 'Storage full.';
   const cost = recipeCost(recipe);
   if ((cost.gold || 0) > state.gold) return `Need ${formatGold(cost.gold)}g more.`;
   for (const [materialId, need] of Object.entries(cost.materials)) {
@@ -580,6 +595,11 @@ export function maxCraftActions(state, recipeId) {
     const out = Math.max(1, recipe.outputCount ?? 1);
     const reserved = (state.crafts[recipeId]?.left ?? 0) * out;
     const free = chestCapacity(state) - chestTotal(state) - reserved;
+    max = Math.min(max, Math.floor(Math.max(0, free) / out));
+  } else if (MATERIALS[recipe.outputMaterial]) {
+    const out = Math.max(1, recipe.outputCount ?? 1);
+    const reserved = (state.crafts[recipeId]?.left ?? 0) * out;
+    const free = storageCap(state) - (state.materials[recipe.outputMaterial] ?? 0) - reserved;
     max = Math.min(max, Math.floor(Math.max(0, free) / out));
   }
   if (!Number.isFinite(max)) return 0;
@@ -1120,7 +1140,8 @@ export function tickMaterials(state, dt) {
     const every = mat.regenEvery;
     if (mat.crafted || !every || every <= 0) continue;
     const cur = state.materials[mat.id] ?? 0;
-    if (cur >= MATERIAL_CAP) {
+    const cap = storageCap(state);
+    if (cur >= cap) {
       state.materialAcc[mat.id] = 0;
       continue;
     }
@@ -1128,7 +1149,7 @@ export function tickMaterials(state, dt) {
     const add = Math.floor(state.materialAcc[mat.id]);
     if (add <= 0) continue;
     state.materialAcc[mat.id] -= add;
-    state.materials[mat.id] = Math.min(MATERIAL_CAP, cur + add);
+    state.materials[mat.id] = Math.min(cap, cur + add);
   }
 }
 
@@ -1186,7 +1207,11 @@ function finishOneCraft(state, recipeId) {
   const recipe = RECIPES[recipeId];
   const n = craftedOutputCount(state, recipe);
   if (isMaterialCraft(recipe) && MATERIALS[recipe.outputMaterial]) {
-    state.materials[recipe.outputMaterial] = (state.materials[recipe.outputMaterial] ?? 0) + n;
+    const cur = state.materials[recipe.outputMaterial] ?? 0;
+    const room = Math.max(0, storageCap(state) - cur);
+    const add = Math.min(n, room);
+    if (add <= 0) return 0;
+    state.materials[recipe.outputMaterial] = cur + add;
   } else {
     addToChest(state, recipeId, n);
   }
@@ -1195,6 +1220,7 @@ function finishOneCraft(state, recipeId) {
   grantShopXp(state, recipeId);
   const skillId = skillForRecipe(recipe, stationForRecipe(recipe));
   if (skillId) state.skills?.addXp(skillId, xpForCraft(recipe));
+  return n;
 }
 
 export function completeCrafts(state, nowSeconds) {
@@ -1203,7 +1229,15 @@ export function completeCrafts(state, nowSeconds) {
     let craft = startCraftState;
     while (craft && nowSeconds - craft.startedAt >= craft.duration) {
       const finishAt = craft.startedAt + craft.duration;
-      finishOneCraft(state, recipeId);
+      const produced = finishOneCraft(state, recipeId);
+      if (produced === 0) {
+        const recipe = RECIPES[recipeId];
+        const remaining = Math.max(0, craft.left ?? 1);
+        if (remaining > 0 && recipe) refundCraftCost(state, recipe, remaining);
+        delete state.crafts[recipeId];
+        craft = null;
+        continue;
+      }
       finished.push(recipeId);
       const remaining = (craft.left ?? 1) - 1;
       if (remaining > 0) {
@@ -1337,7 +1371,7 @@ export function chestDisplayList(state, kind) {
 
 function grantMaterial(state, materialId, amount) {
   const cur = state.materials[materialId] ?? 0;
-  const add = Math.min(MATERIAL_CAP - cur, Math.max(0, Math.round(Number(amount) || 0)));
+  const add = Math.min(storageCap(state) - cur, Math.max(0, Math.round(Number(amount) || 0)));
   if (add <= 0) return 0;
   state.materials[materialId] = cur + add;
   return add;
@@ -1360,7 +1394,7 @@ export function miningBarAmount(state, materialId, amount = mineYield(materialId
   if (!isMinedMaterial(materialId)) return 0;
   const want = minedGrantAmount(state, materialId, amount);
   const have = Math.max(0, state?.materials?.[materialId] ?? 0);
-  return Math.min(want, Math.max(0, MATERIAL_CAP - have));
+  return Math.min(want, Math.max(0, storageCap(state) - have));
 }
 
 export function grantChoppedLogs(state, amount = CHOP_YIELD, materialId = 'logs') {
@@ -1896,6 +1930,7 @@ function chestReadyIds(state) {
 export function canRestock(state, materialId) {
   const mat = MATERIALS[materialId];
   if (!mat || isCraftedMaterial(materialId) || mat.quest || !mat.restock || mat.restock <= 0) return false;
+  if (materialIsFull(state, materialId)) return false;
   return state.gold >= mat.restock;
 }
 
@@ -1903,7 +1938,10 @@ export function restock(state, materialId) {
   const mat = MATERIALS[materialId];
   if (!canRestock(state, materialId)) return false;
   state.gold -= mat.restock;
-  state.materials[materialId] += 1;
+  if (grantMaterial(state, materialId, 1) <= 0) {
+    state.gold += mat.restock;
+    return false;
+  }
   return true;
 }
 
@@ -1937,8 +1975,12 @@ export function sellToCustomer(state, recipeId, gold = RECIPES[recipeId]?.price 
 export function buyFromCustomer(state, materialId, price) {
   const mat = MATERIALS[materialId];
   if (!mat || isCraftedMaterial(materialId) || mat.quest || price < 0 || state.gold < price) return false;
+  if (materialIsFull(state, materialId)) return false;
   state.gold -= price;
-  state.materials[materialId] += 1;
+  if (grantMaterial(state, materialId, 1) <= 0) {
+    state.gold += price;
+    return false;
+  }
   return true;
 }
 

@@ -74,16 +74,19 @@ export function ownedMaterialsKey(materials) {
   return ownedMaterials(materials).map((mat) => `${mat.id}:${mat.count}`).join('|');
 }
 
-export function materialsDrawerHtml(materials) {
+export function materialsDrawerHtml(materials, cap = 250) {
+  const limit = Math.max(1, Math.round(Number(cap) || 250));
   const rows = ownedMaterials(materials);
   if (!rows.length) return '<p class="materials-empty">No materials yet.</p>';
-  return rows.map((mat) => (
-    `<div class="mat materials-row" role="listitem" data-owned="${escapeHtml(mat.id)}">` +
-    `<span class="mat-swatch" style="background:${mat.swatch}" aria-hidden="true"></span>` +
-    `<span class="mat-name">${escapeHtml(mat.name)}</span>` +
-    `<span class="mat-count">×${formatGold(mat.count)}</span>` +
-    '</div>'
-  )).join('');
+  return rows.map((mat) => {
+    const full = mat.count >= limit;
+    return `<div class="mat materials-row${full ? ' is-full' : ''}" role="listitem" data-owned="${escapeHtml(mat.id)}">` +
+      `<span class="mat-swatch" style="background:${mat.swatch}" aria-hidden="true"></span>` +
+      `<span class="mat-name">${escapeHtml(mat.name)}</span>` +
+      `<span class="mat-count">×${formatGold(mat.count)}</span>` +
+      (full ? `<button type="button" class="sf-full" data-storage-full="${escapeHtml(mat.id)}" title="Storage full">FULL</button>` : '') +
+      '</div>';
+  }).join('');
 }
 
 /**

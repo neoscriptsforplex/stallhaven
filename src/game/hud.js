@@ -101,6 +101,8 @@ import {
   sellToCustomer,
   shopProgress,
   maxCraftActions,
+  materialIsFull,
+  storageCap,
   busyCraftId,
   cancelCrafts,
   startCraft,
@@ -409,9 +411,14 @@ export function bindHud(root, state, world) {
         const focus = recipe.id === craftFocusId ? ' is-focus' : '';
         const star = mastered ? '<span class="mastery-star" title="Mastered">★</span>' : '';
         const affordable = locked ? 0 : maxCraftActions(state, recipe.id);
+        const storageFull = !locked && Boolean(recipe.outputMaterial) && materialIsFull(state, recipe.outputMaterial);
+        const fullTitle = storageFull ? ' title="Storage full"' : '';
+        const fullActions = storageFull
+          ? `<button type="button" class="sf-full" data-storage-full="${escCraft(recipe.outputMaterial)}" title="Storage full">FULL</button><button type="button" class="sf-link" data-storage-upgrade>Upgrade chest</button>`
+          : '';
         return `
-          <article class="craft-row${locked ? ' is-locked' : ''}${focus}" data-craft-row="${recipe.id}">
-            <button type="button" class="craft${locked ? ' is-locked' : ''}${mastered ? ' is-mastered' : ''}${focus}" data-craft="${recipe.id}">
+          <article class="craft-row${locked ? ' is-locked' : ''}${storageFull ? ' is-full' : ''}${focus}" data-craft-row="${recipe.id}">
+            <button type="button" class="craft${locked ? ' is-locked' : ''}${mastered ? ' is-mastered' : ''}${focus}" data-craft="${recipe.id}"${storageFull ? ' disabled title="Storage full"' : ''}>
               <strong>${star}${recipe.name}</strong>
               <span class="meta">${lockText}</span>
               ${mats ? `<span class="craft-mats-line">${mats}</span>` : ''}
@@ -419,10 +426,11 @@ export function bindHud(root, state, world) {
               <span class="craft-bar" aria-hidden="true"><i data-bar="${recipe.id}"></i></span>
             </button>
             <div class="craft-qty">
-              <button type="button" data-craft-qty="1" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>1×</button>
-              <button type="button" data-craft-qty="5" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>5×</button>
-              <button type="button" data-craft-qty="max" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}>Max</button>
+              <button type="button" data-craft-qty="1" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}${fullTitle}>1×</button>
+              <button type="button" data-craft-qty="5" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}${fullTitle}>5×</button>
+              <button type="button" data-craft-qty="max" data-craft-for="${recipe.id}"${locked || affordable < 1 ? ' disabled' : ''}${fullTitle}>Max</button>
             </div>
+            ${fullActions}
           </article>
         `;
       }).join('');
@@ -742,6 +750,17 @@ export function bindHud(root, state, world) {
   }
 
   function onCraftClick(event) {
+    const full = event.target.closest('[data-storage-full]');
+    if (full) {
+      openStoragePop(full, full.dataset.storageFull);
+      return;
+    }
+    const upgrade = event.target.closest('[data-storage-upgrade]');
+    if (upgrade) {
+      closeStoragePop();
+      openUpgrade();
+      return;
+    }
     const qty = event.target.closest('[data-craft-qty]');
     if (qty) {
       const recipeId = qty.dataset.craftFor;
@@ -984,7 +1003,40 @@ export function bindHud(root, state, world) {
     buyBtn.disabled = !canUpgradeChest(state);
   }
 
+  let storagePop = null;
+
+  function closeStoragePop() {
+    storagePop?.remove();
+    storagePop = null;
+  }
+
+  function openStoragePop(anchor, materialId) {
+    closeStoragePop();
+    if (!anchor) return;
+    const name = MATERIALS[materialId]?.name ?? 'Storage';
+    const have = Math.max(0, Math.round(Number(state.materials?.[materialId]) || 0));
+    const cap = storageCap(state);
+    const pop = document.createElement('div');
+    pop.className = 'sf-pop';
+    pop.innerHTML = `<p class="sf-pop-title"><b>${escCraft(name)}</b> <span>${formatGold(have)} / ${formatGold(cap)}</span></p>`
+      + '<p>Storage is full. Upgrade the chest to hold more.</p>'
+      + '<button type="button" class="sf-upgrade" data-storage-upgrade>Upgrade chest</button>'
+      + '<p class="sf-pop-meta">250 per chest level, up to 2,500.</p>';
+    document.body.appendChild(pop);
+    const rect = anchor.getBoundingClientRect();
+    const width = pop.offsetWidth || 270;
+    const height = pop.offsetHeight || 120;
+    const left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.left + rect.width / 2 - width / 2));
+    const top = Math.max(8, rect.top - height - 12);
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
+    const arrow = Math.min(width - 16, Math.max(16, rect.left + rect.width / 2 - left));
+    pop.style.setProperty('--arrow-x', `${arrow}px`);
+    storagePop = pop;
+  }
+
   function openUpgrade() {
+    closeStoragePop();
     closeChest();
     closeCraft();
     closeTrade();
@@ -2907,6 +2959,13 @@ export function bindHud(root, state, world) {
   });
 
   document.addEventListener('click', (event) => {
+    const popUpgrade = event.target.closest('.sf-pop [data-storage-upgrade]');
+    if (popUpgrade) {
+      closeStoragePop();
+      openUpgrade();
+      return;
+    }
+    if (storagePop && !event.target.closest('.sf-pop, [data-storage-full]')) closeStoragePop();
     const btn = event.target.closest('button');
     if (!btn) return;
     if (
@@ -2935,8 +2994,18 @@ export function bindHud(root, state, world) {
       const progress = craftProgress(state, recipe.id, now);
       const locked = !isUnlocked(state, recipe.id);
       const affordable = maxCraftActions(state, recipe.id);
+      const storageFull = !locked && Boolean(recipe.outputMaterial) && materialIsFull(state, recipe.outputMaterial);
       btn.classList.toggle('is-locked', locked);
       row?.classList.toggle('is-locked', locked);
+      row?.classList.toggle('is-full', storageFull);
+      if (storageFull) {
+        btn.disabled = true;
+        btn.title = 'Storage full';
+      } else if (btn.title === 'Storage full') {
+        btn.disabled = false;
+        btn.removeAttribute('title');
+      }
+      if (row) syncStorageFullActions(row, recipe, storageFull);
       if (progress) {
         btn.classList.add('is-busy');
         const batch = progress.total > 1 ? `${progress.done + 1}/${progress.total} · ` : '';
@@ -2949,6 +3018,8 @@ export function bindHud(root, state, world) {
       }
       for (const qty of row?.querySelectorAll('[data-craft-qty]') ?? []) {
         qty.disabled = locked || affordable < 1;
+        if (storageFull) qty.title = 'Storage full';
+        else if (qty.title === 'Storage full') qty.removeAttribute('title');
       }
     }
   }
@@ -3151,11 +3222,40 @@ export function bindHud(root, state, world) {
 
   function syncOwnedMaterials() {
     if (!ownedMaterialsEl) return;
-    const key = ownedMaterialsKey(state.materials);
+    const key = `${ownedMaterialsKey(state.materials)}@${storageCap(state)}`;
     if (key === ownedKey) return;
     ownedKey = key;
-    ownedMaterialsEl.innerHTML = materialsDrawerHtml(state.materials);
+    ownedMaterialsEl.innerHTML = materialsDrawerHtml(state.materials, storageCap(state));
   }
+
+  function syncStorageFullActions(row, recipe, storageFull) {
+    const existing = row.querySelector('[data-storage-full]');
+    const link = row.querySelector('.sf-link[data-storage-upgrade]');
+    if (!storageFull) {
+      existing?.remove();
+      link?.remove();
+      return;
+    }
+    if (existing) return;
+    const fullBtn = document.createElement('button');
+    fullBtn.type = 'button';
+    fullBtn.className = 'sf-full';
+    fullBtn.dataset.storageFull = recipe.outputMaterial;
+    fullBtn.title = 'Storage full';
+    fullBtn.textContent = 'FULL';
+    const upgradeBtn = document.createElement('button');
+    upgradeBtn.type = 'button';
+    upgradeBtn.className = 'sf-link';
+    upgradeBtn.dataset.storageUpgrade = '';
+    upgradeBtn.textContent = 'Upgrade chest';
+    row.append(fullBtn, upgradeBtn);
+  }
+
+  ownedMaterialsEl?.addEventListener('click', (event) => {
+    const full = event.target.closest('[data-storage-full]');
+    if (!full) return;
+    openStoragePop(full, full.dataset.storageFull);
+  });
 
   function materialsObstacles() {
     const nodes = [

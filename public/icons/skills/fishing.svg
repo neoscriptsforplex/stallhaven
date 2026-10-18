@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Fishing</title>
+  <path d="M5 27L22 4" stroke="#1c120c" stroke-width="3.6" stroke-linecap="round"/>
+  <path d="M5 27L22 4" stroke="#a8743e" stroke-width="1.9" stroke-linecap="round"/>
+  <path d="M22 4c3 3 4 8 4 14" stroke="#1c120c" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+  <path d="M26 18v3a2 2 0 0 1-4 0" stroke="#1c120c" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+  <path d="M9.5 21.5l2.5 1.8" stroke="#1c120c" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M9.5 21.5l2.5 1.8" stroke="#6f7680" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M12 27.5c2.5-3 6-3.6 9-1.8l3-2v5.6l-3-2c-3 1.8-6.5 1.2-9-1.8z" fill="#d98a72" stroke="#1c120c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="15" cy="26.9" r=".8" fill="#1c120c"/>
+</svg>

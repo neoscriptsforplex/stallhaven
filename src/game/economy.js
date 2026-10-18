@@ -9,6 +9,8 @@ import {
   canDisplayOn,
   isCraftedMaterial,
   isMinedMaterial,
+  isFishMaterial,
+  fishYield,
   isMaterialCraft,
   CHOP_YIELD,
   FLAX_YIELD,
@@ -123,7 +125,7 @@ export {
   DEFAULT_BRIGHTNESS,
 };
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 /** Ore counts were copied onto bars before save version 11. Later saves must not run that again. */
 const ORE_BAR_MIGRATION_VERSION = 11;
 export const OLD_DEFAULT_DISPLAYS = 8;
@@ -153,6 +155,24 @@ function migrateLegacyMetalBars(next, data) {
     next.materials[barId] = next.materials[metal.id] ?? 0;
   }
   next.materials.bow_string = 0;
+}
+
+/**
+ * v13: cooking needs raw fish from the pond, and the bought generic "Fish" is
+ * gone. Move any saved Fish onto Raw salmon (the level-1 catch) so a stocked
+ * kitchen keeps cooking.
+ */
+function migrateGenericFish(next, data) {
+  if ((data.version ?? 0) >= 13) return;
+  // Old saves never had the 3 starting salmon; give them exactly their old Fish.
+  const raw = data.materials?.fish;
+  const old = typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, raw) : 0;
+  const saved = data.materials?.raw_salmon;
+  const cur = typeof saved === 'number' && Number.isFinite(saved) ? Math.max(0, Math.round(saved)) : 0;
+  const level = typeof data.chestLevel === 'number' && Number.isFinite(data.chestLevel)
+    ? data.chestLevel
+    : next.chestLevel;
+  next.materials.raw_salmon = Math.min(materialCap(level), cur + Math.round(old));
 }
 
 export function skyboxId(id) {
@@ -1482,6 +1502,12 @@ export function grantChoppedLogs(state, amount = CHOP_YIELD, materialId = 'logs'
   return grantMaterial(state, id, amount);
 }
 
+/** One completed catch bar at a pond fishing spot. Caps like every other gathered good. */
+export function grantCaughtFish(state, materialId, amount = fishYield(materialId)) {
+  if (!isFishMaterial(materialId)) return 0;
+  return grantMaterial(state, materialId, amount);
+}
+
 export function grantPickedFlax(state, amount = FLAX_YIELD) {
   return grantMaterial(state, 'flax', amount);
 }
@@ -1654,6 +1680,7 @@ export function applyState(state, data) {
       if (data.materials.guam == null) next.materials.guam = extra;
       else next.materials.guam = (next.materials.guam ?? 0) + extra;
     }
+    migrateGenericFish(next, data);
   }
   if (data.chest && typeof data.chest === 'object') {
     for (const [id, count] of Object.entries(data.chest)) {

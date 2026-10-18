@@ -3,6 +3,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   EXPANSION_PADS,
   FOUNTAIN,
+  FISHING_SPOTS,
+  POND,
+  POND_DOCK,
   ROOM_D,
   ROOM_W,
   SHOP_DOOR_LINTEL,
@@ -50,7 +53,7 @@ import {
   doorwayFloor,
   wallVineMounts,
 } from './layout.js';
-import { MATERIALS, METALS, chopYield } from './catalog.js';
+import { MATERIALS, METALS, chopYield, fishYield } from './catalog.js';
 import { createMagicSparkles } from './magic-tree-sparkles.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
@@ -60,6 +63,7 @@ import { prepareDungeonRockMaterials } from './upload.js';
 import { attachSpinner } from './stationSpin.js';
 import { attachFountainWater } from './fountainWater.js';
 import { attachPortalJelly } from './portalJelly.js';
+import { attachPondWater } from './pondWater.js';
 import { attachFurnaceFx } from './furnaceFx.js';
 import { attachRangeFx } from './rangeFx.js';
 import { attachLoomFx } from './loomFx.js';
@@ -2599,6 +2603,86 @@ function addFountain(root, x, z) {
   return group;
 }
 
+/**
+ * Fishing pond: public/models/pond/pond.obj (OSRS units, centre origin, y = 0
+ * lawn) at x0.01125, or a small procedural stand-in. Water animation rides on
+ * userData.fountainFlow so tickFountainWater updates it.
+ */
+export function buildPond() {
+  const group = new THREE.Group();
+  group.name = 'pond';
+  const bundled = getBundledLook('pond');
+  if (bundled) {
+    const body = bundled.clone(true);
+    body.name = 'pond-body';
+    applyOsrsScale(body);
+    body.traverse((child) => {
+      if (!child.isMesh) return;
+      child.receiveShadow = true;
+      child.castShadow = child.name !== 'water' && child.name !== 'bank' && child.name !== 'lilies';
+    });
+    group.add(body);
+  } else {
+    group.add(buildProceduralPond());
+  }
+  const spots = FISHING_SPOTS.map((spot) => ({ x: spot.x - POND.x, z: spot.z - POND.z }));
+  group.userData.fountainFlow = { fx: attachPondWater(group, { rx: POND.rx, rz: POND.rz, spots }), lastNow: null };
+  return group;
+}
+
+function buildProceduralPond() {
+  const group = new THREE.Group();
+  group.name = 'pond-body';
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 28),
+    new THREE.MeshStandardMaterial({ color: 0x2e6a8e, roughness: 0.3 }),
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.scale.set(POND.rx, POND.rz, 1);
+  water.position.y = 0.03;
+  group.add(water);
+  const rim = addShadow(new THREE.Mesh(
+    new THREE.TorusGeometry(1, 0.06, 4, 28),
+    new THREE.MeshStandardMaterial({ color: 0x6f6a5e, roughness: 0.9 }),
+  ));
+  rim.rotation.x = -Math.PI / 2;
+  rim.scale.set(POND.rx + 0.08, POND.rz + 0.08, 1);
+  rim.position.y = 0.04;
+  group.add(rim);
+  const deck = addShadow(new THREE.Mesh(
+    new THREE.BoxGeometry(POND_DOCK.maxX - POND_DOCK.minX, 0.03, POND_DOCK.maxZ - POND_DOCK.minZ),
+    new THREE.MeshStandardMaterial({ color: 0x8a6238, roughness: 0.9 }),
+  ));
+  deck.position.set(
+    (POND_DOCK.minX + POND_DOCK.maxX) / 2 - POND.x,
+    POND_DOCK.top - 0.015,
+    (POND_DOCK.minZ + POND_DOCK.maxZ) / 2 - POND.z,
+  );
+  group.add(deck);
+  return group;
+}
+
+function addPond(root) {
+  const group = buildPond();
+  group.position.set(POND.x, 0, POND.z);
+  for (const spot of FISHING_SPOTS) {
+    // Invisible click volume over each bubbling spot, like the boulder picks.
+    const pick = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.62, 0.62, 0.5, 10),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    );
+    pick.position.set(spot.x - POND.x, 0.25, spot.z - POND.z);
+    pick.userData.kind = 'fishing_spot';
+    pick.userData.name = spot.name;
+    pick.userData.materialId = spot.materialId;
+    pick.userData.x = spot.x;
+    pick.userData.z = spot.z;
+    group.add(pick);
+  }
+  root.add(group);
+  return group;
+}
+
 const FLOWER_TINTS = [0xffffff, 0xffb7c8, 0xffd56a, 0xf3efe6, 0xd98ad4, 0xff8a5b];
 
 function buildFlowerCluster(rand) {
@@ -2728,6 +2812,7 @@ function addGarden(root, cells, expansionIds = [], furniture = null) {
 
   addCobblePath(root, expansionIds);
   if (keepFountain(expansionIds)) addFountain(root, FOUNTAIN.x, FOUNTAIN.z);
+  addPond(root);
 
   const rand = randAt(1337 + cells.length * 17);
   resetPlantedTrunks();
@@ -3197,6 +3282,17 @@ export function flaxInspect() {
 
 export function wheatInspect() {
   return { name: 'Wheat', blurb: 'A clump of wheat. Left-click to walk over and pick it. You get 1 wheat.' };
+}
+
+export function fishingInspect(materialId) {
+  const spot = FISHING_SPOTS.find((item) => item.materialId === materialId);
+  const mat = MATERIALS[materialId];
+  if (!spot || !mat) return { name: 'Fishing spot', blurb: 'Bubbles in the pond. Left-click to walk over and fish.' };
+  const n = fishYield(materialId);
+  return {
+    name: spot.name,
+    blurb: `Fish rise here. Left-click to walk over and fish. Each catch gives ${n} ${mat.name}.`,
+  };
 }
 
 export function boulderInspect(materialId) {

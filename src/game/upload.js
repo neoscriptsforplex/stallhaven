@@ -412,6 +412,7 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'wheat-plant', folder: 'wheat' },
   { id: 'rock', folder: 'rock' },
   { id: 'fountain', folder: 'fountain', rev: FOUNTAIN_DUMP_REV },
+  { id: 'pond', folder: 'pond' },
   { id: 'skeleton', folder: 'skeleton' },
   { id: 'portal', folder: 'portal' },
   { id: 'altar-air', folder: 'altar-air' },
@@ -628,6 +629,11 @@ async function loadBundledGltf(file) {
 /** Fetch character_rigged.glb from the same models roots as the OBJ player. */
 export async function loadBundledRiggedPlayer() {
   return loadBundledGltf('player/character_rigged.glb');
+}
+
+/** Rig's fishing rod. Missing file keeps the mine-pose fallback. */
+export async function loadBundledFishingRod() {
+  return loadBundledGltf('player/fishing_rod.glb');
 }
 
 /** Fetch goblin_rigged.glb. Throws so the caller can keep the old goblin. */

@@ -41,6 +41,8 @@ import {
   proceduralPlayerFitHeight,
   setHeldTool,
   setGatherClip,
+  mountFishingRod,
+  FISHING_ROD_GRIP,
   updateMinePose,
   updateWalkPose,
   setBundledLook,
@@ -3197,7 +3199,7 @@ describe('bundled prop swaps', () => {
 
   it('fits bundled weapon, armour, ammo, and tool dumps to the current mesh size', async () => {
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
-    assert.equal(LUKE_MODEL_FOLDERS.length, 216);
+    assert.equal(LUKE_MODEL_FOLDERS.length, 221);
     for (const item of LUKE_MODEL_FOLDERS) {
       assert.equal(byId[item.id], item.folder, item.id);
       const slug = item.folder.split('/').pop();
@@ -3561,10 +3563,57 @@ describe('shop props', () => {
       updateWalkPose(rigged, true, 0.05, 1);
       const walkScale = 1.85 / (0.834 * loco.modelScale);
       assert.ok(Math.abs(loco.walk.timeScale - walkScale) < 1e-6);
+      assert.ok(Math.abs(loco.actions.fish.getClip().duration - 4) < 1e-3);
+      assert.ok(Math.abs(loco.actions.cast.getClip().duration - 1.6) < 1e-3);
     } finally {
       setBundledLook('runite_pickaxe', null);
       setBundledLook('runite_hatchet', null);
     }
+  });
+
+  it('hangs the fishing rod on the right hand and casts before the fish loop', async () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), '../../public/models/player');
+    const load = (name) => new Promise((resolve, reject) => {
+      const glb = readFileSync(join(root, name));
+      new GLTFLoader().parse(
+        glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength),
+        '',
+        resolve,
+        reject,
+      );
+    });
+    const [player, rodFile] = await Promise.all([
+      load('character_rigged.glb'),
+      load('fishing_rod.glb'),
+    ]);
+    assert.ok(rodFile.scene.getObjectByName('FishingRodGrip'));
+    assert.ok(rodFile.scene.getObjectByName('FishingLine'));
+    assert.ok(rodFile.scene.getObjectByName('FishingBob'));
+    const rigged = wrapRiggedShopkeeper(player, { height: 1.7, fishingRod: rodFile });
+    const mounted = rigged.userData.rod;
+    assert.equal(mounted?.parent?.name, 'Hand_R');
+    assert.equal(mounted.visible, false);
+    assert.ok(Math.abs(mounted.position.x - (-0.0089)) < 1e-4);
+    assert.ok(Math.abs(mounted.position.y - (-0.0579)) < 1e-4);
+    assert.ok(Math.abs(mounted.position.z - 0.0045) < 1e-4);
+    const grip = FISHING_ROD_GRIP;
+    assert.ok(Math.abs(mounted.quaternion.x - grip.x) < 1e-6);
+    assert.ok(Math.abs(mounted.quaternion.y - grip.y) < 1e-6);
+    assert.ok(Math.abs(mounted.quaternion.z - grip.z) < 1e-6);
+    assert.ok(Math.abs(mounted.quaternion.w - grip.w) < 1e-6);
+    assert.equal(mountFishingRod(rigged, rodFile), mounted, 'a second mount leaves the first rod');
+    setHeldTool(rigged, 'rod');
+    assert.equal(mounted.visible, true);
+    assert.equal(rigged.userData.pickaxe.visible, false);
+    assert.equal(setGatherClip(rigged, 'fish'), true);
+    const loco = rigged.userData.clipLocomotion;
+    assert.equal(loco.castPending, true);
+    updateWalkPose(rigged, false, 0.2, 1);
+    assert.equal(loco.mode, 'cast');
+    assert.equal(rigged.userData.fishingLine.visible, false);
+    setGatherClip(rigged, null);
+    setHeldTool(rigged, null);
+    assert.equal(mounted.visible, false);
   });
 
   it('seats the pickaxe head on the wooden haft and holds it in the right hand', () => {

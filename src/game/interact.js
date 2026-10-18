@@ -1,9 +1,9 @@
 import { FLAX_ARRIVE } from './catalog.js';
 import { PLAYER_RADIUS, isWalkable, planPlayerWalk, playerObstacles } from './nav.js';
-import { FOUNTAIN, furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, PORTAL_TARGET_HEIGHT, TREE_TRUNK_RADIUS } from './layout.js';
+import { FOUNTAIN, fishingSpotById, furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, PORTAL_TARGET_HEIGHT, TREE_TRUNK_RADIUS } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'sawmill', 'portal'];
-export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder', 'fountain', 'farming_patch']);
+export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder', 'fountain', 'farming_patch', 'fishing_spot']);
 
 function stationHit(kind, height, pickY) {
   const { hw, hd } = furnitureHalfSize(kind);
@@ -584,6 +584,20 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
       }
     }
     return { action: 'blocked', dest: spots[0], face };
+  }
+  if (kind === 'fishing_spot') {
+    // One fixed stand per spot (shore or dock end), facing the water, like the ladder.
+    const spot = fishingSpotById(pose.materialId ?? pose.id);
+    if (!spot) return { action: 'blocked' };
+    const dest = { x: spot.stand.x, z: spot.stand.z };
+    const face = spot.face;
+    if (isNearPoint(from, dest, 0.45)) return { action: 'open', dest, face };
+    const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+    const end = path[path.length - 1];
+    if (end && Math.hypot(end.x - dest.x, end.z - dest.z) < 0.3) {
+      return { action: 'walk', path, dest, face };
+    }
+    return { action: 'blocked', dest, face };
   }
   if (kind === 'fountain') {
     const reach = (FOUNTAIN.radius ?? 0.7) + 0.65;

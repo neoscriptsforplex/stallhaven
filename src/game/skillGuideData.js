@@ -23,7 +23,7 @@
 
 import { RECIPES } from './catalog.js';
 import { MELEE_SMITH_LEVELS, RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
-import { ESSENCE_DOUBLE_LEVEL, MINING_LEVELS, WOODCUTTING_LEVELS } from './skills.js';
+import { ESSENCE_DOUBLE_LEVEL, FISHING_LEVELS, MINING_LEVELS, WOODCUTTING_LEVELS } from './skills.js';
 
 export const TIER = {
   bronze: '#c07a3e',
@@ -124,6 +124,20 @@ const woodcutting = {
       { lv: WOODCUTTING_LEVELS.yew, name: 'Yew logs', desc: 'Chop yew trees', icon: 'log', tint: '#6e7a3a' },
       { lv: WOODCUTTING_LEVELS.magic, name: 'Magic logs', desc: 'Chop magic trees', icon: 'log', tint: '#5fb7d8' },
     ],
+  }],
+};
+
+/** Pond fishing spots. Levels come from the live FISHING_LEVELS table. */
+const fishing = {
+  tabs: [{
+    id: 'pond', label: 'Pond',
+    rows: [
+      ['raw_salmon', 'Raw salmon', '#d98a72'],
+      ['raw_lobster', 'Raw lobster', '#3d5a6e'],
+      ['raw_monkfish', 'Raw monkfish', '#8c7a62'],
+      ['raw_shark', 'Raw shark', '#7d8c98'],
+      ['raw_anglerfish', 'Raw anglerfish', '#6e4038'],
+    ].map(([id, name, tint]) => ({ lv: FISHING_LEVELS[id], name, desc: 'Fish at the pond', icon: 'food', tint })),
   }],
 };
 
@@ -312,5 +326,5 @@ const construction = {
 };
 
 export const SKILL_GUIDES = {
-  farming, fletching, herblore, woodcutting, smithing, mining, cooking, crafting, construction, runecrafting,
+  farming, fletching, herblore, woodcutting, smithing, mining, fishing, cooking, crafting, construction, runecrafting,
 };

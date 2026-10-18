@@ -1828,6 +1828,10 @@ export function fitMannequinWear(mesh, recipeId) {
  * Wizard and mystic robe tops stand edge-on to that front; a quarter turn
  * puts the chest toward +Z. Splitbark tops and dragon masks already face
  * along Z, but the outer surface points -Z (away from the customer).
+ * Bronze through rune chainbodies present the flat sealed back to +Z.
+ * A half-turn shows the chain. The dragon chainbody already faces +Z.
+ * Plateskirts and the mystic and splitbark robe bottoms already show their
+ * patterned side to the front, so they are left alone.
  * Baked into the ware mesh. Displays apply previewBasePose on a parent and
  * must not apply this yaw again.
  */
@@ -1836,6 +1840,7 @@ export function wareDisplayYaw(id) {
   if (id === 'mystic_robe_top') return Math.PI / 2;
   if (id === 'splitbark_robe_top') return Math.PI;
   if (String(id).endsWith('_dragon_mask')) return Math.PI;
+  if (String(id).endsWith('_chainbody') && id !== 'dragon_chainbody') return Math.PI;
   return 0;
 }
 

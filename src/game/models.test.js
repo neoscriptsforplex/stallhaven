@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -3162,6 +3162,35 @@ describe('bundled prop swaps', () => {
       setBundledLook('ore-essence', null);
       setBundledLook('ore-bronze', null);
       setBundledLook('skeleton', null);
+    }
+  });
+
+  it('resolves every gear folder to public/models/gear/<id>', () => {
+    const gearRoot = join(modelsRoot, 'gear');
+    const dirs = readdirSync(gearRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+    const byId = Object.fromEntries(LUKE_MODEL_FOLDERS.map((item) => [item.id, item.folder]));
+    const used = new Set(Object.values(byId));
+    for (const name of dirs) {
+      assert.equal(existsSync(join(gearRoot, name, `${name}.obj`)), true, name);
+      assert.equal(existsSync(join(gearRoot, name, `${name}.mtl`)), true, name);
+    }
+    for (const item of LUKE_MODEL_FOLDERS) {
+      if (!item.folder.startsWith('gear/')) continue;
+      const own = item.id.replaceAll('_', '-');
+      if (!dirs.includes(own)) continue;
+      // Fire battlestaff shares the mystic fire staff mesh on purpose.
+      if (item.id === 'fire_battlestaff') {
+        assert.equal(item.folder, 'gear/mystic-fire-staff');
+        continue;
+      }
+      assert.equal(item.folder, `gear/${own}`, item.id);
+      assert.equal(byId[item.id], `gear/${own}`);
+    }
+    for (const name of dirs) {
+      if (name === 'fire-battlestaff') continue;
+      assert.equal(used.has(`gear/${name}`), true, `unused gear folder ${name}`);
     }
   });
 

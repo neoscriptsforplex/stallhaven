@@ -789,6 +789,13 @@ addRecipe({
   tint: 0xc4a05a,
 });
 
+/**
+ * Cloth multiplier by magic-armour set (wizard → ancient).
+ * Piece bases stay 1 (hat, robe bottom, boots, gloves) or 2 (robe top).
+ * Wizard is unchanged. Each later set doubles.
+ */
+export const MAGE_CLOTH_TIER = [1, 2, 4, 8, 16, 32];
+
 function addMagicArmour({
   id,
   name,
@@ -804,6 +811,7 @@ function addMagicArmour({
   weightKey,
 }) {
   const set = MAGIC_SETS[setIndex];
+  const clothCost = cloth * (MAGE_CLOTH_TIER[setIndex] ?? 1);
   addRecipe({
     id,
     name,
@@ -818,7 +826,7 @@ function addMagicArmour({
     previousId,
     unlockNeed: unlockAt ?? unlockNeed(lineIndex),
     tier: lineIndex + 1,
-    cost: { materials: { cloth }, gold: setIndex * 2 },
+    cost: { materials: { cloth: clothCost }, gold: setIndex * 2 },
     time: 4 + setIndex,
     price: tierSellPrice(setIndex, { count: MAGIC_SETS.length, weight: MAGIC_ARMOUR_WEIGHT[weightKey] ?? 1 }),
     buyers: ['hedgemage'],

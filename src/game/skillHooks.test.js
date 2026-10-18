@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { RECIPES, SHOP, recipeCost, recipeList, stationForRecipe } from './catalog.js';
+import { MAGE_CLOTH_TIER, RECIPES, SHOP, recipeCost, recipeList, stationForRecipe } from './catalog.js';
 import {
   SAWMILL_COST,
   applyState,
@@ -17,6 +17,9 @@ import {
 } from './economy.js';
 import { furnitureBuildParts } from './layout.js';
 import {
+  GATHER_NODES,
+  MINING_LEVELS,
+  WOODCUTTING_LEVELS,
   gatherBlockText,
   gatherInspectTitle,
   meetsGatherLevel,
@@ -29,7 +32,7 @@ import {
   xpForMine,
   xpForPick,
 } from './skills.js';
-import { nextUnlockLabel } from './skillLevels.js';
+import { MELEE_SMITH_LEVELS, nextUnlockLabel } from './skillLevels.js';
 
 function placeStation(state, id) {
   const pose = SHOP[id];
@@ -161,13 +164,13 @@ describe('skill xp hooks', () => {
     assert.equal(xpForChop('magic_logs'), 365);
     assert.equal(xpForMine('runite'), 505);
     assert.equal(xpForMine('dragon'), 645);
-    assert.equal(gatherBlockText('runite'), 'You need a Mining level of 85 to mine this rock.');
+    assert.equal(gatherBlockText('runite'), 'You need a Mining level of 40 to mine this rock.');
     assert.equal(gatherBlockText('oak_logs'), 'You need a Woodcutting level of 15 to chop this Oak tree.');
     assert.equal(gatherBlockText('yew_logs'), 'You need a Woodcutting level of 60 to chop this Yew tree.');
     assert.equal(gatherBlockText('wheat'), 'You need a Farming level of 5 to pick this wheat.');
     assert.equal(gatherInspectTitle('Logs', 'logs'), 'Logs');
     assert.equal(gatherInspectTitle('Oak logs', 'oak_logs'), 'Oak tree · Requires Woodcutting 15');
-    assert.match(nextUnlockLabel('mining', 1), /Next unlock: Iron rock \(Lv 15\)/);
+    assert.match(nextUnlockLabel('mining', 1), /Next unlock: Iron rock \(Lv 5\)/);
     reachLevel(state, 'farming', 5);
     assert.equal(meetsGatherLevel(state, 'wheat'), true);
   });
@@ -183,13 +186,13 @@ describe('skill xp hooks', () => {
       },
     }), true);
     assert.equal(old.skills.getXp('mining'), 4 * xpForMine('bronze') + 2 * xpForMine('iron'));
-    assert.equal(old.skills.getLevel('smithing'), RECIPES.bronze_platebody.requires.level);
+    assert.equal(old.skills.getLevel('smithing'), RECIPES.bronze_pickaxe.requires.level);
     assert.equal(old.skills.getLevel('crafting'), RECIPES.staff.requires.level);
     assert.equal(isUnlocked(old, 'iron_sword'), true);
     assert.equal(isUnlocked(old, 'runite_platebody'), false);
     assert.ok(old.skills.getLevel('smithing') < 99);
     assert.match(old.log[0], /Skills have arrived!/);
-    assert.match(old.log[0], /Smithing 19/);
+    assert.match(old.log[0], /Smithing 7/);
     assert.match(old.log[0], /Crafting 12/);
 
     const current = createState();
@@ -200,6 +203,46 @@ describe('skill xp hooks', () => {
     assert.equal(applyState(next, saved), true);
     assert.equal(next.skills.getLevel('smithing'), 1);
     assert.equal(next.log.some((line) => /Skills have arrived/.test(line)), false);
+  });
+
+  it('uses the metal tables for mining, melee smithing, and woodcutting', () => {
+    const metals = ['bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon'];
+    metals.forEach((metal, index) => {
+      const node = GATHER_NODES.find((item) => item.id === metal);
+      assert.equal(node.level, MINING_LEVELS[metal], metal);
+      assert.equal(RECIPES[`${metal}_scimitar`].requires.level, MELEE_SMITH_LEVELS[index], metal);
+      assert.equal(RECIPES[`${metal}_platebody`]?.requires.level ?? MELEE_SMITH_LEVELS[index], MELEE_SMITH_LEVELS[index]);
+      assert.equal(RECIPES[`${metal}_dagger`].xp, RECIPES[`smelt_${metal}`].xp, `${metal} xp unchanged`);
+    });
+    assert.equal(RECIPES.dragon_full_helm, undefined);
+    assert.equal(RECIPES.bronze_hatchet.requires.level, 2);
+    assert.equal(RECIPES.iron_nails.requires.level, 15);
+    assert.equal(RECIPES.air_rune.requires.level, 1);
+    assert.equal(RECIPES.water_rune.requires.level, 5);
+    assert.equal(RECIPES.earth_rune.requires.level, 9);
+    assert.equal(RECIPES.fire_rune.requires.level, 14);
+    assert.equal(RECIPES.water_rune.xp, 9);
+    assert.equal(RECIPES.earth_rune.xp, 6);
+    assert.equal(stationForRecipe(RECIPES.water_rune), 'altar-water');
+    assert.equal(WOODCUTTING_LEVELS.teak, 35);
+    assert.equal(WOODCUTTING_LEVELS.mahogany, 50);
+    assert.equal(GATHER_NODES.find((node) => node.id === 'yew_logs').level, 60);
+    assert.equal(GATHER_NODES.find((node) => node.id === 'magic_logs').level, 75);
+    assert.equal(gatherBlockText('magic_logs'), 'You need a Woodcutting level of 75 to chop this Magic tree.');
+  });
+
+  it('charges more cloth on later mage armour tiers', () => {
+    assert.deepEqual(MAGE_CLOTH_TIER, [1, 2, 4, 8, 16, 32]);
+    assert.equal(recipeCost(RECIPES.wizard_hat).materials.cloth, 1);
+    assert.equal(recipeCost(RECIPES.wizard_robe).materials.cloth, 2);
+    assert.equal(recipeCost(RECIPES.mystic_robe_top).materials.cloth, 4);
+    assert.equal(recipeCost(RECIPES.mystic_robe_bottom).materials.cloth, 2);
+    assert.equal(recipeCost(RECIPES.splitbark_hat).materials.cloth, 4);
+    assert.equal(recipeCost(RECIPES.battlemage_robe_top).materials.cloth, 16);
+    assert.equal(recipeCost(RECIPES.lunar_gloves).materials.cloth, 16);
+    assert.equal(recipeCost(RECIPES.ancient_robe_top).materials.cloth, 64);
+    assert.equal(recipeCost(RECIPES.ancient_hat).materials.cloth, 32);
+    assert.equal(recipeCost(RECIPES.ancient_staff).materials.cloth, 100);
   });
 
   it('stamps a level and an xp amount on every recipe', () => {

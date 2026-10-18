@@ -162,24 +162,52 @@ export const XP_RATES = Object.freeze({
  * Gathering nodes: level lock, XP per completed bar, and the inspect name.
  * Rocks, trees, flax, and wheat. The fountain is not a skill action.
  */
+/**
+ * Woodcutting levels. Teak and mahogany are not choppable yet; the numbers
+ * are kept so a later tree can use the same table.
+ */
+export const WOODCUTTING_LEVELS = Object.freeze({
+  logs: 1,
+  oak: 15,
+  willow: 30,
+  teak: 35,
+  maple: 45,
+  mahogany: 50,
+  yew: 60,
+  magic: 75,
+});
+
+/** Mining rock unlocks. Clay and essence stay at 1. XP is unchanged. */
+export const MINING_LEVELS = Object.freeze({
+  hard_clay: 1,
+  essence: 1,
+  bronze: 1,
+  iron: 5,
+  steel: 10,
+  mithril: 20,
+  adamant: 30,
+  runite: 40,
+  dragon: 60,
+});
+
 export const GATHER_NODES = Object.freeze([
   { id: 'flax', name: 'Flax', skill: 'farming', level: 1, xp: 12 },
   { id: 'wheat', name: 'Wheat', skill: 'farming', level: 5, xp: 15 },
-  { id: 'logs', name: 'Pine tree', skill: 'woodcutting', level: 1, xp: 9 },
-  { id: 'oak_logs', name: 'Oak tree', skill: 'woodcutting', level: 15, xp: 19 },
-  { id: 'willow_logs', name: 'Willow tree', skill: 'woodcutting', level: 30, xp: 39 },
-  { id: 'maple_logs', name: 'Maple tree', skill: 'woodcutting', level: 45, xp: 82 },
-  { id: 'yew_logs', name: 'Yew tree', skill: 'woodcutting', level: 60, xp: 175 },
-  { id: 'magic_logs', name: 'Magic tree', skill: 'woodcutting', level: 75, xp: 365 },
-  { id: 'hard_clay', name: 'Clay rock', skill: 'mining', level: 1, xp: 8 },
-  { id: 'essence', name: 'Essence rock', skill: 'mining', level: 1, xp: 8 },
-  { id: 'bronze', name: 'Bronze rock', skill: 'mining', level: 1, xp: 8 },
-  { id: 'iron', name: 'Iron rock', skill: 'mining', level: 15, xp: 16 },
-  { id: 'steel', name: 'Steel rock', skill: 'mining', level: 30, xp: 33 },
-  { id: 'mithril', name: 'Mithril rock', skill: 'mining', level: 50, xp: 89 },
-  { id: 'adamant', name: 'Adamantite rock', skill: 'mining', level: 70, xp: 240 },
-  { id: 'runite', name: 'Runite rock', skill: 'mining', level: 85, xp: 505 },
-  { id: 'dragon', name: 'Dragon rock', skill: 'mining', level: 90, xp: 645 },
+  { id: 'logs', name: 'Pine tree', skill: 'woodcutting', level: WOODCUTTING_LEVELS.logs, xp: 9 },
+  { id: 'oak_logs', name: 'Oak tree', skill: 'woodcutting', level: WOODCUTTING_LEVELS.oak, xp: 19 },
+  { id: 'willow_logs', name: 'Willow tree', skill: 'woodcutting', level: WOODCUTTING_LEVELS.willow, xp: 39 },
+  { id: 'maple_logs', name: 'Maple tree', skill: 'woodcutting', level: WOODCUTTING_LEVELS.maple, xp: 82 },
+  { id: 'yew_logs', name: 'Yew tree', skill: 'woodcutting', level: WOODCUTTING_LEVELS.yew, xp: 175 },
+  { id: 'magic_logs', name: 'Magic tree', skill: 'woodcutting', level: WOODCUTTING_LEVELS.magic, xp: 365 },
+  { id: 'hard_clay', name: 'Clay rock', skill: 'mining', level: MINING_LEVELS.hard_clay, xp: 8 },
+  { id: 'essence', name: 'Essence rock', skill: 'mining', level: MINING_LEVELS.essence, xp: 8 },
+  { id: 'bronze', name: 'Bronze rock', skill: 'mining', level: MINING_LEVELS.bronze, xp: 8 },
+  { id: 'iron', name: 'Iron rock', skill: 'mining', level: MINING_LEVELS.iron, xp: 16 },
+  { id: 'steel', name: 'Steel rock', skill: 'mining', level: MINING_LEVELS.steel, xp: 33 },
+  { id: 'mithril', name: 'Mithril rock', skill: 'mining', level: MINING_LEVELS.mithril, xp: 89 },
+  { id: 'adamant', name: 'Adamantite rock', skill: 'mining', level: MINING_LEVELS.adamant, xp: 240 },
+  { id: 'runite', name: 'Runite rock', skill: 'mining', level: MINING_LEVELS.runite, xp: 505 },
+  { id: 'dragon', name: 'Dragon rock', skill: 'mining', level: MINING_LEVELS.dragon, xp: 645 },
 ]);
 
 const GATHER_BY_ID = Object.fromEntries(GATHER_NODES.map((node) => [node.id, node]));
@@ -226,7 +254,7 @@ export function meetsGatherLevel(state, materialId) {
   return skillLevelOf(state, req.skill) >= req.level;
 }
 
-/** "You need a Mining level of 85 to mine this rock." */
+/** "You need a Mining level of 40 to mine this rock." */
 export function gatherBlockText(materialId) {
   const req = gatherLevelRequirement(materialId);
   if (!req) return '';
@@ -240,7 +268,7 @@ export function gatherBlockText(materialId) {
 
 /**
  * Inspect title. Level 1 nodes keep their own name. Higher nodes read
- * "Runite rock · Requires Mining 85".
+ * "Runite rock · Requires Mining 40".
  */
 export function gatherInspectTitle(fallbackName, materialId) {
   const req = gatherLevelRequirement(materialId);

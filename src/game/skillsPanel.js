@@ -56,7 +56,7 @@ function tileHtml(skill, iconBase) {
 }
 
 /** Inner markup of #skills-dock. */
-export function skillsDockHtml({ iconBase = defaultIconBase() } = {}) {
+export function skillsDockHtml({ iconBase = defaultIconBase(), hint = 'Tap a skill to see its XP.' } = {}) {
   return `
     <header class="skills-head">
       <span class="skills-grip" aria-hidden="true"></span>
@@ -68,7 +68,7 @@ export function skillsDockHtml({ iconBase = defaultIconBase() } = {}) {
       <p class="skills-total" data-skills-total>Total level: 10</p>
     </div>
     <div class="skill-tip" id="skills-tip" data-skill-tip role="status" aria-live="polite">
-      <p class="skill-tip-hint" data-tip-hint>Tap a skill to see its XP.</p>
+      <p class="skill-tip-hint" data-tip-hint>${hint}</p>
       <div class="skill-tip-body" data-tip-body hidden>
         <p class="skill-tip-name"><img data-tip-icon alt="" width="20" height="20" /><span data-tip-name>Skill</span><span class="skill-tip-level" data-tip-level>Lv 1</span></p>
         <dl class="skill-tip-rows">
@@ -119,10 +119,15 @@ export function bindSkillsPanel({
   onOpen = null,
   onClose = null,
   nextUnlock = null,
+  onSkillClick = null,
   portraitQuery = PORTRAIT_QUERY,
 } = {}) {
   if (!dock || !skills) throw new Error('bindSkillsPanel needs a #skills-dock element and a skills tracker');
-  dock.innerHTML = skillsDockHtml({ iconBase });
+  dock.innerHTML = skillsDockHtml({
+    iconBase,
+    hint: onSkillClick ? 'Tap a skill to open its guide.' : undefined,
+  });
+  dock.classList.toggle('has-guide', Boolean(onSkillClick));
 
   const tip = dock.querySelector('[data-skill-tip]');
   const tipHint = tip.querySelector('[data-tip-hint]');
@@ -254,7 +259,14 @@ export function bindSkillsPanel({
 
   dock.addEventListener('click', (event) => {
     const tile = event.target.closest('[data-skill]');
-    if (tile) select(tile.dataset.skill);
+    if (!tile) return;
+    if (onSkillClick) {
+      // Hover keeps the tooltip; click opens the guide instead of pinning it.
+      pinned = null;
+      onSkillClick(tile.dataset.skill, tile);
+    } else {
+      select(tile.dataset.skill);
+    }
   });
 
   // Mouse hover only. Touch uses tap (click) so a tap never flashes two states.

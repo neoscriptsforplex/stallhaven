@@ -162,6 +162,9 @@ import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 import { mountDisplayBasePose } from './craftpreview.js';
+import { browseWait, nextSpawnTime, pickBrowseStops, planCustomerSpawn, rescheduleKing } from './customerSim.js';
+import { intentBus } from './intents.js';
+import { createRemoteKeepers } from './remoteKeepers.js';
 
 const CUSTOMER_SPEED = 1.35;
 const PLAYER_SPEED = 1.85;
@@ -285,6 +288,12 @@ function buildClouds() {
 }
 
 export function createWorld(canvas, state, opts = {}) {
+  // Injectable randomness for the customer simulation (co-op tests pass a seeded one).
+  const rng = typeof opts.rng === 'function' ? opts.rng : Math.random;
+  intentBus.bind(state);
+  // 'local': this browser runs travellers (solo). 'remote': a co-op room sends them.
+  let customerAuthority = 'local';
+  let localMoveListener = null;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -951,6 +960,21 @@ export function createWorld(canvas, state, opts = {}) {
   let outlineKey = '';
 
   const customers = [];
+  const remoteKeepers = createRemoteKeepers({
+    scene,
+    speed: PLAYER_SPEED,
+    buildMesh: (player) => {
+      const mesh = buildShopkeeper({ appearance: player.appearance ?? state.appearance });
+      mesh.scale.setScalar(PLAYER_WORLD_SCALE);
+      return mesh;
+    },
+    planWalk: (from, to, scene) => (scene === 'shop' ? planPlayerWalk(from, to, state, PLAYER_RADIUS) : [to]),
+    walkToward: (actor, goal, dt, speed) => walkToward(actor, goal, dt, speed),
+    idle: (actor, dt, now) => {
+      syncStance(actor.mesh);
+      updateWalkPose(actor.mesh, false, dt, now);
+    },
+  });
   let nextSpawnAt = FIRST_CUSTOMER_DELAY;
   let firstSpawn = true;
   let customerSerial = 1;
@@ -1648,7 +1672,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   function fillFromFountain() {
     stopMining();
-    const got = grantFountainWater(state, FOUNTAIN_WATER_YIELD);
+    const got = intentBus.run({ type: 'gather', mode: 'water' }) || 0;
     if (got > 0) pushLog(state, `Filled ${got} Buckets of water.`);
     else pushLog(state, 'Buckets of water are full.');
     pickHandler?.({ type: 'drew-water', amount: got });
@@ -1682,9 +1706,8 @@ export function createWorld(canvas, state, opts = {}) {
     if (mining.mode === 'pick') {
       releaseHeldFlax(false);
       const field = pickCrop(mining.crop);
-      const got = field.grant(state, field.yield);
+      const got = intentBus.run({ type: 'gather', mode: 'pick', materialId: field.materialId }) || 0;
       if (got > 0) {
-        state.skills?.addXp('farming', xpForPick(field.materialId));
         pushLog(state, `Picked ${got} ${field.name}.`);
         pickHandler?.({
           type: 'picked',
@@ -1703,12 +1726,12 @@ export function createWorld(canvas, state, opts = {}) {
       stopMining();
       return;
     }
-    const got = mining.mode === 'chop'
-      ? grantChoppedLogs(state, barYield(mining), mining.materialId)
-      : grantMinedMaterial(state, mining.materialId, barYield(mining));
+    const got = intentBus.run({
+      type: 'gather',
+      mode: mining.mode === 'chop' ? 'chop' : 'mine',
+      materialId: mining.materialId,
+    }) || 0;
     if (got > 0) {
-      if (mining.mode === 'chop') state.skills?.addXp('woodcutting', xpForChop(mining.materialId));
-      else state.skills?.addXp('mining', xpForMine(mining.materialId));
       const choppedName = MATERIALS[mining.materialId]?.name ?? 'Logs';
       pushLog(state, mining.mode === 'chop' ? `Chopped ${got} ${choppedName}.` : `Mined ${got} ${mining.name}.`);
       pickHandler?.({
@@ -1765,6 +1788,7 @@ export function createWorld(canvas, state, opts = {}) {
     const goal = path[path.length - 1];
     moveMarker.position.set(goal.x, 0.1, goal.z);
     moveMarker.visible = true;
+    localMoveListener?.({ x: goal.x, z: goal.z, scene: sceneMode });
     return true;
   }
 
@@ -3092,11 +3116,7 @@ export function createWorld(canvas, state, opts = {}) {
   ];
 
   function browseStops() {
-    const first = BROWSE_SPOTS[Math.floor(Math.random() * BROWSE_SPOTS.length)];
-    const rest = BROWSE_SPOTS.filter((spot) => spot !== first);
-    const second = rest[Math.floor(Math.random() * rest.length)];
-    const count = Math.random() < 0.45 ? 1 : 2;
-    return count === 1 ? [first] : [first, second];
+    return pickBrowseStops(BROWSE_SPOTS, rng);
   }
 
   function customersShown() {
@@ -3112,28 +3132,12 @@ export function createWorld(canvas, state, opts = {}) {
     if (!customersShown()) return;
     const inShop = customers.filter((actor) => actor.state !== 'leave').length;
     if (inShop >= MAX_CUSTOMERS) return;
-    if (!state.kingRoaldAt) state.kingRoaldAt = scheduleKingRoald(state.playTime ?? 0);
     const kingHere = customers.some((actor) => actor.typeId === 'kingroald' && actor.state !== 'leave');
-    const wantKing = !kingHere && (state.playTime ?? 0) >= (state.kingRoaldAt ?? Infinity);
-    const recipeId = wantKing ? mostExpensiveChestId(state) : null;
-    if (wantKing && recipeId) {
-      spawnActor('kingroald', now, {
-        recipeId,
-        gold: RECIPES[recipeId].price,
-        offer: null,
-        royal: true,
-      });
-      return;
-    }
-    if (wantKing && !recipeId) {
-      state.kingRoaldAt = (state.playTime ?? 0) + 90;
-    }
-    const types = Object.keys(CUSTOMERS).filter((id) => id !== 'kingroald');
-    const typeId = firstSpawn ? 'pilgrim' : types[Math.floor(Math.random() * types.length)];
-    firstSpawn = false;
-    const request = decideRequest(typeId, Math.random, state);
-    if (!request) return;
-    spawnActor(typeId, now, request);
+    const plan = planCustomerSpawn(state, { rng, firstSpawn, inShop, kingHere });
+    if (!plan) return;
+    if (plan.usedFirst) firstSpawn = false;
+    if (!plan.typeId || !plan.request) return;
+    spawnActor(plan.typeId, now, plan.request);
   }
 
   function makeCustomerMesh(typeId, seed, lookId) {
@@ -3157,9 +3161,10 @@ export function createWorld(canvas, state, opts = {}) {
     return buyerCobbleRoute(state.expansions ?? []);
   }
 
-  function spawnActor(typeId, now, request) {
+  function spawnActor(typeId, now, request, forcedId = null) {
+    if (Number.isInteger(forcedId)) customerSerial = forcedId;
     const lookId = nextBuyerLookId(typeId);
-    const mesh = makeCustomerMesh(typeId, customerSerial + Math.random(), lookId);
+    const mesh = makeCustomerMesh(typeId, customerSerial + rng(), lookId);
     mesh.userData.pick.userData.customerId = customerSerial;
     const route = buyerRoute();
     mesh.position.set(route.spawn.x, 0, route.spawn.z);
@@ -3189,7 +3194,7 @@ export function createWorld(canvas, state, opts = {}) {
     customerSerial += 1;
     actor.mesh.visible = customersShown();
     customers.push(actor);
-    nextSpawnAt = now + SPAWN_GAP_MIN + Math.random() * (SPAWN_GAP_MAX - SPAWN_GAP_MIN);
+    nextSpawnAt = nextSpawnTime(now, rng);
     if (typeId === 'kingroald') {
       pushLog(state, `King Roald arrives, seeking ${RECIPES[request.recipeId].name}.`);
     } else {
@@ -3218,8 +3223,8 @@ export function createWorld(canvas, state, opts = {}) {
     if (actor.browsing) {
       actor.state = 'browse';
       actor.path = [];
-      actor.waitUntil = now + 1.1 + Math.random() * 1.6;
-      actor.mesh.rotation.y = Math.random() * Math.PI * 2;
+      actor.waitUntil = now + browseWait(rng);
+      actor.mesh.rotation.y = rng() * Math.PI * 2;
       return;
     }
     actor.path = [];
@@ -3259,8 +3264,8 @@ export function createWorld(canvas, state, opts = {}) {
     }
     setSpeechText(actor.mesh, sold ? 'Thanks!' : farewell);
     if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = false;
-    if (actor.typeId === 'kingroald') {
-      state.kingRoaldAt = scheduleKingRoald(state.playTime ?? 0);
+    if (actor.typeId === 'kingroald' && customerAuthority === 'local') {
+      rescheduleKing(state, rng);
     }
     actor.state = 'leave';
     const route = buyerRoute();
@@ -3284,7 +3289,7 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function updateCustomers(dt, now) {
-    if (now >= nextSpawnAt) spawnCustomer(now);
+    if (customerAuthority === 'local' && now >= nextSpawnAt) spawnCustomer(now);
     for (let i = customers.length - 1; i >= 0; i -= 1) {
       const actor = customers[i];
       if (actor.state === 'enter') {
@@ -3309,7 +3314,7 @@ export function createWorld(canvas, state, opts = {}) {
         actor.mesh.userData.ring.material.color.setHex(
           actor.id === tradingId ? 0xf0d27a : have ? 0x8ecf4a : 0xe8b45a,
         );
-        if (now >= actor.waitUntil) {
+        if (customerAuthority === 'local' && now >= actor.waitUntil) {
           pushLog(state, `${customerName(actor.typeId)} grows tired and leaves.`);
           dismissCustomer(actor, false);
         }
@@ -3359,6 +3364,7 @@ export function createWorld(canvas, state, opts = {}) {
       outlineEdgeMat.opacity = 0.82 + Math.sin(now * 3.1) * 0.16;
       outlineBoxMat.opacity = 0.72 + Math.sin(now * 2.4) * 0.18;
     }
+    remoteKeepers.tick(dt, now, sceneMode);
     if (sceneMode === 'shop') {
       updateCustomers(dt, now);
       updateGoblins(dt, now);
@@ -3693,6 +3699,51 @@ export function createWorld(canvas, state, opts = {}) {
     getCustomer(id) {
       return customers.find((c) => c.id === id) ?? null;
     },
+    /** Co-op: 'remote' stops local spawns and timeouts; the room sends travellers instead. */
+    setCustomerAuthority(mode) {
+      const next = mode === 'remote' ? 'remote' : 'local';
+      if (next === customerAuthority) return;
+      customerAuthority = next;
+      for (const actor of customers) scene.remove(actor.mesh);
+      customers.length = 0;
+      tradingId = null;
+      nextSpawnAt = (lastNow || 0) + FIRST_CUSTOMER_DELAY;
+    },
+    getCustomerAuthority() {
+      return customerAuthority;
+    },
+    /** Co-op: draw a traveller the room spawned. */
+    spawnRemoteCustomer(customer) {
+      if (!customer || customers.some((c) => c.id === customer.id)) return null;
+      if (!CUSTOMERS[customer.typeId] || !RECIPES[customer.request?.recipeId]) return null;
+      const keep = customerSerial;
+      spawnActor(customer.typeId, lastNow || 0, customer.request, customer.id);
+      customerSerial = Math.max(keep, customer.id + 1);
+      return customers.find((c) => c.id === customer.id) ?? null;
+    },
+    /** Co-op: a traveller left in the room (sold, bought, refused, timeout). */
+    removeRemoteCustomer(id, reason = 'timeout') {
+      const actor = customers.find((c) => c.id === id);
+      if (!actor || actor.state === 'leave') return false;
+      if (reason === 'sold') {
+        actor.pendingCarry = takeWareMesh(actor.requestRecipeId);
+        dismissCustomer(actor, true);
+        syncDisplays();
+      } else if (reason === 'bought') {
+        dismissCustomer(actor, false, 'Sold.');
+      } else {
+        dismissCustomer(actor, false);
+      }
+      return true;
+    },
+    /** Co-op: called with { x, z, scene } whenever the local keeper starts a walk. */
+    onLocalMove(fn) {
+      localMoveListener = typeof fn === 'function' ? fn : null;
+    },
+    getLocalKeeperPose() {
+      return { x: shopkeeper.position.x, z: shopkeeper.position.z, scene: sceneMode };
+    },
+    remoteKeepers: remoteKeepers.api,
     listCustomers() {
       return waitingLine();
     },

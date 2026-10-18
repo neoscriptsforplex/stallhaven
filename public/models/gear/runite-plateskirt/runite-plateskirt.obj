@@ -93,7 +93,9 @@ usemtl c21
 f 17 20 21
 usemtl c23
 f 18 22 9
+usemtl c23
 f 9 22 23
+usemtl c23
 f 9 23 24
 usemtl c24
 f 24 23 25
@@ -107,7 +109,9 @@ usemtl c28
 f 13 28 29
 usemtl c29
 f 13 29 19
+usemtl c29
 f 29 28 16
+usemtl c29
 f 29 16 30
 usemtl c30
 f 8 9 31
@@ -129,3 +133,71 @@ usemtl c37
 f 36 38 39
 usemtl c38
 f 40 37 14
+usemtl c39
+f 11 2 8
+usemtl c40
+f 2 4 3
+usemtl c41
+f 2 12 4
+usemtl c41
+f 2 14 12
+usemtl c42
+f 2 15 14
+usemtl c43
+f 2 16 15
+usemtl c44
+f 2 10 16
+usemtl c44
+f 2 11 10
+usemtl c45
+f 36 14 13
+usemtl c45
+f 14 37 40
+usemtl c46
+f 37 39 38
+usemtl c47
+f 37 36 39
+usemtl c45
+f 37 14 36
+usemtl c48
+f 13 9 24
+usemtl c49
+f 24 10 25
+usemtl c50
+f 24 25 23
+usemtl c51
+f 22 27 26
+usemtl c52
+f 22 26 18
+usemtl c53
+f 17 21 20
+usemtl c54
+f 17 20 19
+usemtl c55
+f 17 19 29
+usemtl c50
+f 29 30 16
+usemtl c49
+f 29 16 28
+usemtl c49
+f 29 28 13
+usemtl c53
+f 29 13 24
+usemtl c53
+f 29 24 23
+usemtl c56
+f 29 23 22
+usemtl c52
+f 29 22 18
+usemtl c53
+f 29 18 17
+usemtl c57
+f 9 8 33
+usemtl c57
+f 9 33 32
+usemtl c58
+f 32 35 34
+usemtl c59
+f 32 34 31
+usemtl c57
+f 32 31 9

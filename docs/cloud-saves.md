@@ -38,3 +38,9 @@ VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=<anon key printe
 5. Email sending: the built-in mailer only sends a few emails per hour and is meant for testing. For real players, set up custom SMTP (for example Resend's or Brevo's free tier) under Authentication → SMTP, then raise the rate limits under Authentication → Rate limits.
 6. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Project Settings → API) to the site's build, for example as GitHub Actions secrets or variables for the Pages build. Never add the service_role key.
 7. Note: free projects pause after about a week with no activity. Sign-ins and syncs fail while a project is paused (local saves keep working), and it has to be resumed from the dashboard. Upgrade or keep the project active to avoid this.
+
+## Live project status (set up 18 Oct 2026)
+- Project `pvihgwdiwpbhsmuytulj` (named "Stallhaven", free plan, region ap-northeast-1 Tokyo). The URL and anon key are in the `<meta>` tags in `index.html`.
+- The migration is applied. Site URL and redirect URLs are set, email sign-in and signups are on, and the code length is 6.
+- **Not done yet: the custom email template.** Supabase only allows template edits on the free plan once custom SMTP is set up, so emails currently use Supabase's default "Your sign-in link" email: link only, no 6-digit code. Set up SMTP, then paste `supabase/templates/magic_link.html` into the Magic link **and** Confirm signup templates.
+- The built-in mailer sends at most 2 emails per hour for the whole project.

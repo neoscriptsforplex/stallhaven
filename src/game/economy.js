@@ -12,6 +12,7 @@ import {
   isMaterialCraft,
   CHOP_YIELD,
   FLAX_YIELD,
+  FOUNTAIN_DURATION,
   FOUNTAIN_WATER_YIELD,
   WHEAT_YIELD,
   mineYield,
@@ -1332,9 +1333,40 @@ export function grantPickedWheat(state, amount = WHEAT_YIELD) {
   return grantMaterial(state, 'wheat', amount);
 }
 
-/** One fountain click. Caps at the material limit, same as other gathered goods. */
+/** One completed fountain fill. Caps at the material limit, same as other gathered goods. */
 export function grantFountainWater(state, amount = FOUNTAIN_WATER_YIELD) {
   return grantMaterial(state, 'water', amount);
+}
+
+/** Gather session for drawing buckets. The bar matches mining, flax, and woodcutting. */
+export function createFountainFill(now = 0) {
+  return {
+    mode: 'fill',
+    materialId: 'water',
+    name: 'Buckets of water',
+    verb: 'Filling',
+    startedAt: now,
+    duration: FOUNTAIN_DURATION,
+    yield: FOUNTAIN_WATER_YIELD,
+  };
+}
+
+/**
+ * Advance a fountain fill. Before the bar finishes, nothing is granted.
+ * A finished bar adds the yield and restarts. A full inventory ends the loop.
+ */
+export function advanceFountainFill(state, session, now) {
+  if (!session || now - session.startedAt < session.duration) {
+    return { ready: false, got: 0, full: false, session };
+  }
+  const got = grantFountainWater(state, session.yield ?? FOUNTAIN_WATER_YIELD);
+  if (got <= 0) return { ready: true, got: 0, full: true, session: null };
+  return {
+    ready: true,
+    got,
+    full: false,
+    session: { ...session, startedAt: now },
+  };
 }
 
 /** Quest reward. Adds Dwarven Plans straight into materials (id `dwarven_plans`). */

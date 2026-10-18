@@ -43,6 +43,9 @@ import {
   chopTiming,
   FLAX_DURATION,
   FLAX_YIELD,
+  FOUNTAIN_DURATION,
+  FOUNTAIN_WATER_YIELD,
+  MINE_DURATION,
   MINE_YIELD,
   MINE_YIELDS,
   CLAY_MINE_DURATION,
@@ -89,6 +92,8 @@ import {
   chestDisplayList,
   grantAncientPlans,
   grantChoppedLogs,
+  advanceFountainFill,
+  createFountainFill,
   grantFountainWater,
   grantMinedMaterial,
   grantPickedFlax,
@@ -1197,8 +1202,44 @@ describe('material regen', () => {
     assert.equal(canRestock(state, 'water'), false);
     assert.equal(grantFountainWater(state), 5);
     assert.equal(state.materials.water, 5);
+    assert.equal(FOUNTAIN_WATER_YIELD, 5);
+    assert.equal(FOUNTAIN_DURATION, MINE_DURATION);
+    assert.equal(FOUNTAIN_DURATION, FLAX_DURATION);
     state.materials.water = 248;
     assert.equal(grantFountainWater(state), 2);
+    assert.equal(state.materials.water, 250);
+  });
+
+  it('fills buckets on a gathering bar and keeps drawing until water is full', () => {
+    const state = createState();
+    state.materials.water = 0;
+    const session = createFountainFill(10);
+    assert.equal(session.mode, 'fill');
+    assert.equal(session.verb, 'Filling');
+    assert.equal(session.duration, FOUNTAIN_DURATION);
+    assert.equal(session.yield, 5);
+    const early = advanceFountainFill(state, session, 10 + FOUNTAIN_DURATION - 0.01);
+    assert.equal(early.ready, false);
+    assert.equal(early.session, session);
+    assert.equal(state.materials.water, 0);
+    const first = advanceFountainFill(state, session, 10 + FOUNTAIN_DURATION + 0.02);
+    assert.equal(first.ready, true);
+    assert.equal(first.got, 5);
+    assert.equal(first.full, false);
+    assert.equal(state.materials.water, 5);
+    assert.equal(first.session.startedAt, 10 + FOUNTAIN_DURATION + 0.02);
+    const second = advanceFountainFill(state, first.session, first.session.startedAt + FOUNTAIN_DURATION + 0.02);
+    assert.equal(second.got, 5);
+    assert.equal(state.materials.water, 10);
+    state.materials.water = 248;
+    const partial = advanceFountainFill(state, second.session, second.session.startedAt + FOUNTAIN_DURATION + 0.02);
+    assert.equal(partial.got, 2);
+    assert.equal(partial.full, false);
+    assert.equal(state.materials.water, 250);
+    const full = advanceFountainFill(state, partial.session, partial.session.startedAt + FOUNTAIN_DURATION + 0.02);
+    assert.equal(full.got, 0);
+    assert.equal(full.full, true);
+    assert.equal(full.session, null);
     assert.equal(state.materials.water, 250);
   });
 

@@ -12,6 +12,8 @@ import {
   isMaterialCraft,
   CHOP_YIELD,
   FLAX_YIELD,
+  FOUNTAIN_WATER_YIELD,
+  WHEAT_YIELD,
   mineYield,
   SHOP,
   SHELF_SLOT_COUNT,
@@ -36,6 +38,12 @@ import {
   stationForRecipe,
   scheduleKingRoald,
 } from './catalog.js';
+import {
+  createSkills,
+  levelRequirementText,
+  meetsLevelRequirement,
+  skillLevelOf,
+} from './skills.js';
 import {
   CAULDRON_COST,
   WHEEL_COST,
@@ -195,15 +203,25 @@ export function applyCheat(state, raw) {
     if (state.furniture) {
       for (const station of STATION_UNLOCKS) state.furniture[station.id] = null;
     }
-    if (state.materials) state.materials.flax = MATERIALS.flax.start;
-    if (state.materialAcc) state.materialAcc.flax = 0;
+    if (state.materials) {
+      state.materials.flax = MATERIALS.flax.start;
+      state.materials.wheat = MATERIALS.wheat.start;
+    }
+    if (state.materialAcc) {
+      state.materialAcc.flax = 0;
+      state.materialAcc.wheat = 0;
+    }
     return 'noob';
   }
   if (code === 'freshstart') {
+    const skills = state.skills;
     const next = createState();
     for (const key of Object.keys(next)) {
+      if (key === 'skills') continue;
       state[key] = next[key];
     }
+    if (skills?.reset) skills.reset();
+    else state.skills = next.skills;
     state.crafts = {};
     state.ready = [];
     state.log = [];
@@ -307,6 +325,7 @@ export function createState() {
     playTime: 0,
     kingRoaldAt: scheduleKingRoald(0),
     log: [],
+    skills: createSkills(),
   };
 }
 
@@ -376,6 +395,9 @@ export function craftBlockReason(state, recipeId) {
   if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) {
     return 'Place a Potter Wheel from Build to turn soft clay into clay.';
   }
+  if (!meetsLevelRequirement(recipe, (skillId) => skillLevelOf(state, skillId))) {
+    return levelRequirementText(recipe);
+  }
   if (!isUnlocked(state, recipeId)) {
     const remain = unlockRemaining(state, recipeId);
     const prev = recipe.previousId ? RECIPES[recipe.previousId] : null;
@@ -437,6 +459,7 @@ export function maxCraftActions(state, recipeId) {
   if (stationForRecipe(recipe) === 'loom' && !ownsStation(state, 'loom')) return 0;
   if (stationForRecipe(recipe) === 'fletch' && !ownsStation(state, 'fletch')) return 0;
   if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) return 0;
+  if (!meetsLevelRequirement(recipe, (skillId) => skillLevelOf(state, skillId))) return 0;
   if (!isUnlocked(state, recipeId)) return 0;
   const cost = recipeCost(recipe);
   let max = Infinity;
@@ -1116,11 +1139,28 @@ export function grantPickedFlax(state, amount = FLAX_YIELD) {
   return grantMaterial(state, 'flax', amount);
 }
 
+export function grantPickedWheat(state, amount = WHEAT_YIELD) {
+  return grantMaterial(state, 'wheat', amount);
+}
+
+/** One fountain click. Caps at the material limit, same as other gathered goods. */
+export function grantFountainWater(state, amount = FOUNTAIN_WATER_YIELD) {
+  return grantMaterial(state, 'water', amount);
+}
+
 /** Quest reward. Adds Dwarven Plans straight into materials (id `dwarven_plans`). */
 export function grantDwarvenPlans(state, amount = 1) {
   const add = Math.max(0, Math.round(Number(amount) || 0));
   if (!add || !state?.materials) return 0;
   state.materials.dwarven_plans = (state.materials.dwarven_plans ?? 0) + add;
+  return add;
+}
+
+/** Quest reward. Adds Ancient Plans straight into materials (id `ancient_plans`). */
+export function grantAncientPlans(state, amount = 1) {
+  const add = Math.max(0, Math.round(Number(amount) || 0));
+  if (!add || !state?.materials) return 0;
+  state.materials.ancient_plans = (state.materials.ancient_plans ?? 0) + add;
   return add;
 }
 
@@ -1179,6 +1219,7 @@ export function serializeState(state) {
     appearance: normalizeAppearance(state.appearance),
     playTime: Math.max(0, Number(state.playTime) || 0),
     kingRoaldAt: Number.isFinite(state.kingRoaldAt) ? state.kingRoaldAt : scheduleKingRoald(Math.max(0, Number(state.playTime) || 0)),
+    skills: state.skills?.toJSON?.() ?? createSkills().toJSON(),
     displays: state.displays.map((display, index) => ({
       ware: display.ware ? { recipeId: display.ware.recipeId } : null,
       furnitureId: display.furnitureId ?? null,
@@ -1433,6 +1474,8 @@ export function applyState(state, data) {
   claimLoadedDisplays(state);
   refreshShowcases(state);
   if ((state.expansions ?? []).includes('back')) clearBackWallShelf(state);
+  if (!state.skills?.fromJSON) state.skills = createSkills();
+  state.skills.fromJSON(data.skills);
   return true;
 }
 

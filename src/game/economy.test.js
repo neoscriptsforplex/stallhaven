@@ -81,9 +81,12 @@ import {
   chestCapacity,
   chestCount,
   chestDisplayList,
+  grantAncientPlans,
   grantChoppedLogs,
+  grantFountainWater,
   grantMinedMaterial,
   grantPickedFlax,
+  grantPickedWheat,
   FREE_FURNITURE_REPLACE,
   chestTotal,
   completeCrafts,
@@ -125,6 +128,7 @@ import {
 import { defaultFurniture, furnitureHalfSize, furnaceBesideAnvil, roomInteriorFloor, SHELF_FROM_WALL } from './layout.js';
 import { QUEUE_AISLE, queueSlot, rectHitsAisle } from './nav.js';
 import { boulderInspect, DUNGEON_BOULDERS, DUNGEON_REMAINS, flaxInspect, treeInspect } from './shopbuild.js';
+import { xpForLevel } from './skills.js';
 
 function placeStation(state, id) {
   const pose = SHOP[id];
@@ -160,7 +164,13 @@ describe('stall economy', () => {
     assert.equal(state.materials.bronze_bar, 0);
     assert.equal(state.materials.bow_string, 0);
     assert.equal(state.materials.flax, 5);
-    assert.equal(state.materials.flour, 10);
+    assert.equal(state.materials.wheat, 0);
+    assert.equal(state.materials.flour, 0);
+    assert.equal(MATERIALS.flour.name, 'Pot of flour');
+    assert.equal(MATERIALS.flour.crafted, true);
+    assert.equal(MATERIALS.water.name, 'Bucket of water');
+    assert.equal(MATERIALS.water.restock, 0);
+    assert.equal(CUSTOMERS.pilgrim.offer, null);
     assert.equal(state.materials.logs, 0);
     assert.equal(state.materials.hide, 8);
     assert.equal(state.materials.herbs, 8);
@@ -173,9 +183,12 @@ describe('stall economy', () => {
   it('crafts from materials into the chest without auto-placing on stalls', () => {
     const state = createState();
     placeStation(state, 'range');
+    state.materials.flour = 10;
     assert.equal(canCraft(state, 'bread'), true);
     assert.equal(startCraft(state, 'bread', 0), true);
     assert.equal(state.materials.flour, 9);
+    assert.equal(state.materials.egg, 3);
+    assert.equal(state.materials.water, 11);
     assert.deepEqual(completeCrafts(state, 1.9), []);
     assert.deepEqual(completeCrafts(state, 2), ['bread']);
     assert.equal(state.chest.bread, 1);
@@ -190,8 +203,8 @@ describe('stall economy', () => {
     assert.equal(paid, RECIPES.bread.price);
     assert.equal(state.gold, START_GOLD + RECIPES.bread.price);
     assert.equal(chestCount(state, 'bread'), 0);
-    assert.equal(restock(state, 'flour'), true);
-    assert.equal(state.gold, START_GOLD + RECIPES.bread.price - MATERIALS.flour.restock);
+    assert.equal(restock(state, 'egg'), true);
+    assert.equal(state.gold, START_GOLD + RECIPES.bread.price - MATERIALS.egg.restock);
   });
 
   it('keeps extra finished wares in the chest after a sale', () => {
@@ -404,6 +417,10 @@ describe('save and load', () => {
     assert.equal(state.materials.string, undefined);
     assert.equal(state.materials.herbs, 8);
     assert.equal(state.materials.water, 12);
+    assert.equal(state.materials.flour, 2);
+    assert.equal(state.materials.wheat, 0);
+    assert.equal(state.materials.ancient_plans, 0);
+    assert.equal(state.skills.getLevel('smithing'), 1);
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
     assert.equal(ownsFurnace(state), false);
     assert.equal(ownsRange(state), false);
@@ -701,7 +718,7 @@ describe('catalog', () => {
     assert.equal(RECIPES.wizard_robe.name, 'Wizard Robe');
     assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
     assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
-    assert.equal(recipes.filter((r) => r.category === 'food').length, 13);
+    assert.equal(recipes.filter((r) => r.category === 'food').length, 14);
     assert.equal(recipes.filter((r) => r.category === 'potion').length, 8);
     assert.ok(RECIPES.salmon.price < RECIPES.cake.price);
     assert.ok(RECIPES.cake.price < RECIPES.lobster.price);
@@ -738,6 +755,9 @@ describe('catalog', () => {
     assert.equal(recipeCost(RECIPES.mystic_air_staff).materials.orb, 100);
     assert.equal(recipeCost(RECIPES.ancient_staff).materials.cloth, 100);
     assert.equal(recipeCost(RECIPES.ancient_staff).materials.dragon_bar, 10);
+    assert.equal(recipeCost(RECIPES.ancient_staff).materials.ancient_plans, 1);
+    assert.equal(RECIPES.ancient_staff.price, 500000);
+    assert.equal(reducedSalePrice(RECIPES.ancient_staff.price), 325000);
     assert.equal(RECIPES.fish_pie.name, 'Fish Pie');
     assert.equal(RECIPES.bronze_2h_sword.name, 'Bronze 2H Sword');
     assert.equal(RECIPES.bronze_thrownaxe.name, 'Bronze Thrown Axe');
@@ -747,7 +767,7 @@ describe('catalog', () => {
     for (const recipe of recipeList()) {
       for (const word of recipe.name.split(/\s+/)) {
         const letter = word.replace(/^[^A-Za-z]+/, '')[0];
-        if (!letter || word.toLowerCase() === 'of') continue;
+        if (!letter || word.toLowerCase() === 'of' || word.toLowerCase() === 'flour') continue;
         assert.equal(letter, letter.toUpperCase(), recipe.name);
       }
     }
@@ -837,7 +857,21 @@ describe('catalog', () => {
     assert.ok(food.some((r) => r.id === 'bread'));
     assert.ok(food.some((r) => r.id === 'salmon'));
     assert.ok(food.some((r) => r.id === 'anglerfish'));
-    assert.equal(food.length, 13);
+    assert.equal(food.length, 14);
+    assert.equal(food[0].id, 'pot_of_flour');
+    assert.equal(RECIPES.pot_of_flour.outputMaterial, 'flour');
+    assert.deepEqual(RECIPES.pot_of_flour.buyers, []);
+    assert.equal(recipeCost(RECIPES.bread).materials.egg, 1);
+    assert.equal(recipeCost(RECIPES.bread).materials.water, 1);
+    assert.equal(recipeCost(RECIPES.pizza).materials.egg, undefined);
+    assert.equal(recipeCost(RECIPES.pizza).materials.water, undefined);
+    assert.equal(recipeCost(RECIPES.cake).materials.water, 1);
+    assert.equal(recipeCost(RECIPES.pie).materials.egg, 1);
+    assert.equal(recipeCost(RECIPES.fish_pie).materials.water, 1);
+    assert.equal(recipeCost(RECIPES.chocolate_cake).materials.egg, 1);
+    assert.equal(recipeCost(RECIPES.chocolate_cake).materials.water, 1);
+    assert.equal(recipeCost(RECIPES.summer_pie).materials.egg, 1);
+    assert.equal(recipeCost(RECIPES.summer_pie).materials.water, 1);
     assert.ok(!melee.some((r) => r.category === 'food'));
     assert.ok(!melee.some((r) => r.combatClass === 'tools'));
     const tools = recipesForTab('tools');
@@ -938,18 +972,22 @@ describe('chest upgrades', () => {
 describe('material regen', () => {
   it('fills basic kitchen materials, capped at 250', () => {
     const state = createState();
-    state.materials.flour = 0;
+    state.materials.egg = 0;
     state.materials.logs = 0;
+    state.materials.flour = 0;
+    state.materials.water = 0;
     tickMaterials(state, 8);
-    assert.equal(state.materials.flour, 1);
+    assert.equal(state.materials.egg, 1);
     tickMaterials(state, 8);
     assert.equal(state.materials.logs, 0);
-    state.materials.flour = 249;
-    state.materialAcc.flour = 0;
+    assert.equal(state.materials.flour, 0);
+    assert.equal(state.materials.water, 0);
+    state.materials.egg = 249;
+    state.materialAcc.egg = 0;
     tickMaterials(state, 16);
-    assert.equal(state.materials.flour, 250);
+    assert.equal(state.materials.egg, 250);
     tickMaterials(state, 80);
-    assert.equal(state.materials.flour, 250);
+    assert.equal(state.materials.egg, 250);
   });
 
   it('does not regenerate or restock ores or essence', () => {
@@ -1055,7 +1093,9 @@ describe('material regen', () => {
     assert.equal(canRestock(state, 'bow_string'), false);
     assert.equal(restock(state, 'bronze_bar'), false);
     assert.equal(restock(state, 'bow_string'), false);
-    assert.equal(canRestock(state, 'flour'), true);
+    assert.equal(canRestock(state, 'egg'), true);
+    assert.equal(canRestock(state, 'flour'), false);
+    assert.equal(canRestock(state, 'water'), false);
   });
 
   it('does not regenerate or restock flax and grants one per pick', () => {
@@ -1082,6 +1122,53 @@ describe('material regen', () => {
     state.materials.flax = 250;
     assert.equal(grantPickedFlax(state), 0);
     assert.equal(state.materials.flax, 250);
+  });
+
+  it('picks wheat, mills it into flour, and draws water from the fountain', () => {
+    const state = createState();
+    assert.equal(MATERIALS.wheat.gathered, true);
+    assert.equal(MATERIALS.wheat.start, 0);
+    assert.equal(grantPickedWheat(state), 1);
+    assert.equal(state.materials.wheat, 1);
+    placeStation(state, 'range');
+    assert.equal(recipesForTab('food')[0].id, 'pot_of_flour');
+    assert.equal(RECIPES.pot_of_flour.name, 'Pot of flour');
+    assert.equal(CUSTOMERS.pilgrim.prefers.includes('pot_of_flour'), false);
+    assert.equal(startCraft(state, 'pot_of_flour', 0), true);
+    assert.equal(state.materials.wheat, 0);
+    assert.deepEqual(completeCrafts(state, 2), ['pot_of_flour']);
+    assert.equal(state.materials.flour, 1);
+    assert.equal(state.chest.pot_of_flour, undefined);
+    state.materials.water = 0;
+    state.materialAcc.water = 0;
+    tickMaterials(state, 80);
+    assert.equal(state.materials.water, 0);
+    assert.equal(canRestock(state, 'water'), false);
+    assert.equal(grantFountainWater(state), 5);
+    assert.equal(state.materials.water, 5);
+    state.materials.water = 248;
+    assert.equal(grantFountainWater(state), 2);
+    assert.equal(state.materials.water, 250);
+  });
+
+  it('grants Ancient Plans with no source and sells the Ancient Staff at 500,000 before the offer cut', () => {
+    assert.equal(MATERIALS.ancient_plans.name, 'Ancient Plans');
+    assert.equal(MATERIALS.ancient_plans.quest, true);
+    assert.equal(MATERIALS.ancient_plans.start, 0);
+    assert.equal(recipeList().some((recipe) => recipe.outputMaterial === 'ancient_plans'), false);
+    const state = createState();
+    assert.equal(canRestock(state, 'ancient_plans'), false);
+    assert.equal(grantAncientPlans(state, 1), 1);
+    assert.equal(state.materials.ancient_plans, 1);
+    assert.equal(grantAncientPlans(state, 0), 0);
+    assert.equal(RECIPES.ancient_staff.price, 500000);
+    assert.equal(reducedSalePrice(RECIPES.ancient_staff.price), 325000);
+    const skills = state.skills;
+    skills.addXp('smithing', xpForLevel(20));
+    applyCheat(state, 'freshstart');
+    assert.equal(state.skills, skills);
+    assert.equal(state.skills.getLevel('smithing'), 1);
+    assert.equal(state.materials.ancient_plans, 0);
   });
 });
 
@@ -1222,6 +1309,8 @@ describe('furnace and spinning wheel', () => {
     assert.equal(ownsRange(state), true);
     assert.equal(canBuyRange(state), false);
     assert.equal(isUnlocked(state, 'bread'), true);
+    assert.match(craftBlockReason(state, 'bread'), /Pot of flour/);
+    state.materials.flour = 1;
     assert.equal(canCraft(state, 'bread'), true);
   });
 

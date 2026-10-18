@@ -68,7 +68,7 @@ import { BUNDLED_PROP_FOLDERS, FOUNTAIN_DUMP_REV, isDungeonRockDump, parseBundle
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { ALTAR_CLICK, ALTAR_OSRS_SCALE, characterGroundY, EXPANSION_PADS, furnitureVisualYaw, gardenTreeSpots, OUTDOOR_GROUND_Y, OUTDOOR_TREE_SCALE, plantedTrunkRadius, pointHitsShop, ROOM_D, ROOM_W, roomCenter, RUNE_ALTAR_SPOTS, RUNE_PORTAL_GRASS_CLEAR, shopDoorOpening, shopFloorFootprint, shopFloorTopY, SHOP_FURNITURE_FLOOR_Y, TRAPDOOR, TRAPDOOR_HOLE_CLEAR, TREE_SCALE_SPREAD, TREE_TRUNK_RADIUS, TREE_WALK_BLOCK, treeWalkBlock } from './layout.js';
 import { RAT_DUMP_YAW } from './rats.js';
-import { buildAltar, buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRat, buildRuneField, buildShop, buildSpinningWheel, buildTorch, buildTree, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_FLOOR_TILE_M, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonFloorTextureUrls, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, generalStoreSignTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
+import { buildAltar, buildCauldron, buildDungeon, buildDungeonLadder, buildFletchingBench, buildFlaxPlant, buildFountain, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRat, buildRuneField, buildShop, buildSpinningWheel, buildTorch, buildTree, buildWheatPlant, DUNGEON_BOULDERS, DUNGEON_FLOOR_Y, DUNGEON_REMAINS, DUNGEON_ROCK_ALBEDO_LIFT, DUNGEON_ROCK_AMBIENT, DUNGEON_ROCK_EMIT, DUNGEON_ROCK_SINK, DUNGEON_FLOOR_TILE_M, DUNGEON_WALL_H, DUNGEON_WALL_TILE_M, dungeonFloorTextureUrls, dungeonWallTextureUrls, ESSENCE_OLD_XZ, dungeonFloorSurfaceY, dungeonRockContactMins, measureShopFloorPieces, measureShopFloorTop, AWNING_TILE_M, awningTextureUrls, FOUNTAIN_COBBLE_TILE_M, fountainCobbleTextureUrls, generalStoreSignTextureUrls, RANGE_PLATE_FRAC, RANGE_WORLD_SCALE, SHOP_FLOOR_TILE_M, shopFloorTextureUrls, SHOP_ROOF_SMALL_TILE_M, SHOP_ROOF_TILE_M, shopRoofTextureUrls, SHOP_WALL_REPEAT, shopWallTextureUrls, WHEEL_WORLD_SCALE, mountFountainWater, seatTreeOnGround } from './shopbuild.js';
 import { gardenObstacles } from './nav.js';
 import { GATHER_CONTACT, chopStandDistance, gatherStandCandidates, mineStandDistance, treeTrunkOffset } from './interact.js';
 
@@ -1858,7 +1858,7 @@ describe('bundled prop swaps', () => {
 
   it('lists the shipped prop folders and skips a missing goblin dump', () => {
     const ids = BUNDLED_PROP_FOLDERS.map((item) => item.id);
-    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'flax-plant', 'rock', 'fountain', 'skeleton', 'portal', 'altar-air', 'altar-earth', 'altar-water', 'altar-fire']) {
+    for (const id of ['chest', 'furnace', 'range', 'anvil', 'cauldron', 'door', 'ladder', 'torch', 'trapdoor', 'wheel', 'rat', 'table', 'counter', 'tree', 'flowers', 'flax-plant', 'wheat-plant', 'rock', 'fountain', 'skeleton', 'portal', 'altar-air', 'altar-earth', 'altar-water', 'altar-fire']) {
       assert.ok(ids.includes(id), id);
     }
     for (const id of ['rune-air', 'rune-water', 'rune-earth', 'rune-fire', 'ore-bronze', 'ore-iron', 'ore-steel', 'ore-mithril', 'ore-adamant', 'ore-runite', 'ore-dragon', 'ore-essence', 'ore-clay']) {
@@ -1973,6 +1973,23 @@ describe('bundled prop swaps', () => {
     assert.ok(Math.abs(flaxSize.y - flaxWant) < 0.08, `flax height ${flaxSize.y} vs ${flaxWant}`);
     assert.ok(Math.max(flaxSize.x, flaxSize.z) < 1.05, `flax footprint ${flaxSize.x}×${flaxSize.z}`);
     setBundledLook('flax-plant', null);
+
+    setBundledLook('wheat-plant', null);
+    const fallbackWheat = buildWheatPlant();
+    assert.equal(fallbackWheat.userData.wheatProcedural, true);
+    const wheatDump = await loadFolder('wheat');
+    wheatDump.updateMatrixWorld(true);
+    const wheatRaw = new THREE.Box3().setFromObject(wheatDump).getSize(new THREE.Vector3());
+    const wheatRawMax = Math.max(wheatRaw.x, wheatRaw.y, wheatRaw.z);
+    setBundledLook('wheat-plant', wheatDump);
+    const wheatPlant = buildWheatPlant();
+    assert.equal(wheatPlant.userData.wheatProcedural, false);
+    assertUniform(wheatPlant);
+    assertGrounded(wheatPlant);
+    const wheatSize = measureVisibleBox(wheatPlant).getSize(new THREE.Vector3());
+    const wheatMax = Math.max(wheatSize.x, wheatSize.y, wheatSize.z);
+    assert.ok(Math.abs(wheatMax - wheatRawMax * OSRS_MODEL_SCALE) < 0.08, `wheat scale ${wheatMax} vs ${wheatRawMax * OSRS_MODEL_SCALE}`);
+    setBundledLook('wheat-plant', null);
 
     const flowers = wrapBundledProp(await loadFolder('flowers'), new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.22, 0.55)), { name: 'flowers', fit: 'max' });
     assertUniform(flowers);
@@ -3115,7 +3132,7 @@ describe('bundled prop swaps', () => {
 
   it('fits bundled weapon, armour, ammo, and tool dumps to the current mesh size', async () => {
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
-    assert.equal(LUKE_MODEL_FOLDERS.length, 195);
+    assert.equal(LUKE_MODEL_FOLDERS.length, 197);
     for (const item of LUKE_MODEL_FOLDERS) {
       assert.equal(byId[item.id], item.folder, item.id);
       const slug = item.folder.split('/').pop();

@@ -11,6 +11,7 @@ import {
   portalPlaceFloors,
   PORTAL_HOME,
   rollFlaxSpots,
+  rollWheatSpots,
   roomCenter,
   shopRugPose,
   shopRugRect,
@@ -424,9 +425,16 @@ describe('shop navigation', () => {
         furniture: state.furniture,
       });
       assert.ok(flax.length >= 8, `flax field too small for [${expansions}]`);
+      const wheat = rollWheatSpots(expansions, {
+        rng: flaxRng(29 + expansions.length),
+        furniture: state.furniture,
+        occupied: flax.map((spot) => ({ ...spot, spacing: 1.85 })),
+      });
+      assert.ok(wheat.length >= 4, `wheat field too small for [${expansions}]`);
       const nodes = [
         ...trees.map((spot) => ({ ...spot, kind: 'tree' })),
         ...flax.map((spot) => ({ ...spot, kind: 'flax', side: 'flax' })),
+        ...wheat.map((spot) => ({ ...spot, kind: 'wheat', side: 'wheat' })),
       ];
       for (const node of nodes) {
         const label = `${node.kind} ${node.side} ${node.x.toFixed(2)},${node.z.toFixed(2)} [${expansions}]`;
@@ -438,7 +446,7 @@ describe('shop navigation', () => {
         assert.ok(Math.hypot(end.x - node.x, end.z - node.z) < 1.5, `stopped far from ${label}`);
         const around = expansions.length === 0 && (
           node.side === 'left' || node.side === 'right'
-          || node.side === 'rear' || node.side === 'edge' || node.kind === 'flax'
+          || node.side === 'rear' || node.side === 'edge' || node.kind === 'flax' || node.kind === 'wheat'
         );
         const stands = gatherStandCandidates(node.kind, node).filter((dest) => (
           isWalkable(dest.x, dest.z, obstacles, PLAYER_RADIUS, floors)

@@ -115,10 +115,10 @@ import {
   STATION_UNLOCKS,
 } from './layout.js';
 import { clampMapZoom, drawMinimap, mapToWorld, minimapBufferPixels, minimapFrame } from './minimap.js';
-import { boulderInspect, flaxInspect, treeInspect } from './shopbuild.js';
+import { boulderInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
 import { loadStateFromFile, saveStateToFile } from './savefile.js';
 import { createCraftPreview } from './craftpreview.js';
-import { createSkills } from './skills.js';
+import { createSkills, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
 import { bindSkillsPanel } from './skillsPanel.js';
 import {
   brightnessPercent,
@@ -168,7 +168,8 @@ export function bindHud(root, state, world) {
   const settingsDock = document.querySelector('#settings-dock');
   const settingsBtn = document.querySelector('#settings-btn');
   let skillsPanel = null;
-  const skills = createSkills();
+  const skills = state.skills?.getLevel ? state.skills : createSkills();
+  if (!state.skills) state.skills = skills;
   const furnMenu = document.querySelector('#furn-menu');
   const inspectPop = document.querySelector('#inspect-pop');
   let inspectTarget = null;
@@ -278,14 +279,20 @@ export function bindHud(root, state, world) {
       list.sort((a, b) => a.lineIndex - b.lineIndex);
       const lineTitle = list[0]?.lineName ? `<h4 class="line">${list[0].lineName}</h4>` : '';
       return lineTitle + list.map((recipe) => {
-        const locked = !isUnlocked(state, recipe.id);
+        const levelText = levelRequirementText(recipe);
+        const levelLocked = Boolean(levelText)
+          && !meetsLevelRequirement(recipe, (skillId) => skillLevelOf(state, skillId));
+        const chainLocked = !isUnlocked(state, recipe.id);
+        const locked = chainLocked || levelLocked;
         const mastered = isMastered(state, recipe.id);
         const prev = recipe.previousId ? RECIPES[recipe.previousId] : null;
         const remain = unlockRemaining(state, recipe.id);
         const duration = craftDuration(state, recipe.id);
-        const lockText = locked
-          ? `Locked · ${remain} more ${prev?.name ?? 'crafts'}`
-          : costLabel(recipe, duration);
+        const lockText = levelLocked
+          ? levelText
+          : chainLocked
+            ? `Locked · ${remain} more ${prev?.name ?? 'crafts'}`
+            : costLabel(recipe, duration);
         const mats = recipeMatsLabel(recipe);
         const focus = recipe.id === craftFocusId ? ' is-focus' : '';
         const star = mastered ? '<span class="mastery-star" title="Mastered">★</span>' : '';
@@ -454,9 +461,11 @@ export function bindHud(root, state, world) {
             ? '<span class="mat-crafted">Mined</span>'
             : mat.gathered
               ? '<span class="mat-crafted">Picked</span>'
-              : mat.quest
-                ? '<span class="mat-crafted">Quest</span>'
-                : `<button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>`}
+              : mat.drawn
+                ? '<span class="mat-crafted">Fountain</span>'
+                : mat.quest
+                  ? '<span class="mat-crafted">Quest</span>'
+                  : `<button type="button" class="restock" data-restock="${mat.id}">${formatGold(mat.restock)}g</button>`}
       </div>
     `).join('');
     container.dataset.ready = '1';
@@ -668,17 +677,29 @@ export function bindHud(root, state, world) {
     if (!inspectPop) return;
     furnMenu.hidden = true;
     furnTarget = null;
-    const kind = pose?.kind === 'tree' ? 'tree' : pose?.kind === 'flax' ? 'flax' : 'boulder';
+    const kind = pose?.kind === 'tree'
+      ? 'tree'
+      : pose?.kind === 'flax'
+        ? 'flax'
+        : pose?.kind === 'wheat'
+          ? 'wheat'
+          : 'boulder';
     inspectTarget = materialId
       ? { materialId, x: pose?.x, z: pose?.z, kind, plantId: pose?.plantId }
       : null;
-    const info = kind === 'tree' ? treeInspect() : kind === 'flax' ? flaxInspect() : boulderInspect(materialId);
+    const info = kind === 'tree'
+      ? treeInspect()
+      : kind === 'flax'
+        ? flaxInspect()
+        : kind === 'wheat'
+          ? wheatInspect()
+          : boulderInspect(materialId);
     const nameEl = inspectPop.querySelector('[data-inspect-name]');
     const blurbEl = inspectPop.querySelector('[data-inspect-blurb]');
     const mineBtn = inspectPop.querySelector('[data-inspect-mine]');
     if (nameEl) nameEl.textContent = info.name;
     if (blurbEl) blurbEl.textContent = info.blurb;
-    if (mineBtn) mineBtn.textContent = kind === 'tree' ? 'Chop' : kind === 'flax' ? 'Pick' : 'Mine';
+    if (mineBtn) mineBtn.textContent = kind === 'tree' ? 'Chop' : kind === 'flax' || kind === 'wheat' ? 'Pick' : 'Mine';
     inspectPop.hidden = false;
     const x = Math.min(window.innerWidth - 250, Math.max(8, clientX ?? 24));
     const y = Math.min(window.innerHeight - 180, Math.max(8, clientY ?? 80));
@@ -2423,6 +2444,9 @@ export function bindHud(root, state, world) {
     }
     if (event.type === 'flax-inspect') {
       showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'flax' });
+    }
+    if (event.type === 'wheat-inspect') {
+      showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'wheat' });
     }
     if (event.type === 'mined' || event.type === 'chopped' || event.type === 'picked') {
       if (activeCraftYield) {

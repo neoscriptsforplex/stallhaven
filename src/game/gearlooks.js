@@ -71,6 +71,8 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'fire_battlestaff', folder: 'gear/mystic-fire-staff' },
   { id: 'fire_clay', folder: 'materials/clay' },
   { id: 'flax', folder: 'materials/flax' },
+  { id: 'egg', folder: 'materials/egg' },
+  { id: 'water', folder: 'materials/water' },
   { id: 'fletch', folder: 'fletch' },
   { id: 'green_dhide_body', folder: 'gear/green-dhide-body' },
   { id: 'green_dhide_chaps', folder: 'gear/green-dhide-chaps' },

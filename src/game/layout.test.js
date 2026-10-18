@@ -33,6 +33,9 @@ import {
   FLAX_SPACING,
   FLAX_RESPAWN_SEC,
   rollFlaxSpots,
+  rollWheatSpots,
+  WHEAT_COUNT,
+  WHEAT_SPACING,
   flaxSpotBlocked,
   pickFlaxNode,
   sproutDueFlax,
@@ -702,6 +705,29 @@ describe('flax field', () => {
     assert.equal(nodes.filter((node) => node.alive).length, FLAX_COUNT);
     assert.equal(nodes[0].x, next.x);
     assert.equal(nodes[0].z, next.z);
+  });
+});
+
+describe('wheat field', () => {
+  it('scatters clumps clear of flax, the fountain, and each other', () => {
+    const flax = rollFlaxSpots([], { rng: flaxRng(4) }).map((spot) => ({ ...spot, spacing: WHEAT_SPACING }));
+    const wheat = rollWheatSpots([], { rng: flaxRng(5), occupied: flax });
+    assert.equal(wheat.length, WHEAT_COUNT);
+    for (let i = 0; i < wheat.length; i += 1) {
+      const spot = wheat[i];
+      const occupied = [
+        ...flax,
+        ...wheat.filter((_, j) => j !== i).map((other) => ({ ...other, spacing: WHEAT_SPACING })),
+      ];
+      assert.equal(flaxSpotBlocked(spot.x, spot.z, [], { occupied, spacing: WHEAT_SPACING }), false);
+      assert.ok(Math.hypot(spot.x - FOUNTAIN.x, spot.z - FOUNTAIN.z) >= FOUNTAIN.apron);
+      for (const other of flax) {
+        assert.ok(Math.hypot(spot.x - other.x, spot.z - other.z) >= WHEAT_SPACING - 1e-6);
+      }
+      for (let j = i + 1; j < wheat.length; j += 1) {
+        assert.ok(Math.hypot(spot.x - wheat[j].x, spot.z - wheat[j].z) >= WHEAT_SPACING - 1e-6);
+      }
+    }
   });
 });
 

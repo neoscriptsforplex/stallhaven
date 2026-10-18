@@ -332,6 +332,40 @@ export function createSkills(saved = null) {
   return api;
 }
 
+/** `{ skill, level, name }` when a recipe carries `requires`, otherwise null. */
+export function recipeLevelRequirement(recipe) {
+  const req = recipe?.requires;
+  if (!req || !isSkillId(req.skill)) return null;
+  const level = Math.floor(Number(req.level));
+  if (!Number.isFinite(level)) return null;
+  return {
+    skill: req.skill,
+    level: Math.max(1, Math.min(MAX_LEVEL, level)),
+    name: SKILL_BY_ID[req.skill].name,
+  };
+}
+
+/** Player-facing lock line, e.g. "Requires level 99 Smithing". */
+export function levelRequirementText(recipe) {
+  const req = recipeLevelRequirement(recipe);
+  if (!req) return '';
+  return `Requires level ${req.level} ${req.name}`;
+}
+
+/** Smithing (and the rest) from `state.skills`, or 1 when the tracker is missing. */
+export function skillLevelOf(state, skillId) {
+  const level = state?.skills?.getLevel?.(skillId);
+  return Number.isFinite(level) ? level : 1;
+}
+
+/** True when the recipe has no level lock or the player already meets it. */
+export function meetsLevelRequirement(recipe, getLevel) {
+  const req = recipeLevelRequirement(recipe);
+  if (!req) return true;
+  const level = typeof getLevel === 'function' ? getLevel(req.skill) : 1;
+  return level >= req.level;
+}
+
 /**
  * Optional, for old saves: rebuild skill XP from craft history so a player
  * who has crafted for hours does not start at level 1.

@@ -274,6 +274,7 @@ export const MATERIALS = {
   dragon: { id: 'dragon', name: 'Dragon Ore', restock: 0, start: 0, tier: 7, regenEvery: 0 },
   logs: { id: 'logs', name: 'Logs', restock: 0, start: 0, tier: 1, regenEvery: 0 },
   flax: { id: 'flax', name: 'Flax', restock: 0, start: 5, tier: 1, regenEvery: 0, gathered: true },
+  wheat: { id: 'wheat', name: 'Wheat', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true },
   bow_string: {
     id: 'bow_string',
     name: 'Bow String',
@@ -306,13 +307,13 @@ export const MATERIALS = {
   orb: { id: 'orb', name: 'Unpowered Orb', restock: 6, start: 4, tier: 2, regenEvery: regenEvery(2) },
   hide: { id: 'hide', name: 'Hide', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   egg: { id: 'egg', name: 'Egg', restock: 4, start: 4, tier: 1, regenEvery: regenEvery(1) },
-  flour: { id: 'flour', name: 'Flour', restock: 3, start: 10, tier: 1, regenEvery: regenEvery(1) },
+  flour: { id: 'flour', name: 'Pot of flour', restock: 0, start: 0, tier: 1, regenEvery: 0, crafted: true },
   pineapple: { id: 'pineapple', name: 'Pineapple', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   raspberry: { id: 'raspberry', name: 'Raspberry', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   chocolate: { id: 'chocolate', name: 'Chocolate', restock: 6, start: 2, tier: 1, regenEvery: regenEvery(1) },
   fish: { id: 'fish', name: 'Fish', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
   herbs: { id: 'herbs', name: 'Herbs', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
-  water: { id: 'water', name: 'Water', restock: 2, start: 12, tier: 1, regenEvery: regenEvery(1) },
+  water: { id: 'water', name: 'Bucket of water', restock: 0, start: 12, tier: 1, regenEvery: 0, drawn: true },
   essence: { id: 'essence', name: 'Essence', restock: 0, start: 10, tier: 1, regenEvery: 0 },
   dwarven_plans: {
     id: 'dwarven_plans',
@@ -320,6 +321,15 @@ export const MATERIALS = {
     restock: 0,
     start: 0,
     tier: 8,
+    regenEvery: 0,
+    quest: true,
+  },
+  ancient_plans: {
+    id: 'ancient_plans',
+    name: 'Ancient Plans',
+    restock: 0,
+    start: 0,
+    tier: 5,
     regenEvery: 0,
     quest: true,
   },
@@ -501,8 +511,9 @@ for (const piece of RANGE_WEAPONS) {
       previousId: null,
       unlockNeed: 0,
       tier: 8,
+      requires: { skill: 'smithing', level: 99 },
       cost: {
-        materials: { steel_bar: 50000, dwarven_plans: 1 },
+        materials: { steel_bar: 5000, dwarven_plans: 1 },
         items: { cannonballs: 5000 },
         gold: 0,
       },
@@ -739,12 +750,12 @@ addRecipe({
   unlockNeed: unlockNeed(1),
   tier: 5,
   cost: {
-    materials: { cloth: 100, orb: 100, ...ANCIENT_BARS },
+    materials: { cloth: 100, orb: 100, ...ANCIENT_BARS, ancient_plans: 1 },
     items: ANCIENT_RUNES,
     gold: 0,
   },
   time: 12,
-  price: tierSellPrice(4, { count: STAFF_TIER_COUNT }),
+  price: 500000,
   buyers: ['hedgemage'],
   tint: 0xc4a05a,
 });
@@ -944,22 +955,22 @@ RUNE_LINE.forEach((rune, index) => {
 });
 
 const FOOD_LINE = [
-  { id: 'bread', name: 'Bread', mats: { flour: 1 }, tint: 0xc4a05a, time: 3, price: 8 },
+  { id: 'bread', name: 'Bread', mats: { flour: 1, egg: 1, water: 1 }, tint: 0xc4a05a, time: 3, price: 8 },
   { id: 'pizza', name: 'Pizza', mats: { flour: 1, pineapple: 1 }, tint: 0xd4a04a, time: 4, price: 14 },
-  { id: 'cake', name: 'Cake', mats: { flour: 1, egg: 1 }, tint: 0xe8c8a0, time: 5, price: 20 },
-  { id: 'pie', name: 'Pie', mats: { flour: 1, raspberry: 1 }, tint: 0xb45a4a, time: 6, price: 26 },
-  { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, fish: 1 }, tint: 0xc8b07a, time: 7, price: 32 },
+  { id: 'cake', name: 'Cake', mats: { flour: 1, egg: 1, water: 1 }, tint: 0xe8c8a0, time: 5, price: 20 },
+  { id: 'pie', name: 'Pie', mats: { flour: 1, raspberry: 1, egg: 1, water: 1 }, tint: 0xb45a4a, time: 6, price: 26 },
+  { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, fish: 1, egg: 1, water: 1 }, tint: 0xc8b07a, time: 7, price: 32 },
 ];
 
 /** Grill / feast line. Prices sit around Cake (20g): Salmon below, then Lobster and up. */
 const FEAST_LINE = [
   { id: 'salmon', name: 'Salmon', mats: { fish: 1 }, tint: 0xe07a4a, time: 3, price: 16 },
   { id: 'lobster', name: 'Lobster', mats: { fish: 1 }, tint: 0xc45a32, time: 5, price: 28 },
-  { id: 'chocolate_cake', name: 'Chocolate Cake', mats: { flour: 1, egg: 1, chocolate: 1 }, tint: 0x5a3220, time: 6, price: 38 },
+  { id: 'chocolate_cake', name: 'Chocolate Cake', mats: { flour: 1, egg: 1, chocolate: 1, water: 1 }, tint: 0x5a3220, time: 6, price: 38 },
   { id: 'monkfish', name: 'Monkfish', mats: { fish: 2 }, tint: 0xd8c8a0, time: 7, price: 50 },
   { id: 'curry', name: 'Curry', mats: { fish: 1, herbs: 1 }, tint: 0xd48a28, time: 8, price: 64 },
   { id: 'shark', name: 'Shark', mats: { fish: 2 }, tint: 0x6a7a88, time: 9, price: 80 },
-  { id: 'summer_pie', name: 'Summer Pie', mats: { flour: 1, pineapple: 1, raspberry: 1 }, tint: 0xe8a04a, time: 10, price: 98 },
+  { id: 'summer_pie', name: 'Summer Pie', mats: { flour: 1, pineapple: 1, raspberry: 1, egg: 1, water: 1 }, tint: 0xe8a04a, time: 10, price: 98 },
   { id: 'anglerfish', name: 'Anglerfish', mats: { fish: 3 }, tint: 0xc8a04a, time: 12, price: 120 },
 ];
 
@@ -996,6 +1007,30 @@ function addFoodLine(list, lineId, lineName, setKey, firstPreviousId = null) {
     });
   });
 }
+
+// First range recipe. Wheat has no supplier; picking the outdoor clumps is the source.
+addRecipe({
+  id: 'pot_of_flour',
+  name: 'Pot of flour',
+  category: 'food',
+  combatClass: null,
+  slot: 'food',
+  shape: 'pot_of_flour',
+  setKey: 'mill',
+  lineId: 'food-mill',
+  lineName: 'Milling',
+  lineIndex: 0,
+  previousId: null,
+  unlockNeed: 0,
+  tier: 1,
+  cost: { materials: { wheat: 1 }, gold: 0 },
+  time: 2,
+  price: 0,
+  buyers: [],
+  tint: 0xf4efe4,
+  outputMaterial: 'flour',
+  outputCount: 1,
+});
 
 // Food is small and sits on wall shelves. Potions share the same four shelf slots.
 addFoodLine(FOOD_LINE, 'food-bake', 'Kitchen', 'kitchen');
@@ -1271,7 +1306,7 @@ export const CUSTOMERS = {
     robe: 0xc8b48a,
     accent: 0x6b4e31,
     look: 'pilgrim',
-    offer: { materialId: 'flour', price: 3 },
+    offer: null,
   },
   mercenary: {
     id: 'mercenary',
@@ -1453,6 +1488,12 @@ export const FLAX_YIELD = 1;
 export const FLAX_DURATION = 3.2;
 /** How close the player stands before the pick bar starts. */
 export const FLAX_ARRIVE = 0.85;
+/** One wheat from one completed pick, same bar as flax. */
+export const WHEAT_YIELD = 1;
+export const WHEAT_DURATION = 3.2;
+export const WHEAT_ARRIVE = 0.85;
+/** Buckets drawn from the outdoor fountain on one click. */
+export const FOUNTAIN_WATER_YIELD = 5;
 
 export function mineTiming(materialId) {
   return { duration: MINE_DURATION, yield: mineYield(materialId) };

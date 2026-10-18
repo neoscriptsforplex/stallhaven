@@ -123,8 +123,10 @@ import {
   LADDER_STAND,
   STATION_ARRIVE,
   STATION_HIT,
+  clickLeavesGather,
   fletchFaceYaw,
   floorClickPoint,
+  furnaceFaceYaw,
   ignoredClickObject,
   pickUseHit,
   rangeFaceYaw,
@@ -1943,6 +1945,7 @@ export function createWorld(canvas, state, opts = {}) {
     moveMarker.position.set(goal.x, 0.1, goal.z);
     moveMarker.visible = true;
     localMoveListener?.({ x: goal.x, z: goal.z, scene: sceneMode });
+    pickHandler?.({ type: 'player-move' });
     return true;
   }
 
@@ -2061,12 +2064,13 @@ export function createWorld(canvas, state, opts = {}) {
     const canStand = (x, z) => isWalkable(x, z, standBlocks, PLAYER_RADIUS, standFloors);
     const plan = resolveStationUse(from, pose, state, planSceneWalk, type, canStand);
     const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax' || type === 'wheat';
-    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'fletch' || type === 'ladder' || gatherKind || type === 'fountain' || type === 'farming_patch';
+    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'furnace' || type === 'fletch' || type === 'ladder' || gatherKind || type === 'fountain' || type === 'farming_patch';
     const faceYaw = plan.face != null
       ? plan.face
       : type === 'range' ? rangeFaceYaw(pose)
-        : type === 'fletch' ? fletchFaceYaw(pose)
-          : null;
+        : type === 'furnace' ? furnaceFaceYaw(pose)
+          : type === 'fletch' ? fletchFaceYaw(pose)
+            : null;
     const standArrive = type === 'fountain'
       ? 0.45
       : gatherKind
@@ -2550,6 +2554,20 @@ export function createWorld(canvas, state, opts = {}) {
     }
 
     const picked = hitFurniture(hits);
+    const floorPoint = floorClickPoint(hits);
+    if (clickLeavesGather(mining, floorPoint, picked?.object.userData?.kind ?? null)) {
+      pendingUse = null;
+      if (setMoveTarget(floorPoint.x, floorPoint.z)) {
+        playClick('move');
+      } else {
+        stopMining();
+      }
+      if (state.selectedDisplay !== -1) {
+        state.selectedDisplay = -1;
+        refreshSelection(true);
+      }
+      return;
+    }
     if (picked) {
       const data = picked.object.userData;
       if (data.kind === 'trapdoor') {
@@ -2574,14 +2592,15 @@ export function createWorld(canvas, state, opts = {}) {
         return;
       }
       if (data.kind === 'tree') {
-        if (data.depleted || !treeCanChop(data.x, data.z)) return;
-        queueUse('tree', {
-          x: data.x,
-          z: data.z,
-          materialId: data.materialId ?? 'logs',
-          trunkRadius: data.trunkRadius ?? plantedTrunkRadius(data.x, data.z),
-        });
-        return;
+        if (!(data.depleted || !treeCanChop(data.x, data.z))) {
+          queueUse('tree', {
+            x: data.x,
+            z: data.z,
+            materialId: data.materialId ?? 'logs',
+            trunkRadius: data.trunkRadius ?? plantedTrunkRadius(data.x, data.z),
+          });
+          return;
+        }
       }
       if (data.kind === 'flax') {
         queueUse('flax', { x: data.x, z: data.z, materialId: 'flax', plantId: data.plantId });

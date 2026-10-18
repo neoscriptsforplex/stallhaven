@@ -84,6 +84,7 @@ import {
   FARMING_PATCH_CAP,
   FARMING_PATCH_COSTS,
   farmingPatchPoseKept,
+  migrateStarterMannequins,
   padById,
   padConnects,
   snapToWallGrid,
@@ -1711,7 +1712,7 @@ export function applyState(state, data) {
           pose && typeof pose.x === 'number' && typeof pose.z === 'number'
         )).slice(0, FARMING_PATCH_CAP).map((pose) => readPose(pose, { x: pose.x, z: pose.z, rot: FURNITURE_FORWARD }))
         : [],
-      displays: next.displays.map((display, index) => {
+      displays: migrateStarterMannequins(next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {
           x: 0,
           z: 0.8,
@@ -1722,7 +1723,7 @@ export function applyState(state, data) {
           return snapToWallGrid(pose.x, pose.z, next.expansions ?? [], pose.rot);
         }
         return pose;
-      }),
+      })),
     };
   }
   while ((next.furniture.displays?.length ?? 0) < next.displays.length) {

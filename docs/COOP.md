@@ -1,7 +1,9 @@
-# Co-op prototype (up to 4 players, invite codes)
+# Co-op (up to 4 players, invite codes)
 
-**Status:** prototype on branch `net/coop-prototype`. Not merged, not deployed. No Cloudflare account is used:
-everything runs locally with `wrangler dev`.
+**Status:** live. The room server runs on Cloudflare Workers (free plan, SQLite-backed Durable Objects) at
+`https://stallhaven-coop.stallhaven.workers.dev`, and `index.html` points the live site at it with the
+`stallhaven-room-server` meta tag. Redeploy from `party/` with `npx wrangler deploy` (needs
+`CLOUDFLARE_API_TOKEN`). Local dev still works with `wrangler dev`, no account needed.
 
 ## Try it locally (two browsers)
 
@@ -28,10 +30,10 @@ The **Co-op** button only appears when:
 2. the game runs on this machine (`localhost`, `127.0.0.1`, `::1`, `*.localhost`). In that case it talks to
    `http://127.0.0.1:8787`, the server from `npm run coop:server`.
 
-Otherwise (the live site today, with no public room server) the button and all co-op UI are left out entirely,
-and solo play is unchanged. Logic and tests: `src/coop/config.js`, `src/coop/config.test.js`.
-To switch co-op on for the live site later: deploy the room server, add its origin to `ALLOWED_ORIGINS`,
-then add the meta tag to `index.html`.
+Otherwise (no room server configured) the button and all co-op UI are left out entirely, and solo play is
+unchanged. Logic and tests: `src/coop/config.js`, `src/coop/config.test.js`.
+The live site sets the meta tag, and `https://neoscriptsforplex.github.io` is in `ALLOWED_ORIGINS`
+(`party/wrangler.jsonc`). To use another host, add its origin there and redeploy.
 
 ## Tests
 

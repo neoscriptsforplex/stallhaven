@@ -1,13 +1,14 @@
-// Co-op room server for Store of Geilenor. LOCAL PROTOTYPE ONLY.
-// Run with `npm run dev` (wrangler dev, no Cloudflare account needed).
-// Nothing here is deployed; do not run `wrangler deploy` without Luke's OK.
+// Co-op room server for Store of Geilenor.
+// Local: `npm run dev` (wrangler dev, no Cloudflare account needed).
+// Live: deployed with `wrangler deploy` to https://stallhaven-coop.stallhaven.workers.dev
+// on the Cloudflare Workers FREE plan (SQLite-backed Durable Objects). No paid features.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "stallhaven-coop",
   "main": "src/server.js",
   "compatibility_date": "2026-04-01",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": false,
+  "workers_dev": true,
   "durable_objects": {
     "bindings": [
       { "name": "CoopRoom", "class_name": "CoopRoom" },
@@ -18,7 +19,7 @@
     { "tag": "v1", "new_sqlite_classes": ["CoopRoom", "JoinGate"] }
   ],
   "vars": {
-    "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173",
+    "ALLOWED_ORIGINS": "https://neoscriptsforplex.github.io,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173",
     "ROOM_MAX_PLAYERS": "4",
     "ROOM_IDLE_TTL_SECONDS": "900"
   }

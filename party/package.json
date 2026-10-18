@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Co-op room server (PartyServer on Cloudflare Durable Objects). Local only: npm run dev.",
+  "description": "Co-op room server (PartyServer on Cloudflare Durable Objects). Local: npm run dev. Live: npx wrangler deploy (Workers free plan).",
   "scripts": {
     "dev": "wrangler dev --port 8787 --ip 127.0.0.1",
     "test": "node --test test/*.test.js"

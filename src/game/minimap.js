@@ -113,6 +113,14 @@ export function compassNeedleDegrees(yaw = 0) {
   return n * (180 / Math.PI);
 }
 
+/**
+ * Absolute compass SVG url. Relative urls in a custom property are resolved
+ * against src/style.css, which misses public/minimap/compass.svg.
+ */
+export function compassAssetUrl(compassBase, baseURI) {
+  return new URL(`${compassBase}minimap/compass.svg`, baseURI).href;
+}
+
 function focusOf(bounds, focus) {
   return {
     x: focus?.x ?? (bounds.minX + bounds.maxX) / 2,

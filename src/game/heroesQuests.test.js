@@ -135,7 +135,7 @@ test('the top bar has Heroes and Quests, and the phone gear menu keeps Help Save
   const html = readFileSync(join(root, '../../index.html'), 'utf8');
   const css = readFileSync(join(root, '../style.css'), 'utf8');
   const bar = html.slice(html.indexOf('id="save-bar"'), html.indexOf('id="hud"'));
-  assert.match(bar, /id="skills-btn"[\s\S]*id="build-btn"[\s\S]*id="heroes-btn"[\s\S]*id="quests-btn"/);
+  assert.match(bar, /id="heroes-btn"[\s\S]*id="quests-btn"[\s\S]*id="skills-btn"[\s\S]*id="build-btn"/);
   assert.match(html, /id="heroes-dock"/);
   assert.match(html, /id="hero-picker"/);
   assert.match(html, /data-more="help"[\s\S]*data-more="save"[\s\S]*data-more="load"[\s\S]*data-more="fullscreen"/);

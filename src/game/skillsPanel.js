@@ -36,7 +36,7 @@ export function formatXp(n) {
 
 /* ---------- Templates ---------- */
 
-/** Top-bar button. Goes first in #save-bar, before #build-btn. */
+/** Top-bar button. Sits in #save-bar after Quests and before #build-btn. */
 export function skillsButtonHtml() {
   return `<button type="button" id="skills-btn" title="Skills" aria-label="Skills" aria-controls="skills-dock" aria-expanded="false">Skills</button>`;
 }

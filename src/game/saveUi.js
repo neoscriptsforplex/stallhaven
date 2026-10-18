@@ -71,7 +71,7 @@ export function readBootSlot() {
   }
 }
 
-function reloadInto(choice) {
+export function reloadInto(choice) {
   try {
     session()?.setItem(BOOT_SLOT_KEY, JSON.stringify(choice));
   } catch {
@@ -165,6 +165,12 @@ export function mountSaves({ state, hud, store, autosave, makeState, nowSeconds,
         : picker.querySelector('.sv-card.is-current [data-slot-continue]') ?? picker.querySelector('[data-slot-continue],[data-slot-new]');
     focus?.focus();
     if (focus?.select) focus.select();
+    // Online saves decorate the cards (sync badges, conflict) after each paint.
+    document.dispatchEvent(new CustomEvent('rc-picker-painted', { detail: { root: picker } }));
+  }
+
+  function repaintPicker() {
+    if (!picker.hidden && !pickerState.naming && !pickerState.deleting) paintPicker();
   }
 
   function finishPick(choice) {
@@ -263,6 +269,8 @@ export function mountSaves({ state, hud, store, autosave, makeState, nowSeconds,
     if (nameInput && document.activeElement !== nameInput) nameInput.value = s?.name ?? '';
     const note = document.querySelector('[data-save-files-note]');
     if (note) note.textContent = `Back up or move a shop between browsers. Export saves the current slot${n ? ` (Slot ${n})` : ''}.`;
+    const exportBtn = document.querySelector('[data-save-export]');
+    if (exportBtn) exportBtn.textContent = `Export Slot ${n ?? 1}`;
   }
 
   function openDock() {
@@ -469,6 +477,10 @@ export function mountSaves({ state, hud, store, autosave, makeState, nowSeconds,
     events,
     emit,
     showPicker,
+    repaintPicker,
+    get pickerOpen() {
+      return !picker.hidden;
+    },
     loadSlotInto,
     startNew,
     openImport,

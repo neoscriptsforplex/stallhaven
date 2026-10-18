@@ -9,6 +9,11 @@ import { normalizeImported, setBundledLooks, setRiggedBuyers } from './game/mode
 import { createAutosave, createSlotStore, openBackend, applySlotData } from './game/saveSlots.js';
 import { keepSharedSettings, mountSaves, readBootSlot } from './game/saveUi.js';
 import { mountCoop } from './coop/coopUi.js';
+import { cloudConfig } from './cloud/config.js';
+import { createSupabaseClient } from './cloud/supabaseClient.js';
+import { createCloudSync } from './cloud/sync.js';
+import { createAutoBackup } from './cloud/autobackup.js';
+import { deviceLabel, mountCloud } from './cloud/cloudUi.js';
 
 const canvas = document.querySelector('#view');
 const hudRoot = document.querySelector('#hud');
@@ -242,6 +247,46 @@ async function bootGame() {
   });
   window.stallhaven.saves = saves;
   window.stallhaven.saveEvents = saves.events;
+
+  // Online saves (off unless VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set) + backup file.
+  let live = false;
+  const cfg = cloudConfig();
+  let deviceId = null;
+  try {
+    deviceId = local?.getItem('rc-device-id');
+    if (!deviceId) {
+      deviceId = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`).slice(0, 36);
+      local?.setItem('rc-device-id', deviceId);
+    }
+  } catch {
+    deviceId = 'unknown';
+  }
+  const cloudClient = cfg ? createSupabaseClient({ ...cfg, storage: local }) : null;
+  const cloudSync = cloudClient
+    ? createCloudSync({
+      client: cloudClient,
+      store,
+      kv: local,
+      deviceId,
+      deviceLabel: deviceLabel(),
+      isLive: (slot) => live && autosave.slot === slot,
+      emit: (type, detail) => saves.emit(type, detail),
+    })
+    : null;
+  const backup = createAutoBackup({ store, kv: local, emit: (type, detail) => saves.emit(type, detail) });
+  backup.loadHandle().catch(() => {});
+  const cloud = mountCloud({
+    saves,
+    store,
+    autosave,
+    sync: cloudSync,
+    client: cloudClient,
+    backup,
+    emit: (type, detail) => saves.emit(type, detail),
+    isLive: (slot) => live && autosave.slot === slot,
+  });
+  window.stallhaven.cloud = { ui: cloud, sync: cloudSync, backup, enabled: Boolean(cfg) };
+  const cloudStart = cloud.start().catch(() => null);
   window.stallhaven.coop = mountCoop({ state, world, hud, autosave });
   bindUploadUI({
     button: document.querySelector('#upload-btn'),
@@ -301,6 +346,10 @@ async function bootGame() {
   if (bootSlot?.isNew) {
     await saves.startNew(bootSlot.slot, bootSlot.name);
   } else if (!resumed) {
+    // An expired login link opens the sign-in form over the picker.
+    cloudStart.then((r) => {
+      if (r?.expired && saves.pickerOpen) cloud.showExpiredInPicker();
+    });
     for (;;) {
       const choice = await saves.showPicker();
       if (choice.isNew) {
@@ -317,6 +366,8 @@ async function bootGame() {
   }
   await store.setLastSlot(autosave.slot);
   autosave.start();
+  live = true;
+  cloud.afterPick();
   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
   world.tick(0, performance.now() / 1000);
   hideBootCover({ immediate: true });

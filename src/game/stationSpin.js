@@ -20,13 +20,16 @@ const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: 
  * for the parts Runecraft ships. Measured from the models:
  *  - saw_blade (sawmill.obj): disc in the XY plane, axle along Z through (75, 68, 0).
  *  - spin_wheel (wheel.obj): wheel in the YZ plane, axle along X through (0, 110.5, 25.5).
+ *  - pottery_plate (potter.obj): wheel head + clay + shaft + kick wheel, vertical axle (Y)
+ *    through (0, 72, -18).
  */
 export const SPIN_PRESETS = Object.freeze({
   saw_blade: { axis: 'z', pivot: [75, 68, 0], speed: -18 },
   spin_wheel: { axis: 'x', pivot: [0, 110.5, 25.5], speed: 6 },
+  pottery_plate: { axis: 'y', pivot: [0, 72, -18], speed: 7 },
 });
 
-function findPart(root, name) {
+export function findPart(root, name) {
   let hit = null;
   root.traverse((o) => {
     if (hit || !o.name) return;
@@ -134,8 +137,47 @@ export function attachSpinner(root, opts = {}) {
       pivot.quaternion.copy(q.setFromAxisAngle(axis, angle));
     },
     angle() { return angle; },
+    /** 0..1 eased spin level (1 = full speed). */
+    level() { return level * level * (3 - 2 * level); },
     /** Put the part back where it was (no rotation) and drop the pivot. */
     dispose() {
+      pivot.quaternion.identity();
+      part.position.add(centre);
+      parent.add(part);
+      pivot.removeFromParent();
+    },
+  };
+}
+
+/**
+ * Re-parent a named part under a pivot Group at `pivotLocal` (the part's own model/OSRS
+ * frame), like attachSpinner does, for parts that swing or slide (see loomFx.js).
+ * Returns { pivot, part, centre, toParent(vecLocal) -> parent-space vector, dispose() } or null.
+ */
+export function mountPivot(root, name, pivotLocal) {
+  const part = findPart(root, name);
+  if (!part || !part.parent) return null;
+  const parent = part.parent;
+  root.updateMatrixWorld(true);
+  part.updateMatrix();
+  const centre = pivotLocal ? pivotLocal.clone().applyMatrix4(part.matrix) : boundsInParent(part).getCenter(new THREE.Vector3());
+  const pivot = new THREE.Group();
+  pivot.name = `${name}-pivot`;
+  pivot.position.copy(centre);
+  parent.add(pivot);
+  part.position.sub(centre);
+  pivot.add(part);
+  pivot.updateMatrixWorld(true);
+  const linear = new THREE.Matrix4().extractRotation(part.matrix);
+  const scale = part.scale.clone();
+  return {
+    pivot,
+    part,
+    centre,
+    /** Direction/offset given in model units -> parent space (rotation and scale applied). */
+    toParent(v) { return v.clone().multiply(scale).applyMatrix4(linear); },
+    dispose() {
+      pivot.position.copy(centre);
       pivot.quaternion.identity();
       part.position.add(centre);
       parent.add(part);

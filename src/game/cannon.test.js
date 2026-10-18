@@ -145,7 +145,7 @@ describe('dwarven plans', () => {
   });
 
   it('stays zero on an older save', () => {
-    assert.equal(SAVE_VERSION, 13);
+    assert.equal(SAVE_VERSION, 14);
     const state = createState();
     state.materials.bow_string = 4;
     state.materials.logs = 3;

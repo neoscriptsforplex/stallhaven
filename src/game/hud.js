@@ -116,6 +116,13 @@ import {
   upgradeChest,
 } from './economy.js';
 import {
+  CONSTRUCTION_PIECES,
+  constructionCategories,
+  constructionPiece,
+  constructionPlaceBlock,
+  missingMaterials,
+} from './construction.js';
+import {
   CHEST_MAX_LEVEL,
   chestSlots,
   chestUpgradeCost,
@@ -252,6 +259,15 @@ export function bindHud(root, state, world) {
   let lastDisplayListKey = '';
   let displayTarget = null;
   let pendingPlace = null;
+  let buildTab = 'furniture';
+  let buildCategory = 'Seating';
+  let selectedPiece = null;
+  let pieceSnap = true;
+  let constructionHost = true;
+  document.addEventListener('rc-party', (event) => {
+    const detail = event.detail ?? {};
+    constructionHost = !detail.inRoom || Boolean(detail.host);
+  });
   let resumeTrade = null;
 
   tabsEl.innerHTML = ANVIL_TABS.map((tab) => (
@@ -1947,6 +1963,12 @@ export function bindHud(root, state, world) {
   });
 
   function paintBuild() {
+    for (const button of buildModal.querySelectorAll('[data-build-tab]')) {
+      button.classList.toggle('is-on', button.dataset.buildTab === buildTab);
+    }
+    for (const pane of buildModal.querySelectorAll('[data-build-pane]')) {
+      pane.hidden = pane.dataset.buildPane !== buildTab;
+    }
     const status = buildModal.querySelector('[data-cauldron-status]');
     const buyBtn = buildModal.querySelector('[data-cauldron-buy]');
     if (ownsCauldron(state)) {
@@ -2051,6 +2073,62 @@ export function bindHud(root, state, world) {
       itemBuy.disabled = !canBuyFurniture(state, type);
       itemBuy.textContent = cost === 0 ? 'Place · Free' : `Buy · ${formatGold(cost)} gp`;
     }
+    paintConstructionCatalogue();
+  }
+
+  function materialName(id) {
+    return MATERIALS[id]?.name ?? id;
+  }
+
+  function pieceNeedLine(row) {
+    return Object.entries(row.materials).map(([id, need]) => {
+      const have = Math.max(0, Math.floor(Number(state.materials?.[id]) || 0));
+      const mark = have >= need ? 'have' : 'missing';
+      return `<span class="is-${mark}">${materialName(id)} ${have}/${need}</span>`;
+    }).join(' · ');
+  }
+
+  function paintConstructionCatalogue() {
+    const root = buildModal.querySelector('[data-build-catalogue]');
+    const side = buildModal.querySelector('[data-build-side]');
+    const detail = buildModal.querySelector('[data-build-detail]');
+    if (!root || !side) return;
+    const categories = ['Shop', ...constructionCategories()];
+    if (!categories.includes(buildCategory)) buildCategory = categories[0];
+    side.hidden = buildTab !== 'furniture';
+    side.innerHTML = categories.map((name) => (
+      `<button type="button" data-build-cat="${name}" class="${name === buildCategory ? 'is-on' : ''}">${name}</button>`
+    )).join('');
+    for (const article of buildModal.querySelectorAll('[data-shop-furniture]')) {
+      article.hidden = buildTab !== 'furniture' || buildCategory !== 'Shop';
+    }
+    if (buildCategory === 'Shop') {
+      root.innerHTML = '';
+      if (detail) detail.hidden = true;
+      return;
+    }
+    const rows = CONSTRUCTION_PIECES.filter((row) => row.category === buildCategory);
+    root.innerHTML = rows.map((row) => {
+      const blocked = constructionPlaceBlock(state, row.id);
+      const level = state.skills?.getLevel?.('construction') ?? 1;
+      return `<article class="build-item${blocked ? '' : ''}">
+        <h3>${row.name}</h3>
+        <p class="meta">Level ${row.level} Construction${level < row.level ? ' · locked' : ''} · ${row.mount === 'wall' ? 'Wall' : row.mount === 'outdoor' ? 'Indoor or outdoor' : 'Floor'}</p>
+        <p class="build-detail">${pieceNeedLine(row)}</p>
+        <button type="button" data-piece="${row.id}" ${blocked ? 'disabled' : ''}>Place</button>
+      </article>`;
+    }).join('');
+    if (detail) detail.hidden = true;
+  }
+
+  function showPieceDetail(row) {
+    const detail = buildModal.querySelector('[data-build-detail]');
+    if (!detail || !row) return;
+    const missing = missingMaterials(state, row);
+    detail.hidden = false;
+    detail.innerHTML = missing.length
+      ? `Missing: ${missing.map((item) => `${materialName(item.id)} ${item.have}/${item.need}`).join(' · ')}`
+      : `Have everything for ${row.name}. Sell pays ${formatGold(Math.floor(row.gold / 2))} gp. Pick up returns the materials.`;
   }
 
   function paintPlaceDock() {
@@ -2059,10 +2137,28 @@ export function bindHud(root, state, world) {
     const blurb = placeModal.querySelector('[data-place-blurb]');
     const costEl = placeModal.querySelector('[data-place-cost]');
     const note = placeModal.querySelector('[data-place-note]');
-    const label = stationLabel(pendingPlace.type);
-    if (title) title.textContent = pendingPlace.moving ? 'Move Farming Patch' : `Place ${label}`;
+    const label = pendingPlace.pieceId
+      ? (constructionPiece(pendingPlace.pieceId)?.name ?? 'Furniture')
+      : stationLabel(pendingPlace.type);
+    const rotateBtn = placeModal.querySelector('[data-place-rotate]');
+    const snapBtn = placeModal.querySelector('[data-place-snap]');
+    const piecePlace = Boolean(pendingPlace.pieceId);
+    if (rotateBtn) rotateBtn.hidden = !piecePlace;
+    if (snapBtn) {
+      snapBtn.hidden = !piecePlace;
+      snapBtn.textContent = pieceSnap ? 'Snap on' : 'Snap off';
+    }
+    if (title) {
+      title.textContent = pendingPlace.moving && pendingPlace.pieceId
+        ? `Move ${label}`
+        : pendingPlace.moving
+          ? 'Move Farming Patch'
+          : `Place ${label}`;
+    }
     if (blurb) {
-      blurb.textContent = pendingPlace.moving
+      blurb.textContent = pendingPlace.pieceId
+        ? 'Move the ghost, rotate it, and snap it to the grid. Materials are spent only when you confirm. Cancel spends nothing.'
+        : pendingPlace.moving
         ? 'Move the patch on open grass, clear of the path, buildings, and other patches. Nothing is spent. Cancel leaves the patch where it was.'
         : pendingPlace.type === 'farming_patch'
         ? 'Place the patch on open grass, clear of the path and flower beds. Gold is spent only when you confirm.'
@@ -2074,7 +2170,10 @@ export function bindHud(root, state, world) {
           ? 'Move the shelf on the wall grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.'
           : `Move the ${label.toLowerCase()} on the floor snap grid, then confirm. Gold is spent only when you confirm placement. Right-click to move or rotate it afterward.`;
     }
-    if (costEl) {
+    if (costEl && pendingPlace.pieceId) {
+      const row = constructionPiece(pendingPlace.pieceId);
+      costEl.innerHTML = row ? pieceNeedLine(row) : '';
+    } else if (costEl) {
       const needs = pendingPlace.cost > 0 ? buildMaterialNeedLine(state, pendingPlace.type) : '';
       const goldText = pendingPlace.cost > 0 ? `${formatGold(pendingPlace.cost)} gp` : 'Free';
       costEl.textContent = [`Cost: ${goldText}`, needs].filter(Boolean).join('\n');
@@ -2162,7 +2261,9 @@ export function bindHud(root, state, world) {
   }
 
   buildBtn?.addEventListener('click', toggleBuild);
-  buildModal.querySelector('[data-build-close]').addEventListener('click', closeBuild);
+  buildModal.querySelectorAll('[data-build-close]').forEach((button) => {
+    button.addEventListener('click', closeBuild);
+  });
   buildModal.querySelector('[data-expand-buy]')?.addEventListener('click', () => {
     closeBuild();
     openExpand();
@@ -2200,6 +2301,133 @@ export function bindHud(root, state, world) {
   buildModal.querySelector('[data-mannequin-buy]')?.addEventListener('click', () => startFurniturePlace('mannequin'));
   buildModal.querySelector('[data-shelf-buy]')?.addEventListener('click', () => startFurniturePlace('shelf'));
   buildModal.querySelector('[data-farming_patch-buy]')?.addEventListener('click', () => startFurniturePlace('farming_patch'));
+  function hostCannotBuild() {
+    if (constructionHost) return false;
+    pushLog(state, 'Only the host can build.');
+    render(performance.now() / 1000);
+    return true;
+  }
+  function startPiecePlace(pieceId) {
+    if (hostCannotBuild()) return;
+    const row = constructionPiece(pieceId);
+    const block = constructionPlaceBlock(state, pieceId);
+    showPieceDetail(row);
+    if (block) {
+      pushLog(state, block);
+      render(performance.now() / 1000);
+      return;
+    }
+    pendingPlace = { type: 'piece', pieceId, cost: 0, note: '', moving: false };
+    world.beginPlacePiece?.(pieceId);
+    world.setPieceSnap?.(pieceSnap);
+    openPlaceDock();
+    paintPlaceDock();
+    render(performance.now() / 1000);
+  }
+  buildModal.addEventListener('click', (event) => {
+    const tab = event.target.closest('[data-build-tab]');
+    if (tab) {
+      buildTab = tab.dataset.buildTab;
+      paintBuild();
+      return;
+    }
+    const cat = event.target.closest('[data-build-cat]');
+    if (cat) {
+      buildCategory = cat.dataset.buildCat;
+      paintConstructionCatalogue();
+      return;
+    }
+    const pieceBtn = event.target.closest('[data-piece]');
+    if (pieceBtn && !pieceBtn.disabled) startPiecePlace(pieceBtn.dataset.piece);
+  });
+  placeModal.querySelector('[data-place-rotate]')?.addEventListener('click', () => {
+    world.rotateFurniture?.({
+      id: 'piece',
+      pieceId: pendingPlace?.pieceId,
+      index: pendingPlace?.index ?? null,
+    });
+    render(performance.now() / 1000);
+  });
+  placeModal.querySelector('[data-place-snap]')?.addEventListener('click', () => {
+    pieceSnap = !pieceSnap;
+    world.setPieceSnap?.(pieceSnap);
+    paintPlaceDock();
+  });
+  const placedBar = document.querySelector('#placed-bar');
+  function closePlacedBar() {
+    selectedPiece = null;
+    if (placedBar) placedBar.hidden = true;
+  }
+  function openPlacedBar(index) {
+    const row = state.furniture?.placed?.[index];
+    const piece = row ? constructionPiece(row.id) : null;
+    if (!piece || !placedBar) return;
+    selectedPiece = index;
+    placedBar.hidden = false;
+    const name = placedBar.querySelector('[data-placed-name]');
+    if (name) name.textContent = piece.name;
+    const snap = placedBar.querySelector('[data-placed="snap"]');
+    if (snap) snap.textContent = pieceSnap ? 'Snap on' : 'Snap off';
+  }
+  placedBar?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-placed]');
+    if (!button) return;
+    const action = button.dataset.placed;
+    if (action === 'done') {
+      closePlacedBar();
+      return;
+    }
+    if (selectedPiece == null || hostCannotBuild()) return;
+    const row = state.furniture?.placed?.[selectedPiece];
+    const piece = row ? constructionPiece(row.id) : null;
+    if (!row || !piece) {
+      closePlacedBar();
+      return;
+    }
+    if (action === 'snap') {
+      pieceSnap = !pieceSnap;
+      world.setPieceSnap?.(pieceSnap);
+      button.textContent = pieceSnap ? 'Snap on' : 'Snap off';
+      return;
+    }
+    if (action === 'rotate') {
+      const rot = (row.rot ?? 0) + Math.PI / 2;
+      if (intentBus.run({ type: 'movePiece', index: selectedPiece, pose: { x: row.x, z: row.z, rot } })) {
+        world.refreshFurniture?.();
+        pushLog(state, `Turned the ${piece.name}.`);
+        render(performance.now() / 1000);
+      }
+      return;
+    }
+    if (action === 'move') {
+      pendingPlace = { type: 'piece', pieceId: piece.id, index: selectedPiece, cost: 0, note: '', moving: true };
+      world.beginMovePiece?.(selectedPiece);
+      world.setPieceSnap?.(pieceSnap);
+      closePlacedBar();
+      openPlaceDock();
+      paintPlaceDock();
+      render(performance.now() / 1000);
+      return;
+    }
+    if (action === 'pickup') {
+      if (intentBus.run({ type: 'pickupPiece', index: selectedPiece })) {
+        world.refreshFurniture?.();
+        closePlacedBar();
+        pushLog(state, `Picked up the ${piece.name}. Materials returned.`);
+        render(performance.now() / 1000);
+      }
+      return;
+    }
+    if (action === 'sell') {
+      const gold = intentBus.run({ type: 'sellPiece', index: selectedPiece });
+      if (gold) {
+        world.refreshFurniture?.();
+        closePlacedBar();
+        pushLog(state, `Sold the ${piece.name} for ${formatGold(gold)} gp.`);
+        render(performance.now() / 1000);
+      }
+    }
+  });
   function confirmPendingPlace() {
     if (!pendingPlace) return;
     const check = world.tryConfirmPlace?.() ?? { ok: Boolean(world.getPlacePose()), pose: world.getPlacePose() };
@@ -2212,6 +2440,30 @@ export function bindHud(root, state, world) {
     }
     const pose = check.pose;
     const pending = pendingPlace;
+    if (pending.pieceId) {
+      const block = constructionPlaceBlock(state, pending.pieceId);
+      if (!pending.moving && block) {
+        pendingPlace.note = block;
+        paintPlaceDock();
+        pushLog(state, block);
+        render(performance.now() / 1000);
+        return;
+      }
+      const placed = pending.moving
+        ? intentBus.run({ type: 'movePiece', index: pending.index, pose })
+        : intentBus.run({ type: 'placePiece', pieceId: pending.pieceId, pose });
+      if (!placed) {
+        render(performance.now() / 1000);
+        return;
+      }
+      world.confirmPlaceUnlock?.();
+      world.refreshFurniture?.();
+      closePlace();
+      const name = constructionPiece(pending.pieceId)?.name ?? 'furniture';
+      pushLog(state, pending.moving ? `Moved the ${name}.` : `Placed a ${name}.`);
+      render(performance.now() / 1000);
+      return;
+    }
     if (pending.moving && pending.type === 'farming_patch') {
       if (!intentBus.run({ type: 'movePatch', index: pending.index, pose })) {
         render(performance.now() / 1000);
@@ -2946,6 +3198,10 @@ export function bindHud(root, state, world) {
     }
     if (event.type === 'wheat-inspect') {
       showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'wheat' });
+    }
+    if (event.type === 'construction-select') {
+      openPlacedBar(event.index);
+      return;
     }
     if (event.type === 'fishing-inspect') {
       showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'fishing_spot' });

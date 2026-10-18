@@ -7,6 +7,7 @@
  * This file does not import the catalog, so the catalog can import it.
  */
 
+import { CONSTRUCTION_UNLOCKS } from './construction.js';
 import { GATHER_NODES } from './skills.js';
 
 const METALS = ['bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon'];
@@ -307,6 +308,15 @@ export function applyRecipeLevels(recipes) {
       kind: 'gather',
     });
   }
+  for (const row of CONSTRUCTION_UNLOCKS) {
+    unlocks.push({
+      id: row.id,
+      name: row.name,
+      skill: 'construction',
+      level: row.level,
+      kind: 'item',
+    });
+  }
 }
 
 /** Unique unlock levels per skill, after melee metals share one level. Includes gather nodes. */
@@ -320,6 +330,9 @@ export function unlockLevelsBySkill() {
   }
   for (const herb of FARMING_HERBS) {
     (bySkill.farming ??= new Set()).add(herb.level);
+  }
+  for (const row of CONSTRUCTION_UNLOCKS) {
+    (bySkill.construction ??= new Set()).add(row.level);
   }
   return Object.fromEntries(
     Object.entries(bySkill).map(([skill, levels]) => [skill, [...levels].sort((a, b) => a - b)]),

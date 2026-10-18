@@ -236,6 +236,7 @@ export function createRoomCore({
       coop: true,
       now: now(),
       playerId: player.id,
+      host: Boolean(player.host),
       customers: customers.customers,
       gatherLog,
     });

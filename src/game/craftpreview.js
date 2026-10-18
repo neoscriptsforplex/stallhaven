@@ -126,7 +126,7 @@ export function mountDisplayBasePose(ware, id, opts = {}) {
   mount.userData.recipeId = ware.userData?.recipeId ?? id;
   mount.add(pose);
   mount.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(mount);
+  const box = new THREE.Box3().setFromObject(mount, true);
   if (!box.isEmpty()) {
     const center = box.getCenter(_center);
     pose.position.set(-center.x, -box.min.y, -center.z);

@@ -51,6 +51,7 @@ import {
   furnitureVisualYaw,
   FLAX_CLICK_RADIUS,
   FLAX_COUNT,
+  FLAX_SPACING,
   FOUNTAIN,
   keepFountain,
   gardenBox,
@@ -60,6 +61,9 @@ import {
   buyerCobbleRoute,
   gardenTrapdoorSpot,
   gardenTreeSpots,
+  patchHitsTreeOrRock,
+  FARMING_PATCH_HALF,
+  FLAX_RESPAWN_SEC,
   runeFieldTreeSpots,
   runeFieldRect,
   RUNE_ALTAR_SPOTS,
@@ -161,6 +165,7 @@ import {
   PLAYER_WORLD_SCALE,
 } from './models.js';
 import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
+import { attachPortalJelly, tickPortalJelly } from './portalJelly.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -676,6 +681,7 @@ export function createWorld(canvas, state, opts = {}) {
   const sawmillPick = makePick(STATION_HIT.sawmill.w, STATION_HIT.sawmill.h, STATION_HIT.sawmill.d, 'sawmill');
 
   const portalMesh = buildPortal();
+  attachPortalJelly(portalMesh);
   scene.add(portalMesh);
   const portalPick = makePick(STATION_HIT.portal.w, STATION_HIT.portal.h, STATION_HIT.portal.d, 'portal');
 
@@ -1060,6 +1066,84 @@ export function createWorld(canvas, state, opts = {}) {
 
   function livingCropSpots(nodes, spacing) {
     return nodes.filter((node) => node.alive).map((node) => ({ x: node.x, z: node.z, spacing }));
+  }
+
+  function shiftDecorOffPatch(pose) {
+    if (!architecture || !pose) return;
+    const hw = FARMING_PATCH_HALF;
+    const hd = FARMING_PATCH_HALF;
+    const matrix = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    const scl = new THREE.Vector3();
+    architecture.traverse((child) => {
+      if (!child.isInstancedMesh) return;
+      if (child.name !== 'flowers' && child.name !== 'grass') return;
+      let moved = false;
+      for (let i = 0; i < child.count; i += 1) {
+        child.getMatrixAt(i, matrix);
+        matrix.decompose(pos, quat, scl);
+        if (Math.abs(pos.x - pose.x) > hw || Math.abs(pos.z - pose.z) > hd) continue;
+        const dx = pos.x - pose.x;
+        const dz = pos.z - pose.z;
+        if (Math.abs(dx) >= Math.abs(dz)) pos.x = pose.x + Math.sign(dx || 1) * (hw + 0.25);
+        else pos.z = pose.z + Math.sign(dz || 1) * (hd + 0.25);
+        matrix.compose(pos, quat, scl);
+        child.setMatrixAt(i, matrix);
+        moved = true;
+      }
+      if (moved) child.instanceMatrix.needsUpdate = true;
+    });
+  }
+
+  function relocateCrop(nodes, roll, spacing) {
+    let moved = false;
+    for (const node of nodes) {
+      if (!node.alive) continue;
+      if (!spotInsidePatch(node.x, node.z)) continue;
+      const occupied = nodes
+        .filter((item) => item.alive && item !== node)
+        .map((item) => ({ x: item.x, z: item.z, spacing }));
+      const spot = roll(occupied);
+      if (spot) {
+        node.x = spot.x;
+        node.z = spot.z;
+      } else {
+        node.alive = false;
+        node.respawnAt = (lastNow || 0) + FLAX_RESPAWN_SEC;
+      }
+      moved = true;
+    }
+    return moved;
+  }
+
+  let shiftPatchPose = null;
+  function spotInsidePatch(x, z) {
+    const pose = shiftPatchPose;
+    if (!pose) return false;
+    return Math.abs(x - pose.x) <= FARMING_PATCH_HALF && Math.abs(z - pose.z) <= FARMING_PATCH_HALF;
+  }
+
+  function shiftPlantsOffPatch(pose) {
+    shiftPatchPose = pose;
+    const flaxMoved = relocateCrop(flaxNodes, (occupied) => (
+      rollFlaxSpots(state.expansions ?? [], {
+        count: 1,
+        furniture: state.furniture,
+        occupied: [...occupied, ...livingCropSpots(wheatNodes, WHEAT_SPACING)],
+      })[0] ?? null
+    ), FLAX_SPACING);
+    const wheatMoved = relocateCrop(wheatNodes, (occupied) => (
+      rollWheatSpots(state.expansions ?? [], {
+        count: 1,
+        furniture: state.furniture,
+        occupied: [...occupied, ...livingCropSpots(flaxNodes, FLAX_SPACING)],
+      })[0] ?? null
+    ), WHEAT_SPACING);
+    shiftPatchPose = null;
+    if (flaxMoved) syncFlaxMeshes();
+    if (wheatMoved) syncWheatMeshes();
+    shiftDecorOffPatch(pose);
   }
 
   function refillFlaxField() {
@@ -2242,6 +2326,9 @@ export function createWorld(canvas, state, opts = {}) {
     if (corners.some(([x, z]) => pointHitsShop(x, z, expansions, 0.05))) return grass;
     if (corners.some(([x, z]) => pointOnPath(x, z, expansions, 0.05))) return grass;
     if (!gardenSpotClearOfBeds(pose, expansions, hw + 0.55)) return grass;
+    const blocked = patchHitsTreeOrRock(pose, expansions);
+    if (blocked === 'tree') return 'That spot overlaps a tree.';
+    if (blocked === 'rock') return 'That spot overlaps a rock.';
     return null;
   }
 
@@ -3416,6 +3503,8 @@ export function createWorld(canvas, state, opts = {}) {
       outlineEdgeMat.opacity = 0.82 + Math.sin(now * 3.1) * 0.16;
       outlineBoxMat.opacity = 0.72 + Math.sin(now * 2.4) * 0.18;
     }
+    tickPortalJelly(portalMesh, dt);
+    if (runeField?.root?.visible) tickPortalJelly(runeField.portal, dt);
     if (sceneMode === 'shop') {
       updateCustomers(dt, now);
       updateGoblins(dt, now);
@@ -3601,6 +3690,7 @@ export function createWorld(canvas, state, opts = {}) {
   function ensureRuneField() {
     if (runeField) return runeField;
     runeField = buildRuneField();
+    if (runeField.portal) attachPortalJelly(runeField.portal);
     runeField.root.visible = false;
     runeField.grounds.visible = false;
     scene.add(runeField.root);
@@ -3938,6 +4028,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (target.id === 'display') applyDisplayPose(target.index);
       else if (target.id !== 'farming_patch') applyFixturePose(target.id);
       if (patchesReady) syncPatchMeshes();
+      if (target.id === 'farming_patch') shiftPlantsOffPatch(pose);
       return pose;
     },
     beginPlacePatch() {

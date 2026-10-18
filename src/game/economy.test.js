@@ -83,6 +83,7 @@ import {
   canRestock,
   canBuyFurniture,
   canCraft,
+  grantMoltenGlass,
   CAULDRON_COST,
   PORTAL_COST,
   SAWMILL_COST,
@@ -137,6 +138,7 @@ import {
   tickMaterials,
   pushLog,
   visibleLog,
+  isSystemLog,
   unlockRemaining,
   upgradeChest,
 } from './economy.js';
@@ -200,6 +202,13 @@ describe('stall economy', () => {
     assert.equal(MATERIALS.flour.crafted, true);
     assert.equal(state.materials.soft_clay, 0);
     assert.equal(MATERIALS.soft_clay.crafted, true);
+    assert.equal(state.materials.orb, 0);
+    assert.equal(MATERIALS.orb.crafted, true);
+    assert.equal(MATERIALS.orb.restock, 0);
+    assert.equal(MATERIALS.orb.regenEvery, 0);
+    assert.equal(MATERIALS.molten_glass.quest, true);
+    assert.equal(MATERIALS.molten_glass.restock, 0);
+    assert.equal(state.materials.molten_glass, 0);
     assert.equal(MATERIALS.soft_clay.restock, 0);
     assert.equal(MATERIALS.soft_clay.regenEvery, 0);
     assert.equal(MATERIALS.hard_clay.crafted, undefined);
@@ -465,6 +474,20 @@ describe('save and load', () => {
     assert.match(state.log[0], /Smithing 7/);
     assert.match(state.log[0], /Crafting 12/);
     assert.deepEqual(visibleLog(state), state.log);
+    state.log = [
+      'Chopped 5 Logs.',
+      'Shop saved to a file.',
+      'Cheat applied. Gold is now 9.',
+      'Fullscreen is not available in this browser.',
+      'Smithing advanced to 5.',
+    ];
+    assert.equal(isSystemLog('Shop loaded from a file.'), true);
+    assert.equal(isSystemLog('Could not save that file.'), true);
+    assert.equal(isSystemLog('Could not read that save file.'), true);
+    assert.equal(isSystemLog('Rune Craft is open. Walk to an altar to craft runes.'), true);
+    assert.equal(isSystemLog('Cleared uploaded models.'), true);
+    assert.equal(isSystemLog('Chopped 5 Logs.'), false);
+    assert.deepEqual(visibleLog(state), ['Chopped 5 Logs.', 'Smithing advanced to 5.']);
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);
     assert.equal(ownsFurnace(state), false);
     assert.equal(ownsRange(state), false);
@@ -858,7 +881,7 @@ describe('catalog', () => {
   });
 
   it('groups anvil recipes by melee, magic, ranged, and tools with weapons and armour subtabs', () => {
-    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Tools']);
+    assert.deepEqual(CRAFT_TABS.map((tab) => tab.label), ['Melee', 'Magic', 'Tools', 'Misc']);
     assert.equal(stationForRecipe(RECIPES.shortbow), 'fletch');
     assert.equal(stationForRecipe(RECIPES.bronze_arrows), 'fletch');
     assert.equal(stationForRecipe(RECIPES.green_dragon_mask), 'loom');
@@ -877,6 +900,17 @@ describe('catalog', () => {
     assert.equal(RECIPES.soft_clay.requires.skill, 'crafting');
     assert.equal(RECIPES.soft_clay.requires.level, 1);
     assert.equal(RECIPES.soft_clay.xp, 5);
+    assert.equal(stationForRecipe(RECIPES.unpowered_orb), 'anvil');
+    assert.equal(anvilTabForRecipe(RECIPES.unpowered_orb), 'misc');
+    assert.deepEqual(anvilSubtabsForTab('misc'), []);
+    assert.equal(recipesForTab('misc')[0].id, 'unpowered_orb');
+    assert.equal(isCraftHidden(RECIPES.unpowered_orb), false);
+    assert.equal(recipeCost(RECIPES.unpowered_orb).materials.molten_glass, 1);
+    assert.equal(RECIPES.unpowered_orb.outputMaterial, 'orb');
+    assert.equal(RECIPES.unpowered_orb.price, 250);
+    assert.deepEqual(RECIPES.unpowered_orb.buyers, []);
+    assert.equal(RECIPES.unpowered_orb.requires.level, 1);
+    assert.equal(craftUiForStation('anvil', { tab: 'misc', subtab: 'weapon' }).tab, 'misc');
     assert.deepEqual(ANVIL_SUBTABS.map((tab) => tab.label), ['Weapons', 'Armour', 'Ammo', 'Hatchet', 'Pickaxe']);
     assert.equal(anvilSubtabsForTab('magic').some((tab) => tab.id === 'rune'), false);
     assert.equal(recipesForTab('magic', 'rune').some((recipe) => stationForRecipe(recipe) === 'anvil'), false);
@@ -1243,6 +1277,24 @@ describe('material regen', () => {
     assert.deepEqual(completeCrafts(clay, 4), ['soft_clay']);
     assert.equal(clay.materials.soft_clay, 1);
     assert.equal(clay.chest.soft_clay, undefined);
+    const glass = createState();
+    assert.equal(canCraft(glass, 'unpowered_orb'), false);
+    assert.match(craftBlockReason(glass, 'unpowered_orb'), /Molten Glass/);
+    assert.equal(maxCraftActions(glass, 'unpowered_orb'), 0);
+    assert.equal(grantMoltenGlass(glass, 2), 2);
+    assert.equal(canCraft(glass, 'unpowered_orb'), true);
+    assert.equal(startCraft(glass, 'unpowered_orb', 0), true);
+    assert.equal(glass.materials.molten_glass, 1);
+    assert.deepEqual(completeCrafts(glass, 3), ['unpowered_orb']);
+    assert.equal(glass.materials.orb, 1);
+    assert.equal(glass.chest.unpowered_orb, undefined);
+    assert.equal(canRestock(glass, 'orb'), false);
+    assert.equal(canRestock(glass, 'molten_glass'), false);
+    assert.equal(buyFromCustomer(glass, 'molten_glass', 1), false);
+    assert.equal(buyFromCustomer(glass, 'orb', 1), false);
+    const orbSave = createState();
+    assert.equal(applyState(orbSave, { gold: 40, materials: { orb: 7 } }), true);
+    assert.equal(orbSave.materials.orb, 7);
     assert.equal(miningBarAmount(clay, 'hard_clay'), 1);
     assert.equal(state.materials.water, 5);
     assert.equal(FOUNTAIN_WATER_YIELD, 5);
@@ -2734,25 +2786,39 @@ describe('furniture nails and planks', () => {
     assert.equal(grantChoppedLogs(state, chopYield('logs'), 'logs'), 5);
   });
 
-  it('sells at most four farming patches and keeps an old save without them', () => {
+  it('sells at most six farming patches and keeps an old save without them', () => {
     const state = createState();
-    state.gold = 20000000;
-    state.materials.iron_nails = 40;
-    state.materials.oak_plank = 20;
+    state.gold = 70000000;
+    state.materials.iron_nails = 6;
+    state.materials.oak_plank = 2;
+    state.materials.steel_nails = 8;
+    state.materials.willow_plank = 3;
+    state.materials.mithril_nails = 10;
+    state.materials.maple_plank = 4;
+    state.materials.adamant_nails = 12;
+    state.materials.yew_plank = 5;
+    state.materials.runite_nails = 15;
+    state.materials.magic_plank = 14;
+    state.materials.dragon_nails = 20;
     const costs = [];
     const displaysBefore = state.displays.length;
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       costs.push(nextFurnitureCost(state, 'farming_patch'));
       assert.equal(canBuyFurniture(state, 'farming_patch'), true);
       assert.equal(buyFurniture(state, 'farming_patch', { x: i * 3, z: -6, rot: 0 }), true);
     }
-    assert.deepEqual(costs, [1000000, 2000000, 4000000, 8000000]);
-    assert.equal(state.furniture.patches.length, 4);
+    assert.deepEqual(costs, [1000000, 2000000, 4000000, 8000000, 16000000, 32000000]);
+    assert.equal(state.furniture.patches.length, 6);
     assert.equal(state.displays.length, displaysBefore);
-    assert.equal(state.boughtFurniture.farming_patch, 4);
+    assert.equal(state.boughtFurniture.farming_patch, 6);
+    assert.equal(state.materials.iron_nails, 0);
+    assert.equal(state.materials.oak_plank, 0);
+    assert.equal(state.materials.dragon_nails, 0);
+    assert.equal(state.materials.magic_plank, 0);
     assert.equal(canBuyFurniture(state, 'farming_patch'), false);
     assert.equal(buyFurniture(state, 'farming_patch', { x: 0, z: -8, rot: 0 }), false);
-    assert.equal(buildMaterialLabel('farming_patch'), 'Iron Nails ×6 · Oak Plank ×2');
+    assert.equal(buildMaterialLabel('farming_patch', 0), 'Iron Nails ×6 · Oak Plank ×2');
+    assert.equal(buildMaterialLabel('farming_patch', 5), 'Dragon Nails ×20 · Magic Plank ×8');
     const broke = createState();
     broke.gold = 1000000;
     assert.equal(canBuyFurniture(broke, 'farming_patch'), false);

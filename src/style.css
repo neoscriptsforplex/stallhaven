@@ -1118,6 +1118,11 @@ body.modal-open #view {
   flex-shrink: 1;
 }
 
+.build-item .meta,
+[data-place-cost] {
+  white-space: pre-line;
+}
+
 .craft-note {
   color: #f0a07a;
   font-weight: 600;

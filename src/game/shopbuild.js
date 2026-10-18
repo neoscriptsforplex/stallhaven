@@ -1268,8 +1268,6 @@ function addRoomTorches(root, center, neigh) {
 }
 
 function addOriginDecor(root, center) {
-  addWallVines(root, center);
-
   addWallTorch(root, center.x - ROOM_W / 2 + 0.18, 1.62, center.z - 1.85, Math.PI / 2);
   addWallTorch(root, center.x - ROOM_W / 2 + 0.18, 1.62, center.z + 1.85, Math.PI / 2);
   addWallTorch(root, center.x + ROOM_W / 2 - 0.18, 1.62, center.z - 1.85, -Math.PI / 2);
@@ -2651,8 +2649,8 @@ function flowerGeometry(rand) {
   return merged;
 }
 
-function addGrassFlowers(root, expansionIds) {
-  const spots = gardenFlowerSpots(expansionIds);
+function addGrassFlowers(root, expansionIds, furniture = null) {
+  const spots = gardenFlowerSpots(expansionIds, furniture);
   const geometry = flowerGeometry(randAt(8801));
   if (!spots.length || !geometry) return;
   const material = new THREE.MeshStandardMaterial({
@@ -2759,8 +2757,8 @@ function addGarden(root, cells, expansionIds = [], furniture = null) {
     door.position.set(hatch.x, 0, hatch.z);
     root.add(door);
   }
-  addLushGrass(root, grass, expansionIds, rand);
-  addGrassFlowers(root, expansionIds);
+  addLushGrass(root, grass, expansionIds, rand, furniture);
+  addGrassFlowers(root, expansionIds, furniture);
 }
 
 /** Metres of ground covered by one seamless fountain_cobble tile. */
@@ -2983,8 +2981,8 @@ function buildProceduralTrapdoor() {
   return group;
 }
 
-function addLushGrass(root, grass, expansionIds, rand) {
-  const clusters = gardenGrassClusters(expansionIds);
+function addLushGrass(root, grass, expansionIds, rand, furniture = null) {
+  const clusters = gardenGrassClusters(expansionIds, furniture);
   const bladeGeo = new THREE.ConeGeometry(0.016, 1, 4);
   bladeGeo.translate(0, 0.5, 0);
   const greens = [

@@ -1700,7 +1700,9 @@ const MANNEQUIN_THIN_DEPTH = 0.08;
 
 function wearBounds(mesh) {
   mesh.updateMatrixWorld(true);
-  return new THREE.Box3().setFromObject(mesh);
+  // Precise: a turned dump (splitbark's 45° roll) would otherwise measure its
+  // rotated local box, which is far bigger than the mesh, so it fits small and off-centre.
+  return new THREE.Box3().setFromObject(mesh, true);
 }
 
 /** Bake the mesh's current world transform into geometry and clear it. */

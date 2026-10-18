@@ -169,6 +169,7 @@ const LEVELS = {
   summer_pie: row('cooking', 95, 820),
 
   weave_cloth: row('crafting', 1, 5),
+  unpowered_orb: row('smithing', 1, 8),
   soft_clay: row('crafting', 1, 5),
   wizard_boots: row('crafting', 3, 5),
   wizard_hat: row('crafting', 5, 6),

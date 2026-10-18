@@ -57,9 +57,6 @@
       <button type="button" id="save-btn">Save</button>
       <button type="button" id="load-btn">Load</button>
       <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
-      <button type="button" id="expand-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">
-        <span class="expand-icon" aria-hidden="true">⛶</span>
-      </button>
       <button type="button" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
       <input id="music-file" type="file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav" multiple hidden />
@@ -331,7 +328,9 @@ This will allow you to load it back again.
       <article class="build-item">
         <h3>Farming Patch</h3>
         <p>An outdoor 2×2 plot. You can own four. Place it on open grass, clear of the path and flower beds, then confirm. Click a placed patch to grow herbs.</p>
-        <p data-farming_patch-status class="meta">First patch costs 1,000,000 gp. Iron Nails ×6 · Oak Plank ×2.</p>
+        <p data-farming_patch-status class="meta">You can own six farming patches.
+Cost: 1,000,000 gp
+Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
         <button type="button" data-farming_patch-buy>Buy · 1,000,000 gp</button>
       </article>
       <article class="build-item">
@@ -415,6 +414,10 @@ This will allow you to load it back again.
         <span data-dungeon-brightness-label>150%</span>
       </label>
       <p class="meta">Cave lighting only. 100% is the dungeon baseline; new shops and a saved 100% start at 150% (slider max). Other saved levels stay. Does not change the shop.</p>
+      <label class="settings-check" data-fullscreen-row>
+        <input type="checkbox" data-fullscreen />
+        Fullscreen
+      </label>
       <label class="settings-check">
         <input type="checkbox" data-photo-mode />
         Photo mode

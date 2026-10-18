@@ -111,6 +111,7 @@ export const ANVIL_TABS = [
   { id: 'melee', label: 'Melee' },
   { id: 'magic', label: 'Magic' },
   { id: 'tools', label: 'Tools' },
+  { id: 'misc', label: 'Misc' },
 ];
 
 /** Loom: cloth, then ranged and magic armour moved off the anvil. */
@@ -329,7 +330,16 @@ export const MATERIALS = {
     regenEvery: 0,
     tint: 0xb56a3a,
   },
-  orb: { id: 'orb', name: 'Unpowered Orb', restock: 6, start: 4, tier: 2, regenEvery: regenEvery(2) },
+  orb: {
+    id: 'orb',
+    name: 'Unpowered Orb',
+    restock: 0,
+    start: 0,
+    tier: 2,
+    regenEvery: 0,
+    crafted: true,
+    tint: 0xc8d8e8,
+  },
   hide: { id: 'hide', name: 'Hide', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
   egg: { id: 'egg', name: 'Egg', restock: 4, start: 4, tier: 1, regenEvery: regenEvery(1) },
   flour: { id: 'flour', name: 'Pot of flour', restock: 0, start: 0, tier: 1, regenEvery: 0, crafted: true },
@@ -357,6 +367,16 @@ export const MATERIALS = {
     tier: 5,
     regenEvery: 0,
     quest: true,
+  },
+  molten_glass: {
+    id: 'molten_glass',
+    name: 'Molten Glass',
+    restock: 0,
+    start: 0,
+    tier: 2,
+    regenEvery: 0,
+    quest: true,
+    tint: 0xe8a040,
   },
 };
 
@@ -1218,6 +1238,29 @@ addRecipe({
   outputCount: 1,
 });
 
+addRecipe({
+  id: 'unpowered_orb',
+  name: 'Unpowered Orb',
+  category: 'misc',
+  combatClass: null,
+  slot: null,
+  shape: 'orb',
+  setKey: 'orb',
+  lineId: 'misc-unpowered-orb',
+  lineName: 'Unpowered Orb',
+  lineIndex: 0,
+  previousId: null,
+  unlockNeed: 0,
+  tier: 1,
+  cost: { materials: { molten_glass: 1 }, gold: 0 },
+  time: 3,
+  price: 250,
+  buyers: [],
+  tint: 0xc8d8e8,
+  outputMaterial: 'orb',
+  outputCount: 1,
+});
+
 // First potter recipe. Hard clay is mined; a bucket of water softens it.
 addRecipe({
   id: 'soft_clay',
@@ -1737,6 +1780,7 @@ export function isMaterialCraft(recipe) {
 }
 
 export function anvilTabForRecipe(recipe) {
+  if (recipe?.category === 'misc') return 'misc';
   if (isToolRecipe(recipe)) return 'tools';
   if (recipe?.combatClass === 'magic') return 'magic';
   if (recipe?.combatClass === 'range') return 'ranged';
@@ -1754,6 +1798,7 @@ export function anvilSubtabForRecipe(recipe) {
 }
 
 export function anvilSubtabsForTab(tabId) {
+  if (tabId === 'misc') return [];
   if (tabId === 'tools') return TOOL_SUBTABS;
   return ANVIL_SUBTABS.filter((tab) => {
     if (tab.id === 'hatchet' || tab.id === 'pickaxe' || tab.id === 'ammo' || tab.id === 'rune') return false;
@@ -1803,6 +1848,7 @@ export function craftUiForStation(station, prev = {}, recipe = null) {
   if (subtab === 'rune') subtab = 'weapon';
   if (tab !== 'tools' && TOOL_SUBTAB_IDS.has(subtab)) subtab = 'weapon';
   if (tab === 'tools' && !TOOL_SUBTAB_IDS.has(subtab)) subtab = 'hatchet';
+  if (tab === 'misc') subtab = 'weapon';
   return { tab, subtab };
 }
 
@@ -1852,6 +1898,7 @@ export function recipesForTab(tabId, subtabId = null) {
   if (tabId === 'spin') return shown(recipeList().filter((recipe) => recipe.category === 'spin'));
   if (tabId === 'weave' || tabId === 'cloth') return shown(recipeList().filter((recipe) => recipe.category === 'weave'));
   if (tabId === 'potter') return shown(recipeList().filter((recipe) => recipe.category === 'potter'));
+  if (tabId === 'misc') return shown(recipeList().filter((recipe) => recipe.category === 'misc'));
   if (tabId === 'saw') {
     return shown(recipeList().filter((recipe) => recipe.category === 'saw'))
       .sort((a, b) => a.lineIndex - b.lineIndex);

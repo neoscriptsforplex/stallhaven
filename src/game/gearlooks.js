@@ -132,6 +132,7 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'mithril_scimitar', folder: 'gear/mithril-scimitar' },
   { id: 'mithril_spear', folder: 'gear/mithril-spear' },
   { id: 'mithril_sword', folder: 'gear/mithril-sword' },
+  { id: 'molten_glass', folder: 'materials/molten-glass' },
   { id: 'mystic_air_staff', folder: 'gear/mystic-air-staff' },
   { id: 'mystic_boots', folder: 'gear/mystic-boots' },
   { id: 'mystic_earth_staff', folder: 'gear/mystic-earth-staff' },

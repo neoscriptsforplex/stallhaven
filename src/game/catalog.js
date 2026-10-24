@@ -348,6 +348,7 @@ export const MATERIALS = {
   chocolate: { id: 'chocolate', name: 'Chocolate', restock: 6, start: 2, tier: 1, regenEvery: regenEvery(1) },
   // Raw fish come only from the pond (Fishing). The old bought "Fish" is gone;
   // saves before v13 move it onto Raw salmon (economy.migrateGenericFish).
+  raw_shrimp: { id: 'raw_shrimp', name: 'Raw shrimp', restock: 0, start: 0, tier: 1, regenEvery: 0, fished: true, tint: 0xe8a060 },
   raw_salmon: { id: 'raw_salmon', name: 'Raw salmon', restock: 0, start: 3, tier: 1, regenEvery: 0, fished: true, tint: 0xd98a72 },
   raw_lobster: { id: 'raw_lobster', name: 'Raw lobster', restock: 0, start: 0, tier: 2, regenEvery: 0, fished: true, tint: 0x3d5a6e },
   raw_monkfish: { id: 'raw_monkfish', name: 'Raw monkfish', restock: 0, start: 0, tier: 3, regenEvery: 0, fished: true, tint: 0x8c7a62 },
@@ -1070,12 +1071,12 @@ const FOOD_LINE = [
 ];
 
 /**
- * Grill / feast line. Prices sit around Cake (20g): Salmon below, then Lobster and up.
+ * Grill / feast line. Prices sit around Cake (20g): Shrimp under Salmon, then Lobster and up.
  * Each fish cooks from one matching raw fish caught at the pond. Fish Pie uses
- * Raw salmon, the level-1 catch, so it is not locked behind Fishing. Curry
- * needs no fish (Harralander only).
+ * Raw salmon. Curry needs no fish (Harralander only).
  */
 const FEAST_LINE = [
+  { id: 'shrimp', name: 'Shrimp', mats: { raw_shrimp: 1 }, tint: 0xf0b070, time: 2, price: 12 },
   { id: 'salmon', name: 'Salmon', mats: { raw_salmon: 1 }, tint: 0xe07a4a, time: 3, price: 16 },
   { id: 'lobster', name: 'Lobster', mats: { raw_lobster: 1 }, tint: 0xc45a32, time: 5, price: 28 },
   { id: 'chocolate_cake', name: 'Chocolate Cake', mats: { flour: 1, egg: 1, chocolate: 1, water: 1 }, tint: 0x5a3220, time: 6, price: 38 },
@@ -1697,15 +1698,13 @@ export const WHEAT_ARRIVE = 0.85;
 export const FOUNTAIN_WATER_YIELD = 5;
 export const FOUNTAIN_DURATION = MINE_DURATION;
 
-/**
- * Raw fish from one completed catch bar. Same step-down as MINE_YIELDS and
- * CHOP_YIELDS: the level-1 spot matches bronze / pine, the top spot gives one.
- */
+/** One raw fish from one completed catch bar. The bar repeats until the player leaves or the stack is full. */
 export const FISH_YIELDS = {
-  raw_salmon: 5,
-  raw_lobster: 4,
-  raw_monkfish: 3,
-  raw_shark: 2,
+  raw_shrimp: 1,
+  raw_salmon: 1,
+  raw_lobster: 1,
+  raw_monkfish: 1,
+  raw_shark: 1,
   raw_anglerfish: 1,
 };
 /** Same bar length as mining and woodcutting. */

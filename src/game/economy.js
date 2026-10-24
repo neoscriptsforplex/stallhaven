@@ -126,7 +126,7 @@ export {
   DEFAULT_BRIGHTNESS,
 };
 
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 /** Ore counts were copied onto bars before save version 11. Later saves must not run that again. */
 const ORE_BAR_MIGRATION_VERSION = 11;
 export const OLD_DEFAULT_DISPLAYS = 8;
@@ -174,6 +174,39 @@ function migrateGenericFish(next, data) {
     ? data.chestLevel
     : next.chestLevel;
   next.materials.raw_salmon = Math.min(materialCap(level), cur + Math.round(old));
+}
+
+/**
+ * v15 raises Fishing and Cooking requirements to the OSRS levels for fish this
+ * game has. A save that already met the old requirement is lifted to the new
+ * one, so salmon (and the rest) stay open. New games stay at level 1.
+ * Old requirement, then the new one. Anglerfish did not move.
+ */
+const FISHING_LEVEL_CATCHUP = [
+  [1, 30],
+  [20, 40],
+  [40, 62],
+  [60, 76],
+];
+const COOKING_LEVEL_CATCHUP = [
+  [10, 25],
+];
+
+function raiseSkillFloor(skills, skill, pairs) {
+  const level = skills.getLevel(skill);
+  let floor = 1;
+  for (const [oldNeed, newNeed] of pairs) {
+    if (level >= oldNeed) floor = Math.max(floor, newNeed);
+  }
+  const need = xpForLevel(floor);
+  const have = skills.getXp(skill);
+  if (have < need) skills.addXp(skill, need - have);
+}
+
+function catchUpRaisedFishLevels(state, data) {
+  if ((data.version ?? 0) >= 15 || !state.skills?.getLevel) return;
+  raiseSkillFloor(state.skills, 'fishing', FISHING_LEVEL_CATCHUP);
+  raiseSkillFloor(state.skills, 'cooking', COOKING_LEVEL_CATCHUP);
 }
 
 export function skyboxId(id) {
@@ -1941,6 +1974,7 @@ export function applyState(state, data) {
       ? `Skills have arrived! Your past work earned you: ${earned.join(', ')}.`
       : 'Skills have arrived! Every skill starts at level 1.');
   }
+  catchUpRaisedFishLevels(state, data);
   state.hq = normalizeHeroQuestState(data.hq, Date.now());
   repairFarmingPatches(state);
   return true;

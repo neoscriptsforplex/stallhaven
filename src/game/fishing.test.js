@@ -6,7 +6,7 @@ import {
 } from './catalog.js';
 import { SAVE_VERSION, applyState, createState, grantCaughtFish, serializeState } from './economy.js';
 import {
-  FISHING_LEVELS, GATHER_NODES, createSkills, gatherBlockText, meetsGatherLevel, xpForFish,
+  FISHING_LEVELS, GATHER_NODES, createSkills, gatherBlockText, meetsGatherLevel, xpForFish, xpForLevel,
 } from './skills.js';
 import {
   FISHING_SPOTS, MATERIAL_CAP, POND, POND_DOCK, characterGroundY, fishingSpotById, footprintBox, gardenBox,
@@ -16,11 +16,11 @@ import { findPath, gardenObstacles, isWalkable } from './nav.js';
 import { resolveStationUse } from './interact.js';
 import { attachPondWater } from './pondWater.js';
 
-const FISH = ['raw_salmon', 'raw_lobster', 'raw_monkfish', 'raw_shark', 'raw_anglerfish'];
+const FISH = ['raw_shrimp', 'raw_salmon', 'raw_lobster', 'raw_monkfish', 'raw_shark', 'raw_anglerfish'];
 
 describe('fishing skill', () => {
-  it('gates the five pond spots at 1 / 20 / 40 / 60 / 80', () => {
-    assert.deepEqual(FISH.map((id) => FISHING_LEVELS[id]), [1, 20, 40, 60, 80]);
+  it('gates the pond spots on the OSRS levels this game has fish for', () => {
+    assert.deepEqual(FISH.map((id) => FISHING_LEVELS[id]), [1, 30, 40, 62, 76, 80]);
     for (const id of FISH) {
       const node = GATHER_NODES.find((item) => item.id === id);
       assert.equal(node?.skill, 'fishing', id);
@@ -30,20 +30,22 @@ describe('fishing skill', () => {
     assert.equal(xpForFish('logs'), 0);
   });
 
-  it('starts at level 1 with salmon open and the rest locked', () => {
+  it('starts at level 1 with shrimp open and the rest locked', () => {
     const state = { skills: createSkills() };
     assert.equal(state.skills.getLevel('fishing'), 1);
-    assert.equal(meetsGatherLevel(state, 'raw_salmon'), true);
+    assert.equal(meetsGatherLevel(state, 'raw_shrimp'), true);
+    assert.equal(meetsGatherLevel(state, 'raw_salmon'), false);
     assert.equal(meetsGatherLevel(state, 'raw_lobster'), false);
     assert.equal(gatherBlockText('raw_anglerfish'), 'You need a Fishing level of 80 to fish here.');
     state.skills.addXp('fishing', 13_034_431);
     for (const id of FISH) assert.equal(meetsGatherLevel(state, id), true);
   });
 
-  it('uses the gathering bar length and step-down yields', () => {
+  it('uses the gathering bar length and grants one fish per catch', () => {
     assert.equal(FISH_DURATION, CHOP_DURATION);
-    assert.deepEqual(FISH.map(fishYield), [5, 4, 3, 2, 1]);
-    assert.deepEqual(fishTiming('raw_shark'), { duration: FISH_DURATION, yield: FISH_YIELDS.raw_shark });
+    assert.deepEqual(FISH.map(fishYield), [1, 1, 1, 1, 1, 1]);
+    assert.deepEqual(fishTiming('raw_shark'), { duration: FISH_DURATION, yield: 1 });
+    assert.equal(FISH_YIELDS.raw_shrimp, 1);
     for (const id of FISH) assert.equal(isFishMaterial(id), true);
     assert.equal(isFishMaterial('logs'), false);
   });
@@ -56,18 +58,30 @@ describe('fishing skill', () => {
       assert.equal(state.materials[id], id === 'raw_salmon' ? 3 : 0, id);
     }
     assert.equal(MATERIALS.fish, undefined);
-    state.materials.raw_salmon = 0;
-    assert.equal(grantCaughtFish(state, 'raw_salmon'), 5);
-    assert.equal(state.materials.raw_salmon, 5);
-    state.materials.raw_salmon = MATERIAL_CAP - 1;
-    grantCaughtFish(state, 'raw_salmon');
-    assert.equal(state.materials.raw_salmon, MATERIAL_CAP);
+    state.materials.raw_shrimp = 0;
+    assert.equal(grantCaughtFish(state, 'raw_shrimp'), 1);
+    assert.equal(grantCaughtFish(state, 'raw_shrimp'), 1);
+    assert.equal(state.materials.raw_shrimp, 2);
+    state.materials.raw_shrimp = MATERIAL_CAP - 1;
+    assert.equal(grantCaughtFish(state, 'raw_shrimp'), 1);
+    assert.equal(state.materials.raw_shrimp, MATERIAL_CAP);
+    assert.equal(grantCaughtFish(state, 'raw_shrimp'), 0);
     assert.equal(grantCaughtFish(state, 'logs', 3), 0);
   });
 });
 
 describe('cooking needs the matching raw fish', () => {
   it('maps each fish dish to one raw fish', () => {
+    assert.deepEqual(RECIPES.shrimp.cost.materials, { raw_shrimp: 1 });
+    assert.equal(RECIPES.shrimp.requires.level, 1);
+    assert.equal(RECIPES.shrimp.requires.skill, 'cooking');
+    assert.deepEqual(RECIPES.shrimp.buyers, RECIPES.salmon.buyers);
+    assert.ok(RECIPES.shrimp.price < RECIPES.salmon.price);
+    assert.equal(RECIPES.salmon.requires.level, 25);
+    assert.equal(RECIPES.lobster.requires.level, 40);
+    assert.equal(RECIPES.monkfish.requires.level, 62);
+    assert.equal(RECIPES.shark.requires.level, 80);
+    assert.ok(RECIPES.shrimp.lineIndex < RECIPES.salmon.lineIndex);
     assert.deepEqual(RECIPES.salmon.cost.materials, { raw_salmon: 1 });
     assert.deepEqual(RECIPES.lobster.cost.materials, { raw_lobster: 1 });
     assert.deepEqual(RECIPES.monkfish.cost.materials, { raw_monkfish: 1 });
@@ -81,7 +95,7 @@ describe('cooking needs the matching raw fish', () => {
 
 describe('save v13 fish migration', () => {
   it('moves old generic fish onto raw salmon and keeps bow strings', () => {
-    assert.equal(SAVE_VERSION, 14);
+    assert.equal(SAVE_VERSION, 15);
     const saved = serializeState(createState());
     saved.version = 12;
     delete saved.materials.raw_salmon; // v12 saves had no raw fish
@@ -111,6 +125,32 @@ describe('save v13 fish migration', () => {
     applyState(next, serializeState(state));
     assert.equal(next.materials.raw_shark, 3);
     assert.equal(next.materials.raw_salmon, 3, 'new games keep the old 3 starting fish');
+    assert.equal(next.materials.raw_shrimp, 0);
+    assert.equal(next.skills.getLevel('fishing'), 1, 'a current save is not lifted');
+  });
+
+  it('lifts an old save to the new fish levels it already had', () => {
+    const saved = serializeState(createState());
+    saved.version = 14;
+    saved.materials.raw_salmon = 9;
+    saved.materials.raw_shark = 2;
+    saved.skills.xp.fishing = xpForLevel(20);
+    saved.skills.xp.cooking = xpForLevel(10);
+    const next = createState();
+    applyState(next, saved);
+    assert.equal(next.materials.raw_salmon, 9);
+    assert.equal(next.materials.raw_shark, 2);
+    assert.equal(next.materials.raw_shrimp, 0);
+    assert.ok(next.skills.getLevel('fishing') >= 40, 'lobster was open at 20');
+    assert.ok(next.skills.getLevel('fishing') < 62, 'monkfish was still locked');
+    assert.ok(next.skills.getLevel('cooking') >= 25);
+    const low = serializeState(createState());
+    low.version = 14;
+    low.skills.xp.cooking = xpForLevel(9);
+    const stayed = createState();
+    applyState(stayed, low);
+    assert.equal(stayed.skills.getLevel('cooking'), 9);
+    assert.ok(stayed.skills.getLevel('fishing') >= 30, 'salmon was open to every old save');
   });
 });
 

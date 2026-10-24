@@ -68,7 +68,7 @@ describe('construction catalogue', () => {
   });
 
   it('moves without spending and keeps the piece in the save', () => {
-    assert.equal(SAVE_VERSION, 14);
+    assert.equal(SAVE_VERSION, 15);
     const state = funded();
     placeConstruction(state, 'bush', { x: -2, z: 9, rot: 0.2 });
     const xp = state.skills.getXp('construction');

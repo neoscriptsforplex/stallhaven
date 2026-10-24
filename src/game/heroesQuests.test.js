@@ -121,7 +121,7 @@ test('hero hires survive save and load, and old saves stay empty', () => {
   state.gold = 80_000;
   assert.equal(HQ.hireHero(state, state.hq, 'adventurer', 'buyer-adventurer-bob', () => 0), true);
   const saved = serializeState(state);
-  assert.equal(saved.version, 14);
+  assert.equal(saved.version, 15);
   assert.equal(saved.hq.heroes.adventurer.name, 'Sir Aldric');
   assert.equal(saved.hq.heroes.melee, null);
   assert.ok(saved.hq.lastSeenAt > 0);

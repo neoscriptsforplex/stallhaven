@@ -159,7 +159,8 @@ const LEVELS = {
   // Milling wheat. Same station and pace as bread, so Cooking 1 for 2 XP.
   pot_of_flour: row('cooking', 1, 2),
   bread: row('cooking', 1, 2),
-  salmon: row('cooking', 10, 4),
+  shrimp: row('cooking', 1, 3),
+  salmon: row('cooking', 25, 4),
   pizza: row('cooking', 20, 8),
   pie: row('cooking', 30, 20),
   cake: row('cooking', 35, 21),

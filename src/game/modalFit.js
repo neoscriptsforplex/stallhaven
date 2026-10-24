@@ -49,13 +49,15 @@ export function fitModal(modal) {
   sheet.style.maxHeight = `${Math.floor(avail / z)}px`;
   sheet.style.overflowY = 'auto';
   sheet.scrollTop = keep;
+  requestAnimationFrame(avoidTutorial);
 }
 /** Fit every .modal now and whenever one opens, its content changes size, or the layout flips. */
 export function autoFitModals(root = document) {
   const modals = [...root.querySelectorAll('.modal')];
-  const fitAll = () => { for (const m of modals) if (!m.hidden) fitModal(m); };
+  const fitAll = () => { for (const m of modals) if (!m.hidden) fitModal(m); requestAnimationFrame(avoidTutorial); };
   for (const m of modals) {
     new MutationObserver(() => requestAnimationFrame(() => fitModal(m))).observe(m, { attributes: true, attributeFilter: ['hidden'] });
+    new MutationObserver(() => requestAnimationFrame(avoidTutorial)).observe(m, { attributes: true, attributeFilter: ['hidden'] });
     m.addEventListener('click', () => requestAnimationFrame(() => { if (!m.hidden) fitModal(m); }));
   }
   onLayoutChange(fitAll);
@@ -72,6 +74,7 @@ export function fitPanel(el) {
   const popup = el.classList.contains('furn-menu') || el.classList.contains('fish-picker');
   if (!popup) { for (const k of PANEL_KEYS) el.style[k] = ''; el.classList.remove('panel-fit', 'fit-tight'); }
   if (el.hidden || !el.getClientRects().length) return;
+  requestAnimationFrame(avoidTutorial);
   const { top, bottom, touch } = dockBand(8);
   const r = el.getBoundingClientRect();
   const inside = r.top >= top - 1 && r.bottom <= bottom + 1 && r.left >= -1 && r.right <= innerWidth + 1;
@@ -109,7 +112,22 @@ export function fitPanel(el) {
 export function autoFitPanels(root = document) {
   const els = [...root.querySelectorAll('.expand-dock, .cs-dock, .furn-menu, .fish-picker')];
   const fitAll = () => { for (const e of els) if (!e.hidden) fitPanel(e); };
-  for (const e of els) new MutationObserver(() => requestAnimationFrame(() => fitPanel(e))).observe(e, { attributes: true, attributeFilter: ['hidden'] });
+  for (const e of els) new MutationObserver(() => requestAnimationFrame(() => { fitPanel(e); avoidTutorial(); })).observe(e, { attributes: true, attributeFilter: ['hidden'] });
   onLayoutChange(fitAll);
   return fitAll;
+}
+
+// The tutorial card must never cover an open panel's ✕: while a panel is up, it shrinks to a slim strip
+// under the HUD strip/above the bar, on whichever side is clear of the panel's close button.
+const X_SEL = '.craft-x, .cs-x, [data-close], [aria-label="Close"], [aria-label^="Close"], button.x, .skills-close, .settings-x, .panel-x';
+export function avoidTutorial() {
+  const root = document.querySelector('.tut-root');
+  if (!root) return;
+  root.classList.remove('tut-avoid', 'tut-avoid-top');
+  const card = root.querySelector('.tut-card');
+  if (!card) return;
+  const xs = [...document.querySelectorAll(X_SEL)].filter((x) => !root.contains(x) && x.getClientRects().length && !x.closest('[hidden]'));
+  const hit = () => { const c = card.getBoundingClientRect(); return xs.some((x) => { const q = x.getBoundingClientRect(); return q.left < c.right && q.right > c.left && q.top < c.bottom && q.bottom > c.top; }); };
+  if (!xs.length || !hit()) return;
+  root.classList.add('tut-avoid');
 }

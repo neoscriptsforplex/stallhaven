@@ -54,3 +54,9 @@
 .tut-card.is-compact p{font-size:12.5px;margin-bottom:2px;line-height:1.25}
 .tut-card.is-compact .tut-pips{margin:4px 0}
 .tut-card.is-compact .tut-btn{min-height:32px;padding:4px 12px;font-size:13px}
+/* modalFit.avoidTutorial: while a panel is open the card shrinks to a one-line chip over the HUD strip,
+   clear of the panel's ✕ and main buttons. */
+.tut-root.tut-avoid .tut-card{top:2px!important;bottom:auto!important;right:8px!important;left:auto!important;width:min(230px,52vw)!important;max-height:34px;overflow:hidden;padding:4px 40px 4px 10px!important;opacity:.95}
+.tut-root.tut-avoid .tut-card > :not(h3):not(.tut-x){display:none!important}
+.tut-root.tut-avoid .tut-card h3{font-size:13px;margin:0;padding:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:24px}
+.tut-root.tut-avoid .tut-x{top:3px;right:4px;width:26px;height:26px}

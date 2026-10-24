@@ -1,3 +1,4 @@
+import { SKILL_ICON_V } from "./skillsPanel.js";
 // XP orb + XP drops (OSRS style). Mounted once from hud.js.
 import { SKILLS, progressForXp, levelForXp, MAX_LEVEL } from './skills.js';
 const NAME = Object.fromEntries(SKILLS.map((s) => [s.id, s.name]));
@@ -20,7 +21,7 @@ export function createXpOrb({ skills, host = document.body, iconBase = `${import
     const xp = skills.getXp(current), lv = levelForXp(xp), p = progressForXp(xp);
     const frac = Math.max(0, Math.min(1, p.t));
     orb.style.setProperty('--p', frac.toFixed(4));
-    img.src = `${iconBase}${current}.svg`;
+    img.src = `${iconBase}${current}.svg${SKILL_ICON_V}`;
     total.textContent = fmt(xp);
     tip.innerHTML = `<div><b>${NAME[current]}</b> · Level ${lv}</div>
       <div class="row"><span>Current XP</span><span>${fmt(xp)}</span></div>
@@ -29,7 +30,7 @@ export function createXpOrb({ skills, host = document.body, iconBase = `${import
   function wake() { delete wrap.dataset.idle; clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (tip.hidden) wrap.dataset.idle = ''; }, idleMs); }
   function drop(skillId, added) {
     const d = document.createElement('div'); d.className = 'xp-drop';
-    d.innerHTML = `<img src="${iconBase}${skillId}.svg" alt="" />+${fmt(added)}`;
+    d.innerHTML = `<img src="${iconBase}${skillId}.svg${SKILL_ICON_V}" alt="" />+${fmt(added)}`;
     drops.appendChild(d); d.addEventListener('animationend', () => d.remove());
   }
   skills.onChange(({ skillId, added }) => {

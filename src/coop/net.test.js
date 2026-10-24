@@ -7,6 +7,14 @@ import { createRoomCore } from './roomCore.js';
 import { createState } from '../game/economy.js';
 import { createIntentBus } from '../game/intents.js';
 import { AUTOSAVE_KEY, writeAutosave } from '../game/autosave.js';
+import { MATERIALS } from '../game/catalog.js';
+// Hide is quest-only now; borrow a restock price so the shared-gold flow still gets exercised.
+function withRestock(fn) {
+  MATERIALS.hide.restock = 5;
+  const done = (v) => { MATERIALS.hide.restock = 0; return v; };
+  try { const r = fn(); return r && typeof r.then === 'function' ? r.finally(() => done()) : done(r); } catch (e) { done(); throw e; }
+}
+
 
 const rb = (n) => new Uint8Array(nodeRandom(n));
 const tick = () => new Promise((r) => setTimeout(r, 5));
@@ -186,14 +194,14 @@ test('host creates, guest joins and sees the host shop', async () => {
   assert.equal(host.seen('player_joined').name, 'Sam');
 });
 
-test('a guest action updates the host through the room', async () => {
+test('a guest action updates the host through the room', () => withRestock(async () => {
   const { host, guest } = await party();
   const value = guest.bus.run({ type: 'restock', materialId: 'hide' });
   assert.ok(value);
   await until(() => host.state.gold < 500);
   assert.equal(host.state.gold, guest.state.gold);
   assert.equal(guest.bus.apply({ type: 'cheat', code: 'motherlode' }).reason, 'cheats-off');
-});
+}));
 
 test('the guest gets their solo shop back when the host ends the party', async () => {
   const { host, guest } = await party();

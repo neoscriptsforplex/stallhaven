@@ -196,7 +196,7 @@ describe('stall economy', () => {
     assert.equal(state.materials.bronze_bar, 0);
     assert.equal(state.materials.bow_string, 0);
     assert.equal(state.materials.flax, 5);
-    assert.equal(state.materials.wheat, 0);
+    assert.equal(state.materials.wheat, 50);
     assert.equal(state.materials.flour, 0);
     assert.equal(MATERIALS.flour.name, 'Pot of flour');
     assert.equal(MATERIALS.flour.crafted, true);
@@ -216,7 +216,7 @@ describe('stall economy', () => {
     assert.equal(MATERIALS.water.restock, 0);
     assert.equal(CUSTOMERS.pilgrim.offer, null);
     assert.equal(state.materials.logs, 0);
-    assert.equal(state.materials.hide, 8);
+    assert.equal(state.materials.hide, 5);
     assert.equal(state.materials.guam, 8);
     assert.equal(state.materials.herbs, undefined);
     assert.equal(state.materials.water, 12);
@@ -232,7 +232,7 @@ describe('stall economy', () => {
     assert.equal(canCraft(state, 'bread'), true);
     assert.equal(startCraft(state, 'bread', 0), true);
     assert.equal(state.materials.flour, 9);
-    assert.equal(state.materials.egg, 3);
+    assert.equal(state.materials.egg, 4);
     assert.equal(state.materials.water, 11);
     assert.deepEqual(completeCrafts(state, 1.9), []);
     assert.deepEqual(completeCrafts(state, 2), ['bread']);
@@ -248,8 +248,8 @@ describe('stall economy', () => {
     assert.equal(paid, RECIPES.bread.price);
     assert.equal(state.gold, START_GOLD + RECIPES.bread.price);
     assert.equal(chestCount(state, 'bread'), 0);
-    assert.equal(restock(state, 'egg'), true);
-    assert.equal(state.gold, START_GOLD + RECIPES.bread.price - MATERIALS.egg.restock);
+    assert.equal(restock(state, 'egg'), false, 'eggs come from quests now');
+    assert.equal(state.gold, START_GOLD + RECIPES.bread.price);
   });
 
   it('keeps extra finished wares in the chest after a sale', () => {
@@ -468,7 +468,7 @@ describe('save and load', () => {
     assert.equal(state.materials.herbs, undefined);
     assert.equal(state.materials.water, 12);
     assert.equal(state.materials.flour, 2);
-    assert.equal(state.materials.wheat, 0);
+    assert.equal(state.materials.wheat, 50);
     assert.equal(state.materials.ancient_plans, 0);
     assert.equal(state.skills.getLevel('smithing'), RECIPES.bronze_pickaxe.requires.level);
     assert.equal(state.skills.getLevel('crafting'), RECIPES.staff.requires.level);
@@ -1070,7 +1070,7 @@ describe('material regen', () => {
     state.materials.flour = 0;
     state.materials.water = 0;
     tickMaterials(state, 8);
-    assert.equal(state.materials.egg, 1);
+    assert.equal(state.materials.egg, 0, 'eggs no longer regenerate');
     tickMaterials(state, 8);
     assert.equal(state.materials.logs, 0);
     assert.equal(state.materials.flour, 0);
@@ -1078,9 +1078,9 @@ describe('material regen', () => {
     state.materials.egg = 249;
     state.materialAcc.egg = 0;
     tickMaterials(state, 16);
-    assert.equal(state.materials.egg, 250);
+    assert.equal(state.materials.egg, 249);
     tickMaterials(state, 80);
-    assert.equal(state.materials.egg, 250);
+    assert.equal(state.materials.egg, 249);
   });
 
   it('does not regenerate or restock ores or essence', () => {
@@ -1206,7 +1206,7 @@ describe('material regen', () => {
     assert.equal(canRestock(state, 'bow_string'), false);
     assert.equal(restock(state, 'bronze_bar'), false);
     assert.equal(restock(state, 'bow_string'), false);
-    assert.equal(canRestock(state, 'egg'), true);
+    assert.equal(canRestock(state, 'egg'), false);
     assert.equal(canRestock(state, 'flour'), false);
     assert.equal(canRestock(state, 'water'), false);
   });
@@ -1242,13 +1242,13 @@ describe('material regen', () => {
     assert.equal(MATERIALS.wheat.gathered, true);
     assert.equal(MATERIALS.wheat.start, 50);
     assert.equal(grantPickedWheat(state), 1);
-    assert.equal(state.materials.wheat, 1);
+    assert.equal(state.materials.wheat, 51);
     placeStation(state, 'range');
     assert.equal(recipesForTab('food')[0].id, 'pot_of_flour');
     assert.equal(RECIPES.pot_of_flour.name, 'Pot of flour');
     assert.equal(CUSTOMERS.pilgrim.prefers.includes('pot_of_flour'), false);
     assert.equal(startCraft(state, 'pot_of_flour', 0), true);
-    assert.equal(state.materials.wheat, 0);
+    assert.equal(state.materials.wheat, 50);
     assert.deepEqual(completeCrafts(state, 2), ['pot_of_flour']);
     assert.equal(state.materials.flour, 1);
     assert.equal(state.chest.pot_of_flour, undefined);

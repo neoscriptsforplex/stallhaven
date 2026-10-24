@@ -55,7 +55,7 @@ describe('fishing skill', () => {
     for (const id of FISH) {
       assert.equal(MATERIALS[id].fished, true);
       assert.equal(MATERIALS[id].restock, 0);
-      assert.equal(state.materials[id], id === 'raw_salmon' ? 3 : 0, id);
+      assert.equal(state.materials[id], 0, id);
     }
     assert.equal(MATERIALS.fish, undefined);
     state.materials.raw_shrimp = 0;
@@ -124,7 +124,7 @@ describe('save v13 fish migration', () => {
     const next = createState();
     applyState(next, serializeState(state));
     assert.equal(next.materials.raw_shark, 3);
-    assert.equal(next.materials.raw_salmon, 3, 'new games keep the old 3 starting fish');
+    assert.equal(next.materials.raw_salmon, 0, 'fish only come from fishing');
     assert.equal(next.materials.raw_shrimp, 0);
     assert.equal(next.skills.getLevel('fishing'), 1, 'a current save is not lifted');
   });

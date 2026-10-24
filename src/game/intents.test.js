@@ -8,6 +8,14 @@ import {
   createIntentBus,
   GATHER_COOLDOWN_SHARE,
 } from './intents.js';
+import { MATERIALS } from './catalog.js';
+// Hide is quest-only now; borrow a restock price so the shared-gold flow still gets exercised.
+function withRestock(fn) {
+  MATERIALS.hide.restock = 5;
+  const done = (v) => { MATERIALS.hide.restock = 0; return v; };
+  try { const r = fn(); return r && typeof r.then === 'function' ? r.finally(() => done()) : done(r); } catch (e) { done(); throw e; }
+}
+
 
 function withChest(recipeId, n = 1) {
   const state = createState();
@@ -147,7 +155,7 @@ test('quest intents start, collect past the cap, and recall with no reward', () 
   assert.equal(state.materials.essence, 750);
 });
 
-test('intent bus returns plain values and forwards only accepted intents in co-op', () => {
+test('intent bus returns plain values and forwards only accepted intents in co-op', () => withRestock(() => {
   const state = createState();
   const bus = createIntentBus({ now: () => 1 });
   bus.bind(state);
@@ -163,4 +171,4 @@ test('intent bus returns plain values and forwards only accepted intents in co-o
   assert.equal(sent.length, 1);
   bus.setRemote(null);
   assert.equal(bus.coop, false);
-});
+}));

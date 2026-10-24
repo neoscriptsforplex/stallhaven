@@ -268,3 +268,12 @@ export function readPlacedFurniture(saved) {
   }
   return out;
 }
+
+/** Pieces in one Build catalogue tab, sorted by Construction unlock level (stable, ties by gold). */
+export function constructionPiecesByLevel(category) {
+  return CONSTRUCTION_PIECES
+    .filter((row) => row.category === category)
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => (a.row.level ?? 1) - (b.row.level ?? 1) || (a.row.gold ?? 0) - (b.row.gold ?? 0) || a.i - b.i)
+    .map(({ row }) => row);
+}

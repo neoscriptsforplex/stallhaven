@@ -320,3 +320,19 @@ describe('construction build gold', () => {
     assert.deepEqual(readPlacedFurniture([{ id: 'bench', x: 0, z: 0, paid: 20000 }])[0].paid, 20000);
   });
 });
+
+it('build catalogue tabs sort pieces by Construction level', async () => {
+  const C = await import('./construction.js');
+  for (const cat of C.constructionCategories()) {
+    const lv = C.constructionPiecesByLevel(cat).map((p) => p.level ?? 1);
+    for (let i = 1; i < lv.length; i++) assert.ok(lv[i] >= lv[i - 1], `${cat} out of order`);
+  }
+});
+
+it('every construction piece has a build thumbnail', async () => {
+  const { existsSync } = await import('node:fs');
+  const C = await import('./construction.js');
+  for (const p of C.CONSTRUCTION_PIECES) {
+    assert.ok(existsSync(new URL(`../../public/thumbs/build/${p.id.replace(/_/g, '-')}.png`, import.meta.url)), p.id);
+  }
+});

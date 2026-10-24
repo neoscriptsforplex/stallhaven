@@ -124,6 +124,7 @@ import {
   constructionPlaceBlock,
   constructionBuildGold,
   missingMaterials,
+  constructionPiecesByLevel,
 } from './construction.js';
 import {
   CHEST_MAX_LEVEL,
@@ -2192,7 +2193,7 @@ export function bindHud(root, state, world) {
       if (detail) detail.hidden = true;
       return;
     }
-    const rows = CONSTRUCTION_PIECES.filter((row) => row.category === buildCategory);
+    const rows = constructionPiecesByLevel(buildCategory);
     root.innerHTML = rows.map((row) => {
       const blocked = constructionPlaceBlock(state, row.id);
       const level = state.skills?.getLevel?.('construction') ?? 1;

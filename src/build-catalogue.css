@@ -65,3 +65,10 @@
 #build-dock.build-bound[hidden] { display: none; }
 #build-dock.build-bound > * { flex: 0 0 auto; }
 #build-dock.build-bound > .build-layout { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; }
+/* Visible vertical scroll bar for the Construction list and Settings body (long tabs such as Storage). */
+#build-dock.build-fit > .build-layout, #build-dock.build-bound > .build-layout, #settings-dock.dock-fit > .settings-body {
+  scrollbar-width: thin; scrollbar-color: #c9a45a rgba(0,0,0,.35); scrollbar-gutter: stable;
+}
+#build-dock.build-fit > .build-layout::-webkit-scrollbar, #build-dock.build-bound > .build-layout::-webkit-scrollbar, #settings-dock.dock-fit > .settings-body::-webkit-scrollbar { width: 8px; }
+#build-dock.build-fit > .build-layout::-webkit-scrollbar-thumb, #build-dock.build-bound > .build-layout::-webkit-scrollbar-thumb, #settings-dock.dock-fit > .settings-body::-webkit-scrollbar-thumb { background: #c9a45a; border-radius: 4px; }
+#build-dock.build-fit > .build-layout::-webkit-scrollbar-track, #build-dock.build-bound > .build-layout::-webkit-scrollbar-track, #settings-dock.dock-fit > .settings-body::-webkit-scrollbar-track { background: rgba(0,0,0,.35); border-radius: 4px; }

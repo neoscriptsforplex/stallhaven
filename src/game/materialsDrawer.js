@@ -26,7 +26,7 @@ const EXTRA_TINT = {
   egg: 0xf2e2b0,
   flour: 0xf4efe4,
   pineapple: 0xe2b13a,
-  raspberry: 0xc43a52,
+  redberries: 0xc43a52,
   chocolate: 0x6a3a28,
   guam: 0x1f6b1f,
   marrentill: 0x3a8a45,

@@ -161,6 +161,16 @@ function migrateLegacyMetalBars(next, data) {
   next.materials.bow_string = 0;
 }
 
+/** Raspberries were renamed Redberries (id 'redberries'); old saves keep their count. */
+function migrateRaspberries(next, data) {
+  const raw = data.materials?.raspberry;
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return;
+  const saved = data.materials?.redberries;
+  const cur = typeof saved === 'number' && Number.isFinite(saved) ? Math.max(0, Math.round(saved)) : 0;
+  next.materials.redberries = cur + Math.max(0, Math.round(raw));
+  delete next.materials.raspberry;
+}
+
 /**
  * v13: cooking needs raw fish from the pond, and the bought generic "Fish" is
  * gone. Move any saved Fish onto Raw salmon (the level-1 catch) so a stocked
@@ -1792,6 +1802,7 @@ export function applyState(state, data) {
       else next.materials.guam = (next.materials.guam ?? 0) + extra;
     }
     migrateGenericFish(next, data);
+    migrateRaspberries(next, data);
   }
   if (data.chest && typeof data.chest === 'object') {
     for (const [id, count] of Object.entries(data.chest)) {

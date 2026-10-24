@@ -17,7 +17,7 @@ const file = (key) => `public/thumbs/guide/${key.replace(':', '-')}.png`;
 const keyFor = (id) => (existsSync(file(`item:${id}`)) ? `item:${id}` : ALIAS[id] && existsSync(file(ALIAS[id])) ? ALIAS[id] : null);
 // Real OBJ dumps already unpacked under public/models (from Materials/Clay/Hides/Herbs/... .rar): render these
 // straight from the model instead of a stand-in render.
-const DIRECT = { cloth: 'materials/cloth', hard_clay: 'materials/clay', soft_clay: 'materials/clay', flour: 'food/pot-of-flour', wheat: 'wheat', hide: 'materials/hide', molten_glass: 'materials/molten-glass' };
+const DIRECT = { cloth: 'materials/cloth', hard_clay: 'materials/clay', soft_clay: 'materials/clay', flour: 'food/pot-of-flour', wheat: 'wheat', hide: 'materials/hide', redberries: 'materials/redberries', pineapple: 'materials/pineapple', chocolate: 'materials/chocolate', dwarven_plans: 'materials/dwarven-plans', ancient_plans: 'materials/ancient-plans', molten_glass: 'materials/molten-glass' };
 for (const c of ['green', 'blue', 'red', 'black']) DIRECT[`${c}_dhide`] = `materials/${c}-dhide`;
 for (const f of ['shrimp', 'salmon', 'lobster', 'monkfish', 'shark', 'anglerfish']) DIRECT[`raw_${f}`] = `materials/raw-${f}`;
 const FORCE = process.argv.includes('--force');

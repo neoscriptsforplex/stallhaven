@@ -95,7 +95,7 @@ export const QUESTS = [
   { id: 'imp', tab: 'min1', enemy: 'Imp', render: 'icons/quests/imp.png', icon: 'horns', tint: '#c4462e', duration: 1 * MIN, rewards: { molten_glass: 5 } },
   { id: 'chicken', tab: 'min1', enemy: 'Chicken', render: 'icons/quests/chicken.png', icon: 'beak', tint: '#e8dcc0', duration: 1 * MIN, rewards: { egg: 5 } },
   { id: 'cow', tab: 'min1', enemy: 'Cow', render: 'icons/quests/cow.png', icon: 'hoof', tint: '#8a5a3a', duration: 1 * MIN, rewards: { hide: 5 } },
-  { id: 'goblin', tab: 'min15', enemy: 'Goblin', render: 'icons/quests/goblin.png', icon: 'head', tint: '#5f8a3a', duration: 15 * MIN, rewards: { raspberry: 5, pineapple: 5, chocolate: 5 } },
+  { id: 'goblin', tab: 'min15', enemy: 'Goblin', render: 'icons/quests/goblin.png', icon: 'head', tint: '#5f8a3a', duration: 15 * MIN, rewards: { redberries: 5, pineapple: 5, chocolate: 5 } },
   { id: 'giant_spider', tab: 'min15', enemy: 'Giant Spider', render: 'icons/quests/giant_spider.png', icon: 'spider', tint: '#4a3a4a', duration: 15 * MIN, rewards: { cloth: 50 } },
   { id: 'grizzly_bear', tab: 'min15', enemy: 'Grizzly Bear', render: 'icons/quests/grizzly_bear.png', icon: 'paw', tint: '#6a4428', duration: 15 * MIN, rewards: { hide: 50 } },
   { id: 'giant_rat', tab: 'min30', enemy: 'Giant Rat', render: 'icons/quests/giant_rat.png', icon: 'paw', tint: '#7a6a5a', duration: 30 * MIN, rewards: { soft_clay: 10 } },

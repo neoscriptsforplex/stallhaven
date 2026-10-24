@@ -1,0 +1,314 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib redberries.mtl
+o Item Redberries 2026-10-24_20-42-19
+v 2 0 -14
+v -1 0 -10
+v -1 6 -10
+v 2 6 -14
+v 8 0 -14
+v 10 0 -9
+v 7 0 -4
+v 2 0 -4
+v 2 6 -4
+v 7 6 -4
+v 10 6 -9
+v 8 6 -14
+v 7 0 3
+v 4 0 7
+v 4 6 7
+v 7 6 3
+v 13 0 3
+v 15 0 8
+v 12 0 13
+v 7 0 13
+v 7 6 13
+v 12 6 13
+v 15 6 8
+v 13 6 3
+v 12 0 -11
+v 9 0 -7
+v 9 6 -7
+v 12 6 -11
+v 18 0 -11
+v 20 0 -6
+v 17 0 -1
+v 12 0 -1
+v 12 6 -1
+v 17 6 -1
+v 20 6 -6
+v 18 6 -11
+v -4 3 0
+v -2 3 2
+v 12 3 -2
+v 11 3 -4
+v 11 0 -4
+v -4 0 0
+v -8 3 0
+v -10 3 2
+v -4 3 3
+v 6 3 4
+v 6 0 4
+v -2 0 2
+v 12 0 -2
+v 5 3 6
+v -4 0 3
+v 5 0 6
+v 1 3 -6
+v 0 3 -8
+v -10 3 -1
+v -15 3 5
+v -15 0 5
+v -10 0 2
+v -8 0 0
+v -17 3 2
+v -17 0 2
+v -10 0 -1
+v 0 0 -8
+v 1 0 -6
+v -13 3 -6
+v -15 3 -13
+v -18 3 -7
+v -19 3 -3
+v -13 3 -2
+v -16 3 11
+v -10 3 15
+v -11 3 9
+v -13 3 5
+v -18 3 7
+v -18 2 -7
+v -15 2 -13
+v -13 2 -6
+v -13 2 -2
+v -19 2 -3
+v -17 2 2
+v -11 2 9
+v -10 2 15
+v -16 2 11
+v -18 2 7
+v -13 2 5
+usemtl c0
+f 1 2 3
+usemtl c1
+f 1 3 4
+usemtl c2
+f 1 4 5
+usemtl c3
+f 1 5 6
+usemtl c4
+f 1 6 7
+usemtl c5
+f 1 7 8
+usemtl c6
+f 1 8 2
+usemtl c7
+f 2 8 9
+usemtl c8
+f 2 9 3
+usemtl c9
+f 3 9 4
+usemtl c10
+f 4 9 10
+usemtl c11
+f 4 10 11
+usemtl c12
+f 4 11 12
+usemtl c3
+f 4 12 5
+usemtl c13
+f 5 12 6
+usemtl c14
+f 6 12 11
+usemtl c15
+f 6 11 7
+usemtl c16
+f 7 11 10
+usemtl c17
+f 7 10 8
+usemtl c18
+f 8 10 9
+usemtl c0
+f 13 14 15
+usemtl c1
+f 13 15 16
+usemtl c2
+f 13 16 17
+usemtl c3
+f 13 17 18
+usemtl c4
+f 13 18 19
+usemtl c5
+f 13 19 20
+usemtl c6
+f 13 20 14
+usemtl c7
+f 14 20 21
+usemtl c8
+f 14 21 15
+usemtl c9
+f 15 21 16
+usemtl c10
+f 16 21 22
+usemtl c11
+f 16 22 23
+usemtl c12
+f 16 23 24
+usemtl c3
+f 16 24 17
+usemtl c13
+f 17 24 18
+usemtl c14
+f 18 24 23
+usemtl c15
+f 18 23 19
+usemtl c16
+f 19 23 22
+usemtl c17
+f 19 22 20
+usemtl c18
+f 20 22 21
+usemtl c0
+f 25 26 27
+usemtl c1
+f 25 27 28
+usemtl c2
+f 25 28 29
+usemtl c3
+f 25 29 30
+usemtl c4
+f 25 30 31
+usemtl c5
+f 25 31 32
+usemtl c6
+f 25 32 26
+usemtl c7
+f 26 32 33
+usemtl c8
+f 26 33 27
+usemtl c9
+f 27 33 28
+usemtl c10
+f 28 33 34
+usemtl c11
+f 28 34 35
+usemtl c12
+f 28 35 36
+usemtl c3
+f 28 36 29
+usemtl c13
+f 29 36 30
+usemtl c14
+f 30 36 35
+usemtl c15
+f 30 35 31
+usemtl c16
+f 31 35 34
+usemtl c17
+f 31 34 32
+usemtl c18
+f 32 34 33
+usemtl c19
+f 37 38 39
+usemtl c20
+f 37 39 40
+usemtl c21
+f 37 40 41
+usemtl c22
+f 37 41 42
+usemtl c23
+f 37 42 43
+usemtl c19
+f 37 43 44
+usemtl c24
+f 37 44 45
+usemtl c25
+f 37 45 38
+usemtl c26
+f 38 45 46
+usemtl c27
+f 38 46 47
+usemtl c28
+f 38 47 48
+usemtl c29
+f 38 48 49
+usemtl c30
+f 38 49 39
+usemtl c31
+f 45 50 46
+usemtl c32
+f 50 45 51
+usemtl c33
+f 50 51 52
+usemtl c34
+f 52 51 48
+usemtl c35
+f 52 48 47
+usemtl c36
+f 43 53 54
+usemtl c37
+f 43 54 55
+usemtl c26
+f 43 55 44
+usemtl c38
+f 44 55 56
+usemtl c39
+f 44 56 57
+usemtl c40
+f 44 57 58
+usemtl c41
+f 44 58 45
+f 45 58 51
+usemtl c34
+f 51 58 59
+usemtl c42
+f 51 59 42
+f 51 42 48
+usemtl c43
+f 48 42 41
+usemtl c44
+f 48 41 49
+usemtl c45
+f 55 60 56
+usemtl c46
+f 60 55 61
+usemtl c47
+f 61 55 62
+usemtl c48
+f 61 62 58
+usemtl c36
+f 61 58 57
+usemtl c46
+f 62 55 54
+usemtl c49
+f 62 54 63
+usemtl c50
+f 62 63 64
+f 62 64 59
+usemtl c51
+f 62 59 58
+usemtl c45
+f 64 53 43
+usemtl c48
+f 64 43 59
+usemtl c52
+f 59 43 42
+usemtl c53
+f 65 66 67
+f 65 67 68
+f 65 68 69
+usemtl c54
+f 69 68 60
+usemtl c53
+f 70 71 72
+f 70 72 73
+f 70 73 74
+usemtl c54
+f 74 73 60
+usemtl c55
+f 75 76 77
+f 75 77 78
+f 75 78 79
+f 79 78 80
+f 81 82 83
+f 81 83 84
+f 81 84 85
+f 85 84 80

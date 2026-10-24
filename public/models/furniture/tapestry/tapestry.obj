@@ -360,3 +360,257 @@ f 103 106 104
 usemtl c35
 f 105 60 59
 f 105 59 106
+# back faces (reversed copies) so thin cloth renders from behind under FrontSide culling
+usemtl c0
+f 3 2 1
+usemtl c1
+f 4 3 1
+usemtl c2
+f 5 4 1
+usemtl c3
+f 2 5 1
+usemtl c0
+f 6 5 2
+usemtl c4
+f 7 6 2
+f 3 7 2
+usemtl c5
+f 4 7 3
+usemtl c6
+f 8 7 4
+usemtl c7
+f 9 8 4
+usemtl c8
+f 10 9 4
+usemtl c7
+f 11 10 4
+usemtl c6
+f 12 11 4
+usemtl c9
+f 5 12 4
+usemtl c4
+f 13 12 5
+f 14 13 5
+usemtl c1
+f 15 14 5
+f 16 15 5
+usemtl c4
+f 6 16 5
+usemtl c5
+f 8 16 6
+f 7 8 6
+usemtl c10
+f 9 15 16
+usemtl c11
+f 8 9 16
+usemtl c10
+f 10 14 15
+usemtl c12
+f 9 10 15
+usemtl c5
+f 11 13 14
+usemtl c11
+f 10 11 14
+usemtl c5
+f 11 12 13
+usemtl c13
+f 19 18 17
+usemtl c14
+f 20 19 17
+usemtl c15
+f 21 20 17
+usemtl c16
+f 18 21 17
+usemtl c13
+f 22 21 18
+usemtl c17
+f 23 22 18
+f 19 23 18
+usemtl c18
+f 20 23 19
+usemtl c19
+f 24 23 20
+usemtl c20
+f 25 24 20
+usemtl c21
+f 26 25 20
+usemtl c20
+f 27 26 20
+usemtl c19
+f 28 27 20
+usemtl c14
+f 21 28 20
+usemtl c17
+f 29 28 21
+f 30 29 21
+f 31 30 21
+f 32 31 21
+f 22 32 21
+usemtl c18
+f 24 32 22
+f 23 24 22
+usemtl c22
+f 25 31 32
+usemtl c23
+f 24 25 32
+usemtl c22
+f 26 30 31
+usemtl c24
+f 25 26 31
+usemtl c18
+f 27 29 30
+usemtl c23
+f 26 27 30
+usemtl c18
+f 27 28 29
+usemtl c13
+f 35 34 33
+usemtl c14
+f 36 35 33
+usemtl c15
+f 37 36 33
+usemtl c16
+f 34 37 33
+usemtl c13
+f 38 37 34
+usemtl c17
+f 39 38 34
+f 35 39 34
+usemtl c18
+f 36 39 35
+usemtl c19
+f 40 39 36
+usemtl c20
+f 41 40 36
+usemtl c21
+f 42 41 36
+usemtl c20
+f 43 42 36
+usemtl c19
+f 44 43 36
+usemtl c14
+f 37 44 36
+usemtl c17
+f 45 44 37
+f 46 45 37
+f 47 46 37
+f 48 47 37
+f 38 48 37
+usemtl c18
+f 40 48 38
+f 39 40 38
+usemtl c22
+f 41 47 48
+usemtl c23
+f 40 41 48
+usemtl c22
+f 42 46 47
+usemtl c24
+f 41 42 47
+usemtl c18
+f 43 45 46
+usemtl c23
+f 42 43 46
+usemtl c18
+f 43 44 45
+usemtl c25
+f 51 50 49
+f 52 51 49
+usemtl c26
+f 53 52 49
+f 54 53 49
+f 55 54 49
+f 56 55 49
+usemtl c25
+f 50 56 49
+usemtl c26
+f 55 56 50
+f 57 55 50
+f 58 57 50
+f 51 58 50
+f 59 58 51
+f 60 59 51
+f 61 60 51
+f 62 61 51
+f 63 62 51
+f 52 63 51
+f 64 63 52
+f 65 64 52
+f 66 65 52
+f 53 66 52
+usemtl c27
+f 69 68 67
+usemtl c28
+f 70 69 67
+usemtl c27
+f 73 72 71
+usemtl c28
+f 74 73 71
+usemtl c27
+f 77 76 75
+usemtl c28
+f 78 77 75
+usemtl c29
+f 76 80 79
+usemtl c30
+f 75 76 79
+usemtl c31
+f 80 82 81
+usemtl c32
+f 79 80 81
+usemtl c33
+f 84 83 81
+usemtl c34
+f 82 84 81
+usemtl c35
+f 61 62 83
+f 84 61 83
+usemtl c29
+f 72 86 85
+usemtl c30
+f 71 72 85
+usemtl c31
+f 86 88 87
+usemtl c32
+f 85 86 87
+usemtl c33
+f 90 89 87
+usemtl c34
+f 88 90 87
+usemtl c35
+f 63 64 89
+f 90 63 89
+usemtl c29
+f 68 92 91
+usemtl c30
+f 67 68 91
+usemtl c31
+f 92 94 93
+usemtl c32
+f 91 92 93
+usemtl c33
+f 96 95 93
+usemtl c34
+f 94 96 93
+usemtl c35
+f 65 66 95
+f 96 65 95
+usemtl c27
+f 99 98 97
+usemtl c28
+f 100 99 97
+usemtl c29
+f 98 102 101
+usemtl c30
+f 97 98 101
+usemtl c31
+f 102 104 103
+usemtl c32
+f 101 102 103
+usemtl c33
+f 106 105 103
+usemtl c34
+f 104 106 103
+usemtl c35
+f 59 60 105
+f 106 59 105

@@ -169,6 +169,7 @@ import {
   fitMannequinWear,
   slotPose,
   setHeldTool,
+  restartFillBucket,
   isNetCatch,
   setGatherClip,
   getBundledLook,
@@ -532,6 +533,7 @@ export function createWorld(canvas, state, opts = {}) {
   let riggedPlayerGltf = opts.riggedPlayer ?? null;
   const fishingRodGltf = opts.fishingRod ?? null;
   const fishingNetGltf = opts.fishingNet ?? null;
+  const fillBucketGltf = opts.fillBucket ?? null;
   let riggedGoblinGltf = opts.riggedGoblin ?? null;
   let riggedRatGltf = opts.riggedRat ?? null;
   let bundledPlayerSource = opts.bundledPlayer ?? null;
@@ -564,6 +566,7 @@ export function createWorld(canvas, state, opts = {}) {
       chefHatOn: Boolean(state.chefHat),
       fishingRod: fishingRodGltf,
       fishingNet: fishingNetGltf,
+      fillBucket: fillBucketGltf,
     });
     customPlayerSource = model;
     customPlayerYaw = yaw180;
@@ -580,7 +583,9 @@ export function createWorld(canvas, state, opts = {}) {
           chefHatOn: Boolean(state.chefHat),
           fishingRod: fishingRodGltf,
           fishingNet: fishingNetGltf,
+      fillBucket: fillBucketGltf,
       fishingNet: fishingNetGltf,
+      fillBucket: fillBucketGltf,
         });
       } catch (err) {
         console.warn('Rigged player skipped:', err?.message || err);
@@ -2125,7 +2130,8 @@ export function createWorld(canvas, state, opts = {}) {
     };
     setHeldTool(shopkeeper, null);
     faceGather(pose ?? { x: FOUNTAIN.x, z: FOUNTAIN.z });
-    setGatherClip(shopkeeper, 'pick');
+    if (setGatherClip(shopkeeper, 'fillbucket')) restartFillBucket(shopkeeper);
+    else setGatherClip(shopkeeper, 'pick');
     emitLocalActivity('pick');
   }
 
@@ -2170,6 +2176,7 @@ export function createWorld(canvas, state, opts = {}) {
       pushLog(state, `Filled ${got} Buckets of water.`);
       pickHandler?.({ type: 'drew-water', amount: got });
       mining = { ...mining, startedAt: now };
+      if (shopkeeper.userData?.clipLocomotion?.gather === 'fillbucket') restartFillBucket(shopkeeper);
       return;
     }
     if (now - mining.startedAt < mining.duration) return;

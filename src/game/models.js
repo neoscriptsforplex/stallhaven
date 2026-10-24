@@ -996,6 +996,68 @@ function updateClipLocomotion(mesh, moving, dt) {
   }
   updateFishingLine(mesh);
   updateFishingNet(mesh);
+  updateFillBucket(mesh);
+}
+
+/** Rig's bucket grip in Hand_R local units (FillBucket clip). */
+const FILL_BUCKET_POS = Object.freeze({ x: -0.0089, y: -0.0579, z: 0.0045 });
+export const FILL_BUCKET_GRIP = new THREE.Quaternion(0.098034, -0.103235, 0.717752, 0.681589);
+
+/** Parent Rig's bucket to Hand_R. Shown only while FillBucket plays; Fill drives the Empty morph. */
+export function mountFillBucket(mesh, gltf) {
+  const source = gltf?.scene?.getObjectByName?.('BucketGrip');
+  const hand = mesh?.getObjectByName?.('Hand_R');
+  if (!source || !hand || mesh.userData?.fillBucket) return mesh?.userData?.fillBucket ?? null;
+  const bucket = source.clone(true);
+  bucket.name = 'BucketGrip';
+  bucket.position.set(FILL_BUCKET_POS.x, FILL_BUCKET_POS.y, FILL_BUCKET_POS.z);
+  bucket.quaternion.copy(FILL_BUCKET_GRIP);
+  bucket.scale.set(1, 1, 1);
+  bucket.visible = false;
+  bucket.traverse((child) => {
+    if (child.isMesh) child.frustumCulled = false;
+  });
+  hand.add(bucket);
+  const clip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Fill');
+  let bucketMixer = null;
+  let fill = null;
+  if (clip) {
+    bucketMixer = new THREE.AnimationMixer(bucket);
+    fill = bucketMixer.clipAction(clip);
+    fill.setLoop(THREE.LoopOnce, 1);
+    fill.clampWhenFinished = true;
+    fill.play();
+    bucketMixer.update(0);
+  }
+  mesh.userData.fillBucket = bucket;
+  mesh.userData.bucketMixer = bucketMixer;
+  mesh.userData.bucketFill = fill;
+  return bucket;
+}
+
+/** Start one FillBucket pass from the top (one per fill bar). */
+export function restartFillBucket(mesh) {
+  const action = mesh?.userData?.clipLocomotion?.actions?.fillbucket;
+  if (!action) return false;
+  action.reset().play();
+  mesh.userData.bucketFill?.reset().play();
+  return true;
+}
+
+/** Lock Fill to FillBucket time; hide the bucket when the pass ends. */
+export function updateFillBucket(mesh) {
+  const bucket = mesh?.userData?.fillBucket;
+  if (!bucket) return;
+  const loco = mesh.userData?.clipLocomotion;
+  const action = loco?.actions?.fillbucket;
+  const len = action?.getClip?.().duration ?? 0;
+  const active = Boolean(action && loco.gather === 'fillbucket' && action.isRunning() && action.time < len);
+  bucket.visible = active;
+  const fill = mesh.userData.bucketFill;
+  const bucketMixer = mesh.userData.bucketMixer;
+  if (!fill || !bucketMixer) return;
+  if (active) fill.time = action.time;
+  bucketMixer.update(0);
 }
 
 /** Fish caught with Rig's small net (NetFish clip) instead of the rod. */
@@ -4696,13 +4758,17 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
   const walk = mixer.clipAction(walkClip);
   const idle = mixer.clipAction(idleClip);
   const actions = {};
-  for (const name of ['Mine', 'Chop', 'Pick', 'Fish', 'NetFish']) {
+  for (const name of ['Mine', 'Chop', 'Pick', 'Fish', 'NetFish', 'FillBucket']) {
     const clip = THREE.AnimationClip.findByName(gltf.animations ?? [], name);
     if (!clip) continue;
     const action = mixer.clipAction(clip);
     action.setLoop(THREE.LoopRepeat, Infinity);
     action.clampWhenFinished = false;
     action.enabled = false;
+    if (name === 'FillBucket') {
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+    }
     actions[name.toLowerCase()] = action;
   }
   const castClip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'Cast');
@@ -4776,6 +4842,7 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
   bindCastFinish(group);
   if (opts.fishingRod) mountFishingRod(group, opts.fishingRod);
   if (opts.fishingNet) mountFishingNet(group, opts.fishingNet);
+  if (opts.fillBucket) mountFillBucket(group, opts.fillBucket);
   return group;
 }
 
@@ -4973,14 +5040,16 @@ export function wrapUploadedPlayer(source, opts = {}) {
     const idle = playClip(mixer, idleClip);
     const actions = {};
     // 'fish' is optional: Rig's fishing clip plays at the pond when the upload has one.
-    for (const name of ['mine', 'chop', 'pick', 'fish', 'cast', 'netfish']) {
+    for (const name of ['mine', 'chop', 'pick', 'fish', 'cast', 'netfish', 'fillbucket']) {
       const clip = name === 'netfish'
         ? THREE.AnimationClip.findByName(animations, 'NetFish')
-        : findNamedClip(animations, [name], used);
+        : name === 'fillbucket'
+          ? THREE.AnimationClip.findByName(animations, 'FillBucket')
+          : findNamedClip(animations, [name], used);
       const action = playClip(mixer, clip);
       if (!action) continue;
       action.enabled = false;
-      if (name === 'cast') {
+      if (name === 'cast' || name === 'fillbucket') {
         action.setLoop(THREE.LoopOnce, 1);
         action.clampWhenFinished = true;
       }
@@ -5003,6 +5072,7 @@ export function wrapUploadedPlayer(source, opts = {}) {
     bindCastFinish(group);
     if (opts.fishingRod) mountFishingRod(group, opts.fishingRod);
     if (opts.fishingNet) mountFishingNet(group, opts.fishingNet);
+    if (opts.fillBucket) mountFillBucket(group, opts.fillBucket);
   }
 
   group.userData.modelScale = modelScale;

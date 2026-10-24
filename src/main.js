@@ -3,7 +3,7 @@ import { completeCrafts, createState, pushLog, tickMaterials, SAVE_VERSION } fro
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
 import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledFishingRod,
-  loadBundledFishingNet, loadBundledRiggedGoblin, loadBundledRiggedRat, loadBundledRiggedBuyers, loadBundledLooks } from './game/upload.js';
+  loadBundledFishingNet, loadBundledFillBucket, loadBundledRiggedGoblin, loadBundledRiggedRat, loadBundledRiggedBuyers, loadBundledLooks } from './game/upload.js';
 import { enableSfx, getMusicVolume, loadBundledMusic, loadSfxManifest, playSfx, setSfxLoop, unlockAudio } from './game/audio.js';
 import { createSfxDirector } from './game/sfxHooks.js';
 import { installUiSounds, mountSoundSettings, restoreSoundMix } from './game/soundUi.js';
@@ -179,12 +179,13 @@ async function bootGame() {
   let riggedPlayer = null;
   let fishingRod = null;
   let fishingNet = null;
+  let fillBucket = null;
   let riggedGoblin = null;
   let riggedRat = null;
   let riggedBuyers = {};
   let bundledLooks = {};
   try {
-    const [rigged, looks, , goblin, rat, buyers, rod, net] = await Promise.all([
+    const [rigged, looks, , goblin, rat, buyers, rod, net, bucket] = await Promise.all([
       loadBundledRiggedPlayer().catch((err) => {
         console.warn('Rigged player skipped:', err?.message || err);
         return null;
@@ -213,10 +214,15 @@ async function bootGame() {
         console.warn('Fishing net skipped:', err?.message || err);
         return null;
       }),
+      loadBundledFillBucket().catch((err) => {
+        console.warn('Fill bucket skipped:', err?.message || err);
+        return null;
+      }),
     ]);
     riggedPlayer = rigged;
     fishingRod = rod;
     fishingNet = net;
+    fillBucket = bucket;
     riggedGoblin = goblin;
     riggedRat = rat;
     riggedBuyers = buyers ?? {};
@@ -234,7 +240,7 @@ async function bootGame() {
     console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
   }
 
-  const world = createWorld(canvas, state, { bundledPlayer, riggedPlayer, riggedGoblin, riggedRat, fishingRod, fishingNet });
+  const world = createWorld(canvas, state, { bundledPlayer, riggedPlayer, riggedGoblin, riggedRat, fishingRod, fishingNet, fillBucket });
   window.stallhaven = {
     world,
     state,

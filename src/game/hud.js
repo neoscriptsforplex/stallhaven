@@ -599,6 +599,24 @@ export function bindHud(root, state, world) {
     if (repaint) paintHerbRows(craftsEl);
   }
 
+  // Cooking range: shrink the list + materials strip until the sheet fits with no scrollbar.
+  function fitCookSheet(on) {
+    const sheet = craftModal.querySelector('.craft-sheet');
+    const parts = [craftModal.querySelector('.craft-body'), matsEl].filter(Boolean);
+    for (const el of parts) el.style.zoom = '';
+    if (!on || !sheet || craftModal.hidden) return;
+    for (let i = 0; i < 3; i++) {
+      const over = sheet.scrollHeight - sheet.clientHeight;
+      if (over <= 0) break;
+      const total = parts.reduce((a, p) => a + p.getBoundingClientRect().height, 0) || 1;
+      const k = 1 - (over + 2) / total;
+      for (const el of parts) el.style.zoom = Math.max(0.55, (Number(el.style.zoom) || 1) * k).toFixed(3);
+    }
+  }
+  addEventListener('resize', () => { if (!craftModal.hidden) fitCookSheet(craftStation === 'range'); });
+  new MutationObserver(() => { if (!craftModal.hidden) fitCookSheet(craftStation === 'range'); })
+    .observe(craftModal, { attributes: true, attributeFilter: ['hidden'] });
+
   function paintCrafts() {
     const rangeMode = craftStation === 'range';
     const cauldronMode = craftStation === 'cauldron';
@@ -612,6 +630,8 @@ export function bindHud(root, state, world) {
     const altarMode = typeof craftStation === 'string' && craftStation.startsWith('altar-');
     const altarMark = altarMode ? craftStation.slice('altar-'.length) : '';
     const simpleStation = rangeMode || cauldronMode || furnaceMode || wheelMode || potterMode || sawmillMode || patchMode || altarMode;
+    // Cooking range = one compact level-sorted list (no side tabs, no scroll).
+    craftModal.classList.toggle('is-cook', rangeMode);
     ensureCraftTabs();
     tabsEl.hidden = simpleStation || tabsEl.querySelectorAll('[data-tab]').length <= 1;
     subtabsEl.hidden = simpleStation || loomMode || fletchMode;
@@ -690,6 +710,10 @@ export function bindHud(root, state, world) {
     holdCraftScroll(craftsEl, { reveal, focusId: craftFocusId });
     if (sideBefore !== craftSide && craftScrollPlan && !craftScrollPlan.focusId) craftScrollPlan.top = 0;
     paintRecipeButtons(craftsEl, sideList, { headings: false });
+    // Cooking range: only show the materials its dishes use, so the sheet fits without scrolling.
+    const cookMats = rangeMode ? new Set(sideList.flatMap((r) => Object.keys(r.cost?.materials ?? r.mats ?? {}))) : null;
+    for (const el of matsEl?.querySelectorAll('[data-mat]') ?? []) el.hidden = !!cookMats && !cookMats.has(el.dataset.mat);
+    fitCookSheet(rangeMode);
     restoreCraftScrollNow();
     syncQtyHint(craftFocusId);
     if (craftFocusId) showPreview(craftFocusId);
@@ -1844,7 +1868,7 @@ export function bindHud(root, state, world) {
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
     const upgradeBtn = furnMenu.querySelector('[data-furn-upgrade]');
-    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel' || target.id === 'loom' || target.id === 'fletch' || target.id === 'potter' || target.id === 'sawmill' || target.id === 'portal') {
+    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel' || target.id === 'loom' || target.id === 'fletch' || target.id === 'potter' || target.id === 'sawmill' || target.id === 'portal' || target.id === 'farming_patch' || pieceRow?.id === 'bank_booth') {
       useBtn.hidden = false;
       useBtn.textContent = target.id === 'chest' ? 'Open Chest'
         : target.id === 'range' ? 'Cook'
@@ -1856,6 +1880,8 @@ export function bindHud(root, state, world) {
                     : target.id === 'potter' ? 'Shape'
                       : target.id === 'sawmill' ? 'Saw'
                       : target.id === 'portal' ? 'Enter'
+                      : target.id === 'farming_patch' ? 'Grow'
+                      : pieceRow?.id === 'bank_booth' ? 'Bank'
                         : 'Craft';
     } else {
       useBtn.hidden = true;
@@ -2732,9 +2758,10 @@ export function bindHud(root, state, world) {
   furnMenu.querySelector('[data-furn-use]').addEventListener('click', () => {
     const target = furnTarget;
     hideFurnMenu();
-    if (target?.id === 'chest') openChest();
+    if (target?.id === 'chest' || (target?.id === 'piece' && state.furniture?.placed?.[target.index]?.id === 'bank_booth')) openChest();
     if (target?.id === 'anvil') openCraft('anvil');
     if (target?.id === 'range') openCraft('range');
+    if (target?.id === 'farming_patch') openCraft('farming_patch', { patchIndex: target.index });
     if (target?.id === 'cauldron') openCraft('cauldron');
     if (target?.id === 'furnace') openCraft('furnace');
     if (target?.id === 'wheel') openCraft('wheel');
@@ -3335,6 +3362,8 @@ export function bindHud(root, state, world) {
       showInspect(event.materialId, event.clientX, event.clientY, { ...event, kind: 'wheat' });
     }
     if (event.type === 'construction-select') {
+      // Bank Booth opens the shared chest storage (same contents, not a separate bank).
+      if (state.furniture?.placed?.[event.index]?.id === 'bank_booth') { openChest(); return; }
       openPlacedBar(event.index);
       return;
     }

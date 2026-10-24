@@ -1389,11 +1389,14 @@ export function createWorld(canvas, state, opts = {}) {
     pieceGhost = null;
   }
 
+  const PAINTING_CENTER_Y = 1.4; // shop walls: 2.7 m tall, centred at y 1.4 (shopbuild addRoomWalls)
   function pieceVisual(id) {
     const anim = animPieceVisual(id, 0.01125 * (constructionPiece(id)?.scale ?? 1));
     if (anim) {
-      const box = new THREE.Box3().setFromObject(anim);
+      const box = new THREE.Box3().setFromObject(anim, true);
       if (Number.isFinite(box.min.y) && !pieceHangs(id)) anim.position.y -= box.min.y;
+      // Wall paintings: centre on the wall's vertical middle (render-time rule, so old saves follow too).
+      else if (Number.isFinite(box.min.y)) anim.position.y += PAINTING_CENTER_Y - (box.min.y + box.max.y) / 2;
       anim.position.y += constructionPiece(id)?.wallY ?? 0;
       return anim;
     }
@@ -1401,9 +1404,13 @@ export function createWorld(canvas, state, opts = {}) {
     if (look) {
       const mesh = look.clone(true);
       mesh.scale.setScalar(0.01125 * (constructionPiece(id)?.scale ?? 1));
+      // Roll about the wall normal (Lit Torch model lies along +X; stand it flame-up).
+      if (constructionPiece(id)?.roll) mesh.rotation.z = constructionPiece(id).roll;
       mesh.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(mesh);
+      const box = new THREE.Box3().setFromObject(mesh, true);
       if (Number.isFinite(box.min.y) && !pieceHangs(id)) mesh.position.y -= box.min.y;
+      // Wall paintings: centre on the wall's vertical middle (render-time rule, so old saves follow too).
+      else if (Number.isFinite(box.min.y)) mesh.position.y += PAINTING_CENTER_Y - (box.min.y + box.max.y) / 2;
       mesh.position.y += constructionPiece(id)?.wallY ?? 0;
       return mesh;
     }
@@ -1416,6 +1423,31 @@ export function createWorld(canvas, state, opts = {}) {
     mesh.scale.setScalar(boxScale);
     mesh.position.y = 0.25 * boxScale;
     return mesh;
+  }
+
+  /**
+   * Floor height under a placed piece: shop floor indoors, lawn outdoors. Pots and Pans
+   * sit on a display/basic table top when dropped over one. Render-time, so saves/co-op need no new data.
+   */
+  function pieceBaseY(pieceId, x, z, skipIndex = null) {
+    if (pieceHangs(pieceId)) return 0;
+    if (pieceId === 'pots_and_pans') {
+      const p = new THREE.Vector3();
+      for (const slot of displays) {
+        if (!slot?.anchor?.visible || slot.spot?.kind !== 'table' || slot.furniture?.userData?.stand) continue;
+        const span = furnitureHalfSize('table');
+        p.set(x, 0, z); slot.anchor.worldToLocal(p);
+        if (Math.abs(p.x) <= span.hw && Math.abs(p.z) <= span.hd) {
+          return slot.anchor.position.y + (slot.furniture.userData.wareY ?? 0.9);
+        }
+      }
+      for (const anchor of placedGroup.children) {
+        if (anchor.userData.pieceId !== 'basic_table' || anchor.userData.index === skipIndex) continue;
+        const box = new THREE.Box3().setFromObject(anchor);
+        if (x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z) return box.max.y;
+      }
+    }
+    return characterGroundY(x, z, state.expansions ?? []);
   }
 
   function applyPieceGhost() {
@@ -1442,10 +1474,11 @@ export function createWorld(canvas, state, opts = {}) {
       pieceGhost.add(visual);
       scene.add(pieceGhost);
     }
-    pieceGhost.position.set(pose.x, 0, pose.z);
+    pieceGhost.position.set(pose.x, pieceBaseY(pose.pieceId, pose.x, pose.z, pose.index), pose.z);
     pieceGhost.rotation.y = pose.rot ?? 0;
   }
 
+  const wallFixedRows = new WeakSet();
   function syncPlacedMeshes() {
     const moving = placeDraft?.id === 'piece' ? placeDraft.index : null;
     const rows = state.furniture?.placed ?? [];
@@ -1454,6 +1487,14 @@ export function createWorld(canvas, state, opts = {}) {
       old.removeFromParent();
     }
     rows.forEach((row, index) => {
+      // Blacksmiths' Tools became a wall piece: old floor-placed ones move to the nearest wall spot if one is close.
+      if (row.id === 'blacksmiths_tools' && !wallFixedRows.has(row) && index !== moving) {
+        const snap = snapToPieceWall(row.x, row.z, state.expansions ?? [], row.rot);
+        if (snap && Number.isFinite(snap.x) && Math.hypot(snap.x - row.x, snap.z - row.z) < 2.5) {
+          row.x = snap.x; row.z = snap.z; if (snap.rot != null) row.rot = snap.rot;
+        }
+        wallFixedRows.add(row);
+      }
       let anchor = placedGroup.children[index];
       if (!anchor || anchor.userData.pieceId !== row.id) {
         anchor?.removeFromParent();
@@ -1484,6 +1525,7 @@ export function createWorld(canvas, state, opts = {}) {
       anchor.userData.index = index;
       anchor.visible = moving !== index;
       anchor.position.set(row.x, 0, row.z);
+      anchor.position.y = pieceBaseY(row.id, row.x, row.z, index);
       anchor.rotation.y = row.rot ?? 0;
       anchor.traverse((child) => {
         if (child.isMesh) child.userData.index = index;

@@ -249,14 +249,15 @@ const cooking = {
   tabs: [{
     id: 'food', label: 'Food',
     rows: [
-      [1, 'Pot of flour', 'Mill wheat'], [1, 'Bread'], [1, 'Shrimp'], [25, 'Salmon'], [20, 'Pizza'], [30, 'Pie'], [35, 'Cake'],
-      [40, 'Lobster'], [47, 'Fish pie'], [50, 'Chocolate cake'], [60, 'Curry'], [62, 'Monkfish'],
-      [80, 'Shark'], [84, 'Anglerfish'], [95, 'Summer pie'],
+      [1, 'Pot of flour', 'Mill wheat'], [1, 'Shrimp'], [1, 'Bread'], [10, 'Redberry pie'], [25, 'Salmon'], [35, 'Pizza'],
+      [40, 'Lobster'], [40, 'Cake'], [47, 'Fish pie'], [50, 'Chocolate cake'], [60, 'Curry'], [62, 'Monkfish'],
+      [65, 'Pineapple pizza'], [80, 'Shark'], [84, 'Anglerfish'], [95, 'Summer pie'],
     ].map(([lv, name, desc]) => ({ lv, name, desc: desc ?? 'Cook on the range', icon: 'food', tint: '#e0a050' }))
       .concat([
-        [5, 'Cooked chicken'], [15, 'Trout'], [25, 'Stew'], [30, 'Tuna'], [45, 'Swordfish'], [55, 'Meat pizza'],
+        [5, 'Cooked chicken'], [15, 'Trout'], [30, 'Tuna'], [45, 'Swordfish'],
         [70, 'Tuna potato'], [75, 'Sea turtle'], [90, 'Dark crab'], [91, 'Manta ray'],
-      ].map(([lv, name]) => ({ lv, name, icon: 'food', tint: '#c9a27a', soon: true }))),
+      ].map(([lv, name]) => ({ lv, name, icon: 'food', tint: '#c9a27a', soon: true })))
+      .sort((a, b) => a.lv - b.lv),
   }],
 };
 

@@ -3821,3 +3821,39 @@ html.is-booting.is-scene-live #view {
 .fish-picker button.is-last {
   outline: 2px solid var(--gold);
 }
+
+/* ---- Cooking range: one compact list sorted by level ---- */
+#craft-modal.is-cook .craft-body { max-height: none; min-height: 0; }
+#craft-modal.is-cook #crafts {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 6px; align-content: start; overflow: visible;
+}
+#craft-modal.is-cook .craft-row { margin: 0; gap: 4px; }
+#craft-modal.is-cook .craft { padding: 4px 8px; min-height: 0; }
+#craft-modal.is-cook .craft strong { font-size: 0.8rem; }
+#craft-modal.is-cook .craft .meta,
+#craft-modal.is-cook .craft .craft-mats-line {
+  display: block; font-size: 0.64rem; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#craft-modal.is-cook .craft-qty { flex-direction: row; align-items: center; gap: 2px; }
+#craft-modal.is-cook .craft-qty button { min-width: 1.9rem; min-height: 1.4rem; padding: 1px 4px; font-size: 0.64rem; }
+@media (orientation: portrait) and (pointer: coarse) {
+  /* Phone: tap a dish, craft 1x/5x/Max from the preview (Step 8), so tiles drop the qty column. */
+  #craft-modal.is-cook .craft-qty { display: none; }
+  #craft-modal.is-cook .craft-row { grid-template-columns: 1fr; }
+  #craft-modal.is-cook .craft { padding: 3px 6px; }
+  #craft-modal.is-cook .craft strong { font-size: 0.74rem; }
+  #craft-modal.is-cook .craft .meta, #craft-modal.is-cook .craft .craft-mats-line { font-size: 0.6rem; }
+}
+/* Open dishes: the meta line already lists mats · time · price, so drop the duplicate mats line. */
+#craft-modal.is-cook .craft-row:not(.is-locked) .craft-mats-line { display: none; }
+@media (orientation: portrait) and (pointer: coarse) {
+  #craft-modal.is-cook #crafts { gap: 3px 4px; }
+  #craft-modal.is-cook .craft-row.is-locked .craft-mats-line { display: none; }
+}
+/* Cooking range: compact materials strip so the sheet fits with no scrollbar. */
+#craft-modal.is-cook .craft-mats { gap: 3px; margin: 0 0 4px; padding: 2px 0; max-height: none; overflow: visible; }
+#craft-modal.is-cook .craft-mats > * { font-size: 0.66rem; padding: 1px 5px; min-height: 0; line-height: 1.3; }
+@media (orientation: portrait) and (pointer: coarse) {
+  #craft-modal.is-cook .craft-mats > * { font-size: 0.6rem; padding: 0 4px; }
+  #craft-modal.is-cook .craft-mats { margin: 0 0 2px; }
+}

@@ -19,6 +19,7 @@ import {
   decideRequest,
   mostExpensiveChestId,
   scheduleKingRoald,
+  KING_ROALD_PRICE_MULT,
 } from './catalog.js';
 import { defaultRng } from './rng.js';
 import { hasStock, isUnlocked, recipeStationOwned } from './economy.js';
@@ -47,7 +48,7 @@ export function planCustomerSpawn(state, { rng = defaultRng, firstSpawn = false,
   if (wantKing && recipeId) {
     return {
       typeId: 'kingroald',
-      request: { recipeId, gold: RECIPES[recipeId].price, offer: null, royal: true },
+      request: { recipeId, gold: RECIPES[recipeId].price * KING_ROALD_PRICE_MULT, offer: null, royal: true },
       usedFirst: false,
     };
   }

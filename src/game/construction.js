@@ -11,10 +11,10 @@ const piece = (row) => Object.freeze({
 });
 
 export const CONSTRUCTION_PIECES = Object.freeze([
-  piece({ id: 'chair', name: 'Chair', category: 'Seating', mount: 'floor', level: 1, gold: 200, tint: 0x8a5a32, materials: { plank: 1, bronze_nails: 2 } }),
-  piece({ id: 'fancy_chair', name: 'Fancy Chair', category: 'Seating', mount: 'floor', level: 1, gold: 600, tint: 0x6a4428, materials: { oak_plank: 2, iron_nails: 4 } }),
-  piece({ id: 'bench', name: 'Bench', category: 'Seating', mount: 'floor', level: 1, gold: 400, tint: 0x8a6840, materials: { oak_plank: 2, iron_nails: 4 } }),
-  piece({ id: 'throne', name: 'Throne', category: 'Seating', mount: 'floor', level: 1, gold: 5000, tint: 0xc4a24a, materials: { magic_plank: 4, dragon_nails: 8 } }),
+  piece({ id: 'chair', scale: 0.5, name: 'Chair', category: 'Seating', mount: 'floor', level: 1, gold: 200, tint: 0x8a5a32, materials: { plank: 1, bronze_nails: 2 } }),
+  piece({ id: 'fancy_chair', scale: 0.5, name: 'Fancy Chair', category: 'Seating', mount: 'floor', level: 1, gold: 600, tint: 0x6a4428, materials: { oak_plank: 2, iron_nails: 4 } }),
+  piece({ id: 'bench', scale: 0.5, name: 'Bench', category: 'Seating', mount: 'floor', level: 1, gold: 400, tint: 0x8a6840, materials: { oak_plank: 2, iron_nails: 4 } }),
+  piece({ id: 'throne', scale: 0.5, name: 'Throne', category: 'Seating', mount: 'floor', level: 1, gold: 5000, tint: 0xc4a24a, materials: { magic_plank: 4, dragon_nails: 8 } }),
   piece({ id: 'fancy_table', scale: 0.5, name: 'Fancy Table', category: 'Tables', mount: 'floor', level: 1, gold: 800, tint: 0xc4a06a, materials: { oak_plank: 3, iron_nails: 6 } }),
   piece({ id: 'double_bed', scale: 0.5, name: 'Double Bed', category: 'Beds', mount: 'floor', level: 1, gold: 1500, tint: 0x6a3a4a, materials: { willow_plank: 4, steel_nails: 8 } }),
   piece({ id: 'cabinet', name: 'Cabinet', category: 'Storage', mount: 'floor', level: 1, gold: 700, tint: 0xa08050, materials: { oak_plank: 3, iron_nails: 6 } }),
@@ -24,7 +24,7 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'barrel_of_sticks', scale: 0.5, name: 'Barrel of Sticks', category: 'Storage', mount: 'floor', level: 1, gold: 200, tint: 0x7a5a32, materials: { plank: 2, bronze_nails: 2 } }),
   piece({ id: 'old_bookshelf', name: 'Old Bookshelf', category: 'Storage', mount: 'floor', level: 1, gold: 900, tint: 0x6a4a30, materials: { oak_plank: 4, iron_nails: 6 } }),
   piece({ id: 'fire', name: 'Fire', category: 'Light', mount: 'outdoor', level: 1, gold: 100, tint: 0xe07030, materials: { logs: 2 } }),
-  piece({ id: 'fireplace', name: 'Fireplace', category: 'Light', mount: 'floor', level: 1, gold: 1200, tint: 0x8a4030, materials: { willow_plank: 2, steel_nails: 6 } }),
+  piece({ id: 'fireplace', scale: 0.5, name: 'Fireplace', category: 'Light', mount: 'floor', level: 1, gold: 1200, tint: 0x8a4030, materials: { willow_plank: 2, steel_nails: 6 } }),
   piece({ id: 'fancy_fireplace', scale: 0.5, name: 'Fancy Fireplace', category: 'Light', mount: 'floor', level: 1, gold: 2500, tint: 0xa05030, materials: { maple_plank: 3, mithril_nails: 8 } }),
   piece({ id: 'standing_candles', scale: 0.5, name: 'Standing Candles', category: 'Light', mount: 'floor', level: 1, gold: 300, tint: 0xe8d090, materials: { plank: 1, bronze_nails: 2 } }),
   piece({ id: 'lit_torch', name: 'Lit Torch', category: 'Light', mount: 'outdoor', level: 1, gold: 150, tint: 0xe8a040, materials: { logs: 1 } }),

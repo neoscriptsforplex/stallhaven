@@ -1,0 +1,38 @@
+# Made by RuneLite Model-Dumper Plugin
+mtllib small_net.mtl
+o Item Small fishing net 2026-10-24_17-48-04
+v -8 9 16
+v 8 9 16
+v 8 9 -16
+v -8 9 -16
+v -24 1 16
+v -16 1 -16
+v 24 1 16
+v 16 1 -16
+v 8 1 16
+v 8 1 -16
+v -8 1 16
+v -8 1 -16
+v -8 9 16
+v -8 9 16
+v -8 9 16
+v -8 9 16
+v -8 9 16
+v -8 9 16
+usemtl c0
+f 1 2 3
+f 1 3 4
+f 1 4 5
+f 5 4 6
+f 2 7 8
+f 2 8 3
+f 9 7 8
+f 9 8 10
+f 9 10 11
+f 11 10 12
+f 11 12 5
+f 5 12 6
+usemtl c1
+f 1 2 4
+f 5 1 6
+f 9 7 10

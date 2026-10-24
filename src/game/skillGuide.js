@@ -13,6 +13,8 @@
 import { MAX_LEVEL, SKILLS } from './skills.js';
 import { PORTRAIT_QUERY, defaultIconBase, formatXp } from './skillsPanel.js';
 import { SKILL_GUIDES } from './skillGuideData.js';
+import GUIDE_THUMBS from './guideThumbs.js';
+import { thumbUrl } from './guideRenders.js';
 
 /* ---------- Glyphs (24×24, currentColor = tier tint) ---------- */
 const P = (d) => `<path d="${d}"/>`;
@@ -75,7 +77,8 @@ export function skillGuideShellHtml() {
     </section>`;
 }
 
-function rowHtml(row, level, nextLv) {
+function rowHtml(row, level, nextLv, skillId) {
+  const renderKey = skillId ? GUIDE_THUMBS.rows[`${skillId}|${row.name}`] : null;
   const open = !row.soon && row.lv <= level;
   const isNext = !row.soon && row.lv === nextLv;
   const cls = ['guide-row', open ? 'is-open' : 'is-locked', row.perk && 'is-perk', row.soon && 'is-soon', isNext && 'is-next']
@@ -89,7 +92,9 @@ function rowHtml(row, level, nextLv) {
   return `
     <li class="${cls}" ${isNext ? 'data-guide-next' : ''}>
       <span class="guide-lv">${row.lv}</span>
-      <span class="guide-item" style="color:${esc(row.tint ?? '#e3b34a')}">${glyph(row.icon)}</span>
+      ${renderKey
+    ? `<span class="guide-item has-render"><img src="${esc(thumbUrl(renderKey))}" width="34" height="34" alt="" loading="lazy"></span>`
+    : `<span class="guide-item" style="color:${esc(row.tint ?? '#e3b34a')}">${glyph(row.icon)}</span>`}
       <span class="guide-text">
         <span class="guide-name">${esc(row.name)}${badge}</span>
         ${row.desc ? `<span class="guide-desc">${esc(row.desc)}</span>` : ''}
@@ -172,7 +177,7 @@ export function bindSkillGuide({
     const row = info();
     const tab = guide.tabs.find((t) => t.id === tabId) ?? guide.tabs[0];
     const nextLv = nextUnlockLevel(guide, row.level);
-    list.innerHTML = sortedRows(tab).map((r) => rowHtml(r, row.level, nextLv)).join('');
+    list.innerHTML = sortedRows(tab).map((r) => rowHtml(r, row.level, nextLv, skillId)).join('');
     list.setAttribute('aria-label', `${row.name}: ${tab.label}`);
     foot.hidden = !tab.footer;
     foot.textContent = tab.footer ?? '';

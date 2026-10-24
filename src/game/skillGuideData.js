@@ -16,6 +16,7 @@
  *   perk    true = a perk row (special style, star badge)
  *   soon    true = not in the game yet ("Coming soon" badge, always shown locked)
  *
+ * Only list things a station, gather action or the Build menu really offers (isCraftHidden recipes stay out).
  * To add an unlock: add one row. Rows are sorted by level when rendered, so order here doesn't matter.
  * Levels here follow Luke's 18 Oct 2026 list where given, otherwise skillLevels.js / GATHER_NODES (live),
  * otherwise PROGRESSION.md (marked soon).
@@ -63,7 +64,7 @@ const smithing = {
       id: 'armour', label: 'Armour',
       rows: METALS.map(([id, name, lv]) => ({
         lv, name: `${name} armour`,
-        desc: id === 'dragon' ? ARMOUR.replace('full helm, ', '') + ' (no full helm)' : ARMOUR,
+        desc: id === 'dragon' ? ARMOUR.replace('full helm, ', '').replace('platebody, ', '') + ' (no full helm or platebody)' : ARMOUR,
         icon: 'helm', tint: TIER[id],
       })),
     },
@@ -221,10 +222,9 @@ const fletching = {
       ],
     },
     {
-      id: 'other', label: 'Crossbows & axes',
+      id: 'other', label: 'Crossbows',
       rows: [
         ...fletchMetal('crossbow', [9, 24, 39, 54, 61, 69, 78], 'crossbow'),
-        ...fletchMetal('thrown axe', [3, 22, 37, 52, 67, 81, 95], 'axe'),
       ],
     },
   ],
@@ -237,11 +237,7 @@ const herblore = {
       [1, 'Attack potion', '#40c8c0'], [10, 'Strength potion', '#e8d24a'], [20, 'Antipoison', '#8ee53f'],
       [30, 'Energy potion', '#e87aa8'], [40, 'Prayer potion', '#3ec8c4'], [55, 'Antifire potion', '#8a4ec8'],
       [65, 'Ranging potion', '#87ceeb'], [75, 'Magic potion', '#f4c49a'],
-    ].map(([lv, name, tint]) => ({ lv, name, desc: 'Brew in the cauldron', icon: 'potion', tint }))
-      .concat([
-        [45, 'Super attack'], [50, 'Super strength'], [60, 'Super defence'], [70, 'Stamina potion'],
-        [80, 'Super restore'], [85, 'Saradomin brew'], [88, 'Extended antifire'], [92, 'Super combat'], [96, 'Divine super combat'],
-      ].map(([lv, name]) => ({ lv, name, icon: 'potion', tint: '#b9a6e0', soon: true }))),
+    ].map(([lv, name, tint]) => ({ lv, name, desc: 'Brew in the cauldron', icon: 'potion', tint })),
   }],
 };
 
@@ -253,10 +249,6 @@ const cooking = {
       [40, 'Lobster'], [40, 'Cake'], [47, 'Fish pie'], [50, 'Chocolate cake'], [60, 'Curry'], [62, 'Monkfish'],
       [65, 'Pineapple pizza'], [80, 'Shark'], [84, 'Anglerfish'], [95, 'Summer pie'],
     ].map(([lv, name, desc]) => ({ lv, name, desc: desc ?? 'Cook on the range', icon: 'food', tint: '#e0a050' }))
-      .concat([
-        [5, 'Cooked chicken'], [15, 'Trout'], [30, 'Tuna'], [45, 'Swordfish'],
-        [70, 'Tuna potato'], [75, 'Sea turtle'], [90, 'Dark crab'], [91, 'Manta ray'],
-      ].map(([lv, name]) => ({ lv, name, icon: 'food', tint: '#c9a27a', soon: true })))
       .sort((a, b) => a.lv - b.lv),
   }],
 };
@@ -273,12 +265,6 @@ const crafting = {
         set(24, 'Mystic robe bottom', 'Loom', 'cloth', '#3d5bd9'), set(26, 'Mystic robe top', 'Loom', 'cloth', '#3d5bd9'),
         set(38, 'Splitbark gauntlets & boots', 'Loom', 'cloth', '#8a6a3a'), set(40, 'Splitbark hat', 'Loom', 'cloth', '#8a6a3a'),
         set(42, 'Splitbark robe bottom', 'Loom', 'cloth', '#8a6a3a'), set(44, 'Splitbark robe top', 'Loom', 'cloth', '#8a6a3a'),
-        set(56, 'Battlemage gloves & boots', 'Loom', 'cloth', '#6a3d8a'), set(58, 'Battlemage hat', 'Loom', 'cloth', '#6a3d8a'),
-        set(60, 'Battlemage robe bottom', 'Loom', 'cloth', '#6a3d8a'), set(62, 'Battlemage robe top', 'Loom', 'cloth', '#6a3d8a'),
-        set(70, 'Lunar gloves & boots', 'Loom', 'cloth', '#7fa8c8'), set(72, 'Lunar hat', 'Loom', 'cloth', '#7fa8c8'),
-        set(74, 'Lunar robe bottom', 'Loom', 'cloth', '#7fa8c8'), set(76, 'Lunar robe top', 'Loom', 'cloth', '#7fa8c8'),
-        set(86, 'Ancient gloves & boots', 'Loom', 'cloth', '#c9a24e'), set(87, 'Ancient hat', 'Loom', 'cloth', '#c9a24e'),
-        set(88, 'Ancient robe bottom', 'Loom', 'cloth', '#c9a24e'), set(89, 'Ancient robe top', 'Loom', 'cloth', '#c9a24e'),
         set(12, 'Staff', 'Anvil, 50 logs', 'staff', '#a0703f'),
         set(36, 'Elemental staves', 'Air, water, earth, fire', 'staff', '#4c8de0'),
         set(54, 'Battlestaves', 'Air, water, earth, fire', 'staff', '#6a3d8a'),
@@ -291,7 +277,7 @@ const crafting = {
       rows: [
         ['Green', 28, '#3f9a5c'], ['Blue', 46, '#4c6fe0'], ['Red', 64, '#c8402e'], ['Black', 78, '#3a3a40'],
       ].flatMap(([c, lv, tint]) => [
-        set(lv, `${c} d'hide vambraces & boots`, 'Loom', 'vest', tint),
+        set(lv, `${c} d'hide vambraces`, 'Loom', 'vest', tint),
         set(lv + 2, `${c} dragon mask`, 'Loom', 'helm', tint),
         set(lv + (c === 'Red' ? 3 : c === 'Black' ? 3 : 4), `${c} d'hide chaps`, 'Loom', 'vest', tint),
         set(lv + (c === 'Red' ? 4 : c === 'Black' ? 4 : 6), `${c} d'hide body`, 'Loom', 'vest', tint),

@@ -14,6 +14,9 @@ import {
   pickupConstruction,
   placeConstruction,
   sellConstruction,
+  constructionBuildGold,
+  constructionPlaceBlock,
+  readPlacedFurniture,
 } from './construction.js';
 import { SAVE_VERSION, applyState, createState, serializeState } from './economy.js';
 import { applyIntent } from './intents.js';
@@ -27,6 +30,7 @@ function funded() {
   for (const id of ['plank', 'oak_plank', 'willow_plank', 'maple_plank', 'yew_plank', 'magic_plank', 'logs', 'flax', 'steel_bar', 'bronze_nails', 'iron_nails', 'steel_nails', 'mithril_nails', 'adamant_nails', 'dragon_nails']) {
     state.materials[id] = 40;
   }
+  state.gold = 500000;
   return state;
 }
 
@@ -43,7 +47,7 @@ describe('construction catalogue', () => {
     assert.equal(placeConstruction(chair, 'crate', { x: 1, z: 1, rot: 0 }), true);
     assert.equal(chair.materials.plank, 0);
     assert.equal(chair.materials.bronze_nails, 0);
-    assert.equal(chair.gold, funded().gold);
+    assert.equal(chair.gold, funded().gold - 1000);
     assert.equal(chair.furniture.placed.length, 1);
     assert.equal(chair.skills.getXp('construction') - before, constructionXpFor(constructionPiece('crate')));
     assert.equal(placeConstruction(chair, 'crate', { x: 2, z: 1, rot: 0 }), false);
@@ -78,7 +82,7 @@ describe('construction catalogue', () => {
     assert.equal(state.materials.flax, 38);
     const next = createState();
     assert.equal(applyState(next, serializeState(state)), true);
-    assert.deepEqual(next.furniture.placed[0], { id: 'bush', x: -1, z: 8, rot: 1 });
+    assert.deepEqual(next.furniture.placed[0], { id: 'bush', x: -1, z: 8, rot: 1, paid: 1000 });
     const old = serializeState(createState());
     old.version = 13;
     delete old.furniture.placed;
@@ -260,5 +264,49 @@ describe('place anywhere', () => {
     assert.equal(shelves.mount, 'outdoor');
     assert.equal(shelves.hw, 0.61);
     assert.equal(shelves.hd, 0.23);
+  });
+});
+
+function builder() {
+  const state = funded();
+  state.skills.addXp('construction', xpForLevel(20));
+  return state;
+}
+
+describe('construction build gold', () => {
+  it('costs 1,000 gp per unlock level on top of materials', () => {
+    assert.equal(constructionBuildGold(constructionPiece('crate')), 1000);
+    assert.equal(constructionBuildGold(constructionPiece('bench')), 20000);
+    assert.equal(constructionBuildGold(constructionPiece('throne')), 99000);
+    assert.equal(constructionBuildGold({ ...constructionPiece('bench'), free: true }), 0);
+    const state = builder();
+    const gold = state.gold;
+    assert.equal(placeConstruction(state, 'bench', { x: 1, z: 1, rot: 0 }), true);
+    assert.equal(state.gold, gold - 20000);
+    assert.equal(state.furniture.placed[0].paid, 20000);
+  });
+
+  it('blocks placing without enough gold', () => {
+    const state = builder();
+    state.gold = 19999;
+    assert.match(constructionPlaceBlock(state, 'bench'), /need 20,000 gp/);
+    assert.equal(placeConstruction(state, 'bench', { x: 1, z: 1, rot: 0 }), false);
+    assert.equal(state.gold, 19999);
+    assert.equal(state.furniture.placed.length, 0);
+  });
+
+  it('moving is free, delete refunds paid gold, old pieces refund none', () => {
+    const state = builder();
+    placeConstruction(state, 'bench', { x: 1, z: 1, rot: 0 });
+    const gold = state.gold;
+    assert.equal(moveConstruction(state, 0, { x: 2, z: 2, rot: 1 }), true);
+    assert.equal(state.gold, gold);
+    assert.equal(pickupConstruction(state, 0), true);
+    assert.equal(state.gold, gold + 20000);
+    state.furniture.placed.push(...readPlacedFurniture([{ id: 'bench', x: 0, z: 0, rot: 0 }]));
+    const before = state.gold;
+    assert.equal(pickupConstruction(state, 0), true);
+    assert.equal(state.gold, before, 'old-save piece paid no build gold');
+    assert.deepEqual(readPlacedFurniture([{ id: 'bench', x: 0, z: 0, paid: 20000 }])[0].paid, 20000);
   });
 });

@@ -4274,6 +4274,10 @@ export function createWorld(canvas, state, opts = {}) {
     clouds.visible = on;
     if (flaxGroup) flaxGroup.visible = on;
     if (wheatGroup) wheatGroup.visible = on;
+    // Placed main-area objects (farming patches, construction pieces) belong to
+    // the main area only; hide them in the dungeon and rune field.
+    patchGroup.visible = on;
+    placedGroup.visible = on;
     if (on) applyAllPoses();
     else {
       for (const id of Object.keys(fixtureMeshes)) {

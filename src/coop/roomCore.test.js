@@ -6,6 +6,14 @@ import { manualClock } from '../game/clock.js';
 import { seededRng } from '../game/rng.js';
 import { createState, serializeState } from '../game/economy.js';
 import { CLOSE, COLORS, HOLD_SECONDS, cleanName, isValidCode, makeCode, normalizeCode, uniqueName } from './protocol.js';
+import { MATERIALS } from '../game/catalog.js';
+// Hide is quest-only now; borrow a restock price so the shared-gold flow still gets exercised.
+function withRestock(fn) {
+  MATERIALS.hide.restock = 5;
+  const done = (v) => { MATERIALS.hide.restock = 0; return v; };
+  try { const r = fn(); return r && typeof r.then === 'function' ? r.finally(() => done()) : done(r); } catch (e) { done(); throw e; }
+}
+
 
 const rb = (n) => new Uint8Array(nodeRandom(n));
 
@@ -107,7 +115,7 @@ test('bad names are refused', () => {
   assert.equal(t.last('g', 'join_error').reason, 'bad_name');
 });
 
-test('shared gold: a guest restock is validated and everyone gets the patch', () => {
+test('shared gold: a guest restock is validated and everyone gets the patch', () => withRestock(() => {
   const t = setup();
   hostAndGuest(t);
   t.say('g', { t: 'intent', n: 1, intent: { type: 'restock', materialId: 'hide' } });
@@ -115,7 +123,7 @@ test('shared gold: a guest restock is validated and everyone gets the patch', ()
   const patch = t.last('h', 'patch');
   assert.ok(patch.set.gold < 500);
   assert.equal(t.room._state().gold, patch.set.gold);
-});
+}));
 
 test('cheats and junk intents are refused and resynced', () => {
   const t = setup();

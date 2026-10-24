@@ -56,6 +56,9 @@ describe('storage cap', () => {
 
   it('restocks only up to the chest cap', () => {
     const state = createState();
+    const was = MATERIALS.hide.regenEvery;
+    MATERIALS.hide.regenEvery = 8; // hide is quest-only now; borrow a regen rate
+    try {
     state.materials.hide = 250;
     state.materialAcc = {};
     tickMaterials(state, 80);
@@ -64,6 +67,7 @@ describe('storage cap', () => {
     tickMaterials(state, 8);
     assert.ok(state.materials.hide > 250);
     assert.ok(state.materials.hide <= 500);
+    } finally { MATERIALS.hide.regenEvery = was; }
   });
 
   it('blocks a material craft at the cap and refunds a batch that no longer fits', () => {

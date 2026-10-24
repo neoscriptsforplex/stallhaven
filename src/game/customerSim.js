@@ -5,18 +5,25 @@
  * same travellers with the same requests.
  */
 import {
+  ASPIRE_CHANCE,
   CUSTOMERS,
   MAX_CUSTOMERS,
   RECIPES,
   REQUEST_WAIT,
   SPAWN_GAP_MAX,
   SPAWN_GAP_MIN,
+  SPAWN_BREAK_CHANCE,
+  SPAWN_BREAK_MAX,
+  SPAWN_BREAK_MIN,
   FIRST_CUSTOMER_DELAY,
   decideRequest,
   mostExpensiveChestId,
   scheduleKingRoald,
 } from './catalog.js';
 import { defaultRng } from './rng.js';
+import { isUnlocked } from './economy.js';
+
+const canCraftNow = (state, recipe) => (state ? isUnlocked(state, recipe.id) : (recipe.tier ?? 1) <= 1);
 
 /**
  * Decide the next traveller. Mutates state.kingRoaldAt the same way the old
@@ -39,12 +46,28 @@ export function planCustomerSpawn(state, { rng = defaultRng, firstSpawn = false,
   }
   const types = Object.keys(CUSTOMERS).filter((id) => id !== 'kingroald');
   const typeId = firstSpawn ? 'pilgrim' : types[Math.floor(rng() * types.length)];
-  const request = decideRequest(typeId, rng, state);
+  let request = null;
+  let pickedType = typeId;
+  if (rng() < ASPIRE_CHANCE) {
+    request = decideRequest(typeId, rng, state, canCraftNow, 'aspire');
+  } else {
+    // About 4 in 5 travellers want something the shop can make right now.
+    const start = types.indexOf(typeId);
+    const order = firstSpawn ? [typeId] : types.map((_, i) => types[(start + i) % types.length]);
+    for (const id of order) {
+      request = decideRequest(id, rng, state, canCraftNow, 'craftable');
+      if (request) { pickedType = id; break; }
+    }
+    if (!request) request = decideRequest(typeId, rng, state, canCraftNow);
+  }
+  const finalType = request ? pickedType : typeId;
   if (!request) return { typeId: null, request: null, usedFirst: firstSpawn };
-  return { typeId, request, usedFirst: firstSpawn };
+  return { typeId: finalType, request, usedFirst: firstSpawn };
 }
 
 export function nextSpawnTime(now, rng = defaultRng) {
+  // Sometimes the street goes quiet: a 10-30s lull before the next traveller.
+  if (rng() < SPAWN_BREAK_CHANCE) return now + SPAWN_BREAK_MIN + rng() * (SPAWN_BREAK_MAX - SPAWN_BREAK_MIN);
   return now + SPAWN_GAP_MIN + rng() * (SPAWN_GAP_MAX - SPAWN_GAP_MIN);
 }
 

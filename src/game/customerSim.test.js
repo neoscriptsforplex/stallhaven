@@ -70,3 +70,38 @@ test('room queue survives a save and load', () => {
   assert.deepEqual(copy.list(), room.list());
   assert.equal(copy.remove(state, room.list()[0].id, 'refused').op, 'leave');
 });
+
+test('sometimes leaves a 10-30s lull between travellers', async () => {
+  const { nextSpawnTime } = await import('./customerSim.js');
+  const { SPAWN_GAP_MAX } = await import('./catalog.js');
+  const lull = nextSpawnTime(100, (() => { const v = [0.1, 0.5]; return () => v.shift(); })());
+  assert.equal(lull, 120);
+  const normal = nextSpawnTime(100, (() => { const v = [0.9, 0.5]; return () => v.shift(); })());
+  assert.ok(normal - 100 <= SPAWN_GAP_MAX);
+});
+test('asks mostly for things the shop can craft now', async () => {
+  const { planCustomerSpawn } = await import('./customerSim.js');
+  const { createState, isUnlocked } = await import('./economy.js');
+  let seed = 12345;
+  const rng = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const state = createState();
+  let can = 0;
+  let total = 0;
+  for (let i = 0; i < 2000; i += 1) {
+    state.kingRoaldAt = Infinity;
+    const plan = planCustomerSpawn(state, { rng });
+    if (!plan?.request) continue;
+    total += 1;
+    if (isUnlocked(state, plan.request.recipeId)) can += 1;
+  }
+  const ratio = can / total;
+  assert.ok(ratio > 0.7 && ratio < 0.9, String(ratio));
+});
+test('quest-only and fishing-only starting stock', async () => {
+  const { MATERIALS } = await import('./catalog.js');
+  for (const id of ['raspberry', 'pineapple', 'chocolate', 'hide', 'egg']) {
+    assert.equal(MATERIALS[id].start, 5, id);
+    assert.ok(!MATERIALS[id].restock && !MATERIALS[id].regenEvery, id);
+  }
+  for (const m of Object.values(MATERIALS)) if (m.fished || m.id.endsWith('_dhide')) assert.equal(m.start, 0, m.id);
+});

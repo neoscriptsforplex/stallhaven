@@ -610,7 +610,7 @@ describe('customer trade', () => {
     assert.equal(isUnlocked(state, melee.recipeId), true);
     assert.equal(RECIPES[melee.recipeId].combatClass, 'melee');
     const food = decideRequest('pilgrim', sequentialRng(0.9, 0), state);
-    assert.equal(food.recipeId, 'bread');
+    assert.equal(food.recipeId, 'shrimp');
   });
 
   it('sometimes asks for an item that is still level-locked', () => {
@@ -788,21 +788,10 @@ describe('catalog', () => {
     assert.equal(RECIPES.wizard_robe.name, 'Wizard Robe');
     assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
     assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
-    assert.equal(recipes.filter((r) => r.category === 'food').length, 15);
+    assert.equal(recipes.filter((r) => r.category === 'food').length, 16);
     assert.equal(recipes.filter((r) => r.category === 'potion').length, 8);
-    assert.ok(RECIPES.salmon.price < RECIPES.cake.price);
-    assert.ok(RECIPES.cake.price < RECIPES.lobster.price);
-    assert.ok(RECIPES.lobster.price < RECIPES.chocolate_cake.price);
-    assert.ok(RECIPES.chocolate_cake.price < RECIPES.monkfish.price);
-    assert.ok(RECIPES.monkfish.price < RECIPES.curry.price);
-    assert.ok(RECIPES.curry.price < RECIPES.shark.price);
-    assert.ok(RECIPES.shark.price < RECIPES.summer_pie.price);
-    assert.ok(RECIPES.summer_pie.price < RECIPES.anglerfish.price);
-    assert.equal(RECIPES.cake.previousId, 'pizza');
-    assert.equal(RECIPES.shrimp.previousId, 'bread');
-    assert.equal(RECIPES.salmon.previousId, 'shrimp');
-    assert.equal(RECIPES.lobster.previousId, 'salmon');
-    assert.equal(RECIPES.chocolate_cake.previousId, 'lobster');
+    // Food price order now follows Cooking level; see cookingRework.test.js.
+    assert.ok(RECIPES.shrimp.lineIndex < RECIPES.salmon.lineIndex && RECIPES.salmon.lineIndex < RECIPES.cake.lineIndex);
     assert.equal(recipeCost(RECIPES.chocolate_cake).materials.chocolate, 1);
     assert.equal(RECIPES.bronze_scimitar.name, 'Bronze Scimitar');
     assert.equal(RECIPES.iron_platebody.name, 'Iron Platebody');
@@ -946,7 +935,7 @@ describe('catalog', () => {
     assert.ok(food.some((r) => r.id === 'bread'));
     assert.ok(food.some((r) => r.id === 'salmon'));
     assert.ok(food.some((r) => r.id === 'anglerfish'));
-    assert.equal(food.length, 15);
+    assert.equal(food.length, 16);
     assert.equal(food[0].id, 'pot_of_flour');
     assert.equal(RECIPES.pot_of_flour.outputMaterial, 'flour');
     assert.deepEqual(RECIPES.pot_of_flour.buyers, []);
@@ -957,11 +946,11 @@ describe('catalog', () => {
     assert.equal(recipeCost(RECIPES.pizza).materials.egg, 1);
     assert.equal(recipeCost(RECIPES.pizza).materials.water, 1);
     assert.equal(recipeCost(RECIPES.cake).materials.water, 1);
-    assert.equal(recipeCost(RECIPES.pie).materials.egg, 1);
+    assert.equal(recipeCost(RECIPES.pie).materials.raspberry, 1);
     assert.equal(recipeCost(RECIPES.fish_pie).materials.water, 1);
     assert.equal(recipeCost(RECIPES.chocolate_cake).materials.egg, 1);
     assert.equal(recipeCost(RECIPES.chocolate_cake).materials.water, 1);
-    assert.equal(recipeCost(RECIPES.summer_pie).materials.egg, 1);
+    assert.equal(recipeCost(RECIPES.summer_pie).materials.raspberry, 1);
     assert.equal(recipeCost(RECIPES.summer_pie).materials.water, 1);
     assert.ok(!melee.some((r) => r.category === 'food'));
     assert.ok(!melee.some((r) => r.combatClass === 'tools'));
@@ -1536,18 +1525,20 @@ describe('furnace and spinning wheel', () => {
     assert.equal(isUnlocked(state, 'pizza'), false);
     state.craftCounts.bread = 20;
     assert.equal(isUnlocked(state, 'salmon'), false);
-    reachLevel(state, 'cooking', RECIPES.pizza.requires.level);
-    assert.equal(isUnlocked(state, 'pizza'), true);
-    assert.equal(isUnlocked(state, 'salmon'), false);
-    reachLevel(state, 'cooking', RECIPES.salmon.requires.level);
+    reachLevel(state, 'cooking', 25);
     assert.equal(isUnlocked(state, 'salmon'), true);
+    assert.equal(isUnlocked(state, 'plain_pizza'), false);
+    reachLevel(state, 'cooking', 35);
+    assert.equal(isUnlocked(state, 'plain_pizza'), true);
     assert.equal(isUnlocked(state, 'cake'), false);
     assert.equal(isUnlocked(state, 'lobster'), false);
-    reachLevel(state, 'cooking', RECIPES.cake.requires.level);
+    reachLevel(state, 'cooking', 40);
     assert.equal(isUnlocked(state, 'cake'), true);
-    assert.equal(isUnlocked(state, 'lobster'), false);
-    reachLevel(state, 'cooking', RECIPES.lobster.requires.level);
     assert.equal(isUnlocked(state, 'lobster'), true);
+    assert.equal(isUnlocked(state, 'pizza'), false);
+    reachLevel(state, 'cooking', 65);
+    assert.equal(isUnlocked(state, 'pizza'), true);
+    assert.equal(isUnlocked(state, 'summer_pie'), false);
     assert.ok(CUSTOMERS.pilgrim.prefers.includes('shrimp'));
     assert.ok(CUSTOMERS.pilgrim.prefers.includes('salmon'));
     assert.ok(CUSTOMERS.pilgrim.prefers.includes('anglerfish'));
@@ -2574,8 +2565,8 @@ describe('sell price rebalance', () => {
     assert.equal(RECIPES.dragon_scimitar.price, 60000);
     assert.equal(RECIPES.smelt_bronze.price, 0);
     assert.equal(RECIPES.spin_bow_string.price, 0);
-    assert.equal(RECIPES.bread.price, 50);
-    assert.equal(RECIPES.anglerfish.price, 5000);
+    assert.equal(RECIPES.bread.price, 1050);
+    assert.equal(RECIPES.anglerfish.price, 6250);
     assert.ok(RECIPES.bread.time < 3);
     assert.ok(RECIPES.anglerfish.time < 12);
     assert.ok(RECIPES.green_dhide_body.price < RECIPES.black_dhide_body.price);

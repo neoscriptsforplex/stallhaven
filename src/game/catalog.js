@@ -1069,59 +1069,60 @@ RUNE_LINE.forEach((rune, index) => {
   });
 });
 
-const FOOD_LINE = [
-  { id: 'bread', name: 'Bread', mats: { flour: 1, egg: 1, water: 1 }, tint: 0xc4a05a, time: 3, price: 8 },
-  { id: 'pizza', name: 'Pizza', mats: { flour: 1, pineapple: 1, egg: 1, water: 1 }, tint: 0xd4a04a, time: 4, price: 14 },
-  { id: 'cake', name: 'Cake', mats: { flour: 1, egg: 1, water: 1 }, tint: 0xe8c8a0, time: 5, price: 20 },
-  { id: 'pie', name: 'Pie', mats: { flour: 1, raspberry: 1, egg: 1, water: 1 }, tint: 0xb45a4a, time: 6, price: 26 },
-  { id: 'fish_pie', name: 'Fish Pie', mats: { flour: 1, raw_salmon: 1, egg: 1, water: 1 }, tint: 0xc8b07a, time: 7, price: 32 },
-];
-
 /**
- * Grill / feast line. Prices sit around Cake (20g): Shrimp under Salmon, then Lobster and up.
- * Each fish cooks from one matching raw fish caught at the pond. Fish Pie uses
- * Raw salmon. Curry needs no fish (Harralander only).
+ * Cooking range: ONE list sorted by Cooking level (OSRS-style). `lv` mirrors
+ * skillLevels.js and drives the sell price. Ingredients follow the OSRS recipe
+ * using only in-game materials. Fish cook 1 raw -> 1 cooked.
  */
-const FEAST_LINE = [
-  { id: 'shrimp', name: 'Shrimp', mats: { raw_shrimp: 1 }, tint: 0xf0b070, time: 2, price: 12 },
-  { id: 'salmon', name: 'Salmon', mats: { raw_salmon: 1 }, tint: 0xe07a4a, time: 3, price: 16 },
-  { id: 'lobster', name: 'Lobster', mats: { raw_lobster: 1 }, tint: 0xc45a32, time: 5, price: 28 },
-  { id: 'chocolate_cake', name: 'Chocolate Cake', mats: { flour: 1, egg: 1, chocolate: 1, water: 1 }, tint: 0x5a3220, time: 6, price: 38 },
-  { id: 'monkfish', name: 'Monkfish', mats: { raw_monkfish: 1 }, tint: 0xd8c8a0, time: 7, price: 50 },
-  // Harralander, not the starter Guam. Fishing drops the old Fish cost.
-  { id: 'curry', name: 'Curry', mats: { harralander: 1 }, tint: 0xd48a28, time: 8, price: 64 },
-  { id: 'shark', name: 'Shark', mats: { raw_shark: 1 }, tint: 0x6a7a88, time: 9, price: 80 },
-  { id: 'summer_pie', name: 'Summer Pie', mats: { flour: 1, pineapple: 1, raspberry: 1, egg: 1, water: 1 }, tint: 0xe8a04a, time: 10, price: 98 },
-  { id: 'anglerfish', name: 'Anglerfish', mats: { raw_anglerfish: 1 }, tint: 0xc8a04a, time: 12, price: 120 },
+const COOK_LINE = [
+  { id: 'shrimp', name: 'Shrimp', lv: 1, price: 1000, mats: { raw_shrimp: 1 }, tint: 0xf0b070, time: 2 },
+  { id: 'bread', name: 'Bread', lv: 1, price: 1050, mats: { flour: 1, egg: 1, water: 1 }, tint: 0xc4a05a, time: 3 },
+  { id: 'pie', name: 'Redberry Pie', lv: 10, price: 1200, mats: { flour: 1, water: 1, raspberry: 1 }, tint: 0xb45a4a, time: 4 },
+  { id: 'salmon', name: 'Salmon', lv: 25, price: 1700, mats: { raw_salmon: 1 }, tint: 0xe07a4a, time: 3 },
+  { id: 'plain_pizza', name: 'Pizza', lv: 35, price: 2100, mats: { flour: 1, water: 1, egg: 1 }, tint: 0xd8a850, time: 5, shape: 'pizza' },
+  { id: 'lobster', name: 'Lobster', lv: 40, price: 2350, mats: { raw_lobster: 1 }, tint: 0xc45a32, time: 5 },
+  { id: 'cake', name: 'Cake', lv: 40, price: 2400, mats: { flour: 1, egg: 1, water: 1 }, tint: 0xe8c8a0, time: 5 },
+  { id: 'fish_pie', name: 'Fish Pie', lv: 47, price: 2750, mats: { flour: 1, water: 1, raw_salmon: 1, raw_shrimp: 1 }, tint: 0xc8b07a, time: 7 },
+  { id: 'chocolate_cake', name: 'Chocolate Cake', lv: 50, price: 2950, mats: { flour: 1, egg: 1, water: 1, chocolate: 1 }, tint: 0x5a3220, time: 6 },
+  { id: 'curry', name: 'Curry', lv: 60, price: 3700, mats: { harralander: 1, water: 1 }, tint: 0xd48a28, time: 8 },
+  { id: 'monkfish', name: 'Monkfish', lv: 62, price: 3850, mats: { raw_monkfish: 1 }, tint: 0xd8c8a0, time: 7 },
+  { id: 'pizza', name: 'Pineapple Pizza', lv: 65, price: 4100, mats: { flour: 1, water: 1, egg: 1, pineapple: 1 }, tint: 0xd4a04a, time: 8 },
+  { id: 'shark', name: 'Shark', lv: 80, price: 5750, mats: { raw_shark: 1 }, tint: 0x6a7a88, time: 9 },
+  { id: 'anglerfish', name: 'Anglerfish', lv: 84, price: 6250, mats: { raw_anglerfish: 1 }, tint: 0xc8a04a, time: 12 },
+  { id: 'summer_pie', name: 'Summer Pie', lv: 95, price: 8000, mats: { flour: 1, water: 1, raspberry: 1, pineapple: 1 }, tint: 0xe8a04a, time: 10 },
 ];
 
+/** Sell price: 1,000 gp at Lv 1 rising x8 to ~8,000 gp at Lv 95 (nearest 50), set per dish in COOK_LINE. */
+export function cookSellPrice(level) {
+  return Math.round(1000 * 8 ** ((Math.max(1, Number(level) || 1) - 1) / 94) / 50) * 50;
+}
+
+/** @deprecated kept for old callers/tests; cooking now prices by level. */
 /** Bread starts near 50 gp; the top of the feast line sits near 5,000 gp. */
 export function foodSellPrice(oldPrice) {
   const t = Math.max(0, Math.min(1, ((Number(oldPrice) || 0) - 8) / (120 - 8)));
   return Math.max(1, Math.round(50 + t * (5000 - 50)));
 }
 
-function addFoodLine(list, lineId, lineName, setKey, firstPreviousId = null) {
+function addCookLine(list, startIndex) {
   list.forEach((food, index) => {
-    const previousId = index === 0 ? firstPreviousId : list[index - 1].id;
-    const need = index === 0 && firstPreviousId ? unlockNeed(1) : unlockNeed(index);
     addRecipe({
       id: food.id,
       name: food.name,
       category: 'food',
       combatClass: null,
       slot: 'food',
-      shape: food.id,
-      setKey,
-      lineId,
-      lineName,
-      lineIndex: index,
-      previousId,
-      unlockNeed: need,
+      shape: food.shape ?? food.id,
+      setKey: 'cooking',
+      lineId: 'food-range',
+      lineName: 'Cooking',
+      lineIndex: startIndex + index,
+      previousId: null, // level-gated only, like OSRS (no craft-count chain)
+      unlockNeed: 0,
       tier: index + 1,
       cost: { materials: { ...food.mats }, gold: 0 },
       time: Math.round((food.time * 2) / 3 * 10) / 10,
-      price: foodSellPrice(food.price),
+      price: food.price ?? cookSellPrice(food.lv),
       buyers: ['pilgrim'],
       tint: food.tint,
       shelfItem: true,
@@ -1137,9 +1138,9 @@ addRecipe({
   combatClass: null,
   slot: 'food',
   shape: 'pot_of_flour',
-  setKey: 'mill',
-  lineId: 'food-mill',
-  lineName: 'Milling',
+  setKey: 'cooking',
+  lineId: 'food-range',
+  lineName: 'Cooking',
   lineIndex: 0,
   previousId: null,
   unlockNeed: 0,
@@ -1154,8 +1155,7 @@ addRecipe({
 });
 
 // Food is small and sits on wall shelves. Potions share the same four shelf slots.
-addFoodLine(FOOD_LINE, 'food-bake', 'Kitchen', 'kitchen');
-addFoodLine(FEAST_LINE, 'food-feast', 'Feast', 'feast', 'bread');
+addCookLine(COOK_LINE, 1);
 
 const POTION_LINE = [
   { id: 'attack_potion', name: 'Attack Potion', tint: 0x40c8c0, buyers: ['mercenary'], price: 1000 },

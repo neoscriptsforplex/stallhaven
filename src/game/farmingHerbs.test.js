@@ -178,7 +178,7 @@ describe('herb patches', () => {
     assert.equal(applyState(both, { materials: { herbs: 4, guam: 2 } }), true);
     assert.equal(both.materials.guam, 6);
 
-    assert.deepEqual(RECIPES.curry.cost.materials, { harralander: 1 });
+    assert.deepEqual(RECIPES.curry.cost.materials, { harralander: 1, water: 1 });
     assert.deepEqual(RECIPES.attack_potion.cost.materials, { guam: 1, water: 1 });
     assert.deepEqual(RECIPES.strength_potion.cost.materials, { tarromin: 1, water: 1 });
     assert.deepEqual(RECIPES.anti_poison_potion.cost.materials, { marrentill: 1, water: 1 });

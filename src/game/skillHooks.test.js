@@ -257,7 +257,7 @@ describe('skill xp hooks', () => {
 
 describe('xp balance pass', () => it('bread doubled, flour old bread, woodcutting +25%', async () => {
   const { xpForCraft, xpForChop } = await import('./skills.js');
-  assert.equal(xpForCraft(RECIPES.bread), 4);
+  assert.equal(xpForCraft(RECIPES.bread), 18);
   assert.equal(xpForCraft(RECIPES.pot_of_flour), 2);
   assert.equal(xpForChop('maple_logs'), 103);
 }));

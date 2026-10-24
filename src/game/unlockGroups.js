@@ -11,7 +11,8 @@ export function groupUnlocks(rows, recipes = {}) {
     const r = recipes[row.id] ?? {};
     const first = row.name.split(' ')[0];
     let key, label, icon;
-    if (row.kind === 'recipe' && r.category && CAT_LABEL[r.category] && row.name.includes(' ')) {
+    // Food lists each dish by name ("Fish Pie", not "Fish food").
+    if (row.kind === 'recipe' && r.category && r.category !== 'food' && CAT_LABEL[r.category] && row.name.includes(' ')) {
       key = `${first}|${r.category}`; label = `${first}${row.name.includes("D'hide") ? " d'hide" : ''} ${CAT_LABEL[r.category]}`; icon = CAT_ICON[r.category];
     } else if (/\b(Bar|Nails)$/.test(row.name)) {
       key = `${first}|bar`; label = `${first} bar & nails`; icon = 'bar';

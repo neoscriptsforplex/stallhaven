@@ -88,7 +88,8 @@ describe('cooking needs the matching raw fish', () => {
     assert.deepEqual(RECIPES.shark.cost.materials, { raw_shark: 1 });
     assert.deepEqual(RECIPES.anglerfish.cost.materials, { raw_anglerfish: 1 });
     assert.equal(RECIPES.fish_pie.cost.materials.raw_salmon, 1);
-    assert.deepEqual(RECIPES.curry.cost.materials, { harralander: 1 }, 'curry needs Harralander and no fish');
+    assert.equal(RECIPES.fish_pie.cost.materials.raw_shrimp, 1);
+    assert.deepEqual(RECIPES.curry.cost.materials, { harralander: 1, water: 1 }, 'curry needs Harralander and no fish');
     for (const recipe of Object.values(RECIPES)) assert.equal(recipe.cost?.materials?.fish, undefined, recipe.id);
   });
 });

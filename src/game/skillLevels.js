@@ -156,22 +156,25 @@ const LEVELS = {
   ranging_potion: row('herblore', 65, 280),
   magic_potion: row('herblore', 75, 500),
 
-  // Milling wheat pays bread's old 2 XP; bread itself pays double (4).
+  // Cooking: OSRS unlock levels (oldschool.runescape.wiki/w/Cooking). XP follows the
+  // game's smithing curve (4*e^(0.06*(lv-1))) plus a +12 floor so early dishes feel quick,
+  // and always rises with level. Milling keeps a token 2 XP.
   pot_of_flour: row('cooking', 1, 2),
-  bread: row('cooking', 1, 4),
-  shrimp: row('cooking', 1, 3),
-  salmon: row('cooking', 25, 4),
-  pizza: row('cooking', 20, 8),
-  pie: row('cooking', 30, 20),
-  cake: row('cooking', 35, 21),
-  lobster: row('cooking', 40, 27),
-  fish_pie: row('cooking', 47, 54),
-  chocolate_cake: row('cooking', 50, 53),
-  curry: row('cooking', 60, 115),
-  monkfish: row('cooking', 62, 110),
-  shark: row('cooking', 80, 350),
-  anglerfish: row('cooking', 84, 570),
-  summer_pie: row('cooking', 95, 820),
+  shrimp: row('cooking', 1, 16),
+  bread: row('cooking', 1, 18),
+  pie: row('cooking', 10, 19), // Redberry Pie
+  salmon: row('cooking', 25, 29),
+  plain_pizza: row('cooking', 35, 43), // Pizza
+  lobster: row('cooking', 40, 54),
+  cake: row('cooking', 40, 56),
+  fish_pie: row('cooking', 47, 75),
+  chocolate_cake: row('cooking', 50, 88),
+  curry: row('cooking', 60, 150),
+  monkfish: row('cooking', 62, 167),
+  pizza: row('cooking', 65, 198), // Pineapple Pizza
+  shark: row('cooking', 80, 470),
+  anglerfish: row('cooking', 84, 594),
+  summer_pie: row('cooking', 95, 1138),
 
   weave_cloth: row('crafting', 1, 5),
   unpowered_orb: row('smithing', 1, 8),

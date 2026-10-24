@@ -1113,6 +1113,8 @@ export function bindHud(root, state, world) {
               ? 'Fish'
               : 'Mine';
     }
+    const fillBtn = inspectPop.querySelector('[data-inspect-fill]');
+    if (fillBtn) fillBtn.hidden = kind !== 'fishing_spot';
     inspectPop.hidden = false;
     const x = Math.min(window.innerWidth - 250, Math.max(8, clientX ?? 24));
     const y = Math.min(window.innerHeight - 180, Math.max(8, clientY ?? 80));
@@ -1835,7 +1837,9 @@ export function bindHud(root, state, world) {
     if (fishPicker) fishPicker.hidden = true;
   }
   /** Pond click: every fish with its level; the pick walks over and keeps fishing it. */
-  function showFishPicker(clientX, clientY) {
+  let fishPickerPoint = null;
+  function showFishPicker(clientX, clientY, point = null) {
+    fishPickerPoint = point && Number.isFinite(point.x) ? { x: point.x, z: point.z } : null;
     if (!fishPicker) {
       fishPicker = document.createElement('div');
       fishPicker.className = 'furn-menu fish-picker';
@@ -1843,6 +1847,7 @@ export function bindHud(root, state, world) {
       document.body.appendChild(fishPicker);
       fishPicker.addEventListener('click', (ev) => {
         if (ev.target.closest('[data-fish-x]')) { hideFishPicker(); return; }
+        if (ev.target.closest('[data-pond-fill]')) { hideFishPicker(); world.fillAtPond?.(fishPickerPoint); return; }
         const btn = ev.target.closest('[data-fish]');
         if (!btn || btn.disabled) return;
         try { localStorage.setItem(LAST_FISH_KEY, btn.dataset.fish); } catch { /* private mode */ }
@@ -1856,7 +1861,7 @@ export function bindHud(root, state, world) {
     let last = null;
     try { last = localStorage.getItem(LAST_FISH_KEY); } catch { /* private mode */ }
     const level = skillLevelOf(state, 'fishing');
-    fishPicker.innerHTML = `<button type="button" class="ghost settings-x panel-x" data-fish-x aria-label="Close" title="Close">✕</button><p>Fish for…</p>${FISHING_SPOTS.map((spot) => {
+    fishPicker.innerHTML = `<button type="button" class="ghost settings-x panel-x" data-fish-x aria-label="Close" title="Close">✕</button><p>Fish for…</p><button type="button" data-pond-fill>🪣 Fill bucket</button>${FISHING_SPOTS.map((spot) => {
       const req = gatherLevelRequirement(spot.materialId);
       const need = req?.level ?? 1;
       const locked = level < need;
@@ -1895,7 +1900,7 @@ export function bindHud(root, state, world) {
     );
     const useBtn = furnMenu.querySelector('[data-furn-use]');
     const upgradeBtn = furnMenu.querySelector('[data-furn-upgrade]');
-    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel' || target.id === 'loom' || target.id === 'fletch' || target.id === 'potter' || target.id === 'sawmill' || target.id === 'portal' || target.id === 'farming_patch' || pieceRow?.id === 'bank_booth') {
+    if (target.id === 'chest' || target.id === 'anvil' || target.id === 'range' || target.id === 'cauldron' || target.id === 'furnace' || target.id === 'wheel' || target.id === 'loom' || target.id === 'fletch' || target.id === 'potter' || target.id === 'sawmill' || target.id === 'portal' || target.id === 'farming_patch' || pieceRow?.id === 'bank_booth' || pieceRow?.id === 'lumbridge_fountain') {
       useBtn.hidden = false;
       useBtn.textContent = target.id === 'chest' ? 'Open Chest'
         : target.id === 'range' ? 'Cook'
@@ -1909,6 +1914,7 @@ export function bindHud(root, state, world) {
                       : target.id === 'portal' ? 'Enter'
                       : target.id === 'farming_patch' ? 'Grow'
                       : pieceRow?.id === 'bank_booth' ? 'Bank'
+                      : pieceRow?.id === 'lumbridge_fountain' ? 'Fill bucket'
                         : 'Craft';
     } else {
       useBtn.hidden = true;
@@ -2695,6 +2701,11 @@ export function bindHud(root, state, world) {
   });
 
   inspectPop?.querySelector('[data-inspect-close]')?.addEventListener('click', hideInspect);
+  inspectPop?.querySelector('[data-inspect-fill]')?.addEventListener('click', () => {
+    const target = inspectTarget;
+    hideInspect();
+    world.fillAtPond?.(target && Number.isFinite(target.x) ? { x: target.x, z: target.z } : null);
+  });
   inspectPop?.querySelector('[data-inspect-mine]')?.addEventListener('click', () => {
     const target = inspectTarget;
     hideInspect();
@@ -2792,6 +2803,7 @@ export function bindHud(root, state, world) {
   furnMenu.querySelector('[data-furn-use]').addEventListener('click', () => {
     const target = furnTarget;
     hideFurnMenu();
+    if (target?.id === 'piece' && state.furniture?.placed?.[target.index]?.id === 'lumbridge_fountain') { world.fillAtFountainPiece?.(target.index); return; }
     if (target?.id === 'chest' || (target?.id === 'piece' && state.furniture?.placed?.[target.index]?.id === 'bank_booth')) openChest();
     if (target?.id === 'anvil') openCraft('anvil');
     if (target?.id === 'range') openCraft('range');
@@ -3402,7 +3414,7 @@ export function bindHud(root, state, world) {
       return;
     }
     if (event.type === 'fish-picker') {
-      showFishPicker(event.clientX, event.clientY);
+      showFishPicker(event.clientX, event.clientY, { x: event.x, z: event.z });
       return;
     }
     if (event.type === 'fishing-inspect') {

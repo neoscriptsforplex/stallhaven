@@ -1,7 +1,7 @@
 /**
  * Cosmetic furniture from Furniture.rar. Prices are flat materials, not the
- * gold ×3 curve. Placing grants Construction XP through xpForBuild. Pick up
- * returns those materials. Sell pays half the gold value and keeps the materials.
+ * gold ×3 curve, plus build gold of 1,000 × unlock level. Placing grants Construction XP through xpForBuild. Pick up
+ * returns those materials and the build gold paid. Sell pays half the gold value and keeps the materials.
  */
 import { xpForBuild } from './skills.js';
 
@@ -139,6 +139,15 @@ export function constructionXpFor(row) {
   return xpForBuild({ kind: 'item', gp: row?.gold ?? 0, planks: plankMap(row ?? { materials: {} }) });
 }
 
+/** Gold per Construction unlock level charged to place a piece (on top of materials). */
+export const BUILD_GOLD_PER_LEVEL = 1000;
+
+/** Gold to place one piece: 1,000 × unlock level. Pieces flagged `free: true` cost no gold. */
+export function constructionBuildGold(row) {
+  if (!row || row.free === true) return 0;
+  return BUILD_GOLD_PER_LEVEL * Math.max(1, Math.floor(Number(row.level) || 1));
+}
+
 export function missingMaterials(state, row) {
   const missing = [];
   for (const [id, need] of Object.entries(row?.materials ?? {})) {
@@ -156,6 +165,11 @@ export function constructionPlaceBlock(state, pieceId) {
     return `You need a Construction level of ${row.level} to build ${row.name}.`;
   }
   if (missingMaterials(state, row).length) return 'Missing materials.';
+  const gold = constructionBuildGold(row);
+  const have = Math.max(0, Math.floor(Number(state?.gold) || 0));
+  if (have < gold) {
+    return `You need ${gold.toLocaleString('en-US')} gp to build ${row.name}. You have ${have.toLocaleString('en-US')} gp.`;
+  }
   return '';
 }
 
@@ -191,7 +205,9 @@ export function placeConstruction(state, pieceId, pose) {
   const list = placedList(state);
   if (!list) return false;
   pay(state, row);
-  list.push({ id: row.id, x: spot.x, z: spot.z, rot: spot.rot });
+  const paid = constructionBuildGold(row);
+  state.gold = Math.max(0, Math.round((state.gold ?? 0) - paid));
+  list.push({ id: row.id, x: spot.x, z: spot.z, rot: spot.rot, paid });
   state.skills?.addXp?.('construction', constructionXpFor(row));
   return true;
 }
@@ -208,7 +224,10 @@ export function moveConstruction(state, index, pose) {
   return true;
 }
 
-/** Remove a piece and give the materials back. Gold stays spent. */
+/**
+ * Delete / pick up: give the materials back in full, and the build gold
+ * actually paid for this piece (`paid`; 0 for pieces from older saves).
+ */
 export function pickupConstruction(state, index) {
   const list = placedList(state);
   const row = list?.[index];
@@ -216,6 +235,8 @@ export function pickupConstruction(state, index) {
   if (!pieceRow) return false;
   list.splice(index, 1);
   refundMaterials(state, pieceRow);
+  const paid = Math.max(0, Math.floor(Number(row.paid) || 0));
+  if (paid) state.gold = Math.round((state.gold ?? 0) + paid);
   return true;
 }
 
@@ -242,6 +263,7 @@ export function readPlacedFurniture(saved) {
       x: pose.x,
       z: pose.z,
       rot: Number.isFinite(pose.rot) ? pose.rot : 0,
+      ...(Number(pose.paid) > 0 ? { paid: Math.floor(Number(pose.paid)) } : {}),
     });
   }
   return out;

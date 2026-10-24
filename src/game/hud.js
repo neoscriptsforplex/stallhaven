@@ -122,6 +122,7 @@ import {
   shopFurnitureInCategory,
   constructionPiece,
   constructionPlaceBlock,
+  constructionBuildGold,
   missingMaterials,
 } from './construction.js';
 import {
@@ -2150,11 +2151,16 @@ export function bindHud(root, state, world) {
   }
 
   function pieceNeedLine(row) {
-    return Object.entries(row.materials).map(([id, need]) => {
+    const gold = constructionBuildGold(row);
+    const haveGold = Math.max(0, Math.floor(Number(state.gold) || 0));
+    const goldPart = gold
+      ? `<span class="is-${haveGold >= gold ? 'have' : 'missing'}">${formatGold(gold)} gp</span>`
+      : '<span class="is-have">Free</span>';
+    return [goldPart, ...Object.entries(row.materials).map(([id, need]) => {
       const have = Math.max(0, Math.floor(Number(state.materials?.[id]) || 0));
       const mark = have >= need ? 'have' : 'missing';
       return `<span class="is-${mark}">${materialName(id)} ${have}/${need}</span>`;
-    }).join(' · ');
+    })].join(' · ');
   }
 
   /** Long card blurbs are hidden by build-catalogue.css; show them as a hover tooltip instead. */
@@ -2207,9 +2213,11 @@ export function bindHud(root, state, world) {
     if (!detail || !row) return;
     const missing = missingMaterials(state, row);
     detail.hidden = false;
-    detail.innerHTML = missing.length
-      ? `Missing: ${missing.map((item) => `${materialName(item.id)} ${item.have}/${item.need}`).join(' · ')}`
-      : `Have everything for ${row.name}. Sell pays ${formatGold(Math.floor(row.gold / 2))} gp. Pick up returns the materials.`;
+    const gold = constructionBuildGold(row);
+    const short = gold > (Number(state.gold) || 0);
+    detail.innerHTML = missing.length || short
+      ? `Missing: ${[...(short ? [`Gold ${formatGold(Math.floor(Number(state.gold) || 0))}/${formatGold(gold)}`] : []), ...missing.map((item) => `${materialName(item.id)} ${item.have}/${item.need}`)].join(' · ')}`
+      : `Have everything for ${row.name} (${formatGold(gold)} gp). Sell pays ${formatGold(Math.floor(row.gold / 2))} gp. Delete returns the materials and the build gold.`;
   }
 
   function paintPlaceDock() {
@@ -2238,7 +2246,7 @@ export function bindHud(root, state, world) {
     }
     if (blurb) {
       blurb.textContent = pendingPlace.pieceId
-        ? 'Move the ghost, rotate it, and snap it to the grid. Materials are spent only when you confirm. Cancel spends nothing.'
+        ? 'Move the ghost, rotate it, and snap it to the grid. Gold and materials are spent only when you confirm. Cancel spends nothing. Moving later is free.'
         : pendingPlace.moving
         ? 'Move the patch on open grass, clear of the path, buildings, and other patches. Nothing is spent. Cancel leaves the patch where it was.'
         : pendingPlace.type === 'farming_patch'

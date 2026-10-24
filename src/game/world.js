@@ -180,6 +180,7 @@ import {
   defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
 } from './models.js';
+import { FIRE_PIECES } from './sfxHooks.js';
 import { constructionLookId, constructionPiece, pieceHangs } from './construction.js';
 import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
 import { tickPortalJelly } from './portalJelly.js';
@@ -4365,6 +4366,15 @@ export function createWorld(canvas, state, opts = {}) {
     return true;
   }
 
+  function nearestFireDist(x, z) {
+    let best = Infinity;
+    for (const row of state.furniture?.placed ?? []) {
+      if (!FIRE_PIECES.has(row?.id) || !Number.isFinite(row.x) || !Number.isFinite(row.z)) continue;
+      best = Math.min(best, Math.hypot(row.x - x, row.z - z));
+    }
+    return best;
+  }
+
   /** Per-frame view for the sound director (src/game/sfxHooks.js). */
   function sfxSnapshot() {
     const pos = shopkeeper.position;
@@ -4380,6 +4390,7 @@ export function createWorld(canvas, state, opts = {}) {
       player: { x: pos.x, z: pos.z },
       indoors,
       sceneMode,
+      fireDist: sceneMode === 'shop' ? nearestFireDist(pos.x, pos.z) : Infinity,
     };
   }
 

@@ -46,6 +46,19 @@ export function intentSound(intent, result) {
   return null;
 }
 
+/** Fire pieces whose crackle the player hears up close. */
+export const FIRE_PIECES = new Set(['fire', 'fireplace', 'fancy_fireplace']);
+export const FIRE_FULL_DIST = 2;
+export const FIRE_SILENT_DIST = 5;
+
+/** Distance to the nearest fire (m) → crackle gain 0..1 (full within 2 m, silent past 5 m). */
+export function fireCrackleGain(dist) {
+  if (!Number.isFinite(dist) || dist >= FIRE_SILENT_DIST) return 0;
+  if (dist <= FIRE_FULL_DIST) return 1;
+  const g = 1 - (dist - FIRE_FULL_DIST) / (FIRE_SILENT_DIST - FIRE_FULL_DIST);
+  return Math.round(g * 20) / 20;
+}
+
 export function createSfxDirector({ play, loop }) {
   let lastGold = null;
   let goldVoicedUntil = -Infinity;
@@ -53,7 +66,7 @@ export function createSfxDirector({ play, loop }) {
   const repeatAt = new Map();
   let swing = null;
   let lastFishStart = null;
-  let ambience = false;
+  let ambience = 0;
 
   function onIntent(intent, result, now) {
     const id = intentSound(intent, result);
@@ -97,9 +110,10 @@ export function createSfxDirector({ play, loop }) {
       if (lastFishStart !== m.startedAt) play('fishing_splash');
       lastFishStart = m.startedAt;
     } else lastFishStart = null;
-    const amb = Boolean(snap.indoors && snap.sceneMode === 'shop');
+    // Hearth crackle: only near a placed Fire or fireplace, fading with distance.
+    const amb = fireCrackleGain(snap.fireDist);
     if (amb !== ambience) {
-      loop('shop_ambience_loop', amb);
+      loop('shop_ambience_loop', amb > 0, amb);
       ambience = amb;
     }
   }

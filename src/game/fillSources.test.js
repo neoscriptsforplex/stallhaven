@@ -15,7 +15,7 @@ describe('bucket fill: every source', () => {
       assert.ok(d >= 1.44 && d < 1.48, `dist ${d}`);
       const toBowl = Math.atan2(FOUNTAIN.x - s.x, FOUNTAIN.z - s.z);
       const off = Math.abs(Math.atan2(Math.sin(toBowl - s.yaw), Math.cos(toBowl - s.yaw)));
-      assert.ok(off < 0.11, `faces bowl (${off})`);
+      assert.ok(off < 0.01, `faces bowl (${off})`);
     }
   });
 
@@ -28,7 +28,7 @@ describe('bucket fill: every source', () => {
     const c = Math.cos(0.7); const sn = Math.sin(0.7);
     const L = FOUNTAIN_STAND_LOCAL;
     assert.ok(Math.abs(st[0].x - (3 + 1.5 * (L.x * c + L.z * sn))) < 1e-9);
-    assert.ok(Math.abs(st[0].yaw - 0.7) < 1e-9);
+    for (const s of st) assert.ok(Math.abs(s.yaw - Math.atan2(3 - s.x, -4 - s.z)) < 1e-9);
     const plan = resolveStationUse({ x: 3, z: -10 }, pose, {}, straight, 'fountain', () => true);
     assert.equal(plan.action, 'walk');
   });

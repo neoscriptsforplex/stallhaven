@@ -225,7 +225,10 @@ export function fountainStands(pose = FOUNTAIN) {
     const yaw = rot + (k * Math.PI) / 2;
     const c = Math.cos(yaw); const s = Math.sin(yaw);
     const x = FOUNTAIN_STAND_LOCAL.x * k0; const z = FOUNTAIN_STAND_LOCAL.z * k0;
-    out.push({ x: (pose?.x ?? 0) + x * c + z * s, z: (pose?.z ?? 0) - x * s + z * c, yaw });
+    const cx = pose?.x ?? 0; const cz = pose?.z ?? 0;
+    const px = cx + x * c + z * s; const pz = cz - x * s + z * c;
+    // Rig v6: face the exact fountain centre.
+    out.push({ x: px, z: pz, yaw: Math.atan2(cx - px, cz - pz) });
   }
   return out;
 }

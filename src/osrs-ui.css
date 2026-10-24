@@ -139,3 +139,33 @@ button.settings-x.panel-x::after { content: ''; position: absolute; inset: -6px 
 #settings-dock.dock-fit.is-compact { padding: 8px 10px; font-size: 14px; }
 #settings-dock.dock-fit.is-compact > h2 { font-size: 1.05rem; margin-bottom: 6px; }
 #settings-dock.dock-fit.is-compact .settings-body button { padding: 5px 10px; min-height: 32px; }
+
+/* modalFit.js: every centred sheet sits in the HUD/bar band; compact below 0.8 scale. */
+.modal.modal-fit { place-items: start center; align-content: start; box-sizing: border-box; }
+.modal.modal-fit > .sheet { box-sizing: border-box; margin: 0 auto; overscroll-behavior: contain; }
+.modal.fit-tight > .sheet { padding: 8px; }
+.modal.fit-tight > .sheet > p:not(.meta):not(.craft-note) { display: none; }
+.modal.fit-tight > .sheet img, .modal.fit-tight > .sheet canvas { max-width: 64px; max-height: 64px; }
+.panel-fit { position: fixed !important; box-sizing: border-box; overscroll-behavior: contain; }
+.panel-fit .skills-head, .panel-fit .hero-picker-head { position: sticky; top: 0; z-index: 3; background: inherit; }
+.panel-fit.fit-tight > p.hq-sub { display: none; }
+/* Station sheets in the fit band (landscape phone, foldable): recipe list absorbs the height, never overlaps. */
+.modal.modal-fit > .sheet.craft-sheet { display: flex; flex-direction: column; overflow: hidden !important; position: relative; }
+.modal.modal-fit > .sheet.craft-sheet > * { flex: 0 0 auto; }
+.modal.modal-fit > .sheet.craft-sheet > .craft-body { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.modal.modal-fit .craft-sheet .craft-body > * { min-height: 0; overflow-y: auto; }
+.modal.modal-fit .craft-sheet #crafts, .modal.modal-fit .craft-sheet #potion-crafts { height: auto; max-height: none; min-height: 0; overflow-y: auto; }
+.modal.modal-fit .craft-sheet .craft-mats { max-height: 22%; overflow-y: auto; }
+.modal.fit-tight .craft-sheet .craft-mats { max-height: 2.4em; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; justify-content: flex-start; }
+.modal.fit-tight .craft-sheet .craft-mats > * { flex: none; }
+.modal.fit-tight .craft-sheet > .tabs { margin-bottom: 3px; }
+.modal.fit-tight .craft-sheet > .tabs button { padding: 3px 6px; min-height: 26px; }
+.modal.fit-tight .craft-sheet .craft-x { position: absolute; top: 6px; right: 6px; z-index: 5; }
+.modal.modal-fit > .sheet.away-sheet, .modal.modal-fit > .sheet.hero-picker-sheet { position: relative; left: auto; right: auto; bottom: auto; width: min(560px, calc(100vw - 16px)); border-radius: 12px; }
+.modal.modal-fit#away-modal, .modal.modal-fit#hero-picker { place-items: start center; }
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  #hud .minimap-wrap.is-expanded { width: min(calc(var(--portrait-map-open, 100vh) - 14px), calc(100dvh - 150px)) !important; max-width: min(calc(var(--portrait-map-open, 100vh) - 14px), calc(100dvh - 150px)) !important; }
+}
+#craft-modal.modal-fit #materials, #potion-modal.modal-fit .craft-mats { max-height: 22%; overflow-y: auto; }
+#craft-modal.fit-tight #materials, #potion-modal.fit-tight .craft-mats { max-height: 2.6em; display: flex; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; justify-content: flex-start; }
+#craft-modal.fit-tight #materials > *, #potion-modal.fit-tight .craft-mats > * { flex: none; }

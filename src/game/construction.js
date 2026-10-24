@@ -36,6 +36,7 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'tapestry_pole', name: 'Tapestry Pole', category: 'Storage', mount: 'floor', level: 28, gold: 500, tint: 0x8a6840, materials: { oak_plank: 1, iron_nails: 4 } }),
   piece({ id: 'landscape', hang: true, name: 'Landscape', category: 'Wall', mount: 'wall', level: 35, gold: 1200, tint: 0x5a8a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
   piece({ id: 'bush', scale: 2 / 3, name: 'Bush', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 50, tint: 0x4a8a3a, materials: { flax: 2 } }),
+  piece({ id: 'garden_bush', name: 'Garden Bush', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 120, tint: 0x4a7a2a, materials: { flax: 3 } }),
   piece({ id: 'statue', name: 'Statue', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 3000, tint: 0xb0b0b8, materials: { yew_plank: 2, adamant_nails: 6 } }),
   piece({ id: 'log_pile', name: 'Log Pile', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 200, tint: 0x8a6238, materials: { logs: 4 } }),
   piece({ id: 'lumbridge_fountain', name: 'Lumbride Fountain', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 4000, tint: 0x4a88b0, materials: { maple_plank: 4, mithril_nails: 8 } }),

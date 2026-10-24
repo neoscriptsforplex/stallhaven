@@ -99,6 +99,7 @@ import {
   snapToPieceWall,
   placeFloors,
   walkFloors,
+  SHELF_FROM_WALL,
 } from './layout.js';
 import {
   PLAYER_RADIUS,
@@ -1398,6 +1399,13 @@ export function createWorld(canvas, state, opts = {}) {
       // Wall paintings: centre on the wall's vertical middle (render-time rule, so old saves follow too).
       else if (Number.isFinite(box.min.y)) anim.position.y += PAINTING_CENTER_Y - (box.min.y + box.max.y) / 2;
       anim.position.y += constructionPiece(id)?.wallY ?? 0;
+      // Lit Torch GLB: pull it back so the body's back touches the wall (wall is local -Z at SHELF_FROM_WALL).
+      if (id === 'lit_torch') {
+        const body = anim.getObjectByName('body') ?? anim;
+        anim.updateMatrixWorld(true);
+        const bodyBox = new THREE.Box3().setFromObject(body, true);
+        if (Number.isFinite(bodyBox.min.z)) anim.position.z += -SHELF_FROM_WALL - bodyBox.min.z;
+      }
       return anim;
     }
     const look = getBundledLook(constructionLookId(id));

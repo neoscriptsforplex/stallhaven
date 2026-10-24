@@ -51,7 +51,7 @@ describe('gathering rates', () => {
 
 describe('construction unlock levels', () => {
   it('matches the approved levels and mounts', () => {
-    const want = { chair: 5, fire: 5, old_bookshelf: 10, bench: 20, double_bed: 50, standing_candles: 60, fancy_chair: 60, fancy_table: 65, throne: 99 };
+    const want = { chair: 5, fire: 5, old_bookshelf: 10, bench: 20, basic_bed: 20, double_bed: 50, standing_candles: 60, fancy_chair: 60, fancy_table: 65, throne: 99 };
     for (const [id, lv] of Object.entries(want)) assert.equal(constructionPiece(id).level, lv, id);
     for (const id of ['barrel_of_sticks', 'barrel_of_fish', 'sacks']) assert.equal(constructionPiece(id).mount, 'outdoor', id);
     const basic = constructionPiece('basic_table');

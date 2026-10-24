@@ -17,6 +17,7 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'throne', scale: 2 / 3, name: 'Throne', category: 'Seating', mount: 'outdoor', level: 99, gold: 5000, tint: 0xc4a24a, materials: { magic_plank: 4, dragon_nails: 8 } }),
   piece({ id: 'basic_table', scale: 2 / 3, name: 'Basic Table', category: 'Tables', mount: 'outdoor', level: 1, gold: 150, tint: 0xa07848, materials: { plank: 2, bronze_nails: 2 } }),
   piece({ id: 'fancy_table', scale: 2 / 3, name: 'Fancy Table', category: 'Tables', mount: 'outdoor', level: 65, gold: 800, tint: 0xc4a06a, materials: { oak_plank: 3, iron_nails: 6 } }),
+  piece({ id: 'basic_bed', scale: 2 / 3, name: 'Basic Bed', category: 'Beds', mount: 'outdoor', level: 20, gold: 600, tint: 0x8a6a4a, materials: { plank: 3, bronze_nails: 4 } }),
   piece({ id: 'double_bed', scale: 2 / 3, name: 'Double Bed', category: 'Beds', mount: 'outdoor', level: 50, gold: 1500, tint: 0x6a3a4a, materials: { willow_plank: 4, steel_nails: 8 } }),
   piece({ id: 'cabinet', scale: 2 / 3, name: 'Cabinet', category: 'Storage', mount: 'outdoor', level: 1, gold: 700, tint: 0xa08050, materials: { oak_plank: 3, iron_nails: 6 } }),
   piece({ id: 'crate', scale: 2 / 3, name: 'Crate', category: 'Storage', mount: 'outdoor', level: 1, gold: 150, tint: 0xb09060, materials: { plank: 2, bronze_nails: 2 } }),

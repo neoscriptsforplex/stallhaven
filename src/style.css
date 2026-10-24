@@ -1907,7 +1907,7 @@ html.is-booting.is-scene-live #view {
 }
 
 /* Phone portrait: coins, level and XP in one strip; minimap collapses to a corner. */
-@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
+@media (pointer: coarse) { /* TOUCH_HUD_QUERY (layoutQuery.js): compact HUD + minimap on every touch device */
   #hud {
     --portrait-strip: 36px;
     --portrait-map: 112px;
@@ -2623,7 +2623,7 @@ html.is-booting.is-scene-live #view {
 #hud .game-log li:nth-child(n+3) { opacity: 0.5; }
 #hud .active-craft { width: 100%; }
 
-@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
+@media (pointer: coarse) { /* TOUCH_HUD_QUERY (layoutQuery.js): compact HUD + minimap on every touch device */
   #hud { width: auto; max-width: none; }
   #hud .ledger { box-sizing: border-box; width: 100%; }
   #hud .minimap-wrap { width: var(--portrait-map); }
@@ -2746,7 +2746,7 @@ html.is-booting.is-scene-live #view {
   }
 }
 
-@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
+@media (pointer: coarse) { /* TOUCH_HUD_QUERY (layoutQuery.js): compact HUD + minimap on every touch device */
   #hud .minimap-wrap {
     --ring: 4px;
     top: calc(100% + 12px);
@@ -3869,4 +3869,28 @@ html.is-booting.is-scene-live #view {
   .quest-icon.has-render img{width:36px;height:36px}
   #quests-dock.hq-dock{height:auto;max-height:none;overflow:visible}
   #quests-dock .craft-sidetabs{overflow-x:auto;overflow-y:hidden;flex-wrap:wrap}
+}
+
+/* Narrow phone station windows (phoneCraftFit.js): sheet fits between HUD and button bar, no vertical scroll. */
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
+  #craft-modal.phone-fit, #potion-modal.phone-fit { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; }
+  .phone-fit .sheet.craft-sheet { overflow: hidden; display: flex; flex-direction: column; margin: 0; }
+  .phone-fit .craft-sheet > .craft-body { flex: 1 1 auto; min-height: 0; }
+  .phone-fit .craft-body { grid-template-rows: auto minmax(0, 1fr); }
+  .phone-fit .craft-body .craft-preview-pane { order: -1; }
+  .phone-fit .craft-sheet #crafts, .phone-fit .craft-sheet #potion-crafts { height: auto; min-height: 6rem; max-height: none; overflow-y: auto; }
+  .phone-fit.is-measuring .sheet.craft-sheet { overflow: visible; }
+  .phone-fit.is-measuring .craft-sheet > .craft-body { flex: none; }
+  .phone-fit.is-measuring .craft-sheet #crafts, .phone-fit.is-measuring .craft-sheet #potion-crafts { height: clamp(10rem, 34vh, 20rem); flex: none; }
+  .phone-fit .craft-x { position: absolute; top: 6px; right: 6px; z-index: 5; min-width: 36px; min-height: 36px; }
+  .phone-fit .craft-sheet { position: relative; }
+  .phone-fit.is-tight .sheet.craft-sheet { padding: 8px; }
+  .phone-fit.is-tight .craft-row { grid-template-columns: 1fr !important; gap: 4px; }
+  .phone-fit.is-tight .craft { padding: 4px 8px; min-height: 0; }
+  .phone-fit.is-tight .craft-preview-pane { padding: 4px; gap: 4px; }
+  .phone-fit.is-tight .craft-preview-pane canvas { width: 64px; height: 64px; max-width: 64px; max-height: 64px; }
+  .phone-fit.is-tight .craft-qty-hint, .phone-fit.is-tight .craft-sheet > p[data-craft-blurb] { display: none; }
+  .phone-fit.is-tight .craft-sheet > h2 { margin: 0 0 4px; padding-right: 40px; }
+  /* Station open: drawer above the backdrop but boxed between header and Close by JS. */
+  body.station-open .materials-drawer { z-index: 21; }
 }

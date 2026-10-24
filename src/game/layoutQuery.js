@@ -14,5 +14,12 @@ export function onLayoutChange(fn, delay = 100) {
   window.addEventListener('orientationchange', run);
   const mq = window.matchMedia?.(PHONE_QUERY);
   mq?.addEventListener?.('change', run);
+  window.matchMedia?.(TOUCH_HUD_QUERY)?.addEventListener?.('change', run);
   return run;
+}
+// Any touch device (incl. unfolded foldables on the desktop layout) uses the compact HUD strip + round minimap.
+// Must match the CSS @media (pointer: coarse) HUD/minimap blocks.
+export const TOUCH_HUD_QUERY = '(pointer: coarse)';
+export function isTouchHud() {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(TOUCH_HUD_QUERY).matches;
 }

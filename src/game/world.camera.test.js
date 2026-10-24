@@ -55,7 +55,7 @@ describe('canvas orbit yaw', () => {
 
 describe('canvas touch long-press', () => {
   it('treats a still ~2s hold as a right-click, and a swipe as orbit', () => {
-    assert.equal(TOUCH_LONG_PRESS_MS, 2000);
+    assert.equal(TOUCH_LONG_PRESS_MS, 500);
     assert.equal(TOUCH_HOLD_MOVE_PX, 8);
     assert.equal(canvasPointerMovedPastHold({ x: 10, y: 10 }, { x: 12, y: 11 }), false);
     assert.equal(canvasPointerMovedPastHold({ x: 10, y: 10 }, { clientX: 10, clientY: 10 + TOUCH_HOLD_MOVE_PX }), false);

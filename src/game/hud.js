@@ -169,6 +169,7 @@ import {
 } from './materialsDrawer.js';
 
 export function bindHud(root, state, world) {
+  setupPhoneAboutToggles(root);
   intentBus.bind(state);
   const goldEl = root.querySelector('#gold');
   const matsEl = document.querySelector('#materials');
@@ -799,7 +800,7 @@ export function bindHud(root, state, world) {
   function showPreview(recipeId) {
     const recipe = RECIPES[recipeId];
     if (craftPreview) craftPreview.show(recipeId);
-    const label = recipe?.name ?? MATERIALS[recipeId]?.name ?? 'Select or hover a recipe.';
+    const label = recipe?.name ?? MATERIALS[recipeId]?.name ?? (phoneTapPreview() ? 'Tap a recipe to preview.' : 'Select or hover a recipe.');
     const craftName = craftModal.querySelector('[data-craft-preview-name]');
     if (craftName) {
       craftName.textContent = label;
@@ -914,7 +915,18 @@ export function bindHud(root, state, world) {
     }
     const btn = event.target.closest('[data-craft]');
     if (!btn) return;
+    if (phoneTapPreview()) {
+      // Phone: tapping a recipe only previews it; 1x / 5x / Max do the crafting.
+      craftFocusId = btn.dataset.craft;
+      showPreview(craftFocusId);
+      paintCrafts();
+      return;
+    }
     queueCraft(btn.dataset.craft, 1);
+  }
+
+  function phoneTapPreview() {
+    return window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches;
   }
 
   function onCraftHover(event) {
@@ -3624,8 +3636,8 @@ export function bindHud(root, state, world) {
             minimap.setAttribute(
               'aria-label',
               mapSnap.sceneMode === 'dungeon'
-                ? 'Dungeon map. Click to walk. Scroll to zoom.'
-                : 'Shop map. Click to walk. Scroll to zoom.',
+                ? 'Dungeon map. Click or tap to walk. Scroll or use +/− to zoom.'
+                : 'Shop map. Click or tap to walk. Scroll or use +/− to zoom.',
             );
           }
           if (mapPing) {
@@ -3815,4 +3827,24 @@ export function bindHud(root, state, world) {
     paintCrafts,
     showQuestAway: () => heroesPanel?.showAway?.(),
   };
+}
+
+/** Phone portrait: tuck long paragraphs in sheets/docks behind an About toggle, and use tap wording. */
+function setupPhoneAboutToggles(root) {
+  if (typeof window === 'undefined' || !window.matchMedia) return;
+  if (!window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches) return;
+  const doc = root?.ownerDocument ?? document;
+  doc.querySelectorAll('.modal .sheet > p, .expand-dock p').forEach((p) => {
+    if (p.closest('details') || p.classList.contains('meta') || p.classList.contains('help-copy')) return;
+    if ((p.textContent ?? '').trim().length < 120) return;
+    const details = doc.createElement('details');
+    details.className = 'phone-about';
+    const summary = doc.createElement('summary');
+    summary.textContent = 'About';
+    p.replaceWith(details);
+    details.append(summary, p);
+  });
+  doc.querySelectorAll('[data-craft-preview-name], [data-potion-preview-name]').forEach((el) => {
+    el.textContent = el.textContent.replace('Select or hover a', 'Tap a').replace(/\.$/, ' to preview.');
+  });
 }

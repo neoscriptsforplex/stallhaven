@@ -3782,3 +3782,27 @@ html.is-booting.is-scene-live #view {
 .away-list { max-height: none; overflow: visible; }
 .away-row p { overflow-wrap: anywhere; }
 .craft-have { font-size: 0.78rem; color: #cbb48a; }
+
+/* ---------- Phone portrait: modals and side docks as slide-up bottom sheets ---------- */
+@media (orientation: portrait) and (pointer: coarse) {
+  .modal { place-items: end stretch; align-items: end; justify-items: stretch; }
+  .modal > .sheet {
+    width: 100%; max-width: none; margin: 0;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    animation: phone-sheet-up 0.22s ease-out;
+  }
+  .modal > .sheet > .ghost:last-child { position: sticky; bottom: 0; }
+  .expand-dock:not(.skills-dock) {
+    top: auto; right: 0; left: 0; bottom: var(--portrait-thumb, 64px);
+    width: auto; max-width: none;
+    max-height: 60vh; max-height: 60dvh;
+    border-radius: 16px 16px 0 0;
+    animation: phone-sheet-up 0.22s ease-out;
+  }
+  details.phone-about { margin: 4px 0 8px; }
+  details.phone-about > summary { cursor: pointer; min-height: 32px; line-height: 32px; color: #e3b34a; font-size: 0.85rem; }
+  #trade-modal .row { display: grid; grid-template-columns: 1fr 1fr; }
+}
+@keyframes phone-sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .modal > .sheet, .expand-dock { animation: none; } }

@@ -8,7 +8,7 @@
  */
 
 import { CONSTRUCTION_UNLOCKS } from './construction.js';
-import { GATHER_NODES } from './skills.js';
+import { DOUBLE_WATER_LEVEL, GATHER_NODES } from './skills.js';
 
 const METALS = ['bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon'];
 
@@ -312,6 +312,13 @@ export function applyRecipeLevels(recipes) {
       kind: 'gather',
     });
   }
+  unlocks.push({
+    id: 'double_water',
+    name: '2 buckets of water per fill',
+    skill: 'farming',
+    level: DOUBLE_WATER_LEVEL,
+    kind: 'perk',
+  });
   for (const row of CONSTRUCTION_UNLOCKS) {
     unlocks.push({
       id: row.id,
@@ -335,6 +342,7 @@ export function unlockLevelsBySkill() {
   for (const herb of FARMING_HERBS) {
     (bySkill.farming ??= new Set()).add(herb.level);
   }
+  (bySkill.farming ??= new Set()).add(DOUBLE_WATER_LEVEL);
   for (const row of CONSTRUCTION_UNLOCKS) {
     (bySkill.construction ??= new Set()).add(row.level);
   }

@@ -1250,7 +1250,7 @@ describe('material regen', () => {
     tickMaterials(state, 80);
     assert.equal(state.materials.water, 0);
     assert.equal(canRestock(state, 'water'), false);
-    assert.equal(grantFountainWater(state), 5);
+    assert.equal(grantFountainWater(state), 1);
     const clay = createState();
     assert.equal(canRestock(clay, 'soft_clay'), false);
     assert.equal(buyFromCustomer(clay, 'soft_clay', 1), false);
@@ -1292,12 +1292,12 @@ describe('material regen', () => {
     assert.equal(applyState(orbSave, { gold: 40, materials: { orb: 7 } }), true);
     assert.equal(orbSave.materials.orb, 7);
     assert.equal(miningBarAmount(clay, 'hard_clay'), 1);
-    assert.equal(state.materials.water, 5);
-    assert.equal(FOUNTAIN_WATER_YIELD, 5);
+    assert.equal(state.materials.water, 1);
+    assert.equal(FOUNTAIN_WATER_YIELD, 1);
     assert.equal(FOUNTAIN_DURATION, MINE_DURATION);
     assert.equal(FOUNTAIN_DURATION, FLAX_DURATION);
-    state.materials.water = 248;
-    assert.equal(grantFountainWater(state), 2);
+    state.materials.water = 249;
+    assert.equal(grantFountainWater(state), 1);
     assert.equal(state.materials.water, 250);
   });
 
@@ -1308,23 +1308,23 @@ describe('material regen', () => {
     assert.equal(session.mode, 'fill');
     assert.equal(session.verb, 'Filling');
     assert.equal(session.duration, FOUNTAIN_DURATION);
-    assert.equal(session.yield, 5);
+    assert.equal(session.yield, 1);
     const early = advanceFountainFill(state, session, 10 + FOUNTAIN_DURATION - 0.01);
     assert.equal(early.ready, false);
     assert.equal(early.session, session);
     assert.equal(state.materials.water, 0);
     const first = advanceFountainFill(state, session, 10 + FOUNTAIN_DURATION + 0.02);
     assert.equal(first.ready, true);
-    assert.equal(first.got, 5);
+    assert.equal(first.got, 1);
     assert.equal(first.full, false);
-    assert.equal(state.materials.water, 5);
+    assert.equal(state.materials.water, 1);
     assert.equal(first.session.startedAt, 10 + FOUNTAIN_DURATION + 0.02);
     const second = advanceFountainFill(state, first.session, first.session.startedAt + FOUNTAIN_DURATION + 0.02);
-    assert.equal(second.got, 5);
-    assert.equal(state.materials.water, 10);
-    state.materials.water = 248;
+    assert.equal(second.got, 1);
+    assert.equal(state.materials.water, 2);
+    state.materials.water = 249;
     const partial = advanceFountainFill(state, second.session, second.session.startedAt + FOUNTAIN_DURATION + 0.02);
-    assert.equal(partial.got, 2);
+    assert.equal(partial.got, 1);
     assert.equal(partial.full, false);
     assert.equal(state.materials.water, 250);
     const full = advanceFountainFill(state, partial.session, partial.session.startedAt + FOUNTAIN_DURATION + 0.02);
@@ -1332,6 +1332,19 @@ describe('material regen', () => {
     assert.equal(full.full, true);
     assert.equal(full.session, null);
     assert.equal(state.materials.water, 250);
+  });
+
+  it('gives 2 buckets per fill from Farming 25', () => {
+    const state = createState();
+    state.materials.water = 0;
+    let level = 24;
+    state.skills = { ...(state.skills || {}), getLevel: (id) => (id === 'farming' ? level : 1) };
+    assert.equal(grantFountainWater(state), 1);
+    level = 25;
+    assert.equal(grantFountainWater(state), 2);
+    const done = advanceFountainFill(state, createFountainFill(0), FOUNTAIN_DURATION + 0.01);
+    assert.equal(done.got, 2);
+    assert.equal(state.materials.water, 5);
   });
 
   it('grants Ancient Plans with no source and sells the Ancient Staff at 500,000 before the offer cut', () => {

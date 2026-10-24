@@ -60,6 +60,7 @@ import {
   ESSENCE_DOUBLE_LEVEL,
   essencePerBar,
   pickYieldFor,
+  waterYieldFor,
 } from './skills.js';
 import { RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
 import { emptyHeroQuestState, isMaterialFull, materialCap, normalizeHeroQuestState } from './heroesQuests.js';
@@ -1616,7 +1617,11 @@ export function grantPickedWheat(state, amount = pickYield(state, 'wheat')) {
 }
 
 /** One completed fountain fill. Caps at the material limit, same as other gathered goods. */
-export function grantFountainWater(state, amount = FOUNTAIN_WATER_YIELD) {
+export function waterFillYield(state) {
+  return waterYieldFor(state?.skills?.getLevel?.('farming') ?? 1);
+}
+
+export function grantFountainWater(state, amount = waterFillYield(state)) {
   return grantMaterial(state, 'water', amount);
 }
 
@@ -1641,7 +1646,7 @@ export function advanceFountainFill(state, session, now) {
   if (!session || now - session.startedAt < session.duration) {
     return { ready: false, got: 0, full: false, session };
   }
-  const got = grantFountainWater(state, session.yield ?? FOUNTAIN_WATER_YIELD);
+  const got = grantFountainWater(state, waterFillYield(state));
   if (got <= 0) return { ready: true, got: 0, full: true, session: null };
   return {
     ready: true,

@@ -40,7 +40,7 @@ import {
   stationForRecipe,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
-import { pickYield, createFountainFill, gatherFullMessage, grantPickedFlax, grantPickedWheat, hasStock, materialIsFull, miningBarAmount, pushLog, storageCap } from './economy.js';
+import { pickYield, waterFillYield, createFountainFill, gatherFullMessage, grantPickedFlax, grantPickedWheat, hasStock, materialIsFull, miningBarAmount, pushLog, storageCap } from './economy.js';
 import { gatherBlockText, meetsGatherLevel } from './skills.js';
 import {
   FURNITURE_FORWARD,
@@ -1991,7 +1991,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (session?.mode === 'chop') return chopYield(session.materialId);
     if (session?.mode === 'fish') return session.yield ?? fishTiming(session.materialId).yield;
     if (session?.mode === 'pick') return session.yield ?? FLAX_YIELD;
-    if (session?.mode === 'fill') return session.yield ?? FOUNTAIN_WATER_YIELD;
+    if (session?.mode === 'fill') return waterFillYield(state);
     // Always read the rock table. A stored 0 must not hide bronze's +5.
     return mineYield(session?.materialId);
   }

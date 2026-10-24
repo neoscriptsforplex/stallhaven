@@ -1702,7 +1702,7 @@ export const WHEAT_YIELD = 1;
 export const WHEAT_DURATION = 3.2;
 export const WHEAT_ARRIVE = 0.85;
 /** Buckets drawn when one fountain fill bar completes. Same length as mining. */
-export const FOUNTAIN_WATER_YIELD = 5;
+export const FOUNTAIN_WATER_YIELD = 1;
 export const FOUNTAIN_DURATION = MINE_DURATION;
 
 /** One raw fish from one completed catch bar. The bar repeats until the player leaves or the stack is full. */

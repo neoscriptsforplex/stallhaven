@@ -25,7 +25,7 @@
 import { RECIPES } from './catalog.js';
 import { MELEE_SMITH_LEVELS, RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
 import { CONSTRUCTION_GUIDE } from './construction.js';
-import { DOUBLE_PICK_LEVELS, ESSENCE_BONUS_LEVELS, FISHING_LEVELS, MINING_LEVELS, WOODCUTTING_LEVELS } from './skills.js';
+import { DOUBLE_PICK_LEVELS, DOUBLE_WATER_LEVEL, ESSENCE_BONUS_LEVELS, FISHING_LEVELS, MINING_LEVELS, WOODCUTTING_LEVELS } from './skills.js';
 
 export const TIER = {
   bronze: '#c07a3e',
@@ -188,6 +188,7 @@ const farming = {
         { lv: 1, name: 'Flax', desc: 'Pick flax in the field', icon: 'sheaf', tint: '#8fb0d8' },
         { lv: 5, name: 'Wheat', desc: 'Pick wheat; mill it into flour', icon: 'sheaf', tint: '#e0c060' },
         { lv: DOUBLE_PICK_LEVELS.flax, perk: true, name: 'Double flax', desc: 'Every flax pick gives 2', icon: 'star', tint: '#8fb0d8' },
+        { lv: DOUBLE_WATER_LEVEL, perk: true, name: 'Double water', desc: '2 buckets of water per fill', icon: 'star', tint: '#3a7ec8' },
         { lv: DOUBLE_PICK_LEVELS.wheat, perk: true, name: 'Double wheat', desc: 'Every wheat pick gives 2', icon: 'star', tint: '#e0c060' },
       ],
     },

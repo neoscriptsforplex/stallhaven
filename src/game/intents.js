@@ -264,7 +264,7 @@ function gatherAmount(state, intent) {
         ? grantPickedWheat(state)
         : grantPickedFlax(state);
     case 'water':
-      return grantFountainWater(state, FOUNTAIN_WATER_YIELD);
+      return grantFountainWater(state);
     case 'fish':
       return grantCaughtFish(state, intent.materialId);
     default:

@@ -3164,6 +3164,19 @@ export function createWorld(canvas, state, opts = {}) {
       });
       return;
     }
+    const pieceHit = picked?.object.userData.kind === 'construction'
+      ? picked
+      : !picked ? hits.find((hit) => hit.object.userData.kind === 'construction') : null;
+    if (pieceHit && Number.isInteger(pieceHit.object.userData.index)) {
+      playClick('ui');
+      pickHandler?.({
+        type: 'furn-menu',
+        furniture: { id: 'piece', index: pieceHit.object.userData.index },
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      return;
+    }
     if (!picked) return;
     const data = picked.object.userData;
     if (data.kind === 'boulder') {

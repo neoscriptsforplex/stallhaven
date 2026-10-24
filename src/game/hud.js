@@ -1776,8 +1776,10 @@ export function bindHud(root, state, world) {
 
   function showFurnMenu(target, clientX, clientY) {
     furnTarget = target;
+    const pieceRow = target.id === 'piece' ? constructionPiece(state.furniture?.placed?.[target.index]?.id) : null;
     furnMenu.querySelector('[data-furn-name]').textContent = (
-      target.id === 'chest' ? 'Chest'
+      pieceRow ? pieceRow.name
+      : target.id === 'chest' ? 'Chest'
         : target.id === 'anvil' ? 'Anvil'
           : target.id === 'range' ? 'Cooking Range'
             : target.id === 'cauldron' ? 'Cauldron'
@@ -1833,9 +1835,9 @@ export function bindHud(root, state, world) {
     const canDelete = target.id === 'display'
       && (deleteKind === 'shelf' || deleteKind === 'table' || deleteKind === 'stand')
       && !state.displays[target.index]?.removed;
-    if (deleteBtn) deleteBtn.hidden = !(canDelete || target.id === 'farming_patch');
+    if (deleteBtn) deleteBtn.hidden = !(canDelete || target.id === 'farming_patch' || pieceRow);
     const rotateBtn = furnMenu.querySelector('[data-furn-rotate]');
-    if (rotateBtn) rotateBtn.hidden = target.id === 'farming_patch';
+    if (rotateBtn) rotateBtn.hidden = target.id === 'farming_patch' || pieceRow?.mount === 'wall';
     const moveBtn = furnMenu.querySelector('[data-furn-move]');
     if (moveBtn) moveBtn.textContent = target.id === 'farming_patch' ? 'Move' : 'Move Furniture';
     furnMenu.hidden = false;
@@ -2410,7 +2412,9 @@ export function bindHud(root, state, world) {
   placedBar?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-placed]');
     if (!button) return;
-    const action = button.dataset.placed;
+    runPlacedAction(button.dataset.placed, button);
+  });
+  function runPlacedAction(action, button = null) {
     if (action === 'done') {
       closePlacedBar();
       return;
@@ -2425,7 +2429,7 @@ export function bindHud(root, state, world) {
     if (action === 'snap') {
       pieceSnap = !pieceSnap;
       world.setPieceSnap?.(pieceSnap);
-      button.textContent = pieceSnap ? 'Snap on' : 'Snap off';
+      if (button) button.textContent = pieceSnap ? 'Snap on' : 'Snap off';
       return;
     }
     if (action === 'rotate') {
@@ -2465,7 +2469,15 @@ export function bindHud(root, state, world) {
         render(performance.now() / 1000);
       }
     }
-  });
+  }
+  /** Right-click menu on a placed Construction piece: Move, Rotate, Delete (pick up). */
+  function runPieceMenu(target, action) {
+    if (target?.id !== 'piece' || !state.furniture?.placed?.[target.index]) return false;
+    selectedPiece = target.index;
+    runPlacedAction(action);
+    if (action !== 'move') closePlacedBar();
+    return true;
+  }
   function confirmPendingPlace() {
     if (!pendingPlace) return;
     const check = world.tryConfirmPlace?.() ?? { ok: Boolean(world.getPlacePose()), pose: world.getPlacePose() };
@@ -2581,8 +2593,24 @@ export function bindHud(root, state, world) {
     if (event.target === inspectPop) hideInspect();
   });
   furnMenu.querySelector('[data-furn-close]').addEventListener('click', hideFurnMenu);
-  furnMenu.querySelector('[data-furn-move]').addEventListener('click', () => startMove(furnTarget));
-  furnMenu.querySelector('[data-furn-rotate]').addEventListener('click', () => doRotate(furnTarget));
+  furnMenu.querySelector('[data-furn-move]').addEventListener('click', () => {
+    if (furnTarget?.id === 'piece') {
+      const target = furnTarget;
+      hideFurnMenu();
+      runPieceMenu(target, 'move');
+      return;
+    }
+    startMove(furnTarget);
+  });
+  furnMenu.querySelector('[data-furn-rotate]').addEventListener('click', () => {
+    if (furnTarget?.id === 'piece') {
+      const target = furnTarget;
+      hideFurnMenu();
+      runPieceMenu(target, 'rotate');
+      return;
+    }
+    doRotate(furnTarget);
+  });
   furnMenu.querySelector('[data-furn-upgrade]')?.addEventListener('click', () => {
     hideFurnMenu();
     openUpgrade();
@@ -2613,6 +2641,10 @@ export function bindHud(root, state, world) {
   furnMenu.querySelector('[data-furn-delete]')?.addEventListener('click', () => {
     const target = furnTarget;
     hideFurnMenu();
+    if (target?.id === 'piece') {
+      runPieceMenu(target, 'pickup');
+      return;
+    }
     if (target?.id === 'farming_patch') {
       const patch = state.furniture?.patches?.[target.index];
       if (!patch) return;

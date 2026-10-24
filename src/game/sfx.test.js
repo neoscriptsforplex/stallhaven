@@ -16,8 +16,8 @@ const sfxDir = join(root, 'public/audio/sfx');
 const manifest = JSON.parse(readFileSync(join(sfxDir, 'manifest.json'), 'utf8'));
 
 describe('sfx manifest', () => {
-  it('ships all 47 sounds with OGG + MP3 files', () => {
-    assert.equal(manifest.length, 47);
+  it('ships all 50 sounds with OGG + MP3 files', () => {
+    assert.equal(manifest.length, 50);
     assert.ok(!manifest.some((e) => /footstep/.test(e.name)));
     for (const e of manifest) {
       assert.ok(existsSync(join(sfxDir, e.file)), e.file);
@@ -204,5 +204,19 @@ describe('buyer separation', () => {
     const spot = freeStandSpot({ x: 0, z: 0, id: 's' }, [{ x: 0, z: 0 }]);
     assert.ok(Math.hypot(spot.x, spot.z) >= BUYER_MIN_GAP - 1e-9);
     assert.equal(spot.id, 's');
+  });
+});
+
+describe('farming sfx', () => {
+  it('sows on plant and shimmers when a herb finishes', () => {
+    const played = [];
+    const d = createSfxDirector({ play: (id) => played.push(id), loop: () => {} });
+    assert.equal(intentSound({ type: 'plantHerb' }, { ok: true }), 'sow_seeds');
+    assert.equal(parseSfxManifest(manifest).get('sow_seeds').length, 2);
+    d.frame({ herbsReady: 1 }, 0);
+    d.frame({ herbsReady: 1 }, 1);
+    d.frame({ herbsReady: 2 }, 2);
+    d.frame({ herbsReady: 0 }, 3);
+    assert.deepEqual(played, ['herb_grown']);
   });
 });

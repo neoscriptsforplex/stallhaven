@@ -4505,6 +4505,7 @@ export function createWorld(canvas, state, opts = {}) {
       indoors,
       sceneMode,
       fireDist: sceneMode === 'shop' ? nearestFireDist(pos.x, pos.z) : Infinity,
+      herbsReady: (state.furniture?.patches ?? []).filter((p) => p?.crop && Date.now() >= p.crop.endsAt).length,
     };
   }
 

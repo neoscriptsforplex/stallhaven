@@ -866,3 +866,20 @@ describe('garden tree guarantee and sawmill footprint', () => {
     assert.deepEqual(furnitureHalfSize('farming_patch'), { hw: 1.44, hd: 1.44 });
   });
 });
+
+describe('potter wheel 2x (Luke 2026-10-24)', () => {
+  it('doubles the footprint and its default spot clears the other stations', async () => {
+    const { furnitureHalfSize, poseRect, POTTER_SIZE, placeFloors } = await import('./layout.js');
+    const { SHOP } = await import('./catalog.js');
+    assert.equal(POTTER_SIZE, 2);
+    assert.deepEqual(furnitureHalfSize('potter'), { hw: 0.8, hd: 0.8 });
+    const r = poseRect('potter', { ...SHOP.potter, rot: 0 });
+    const [floor] = placeFloors([]);
+    assert.ok(r.minX >= floor.minX && r.maxX <= floor.maxX && r.minZ >= floor.minZ && r.maxZ <= floor.maxZ);
+    for (const id of ['anvil', 'chest', 'furnace', 'range', 'cauldron', 'wheel', 'loom', 'fletch', 'sawmill']) {
+      const o = poseRect(id, { ...SHOP[id], rot: 0 });
+      const hit = r.minX < o.maxX && r.maxX > o.minX && r.minZ < o.maxZ && r.maxZ > o.minZ;
+      assert.equal(hit, false, id);
+    }
+  });
+});

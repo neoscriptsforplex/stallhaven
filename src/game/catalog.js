@@ -1590,7 +1590,7 @@ export const SHOP = {
   wheel: { x: 1.2, z: 0.8 },
   loom: { x: -1.7, z: 1.15 },
   fletch: { x: 1.9, z: 1.15 },
-  potter: { x: -1.7, z: 0.2 },
+  potter: { x: -2.9, z: -0.15 },
   sawmill: { x: 0.35, z: 1.35 },
   queue: { x: 0, z: -0.82, gap: 0.88 },
   displays: [

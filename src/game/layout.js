@@ -836,6 +836,9 @@ export function stationLabel(id) {
             : furnitureLabelForType(id));
 }
 
+/** Potter wheel is drawn and placed at 2× its old placeholder size (Luke 2026-10-24). */
+export const POTTER_SIZE = 2;
+
 export function furnitureHalfSize(kind) {
   if (kind === 'cauldron') return { hw: 0.32, hd: 0.32 };
   if (kind === 'furnace') return { hw: 0.4, hd: 0.36 };
@@ -845,7 +848,7 @@ export function furnitureHalfSize(kind) {
   if (kind === 'range') return { hw: 0.68, hd: 0.56 };
   if (kind === 'loom') return { hw: 0.48, hd: 0.36 };
   if (kind === 'fletch') return { hw: 0.55, hd: 0.4 };
-  if (kind === 'potter') return { hw: 0.4, hd: 0.4 };
+  if (kind === 'potter') return { hw: 0.4 * POTTER_SIZE, hd: 0.4 * POTTER_SIZE };
   if (kind === 'sawmill') return { hw: 0.72, hd: 0.36 };
   if (kind === 'patch' || kind === 'farming_patch') return { hw: FARMING_PATCH_HALF, hd: FARMING_PATCH_HALF };
   if (kind === 'portal') return { hw: PORTAL_TARGET_WIDTH / 2, hd: PORTAL_TARGET_DEPTH / 2 };

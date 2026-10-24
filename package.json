@@ -11,7 +11,8 @@
     "test": "node --test src/game/*.test.js src/coop/*.test.js src/cloud/*.test.js",
     "coop:server": "npm --prefix party run dev",
     "cloud:mock": "node tools/mock-supabase.mjs",
-    "test:coop": "npm --prefix party test"
+    "test:coop": "npm --prefix party test",
+    "ui-fit:build": "node scripts/build-fit-check.mjs"
   },
   "engines": {
     "node": ">=20"

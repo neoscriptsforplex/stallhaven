@@ -12,11 +12,22 @@ function band() {
 export function fitBuildDock(dock) {
   if (!dock) return;
   const s = dock.style;
-  const clear = () => { dock.classList.remove('build-fit', 'is-tight'); for (const k of ['zoom', 'top', 'left', 'width', 'height', 'maxHeight', 'bottom']) s[k] = ''; };
+  const clear = () => { dock.classList.remove('build-fit', 'build-bound', 'is-tight'); for (const k of ['zoom', 'top', 'left', 'width', 'height', 'maxHeight', 'bottom']) s[k] = ''; };
   const list = dock.querySelector('.build-layout'); const keep = list?.scrollTop || 0;
   clear();
   const touch = typeof matchMedia === 'function' && matchMedia(TOUCH_HUD_QUERY).matches;
-  if (dock.hidden || !touch) return;
+  if (dock.hidden) return;
+  if (!touch) {
+    // Desktop/mouse: keep the normal placement but never grow past the screen; the item list scrolls.
+    dock.classList.add('build-bound');
+    const { bottom } = band();
+    const r = dock.getBoundingClientRect();
+    // Bottom-anchored docks grow upwards, top-anchored ones downwards: cap whichever edge would leave the screen.
+    const cap = r.top < 8 ? r.bottom - 8 : Math.min(bottom, innerHeight - 8) - r.top;
+    s.maxHeight = `${Math.max(160, Math.floor(cap))}px`;
+    if (list) list.scrollTop = keep;
+    return;
+  }
   const phone = isPhoneLayout();
   let { top, bottom } = band();
   let width = phone ? innerWidth : Math.min(innerWidth - 16, Math.max(320, Math.round(innerWidth * 0.7)));

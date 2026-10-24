@@ -31,11 +31,11 @@ function funded() {
 }
 
 describe('construction catalogue', () => {
-  it('lists the thirty-four cosmetic pieces at flat material prices', () => {
-    assert.equal(CONSTRUCTION_PIECES.length, 34);
+  it('lists the thirty-five cosmetic pieces at flat material prices', () => {
+    assert.equal(CONSTRUCTION_PIECES.length, 35);
     assert.equal(constructionPiece('chair').materials.plank, 1);
     assert.equal(constructionPiece('chair').gold, 200);
-    assert.equal(new Set(CONSTRUCTION_PIECES.map((row) => row.id)).size, 34);
+    assert.equal(new Set(CONSTRUCTION_PIECES.map((row) => row.id)).size, 35);
     const chair = funded();
     chair.materials.plank = 1;
     chair.materials.bronze_nails = 2;
@@ -125,17 +125,16 @@ describe('construction catalogue', () => {
     for (const id of withModel) {
       assert.equal(existsSync(join(root, id, `${id}.obj`)), true, id);
     }
-    assert.equal(existsSync(join(root, 'cabinet', 'cabinet.obj')), false);
-    assert.equal(existsSync(join(root, 'flag_pole', 'flag_pole.obj')), false);
+    assert.equal(existsSync(join(root, 'cabinet', 'cabinet.obj')), true);
+    assert.equal(existsSync(join(root, 'flag_pole', 'flag_pole.obj')), true);
   });
 });
 
 describe('construction trims (Luke 2026-10-24)', () => {
-  it('drops the Flag Pole and refunds old placed ones', async () => {
+  it('brings the Flag Pole back now its model works (Luke’s new upload)', async () => {
     const mod = await import('./construction.js');
-    assert.equal(mod.constructionPiece('flag_pole'), null);
-    assert.deepEqual(mod.retiredRefund([{ id: 'flag_pole', x: 0, z: 0 }, { id: 'chair', x: 1, z: 1 }]), { oak_plank: 2, iron_nails: 4 });
-    assert.deepEqual(mod.readPlacedFurniture([{ id: 'flag_pole', x: 0, z: 0 }]), []);
+    assert.equal(mod.constructionPiece('flag_pole').name, 'Flag Pole');
+    assert.deepEqual(mod.retiredRefund([{ id: 'flag_pole', x: 0, z: 0 }]), {});
   });
   it('shrinks the listed pieces to two thirds', async () => {
     const mod = await import('./construction.js');
@@ -144,7 +143,7 @@ describe('construction trims (Luke 2026-10-24)', () => {
     }
     assert.equal(mod.constructionPiece('pots_and_pans').scale, 1 / 3);
     assert.equal(mod.constructionPiece('pots_and_pans').mount, 'floor');
-    assert.equal(mod.constructionPiece('cabinet').scale, undefined);
+    assert.equal(mod.constructionPiece('cabinet').scale, 2 / 3);
     assert.equal(mod.constructionPiece('barrel_of_fish').scale, undefined);
     assert.equal(mod.constructionPiece('barrel_of_sticks').scale, undefined);
   });

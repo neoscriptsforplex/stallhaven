@@ -1,0 +1,40 @@
+/* Build catalogue: thumbnails, compact cards, tab/category fix (Youi draft) */
+#build-dock.build-sheet { width: min(660px, calc(100vw - 24px)); max-width: none; max-height: none; overflow: visible; padding-top: 10px; }
+#build-dock > .craft-x { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; min-width: 0; padding: 0; font-size: 12px; line-height: 1; }
+#build-dock > h2 { margin: 0 30px 4px 0; }
+#build-dock > p { margin: 0 0 8px; font-size: .76rem; }
+#build-dock > [data-build-close].ghost { display: none; }
+
+/* Item 3: tabs row, then a separate category chip row. Nothing stacks. */
+#build-dock .build-tabs { display: flex; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+#build-dock .build-tabs button { flex: 0 0 auto; padding: 4px 12px; }
+#build-dock .build-layout { display: block; }
+#build-dock .build-side { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+#build-dock .build-side[hidden] { display: none; }
+#build-dock .build-side button { flex: 0 0 auto; min-width: 0; width: auto; padding: 2px 9px; font-size: .78rem; border-radius: 999px; }
+#build-dock .build-side button.is-on { outline: none; border-color: var(--gold); background: linear-gradient(#8a5a30, #5a3518); color: #fff3cf; }
+
+/* Items 1+2: card grid with model thumb and small button */
+#build-dock .build-main [data-build-pane], #build-dock [data-build-catalogue] { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 6px; }
+#build-dock [data-build-pane][hidden] { display: none; }
+#build-dock [data-build-pane="furniture"] > [data-build-catalogue] { grid-column: 1 / -1; }
+#build-dock [data-build-catalogue]:empty { display: none; }
+#build-dock [data-build-pane="furniture"] > .build-detail { grid-column: 1 / -1; margin: 0; }
+#build-dock .build-item { position: relative; margin: 0; padding: 6px 6px 6px 66px; min-height: 64px; border: 1px solid rgba(227,179,74,.28); border-radius: 6px; background: rgba(20,12,6,.45); }
+#build-dock .build-item[hidden] { display: none; }
+#build-dock .build-thumb { position: absolute; left: 5px; top: 5px; width: 54px; height: 54px; border-radius: 4px; background: radial-gradient(circle at 50% 40%, #5a4330, #24170d 75%); border: 1px solid #0e0905; object-fit: contain; image-rendering: auto; }
+#build-dock .build-item h3 { margin: 0 0 1px; font-size: .86rem; }
+#build-dock .build-item > p:not(.meta):not(.build-detail) { display: none; } /* long blurb → title tooltip */
+#build-dock .build-item .meta, #build-dock .build-item .build-detail { margin: 0 0 3px; font-size: .7rem; line-height: 1.25; white-space: normal; }
+#build-dock .build-item button { width: auto; min-width: 0; min-height: 0; padding: 2px 10px; font-size: .74rem; line-height: 1.4; border-radius: 4px; }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #build-dock.build-sheet { top: auto; max-height: none; width: auto; padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px)); }
+  #build-dock > p { display: none; }
+  #build-dock .build-main [data-build-pane], #build-dock [data-build-catalogue] { grid-template-columns: 1fr 1fr; gap: 5px; }
+  #build-dock .build-item { padding: 5px 5px 5px 48px; min-height: 48px; }
+  #build-dock .build-thumb { width: 40px; height: 40px; left: 4px; top: 4px; }
+  #build-dock .build-item h3 { font-size: .8rem; }
+  #build-dock .build-item button { padding: 3px 9px; min-height: 26px; }
+}
+#build-dock .build-thumb-glyph { display: grid; place-items: center; font-size: 26px; }

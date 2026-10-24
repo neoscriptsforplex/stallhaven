@@ -2089,6 +2089,15 @@ export function bindHud(root, state, world) {
     }).join(' · ');
   }
 
+  /** Long card blurbs are hidden by build-catalogue.css; show them as a hover tooltip instead. */
+  function tooltipBuildBlurbs() {
+    for (const article of buildModal.querySelectorAll('.build-item')) {
+      if (article.title) continue;
+      const blurb = article.querySelector(':scope > p:not(.meta):not(.build-detail)');
+      if (blurb) article.title = blurb.textContent.trim();
+    }
+  }
+
   function paintConstructionCatalogue() {
     const root = buildModal.querySelector('[data-build-catalogue]');
     const side = buildModal.querySelector('[data-build-side]');
@@ -2096,6 +2105,7 @@ export function bindHud(root, state, world) {
     if (!root || !side) return;
     const categories = ['Shop', ...constructionCategories()];
     if (!categories.includes(buildCategory)) buildCategory = categories[0];
+    tooltipBuildBlurbs();
     side.hidden = buildTab !== 'furniture';
     side.innerHTML = categories.map((name) => (
       `<button type="button" data-build-cat="${name}" class="${name === buildCategory ? 'is-on' : ''}">${name}</button>`
@@ -2112,7 +2122,9 @@ export function bindHud(root, state, world) {
     root.innerHTML = rows.map((row) => {
       const blocked = constructionPlaceBlock(state, row.id);
       const level = state.skills?.getLevel?.('construction') ?? 1;
-      return `<article class="build-item${blocked ? '' : ''}">
+      const thumb = `${import.meta.env.BASE_URL}thumbs/build/${row.id.replace(/_/g, '-')}.png`;
+      return `<article class="build-item" title="${row.name}. Level ${row.level} Construction.">
+        <img class="build-thumb" src="${thumb}" alt="" loading="lazy">
         <h3>${row.name}</h3>
         <p class="meta">Level ${row.level} Construction${level < row.level ? ' · locked' : ''} · ${row.mount === 'wall' ? 'Wall' : row.mount === 'outdoor' ? 'Indoor or outdoor' : 'Floor'}</p>
         <p class="build-detail">${pieceNeedLine(row)}</p>

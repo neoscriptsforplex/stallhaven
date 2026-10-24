@@ -153,6 +153,7 @@ import {
   buildCounter,
   buildDust,
   buildFurniture,
+  turnMannequinShield,
   buildGoblin,
   wrapRiggedGoblin,
   buildShopDoor,
@@ -3589,11 +3590,12 @@ export function createWorld(canvas, state, opts = {}) {
     for (const name of ARMOUR_SLOTS) {
       const recipeId = want[name];
       if (!recipeId || isHandOrFootWare(recipeId)) continue;
-      const mesh = mountDisplayBasePose(makeWareMesh(recipeId), recipeId, { mannequin: true });
+      let mesh = mountDisplayBasePose(makeWareMesh(recipeId), recipeId, { mannequin: true });
       if (!fitMannequinWear(mesh, recipeId)) {
         const pose = slotPose(name);
         mesh.position.set(pose.x, pose.y, pose.z);
       }
+      mesh = turnMannequinShield(mesh, name);
       slot.wareAnchor.add(mesh);
       slot.slotMeshes[name] = mesh;
     }

@@ -49,6 +49,7 @@ import {
   occupiedCells,
   padConnects,
   roomCenter,
+  POTTER_SIZE,
   SHOP_RUG,
   doorwayFloor,
   wallVineMounts,
@@ -1780,7 +1781,9 @@ function buildProceduralPotterWheel() {
 }
 
 export function buildPotterWheel() {
-  const wheel = fitBundledStation('potter', buildProceduralPotterWheel());
+  const placeholder = buildProceduralPotterWheel();
+  placeholder.scale.setScalar(POTTER_SIZE);
+  const wheel = fitBundledStation('potter', placeholder);
   // The bundled OBJ carries the wheel head, clay, shaft and kick wheel as `o pottery_plate`
   // (vertical axle); spin it while pottery is crafting.
   const spinner = attachSpinner(wheel, { partName: 'pottery_plate' });

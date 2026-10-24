@@ -190,7 +190,7 @@ import {
   PLAYER_WORLD_SCALE,
 } from './models.js';
 import { FIRE_PIECES } from './sfxHooks.js';
-import { constructionLookId, constructionPiece, pieceHangs, pieceWallFace } from './construction.js';
+import { constructionLookId, constructionPiece, pieceModelId, pieceHangs, pieceWallFace } from './construction.js';
 import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
 import { tickPortalJelly } from './portalJelly.js';
 import { addFireLight, animPieceVisual, disposeAnimProp, loadAnimProps, MAX_FIRE_LIGHTS, setCauldronBrewing, tickAnimProp } from './animProps.js';
@@ -1464,7 +1464,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   const PAINTING_CENTER_Y = 1.4; // shop walls: 2.7 m tall, centred at y 1.4 (shopbuild addRoomWalls)
   function pieceVisual(id) {
-    const anim = animPieceVisual(id, 0.01125 * (constructionPiece(id)?.scale ?? 1));
+    const anim = animPieceVisual(pieceModelId(id), 0.01125 * (constructionPiece(id)?.scale ?? 1));
     if (anim) {
       const box = new THREE.Box3().setFromObject(anim, true);
       if (Number.isFinite(box.min.y) && !pieceHangs(id)) anim.position.y -= box.min.y;
@@ -1472,7 +1472,7 @@ export function createWorld(canvas, state, opts = {}) {
       else if (Number.isFinite(box.min.y)) anim.position.y += PAINTING_CENTER_Y - (box.min.y + box.max.y) / 2;
       anim.position.y += constructionPiece(id)?.wallY ?? 0;
       // Lit Torch GLB: pull it back so the body's back touches the wall (wall is local -Z at SHELF_FROM_WALL).
-      if (id === 'lit_torch') {
+      if (pieceModelId(id) === 'lit_torch') {
         const body = anim.getObjectByName('body') ?? anim;
         anim.updateMatrixWorld(true);
         const bodyBox = new THREE.Box3().setFromObject(body, true);

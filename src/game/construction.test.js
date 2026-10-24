@@ -333,7 +333,7 @@ it('every construction piece has a build thumbnail', async () => {
   const { existsSync } = await import('node:fs');
   const C = await import('./construction.js');
   for (const p of C.CONSTRUCTION_PIECES) {
-    assert.ok(existsSync(new URL(`../../public/thumbs/build/${p.id.replace(/_/g, '-')}.png`, import.meta.url)), p.id);
+    assert.ok(existsSync(new URL(`../../public/thumbs/build/${(p.model ?? p.id).replace(/_/g, '-')}.png`, import.meta.url)), p.id);
   }
 });
 
@@ -342,18 +342,20 @@ describe("Model Man's wall pieces", () => {
     const { snapToPieceWall, ROOM_D } = await import('./layout.js');
     const { constructionPiecesByLevel, constructionBuildGold, constructionXpFor, pieceWallFace } = await import('./construction.js');
     const want = { wall_plant: ['outside', 5], utensil_rack: ['inside', 12], pot_shelf: ['inside', 20], window_box: ['inside', 28] };
-    const wall = constructionPiecesByLevel('Decor').map((r) => r.id);
+    const tabs = { Decor: constructionPiecesByLevel('Decor').map((r) => r.id), Outdoor: constructionPiecesByLevel('Outdoor').map((r) => r.id) };
+    const wall = tabs.Decor;
     for (const [id, [face, lv]] of Object.entries(want)) {
       const row = constructionPiece(id);
       assert.equal(row.mount, 'wall', id);
-      assert.equal(row.category, 'Decor', id);
+      const tab = face === 'outside' ? 'Outdoor' : 'Decor';
+      assert.equal(row.category, tab, id);
       assert.equal(row.level, lv, id);
       assert.equal(pieceWallFace(id), face, id);
       assert.equal(constructionBuildGold(row), lv * 1000, id);
       assert.ok(Object.keys(row.materials).some((m) => m.endsWith('plank')), id);
       assert.ok(Object.keys(row.materials).some((m) => m.endsWith('_nails')), id);
       assert.ok(constructionXpFor(row) > 0, id);
-      assert.ok(wall.includes(id), id);
+      assert.ok(tabs[tab].includes(id), id);
       assert.equal(existsSync(join(root, id, `${id}.obj`)), true, id);
       assert.equal(existsSync(join(root, id, `${id}.mtl`)), true, id);
       const inside = snapToPieceWall(-1, -2.9, [], 0, face);

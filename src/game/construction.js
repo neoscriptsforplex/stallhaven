@@ -37,11 +37,14 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'tapestry', name: 'Tapestry', category: 'Decor', mount: 'wall', level: 28, gold: 1000, tint: 0x8a3a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
   piece({ id: 'tapestry_pole', name: 'Tapestry Pole', category: 'Decor', mount: 'outdoor', level: 28, gold: 500, tint: 0x8a6840, materials: { oak_plank: 1, iron_nails: 4 } }),
   // Model Man's wall pieces (Luke approved). Back of each model sits on the wall face; wallY keeps the authored height.
-  piece({ id: 'wall_plant', hang: true, wallFace: 'outside', wallY: 0.76, name: 'Wall Plant', category: 'Decor', mount: 'wall', level: 5, gold: 300, tint: 0x4a7a2a, materials: { plank: 2, bronze_nails: 2 } }),
+  piece({ id: 'wall_plant', hang: true, wallFace: 'outside', wallY: 0.76, name: 'Wall Plant', category: 'Outdoor', mount: 'wall', level: 5, gold: 300, tint: 0x4a7a2a, materials: { plank: 2, bronze_nails: 2 } }),
   piece({ id: 'utensil_rack', hang: true, wallFace: 'inside', wallY: 0.113, name: 'Utensil Rack', category: 'Decor', mount: 'wall', level: 12, gold: 500, tint: 0x8a6a4a, materials: { oak_plank: 2, iron_nails: 4 } }),
   piece({ id: 'pot_shelf', hang: true, wallFace: 'inside', wallY: 0.231, name: 'Pot Shelf', category: 'Decor', mount: 'wall', level: 20, gold: 700, tint: 0xa0704a, materials: { oak_plank: 3, iron_nails: 6 } }),
   piece({ id: 'window_box', hang: true, wallFace: 'inside', wallY: -0.146, name: 'Window Box', category: 'Decor', mount: 'wall', level: 28, gold: 900, tint: 0x6a8a3a, materials: { oak_plank: 4, iron_nails: 6 } }),
   piece({ id: 'landscape', hang: true, name: 'Landscape', category: 'Decor', mount: 'wall', level: 35, gold: 1200, tint: 0x5a8a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
+  // Outdoor-tab copies: same model, cost, level and XP as the Decor piece, outside walls only.
+  piece({ id: 'lit_torch_outdoor', model: 'lit_torch', wallFace: 'outside', wallY: 1.1, roll: Math.PI / 2, scale: 0.5, name: 'Lit Torch', category: 'Outdoor', mount: 'wall', level: 1, gold: 150, tint: 0xe8a040, materials: { logs: 1 } }),
+  piece({ id: 'window_box_outdoor', model: 'window_box', hang: true, wallFace: 'outside', wallY: -0.146, name: 'Window Box', category: 'Outdoor', mount: 'wall', level: 28, gold: 900, tint: 0x6a8a3a, materials: { oak_plank: 4, iron_nails: 6 } }),
   piece({ id: 'garden_bush', name: 'Garden Bush', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 120, tint: 0x4a7a2a, materials: { flax: 3 } }),
   piece({ id: 'flag_pole', scale: 0.5, name: 'Flag Pole', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 400, tint: 0xc04040, materials: { oak_plank: 2, iron_nails: 4 } }),
   piece({ id: 'statue', name: 'Statue', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 3000, tint: 0xb0b0b8, materials: { yew_plank: 2, adamant_nails: 6 } }),
@@ -73,12 +76,17 @@ export function retiredRefund(saved) {
 
 const BY_ID = Object.fromEntries(CONSTRUCTION_PIECES.map((row) => [row.id, row]));
 
+/** Model/thumbnail id for a piece: Outdoor copies share their Decor original's model. */
+export function pieceModelId(id) {
+  return BY_ID[id]?.model ?? id;
+}
+
 const GUIDE_ICONS = Object.freeze({ pots_and_pans: 'pot', landscape: 'leaf' });
 const GUIDE_DESC = Object.freeze({ Wall: 'Wall decor' });
 
 /** Skill-guide rows: every Build-menu piece that needs more than Construction 1. */
 export const CONSTRUCTION_GUIDE = Object.freeze(
-  CONSTRUCTION_PIECES.filter((row) => row.level > 1)
+  CONSTRUCTION_PIECES.filter((row) => row.level > 1 && !row.model)
     .sort((a, b) => a.level - b.level)
     .map((row) => ({
       lv: row.level,
@@ -90,7 +98,7 @@ export const CONSTRUCTION_GUIDE = Object.freeze(
 );
 
 export const CONSTRUCTION_UNLOCKS = Object.freeze(
-  CONSTRUCTION_PIECES.filter((row) => row.level > 1).map((row) => ({
+  CONSTRUCTION_PIECES.filter((row) => row.level > 1 && !row.model).map((row) => ({
     id: row.id,
     name: row.name,
     level: row.level,
@@ -137,7 +145,7 @@ export function pieceWallFace(id) {
 }
 
 export function constructionLookId(id) {
-  return `furn-${id}`;
+  return `furn-${pieceModelId(id)}`;
 }
 
 function plankMap(row) {

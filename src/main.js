@@ -1,5 +1,5 @@
 import { RECIPES } from './game/catalog.js';
-import { completeCrafts, createState, pushLog, tickMaterials } from './game/economy.js';
+import { completeCrafts, createState, pushLog, tickMaterials, SAVE_VERSION } from './game/economy.js';
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
 import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledFishingRod, loadBundledRiggedGoblin, loadBundledRiggedRat, loadBundledRiggedBuyers, loadBundledLooks } from './game/upload.js';
@@ -277,6 +277,7 @@ async function bootGame() {
       deviceLabel: deviceLabel(),
       isLive: (slot) => live && autosave.slot === slot,
       emit: (type, detail) => saves.emit(type, detail),
+      saveVersion: SAVE_VERSION,
     })
     : null;
   const backup = createAutoBackup({ store, kv: local, emit: (type, detail) => saves.emit(type, detail) });

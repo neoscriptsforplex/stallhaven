@@ -248,3 +248,42 @@ test('cloud config falls back to meta tags', () => {
   const empty = { querySelector: () => null };
   assert.equal(cloudConfig(undefined, empty), null);
 });
+
+test('the whole current save format (v14, construction) survives a sync round-trip', async () => {
+  const { serializeState, applyState, SAVE_VERSION } = await import('../game/economy.js');
+  const cloud = createMemoryCloud({ now });
+  const a = await device(cloud);
+  const s = createState();
+  s.gold = 77;
+  const data = autosaveData(s, 0);
+  assert.equal(data.version, SAVE_VERSION);
+  clock += 1000;
+  await a.store.write(1, data, 'Full');
+  await a.sync.markDirty(1);
+  const b = await device(cloud);
+  await b.sync.pull();
+  const got = await b.store.read(1);
+  const back = createState();
+  assert.ok(applyState(back, got));
+  const strip = (x) => { const { shopName: _n, ...r } = serializeState(x); return r; };
+  assert.deepEqual(strip(back), strip(s));
+  assert.ok('furniture' in got);
+});
+
+test('a save from a newer game version is never downloaded or overwritten', async () => {
+  const cloud = createMemoryCloud({ now });
+  const a = await device(cloud);
+  const data = autosaveData(createState(), 0);
+  data.version = 999;
+  clock += 1000;
+  await a.store.write(1, data, 'Future');
+  await a.sync.markDirty(1);
+  const kv = memoryStore();
+  const store = createSlotStore({ backend: storageBackend(kv), now });
+  await store.loadMeta();
+  const client = cloud.client('luke@example.com');
+  await client.verifyCode('luke@example.com', '1');
+  const old = createCloudSync({ client, store, kv, now, saveVersion: 14 });
+  assert.deepEqual(await old.pull(), { 1: 'newer-version', 2: 'none', 3: 'none' });
+  assert.equal(await store.read(1), null);
+});

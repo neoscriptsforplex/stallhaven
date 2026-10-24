@@ -69,6 +69,7 @@ export function createCloudSync({
   isLive = () => false,
   emit = () => {},
   now = () => Date.now(),
+  saveVersion = Infinity,
 }) {
   let sync = readJson(kv, SYNC_KEY, { userId: null, slots: {}, lastSyncAt: 0 });
   let queue = readJson(kv, QUEUE_KEY, { up: [], del: [] });
@@ -208,6 +209,14 @@ export function createCloudSync({
       let same = false;
       if (local && cloud && (!s || (local.savedAt > (s?.syncedAt ?? 0)))) {
         same = sameSave(await store.read(slot), cloud.data);
+      }
+      // A save written by a newer game version: never load or overwrite it here
+      // (an old cached copy of the game would drop the fields it doesn't know).
+      if (cloud && Number(cloud.data?.version) > saveVersion) {
+        result[slot] = 'newer-version';
+        setStatus(slot, 'local');
+        emit('cloud_sync_error', { slot, reason: 'newer_version' });
+        continue;
       }
       let action = decideSlot({ local, cloud, sync: s, same });
       // Never swap the shop out from under a running game: ask instead.

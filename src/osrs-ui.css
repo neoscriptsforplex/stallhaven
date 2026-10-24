@@ -31,6 +31,15 @@
   .expand-dock, .cs-dock { top: auto; bottom: 68px; right: 12px; }
 }
 
+/* Touch, non-phone (unfolded foldables, tablets): the full ~34px home-indicator inset plus 8px left the
+   strip floating with a dark gap under it. Match the #226 phone fix: keep only the inset past 28px, min 6px.
+   Page and canvas fill to the very bottom edge (dynamic viewport, no 100vh black band). */
+@media (pointer: coarse) and (not ((orientation: portrait) and (max-aspect-ratio: 3/4))) {
+  html, body { height: 100vh; height: 100dvh; }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #save-bar { bottom: max(6px, calc(env(safe-area-inset-bottom, 0px) - 28px)); }
+}
+
 /* Phone portrait: same bar, icons only */
 @media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #save-bar button.osrs-btn { width: auto; height: auto; min-height: 44px; }

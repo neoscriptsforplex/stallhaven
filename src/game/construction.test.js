@@ -137,12 +137,14 @@ describe('construction trims (Luke 2026-10-24)', () => {
     assert.deepEqual(mod.retiredRefund([{ id: 'flag_pole', x: 0, z: 0 }, { id: 'chair', x: 1, z: 1 }]), { oak_plank: 2, iron_nails: 4 });
     assert.deepEqual(mod.readPlacedFurniture([{ id: 'flag_pole', x: 0, z: 0 }]), []);
   });
-  it('halves the listed pieces', async () => {
+  it('shrinks the listed pieces to two thirds', async () => {
     const mod = await import('./construction.js');
-    for (const id of ['blacksmiths_tools', 'standing_torch', 'crate', 'sacks', 'barrel_of_fish', 'barrel_of_sticks', 'standing_candles', 'double_bed', 'fancy_fireplace', 'fancy_table', 'pots_and_pans', 'bush', 'suit_of_armour', 'sink', 'chair', 'fancy_chair', 'bench', 'throne', 'fireplace']) {
-      assert.equal(mod.constructionPiece(id).scale, 0.5, id);
+    for (const id of ['blacksmiths_tools', 'standing_torch', 'crate', 'sacks', 'standing_candles', 'double_bed', 'fancy_fireplace', 'fancy_table', 'pots_and_pans', 'bush', 'suit_of_armour', 'sink', 'chair', 'fancy_chair', 'bench', 'throne', 'fireplace']) {
+      assert.equal(mod.constructionPiece(id).scale, 2 / 3, id);
     }
     assert.equal(mod.constructionPiece('cabinet').scale, undefined);
+    assert.equal(mod.constructionPiece('barrel_of_fish').scale, undefined);
+    assert.equal(mod.constructionPiece('barrel_of_sticks').scale, undefined);
   });
 });
 

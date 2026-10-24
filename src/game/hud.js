@@ -157,7 +157,7 @@ import { createXpOrb } from './xpOrb.js';
 import { fitPhoneCraft } from './phoneCraftFit.js';
 import { fitBuildDock } from './buildFit.js';
 import { fitScrollDock } from './dockFit.js';
-import { autoFitModals } from './modalFit.js';
+import { autoFitModals, autoFitPanels, fitPanel } from './modalFit.js';
 import {
   brightnessPercent,
   clampBrightness,
@@ -1873,6 +1873,7 @@ export function bindHud(root, state, world) {
     const w = 200;
     fishPicker.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, clientX - w / 2))}px`;
     fishPicker.style.top = `${Math.max(8, Math.min(window.innerHeight - 280, clientY - 20))}px`;
+    fishPicker.style.maxHeight = ''; fishPicker.style.overflowY = ''; fitPanel(fishPicker);
   }
 
   function showFurnMenu(target, clientX, clientY) {
@@ -1949,6 +1950,7 @@ export function bindHud(root, state, world) {
     const y = Math.min(window.innerHeight - 220, Math.max(8, clientY ?? 80));
     furnMenu.style.left = `${x}px`;
     furnMenu.style.top = `${y}px`;
+    furnMenu.style.maxHeight = ''; furnMenu.style.overflowY = ''; fitPanel(furnMenu);
   }
 
   chestModal.querySelector('[data-chest-upgrade]')?.addEventListener('click', openUpgrade);
@@ -3209,7 +3211,7 @@ export function bindHud(root, state, world) {
   });
   settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
   settingsDock?.querySelector('[data-settings-x]')?.addEventListener('click', closeSettingsDock);
-  if (typeof document !== 'undefined' && typeof MutationObserver === 'function') autoFitModals(root?.ownerDocument ?? document);
+  if (typeof document !== 'undefined' && typeof MutationObserver === 'function') { autoFitModals(root?.ownerDocument ?? document); autoFitPanels(root?.ownerDocument ?? document); }
   if (settingsDock) {
     // Roomy Settings: wide panel, fixed header, scrolling body capped between HUD and button bar.
     const fitSettings = () => fitScrollDock(settingsDock, { width: 560 });

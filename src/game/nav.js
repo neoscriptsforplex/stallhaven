@@ -815,3 +815,50 @@ export function rectHitsAisle(x, z, hw, hd, aisle = QUEUE_AISLE) {
     || z - hd > aisle.maxZ
   );
 }
+
+function segmentHitsRect(ax, az, bx, bz, r) {
+  // Liang-Barsky clip of segment against rect.
+  let t0 = 0; let t1 = 1;
+  const dx = bx - ax; const dz = bz - az;
+  const p = [-dx, dx, -dz, dz];
+  const q = [ax - r.minX, r.maxX - ax, az - r.minZ, r.maxZ - az];
+  for (let i = 0; i < 4; i += 1) {
+    if (p[i] === 0) { if (q[i] < 0) return false; continue; }
+    const t = q[i] / p[i];
+    if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return true;
+}
+
+/**
+ * If the player at (x, z) overlaps a blocker (a piece was just placed on them,
+ * or an old save loaded them inside one), return the nearest free spot that is
+ * on the same side of every wall (no crossing walls or water). Returns null if
+ * the player is already free or no spot was found.
+ */
+export function pushOutPoint(x, z, obstacles, floors = [FLOOR], walls = [], {
+  checkRadius = WALK_COLLIDE_RADIUS, radius = PLAYER_RADIUS, maxR = 3, step = 0.04,
+} = {}) {
+  if (isWalkable(x, z, obstacles, checkRadius, floors)) return null;
+  for (let ring = step; ring <= maxR; ring += step) {
+    const samples = Math.max(12, Math.round((Math.PI * 2 * ring) / (step * 0.75)));
+    for (let i = 0; i < samples; i += 1) {
+      const a = (i / samples) * Math.PI * 2;
+      const nx = x + Math.cos(a) * ring;
+      const nz = z + Math.sin(a) * ring;
+      if (!isWalkable(nx, nz, obstacles, radius, floors)) continue;
+      if (walls.some((w) => segmentHitsRect(x, z, nx, nz, w))) continue;
+      if (!segmentFloorLinked(x, z, nx, nz, floors)) continue;
+      return { x: nx, z: nz };
+    }
+  }
+  return null;
+}
+
+function segmentFloorLinked(ax, az, bx, bz, floors) {
+  for (let t = 0; t <= 1; t += 0.1) {
+    const px = ax + (bx - ax) * t; const pz = az + (bz - az) * t;
+    if (!floors.some((f) => px >= f.minX && px <= f.maxX && pz >= f.minZ && pz <= f.maxZ)) return false;
+  }
+  return true;
+}

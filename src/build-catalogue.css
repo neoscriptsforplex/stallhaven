@@ -59,3 +59,9 @@
 @media (max-width: 359px) {
   #build-dock.build-fit.is-tight .build-main [data-build-pane], #build-dock.build-fit.is-tight [data-build-catalogue] { grid-template-columns: 1fr; }
 }
+
+/* Desktop (buildFit.js build-bound): panel capped to the screen, only the item list scrolls (e.g. Storage). */
+#build-dock.build-bound { display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
+#build-dock.build-bound[hidden] { display: none; }
+#build-dock.build-bound > * { flex: 0 0 auto; }
+#build-dock.build-bound > .build-layout { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; }

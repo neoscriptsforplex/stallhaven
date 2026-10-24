@@ -104,7 +104,7 @@ export const QUESTS = [
   { id: 'ghost', tab: 'hr1', enemy: 'Ghost', render: 'icons/quests/ghost.png', icon: 'ghost', tint: '#b7e3f5', duration: 1 * HOUR, rewards: { orb: 20 } },
   { id: 'moss_giant', tab: 'hr1', enemy: 'Moss Giant', render: 'icons/quests/moss_giant.png', icon: 'head', tint: '#3a8a45', duration: 1 * HOUR, rewards: each(HERB_IDS, 10) },
   { id: 'pirate', tab: 'hr1', enemy: 'Pirate', render: 'icons/quests/pirate.png', icon: 'head', tint: '#8a2424', duration: 1 * HOUR, rewards: each(ORES, 20) },
-  { id: 'dark_wizard', tab: 'day1', enemy: 'Dark Wizard', icon: 'hat', tint: '#3a2a52', duration: 1 * DAY, rewards: { essence: 500 } },
+  { id: 'dark_wizard', tab: 'day1', enemy: 'Dark Wizard', render: 'icons/quests/grayzag.png', icon: 'hat', tint: '#3a2a52', duration: 1 * DAY, rewards: { essence: 500 } },
   { id: 'vampyre', tab: 'day1', enemy: 'Vampyre', render: 'icons/quests/vampyre.png', icon: 'fangs', tint: '#6a1c28', duration: 1 * DAY, rewards: { dragon_bar: 50 } },
   { id: 'lesser_demon', tab: 'day1', enemy: 'Lesser Demon', render: 'icons/quests/lesser_demon.png', icon: 'horns', tint: '#a82a1c', duration: 1 * DAY, rewards: { dwarven_plans: 1 } },
   { id: 'kalphite', tab: 'day1', enemy: 'Kalphite', icon: 'claw', tint: '#6a8a3a', duration: 1 * DAY, rewards: { ancient_plans: 1 } },

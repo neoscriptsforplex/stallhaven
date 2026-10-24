@@ -2261,7 +2261,7 @@ export function bindHud(root, state, world) {
       return `<article class="build-item" title="${row.name}. Level ${row.level} Construction.">
         <img class="build-thumb" src="${thumb}" alt="" loading="lazy">
         <h3>${row.name}</h3>
-        <p class="meta">Level ${row.level} Construction${level < row.level ? ' · locked' : ''} · ${row.mount === 'wall' ? 'Wall · inside or outside' : row.mount === 'outdoor' ? 'Indoor or outdoor' : 'Floor'}</p>
+        <p class="meta">Level ${row.level} Construction${level < row.level ? ' · locked' : ''} · ${row.mount === 'wall' ? (row.wallFace === 'inside' ? 'Wall · inside' : row.wallFace === 'outside' ? 'Wall · outside' : 'Wall · inside or outside') : row.mount === 'outdoor' ? 'Indoor or outdoor' : 'Floor'}</p>
         <p class="build-detail">${pieceNeedLine(row)}</p>
         <button type="button" data-piece="${row.id}" ${blocked ? 'disabled' : ''}>Place</button>
       </article>`;

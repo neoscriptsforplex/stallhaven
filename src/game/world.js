@@ -188,7 +188,7 @@ import {
   PLAYER_WORLD_SCALE,
 } from './models.js';
 import { FIRE_PIECES } from './sfxHooks.js';
-import { constructionLookId, constructionPiece, pieceHangs } from './construction.js';
+import { constructionLookId, constructionPiece, pieceHangs, pieceWallFace } from './construction.js';
 import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
 import { tickPortalJelly } from './portalJelly.js';
 import { addFireLight, animPieceVisual, disposeAnimProp, loadAnimProps, MAX_FIRE_LIGHTS, setCauldronBrewing, tickAnimProp } from './animProps.js';
@@ -952,7 +952,7 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = placeKindOf(moveTarget);
     const wallPiece = kind === 'piece' && constructionPiece(moveTarget.pieceId)?.mount === 'wall';
     const snapped = wallPiece
-      ? snapToPieceWall(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
+      ? snapToPieceWall(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot, pieceWallFace(moveTarget.pieceId))
       : kind === 'shelf'
       ? snapToWallGrid(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
       : kind === 'piece' && moveTarget.snap === false
@@ -2742,7 +2742,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!piece || !pose) return 'That spot is off the shop floor.';
     if (rectHitsPond(pose.x, pose.z, 0.35, 0.35)) return 'That spot overlaps the pond.';
     if (piece.mount === 'wall') {
-      const snapped = snapToPieceWall(pose.x, pose.z, state.expansions ?? [], pose.rot);
+      const snapped = snapToPieceWall(pose.x, pose.z, state.expansions ?? [], pose.rot, pieceWallFace(moveTarget?.pieceId));
       if (Math.hypot((snapped.x ?? pose.x) - pose.x, (snapped.z ?? pose.z) - pose.z) > 0.45) {
         return 'Place it on an open wall.';
       }
@@ -2900,7 +2900,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (kind === 'shelf' || (kind === 'piece' && constructionPiece(target.pieceId)?.mount === 'wall')) {
       const snapped = kind === 'shelf'
         ? snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot)
-        : snapToPieceWall(pose.x, pose.z, state.expansions ?? [], nextRot);
+        : snapToPieceWall(pose.x, pose.z, state.expansions ?? [], nextRot, pieceWallFace(target.pieceId));
       pose.x = snapped.x;
       pose.z = snapped.z;
       pose.rot = snapped.rot;
@@ -4537,7 +4537,7 @@ export function createWorld(canvas, state, opts = {}) {
         ? portalPlaceFloors(state.expansions ?? [])
         : placeRects;
       const start = row.mount === 'wall'
-        ? snapToPieceWall(home.x, home.z, state.expansions ?? [], FURNITURE_FORWARD)
+        ? snapToPieceWall(home.x, home.z, state.expansions ?? [], FURNITURE_FORWARD, pieceWallFace(pieceId))
         : snapToFloor(home.x, home.z, floors);
       placeDraft = {
         id: 'piece',

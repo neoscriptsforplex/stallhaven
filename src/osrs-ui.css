@@ -107,6 +107,7 @@
 
 /* Top-right ✕ added to panels (same look as the Settings ✕). The ::after pad widens the tap target without growing the panel. */
 .modal .sheet { position: relative; }
-button.settings-x.panel-x { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; min-width: 0; padding: 0; margin: 0; font-size: 12px; line-height: 1; z-index: 2; }
+button.settings-x.panel-x, .fish-picker > button.settings-x.panel-x, .furn-menu > button.settings-x.panel-x { position: absolute; top: 6px; right: 6px; left: auto; bottom: auto; box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-width: 0; min-height: 0; max-width: 22px; padding: 0; margin: 0; font-size: 12px; line-height: 1; text-align: center; z-index: 2; }
+#settings-dock.fit-panel .settings-x { display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
 button.settings-x.panel-x::after { content: ''; position: absolute; inset: -6px -6px -14px -14px; }
 .modal .sheet > h2, .expand-dock > h2, .fish-picker > p:first-of-type, .sf-pop-title, #furn-menu > :nth-child(2), #inspect-pop > :nth-child(2) { padding-right: 26px; }

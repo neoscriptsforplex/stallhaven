@@ -122,6 +122,8 @@ import {
   playerObstacles,
   queueSlot,
   rebuildShopWalls,
+  pushOutPoint,
+  buildShopWallRects,
 } from './nav.js';
 import { playClick, playSfx } from './audio.js';
 import {
@@ -518,6 +520,7 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   let collideObstacles = [];
+  let pushReady = false;
 
   function rebuildNav() {
     const next = liveObstacles(state);
@@ -525,6 +528,37 @@ export function createWorld(canvas, state, opts = {}) {
     obstacles.push(...next);
     rebuildShopWalls(state.expansions ?? []);
     collideObstacles = playerObstacles(state);
+    pushPlayerClear();
+  }
+
+  /** Slide target when a placed piece (or an old save) leaves the player inside a blocker. */
+  let pushSlide = null;
+  function pushPlayerClear() {
+    if (!pushReady || sceneMode !== 'shop') return false;
+    const pos = shopkeeper.position;
+    const spot = pushOutPoint(pos.x, pos.z, collideObstacles, playerFloors, buildShopWallRects(state.expansions ?? []));
+    if (!spot) return false;
+    playerPath.length = 0;
+    walkGoal = null;
+    pendingUse = null;
+    moveMarker.visible = false;
+    stopMining();
+    pushSlide = { x: spot.x, z: spot.z };
+    return true;
+  }
+
+  function tickPushSlide(dt) {
+    if (!pushSlide) return;
+    const pos = shopkeeper.position;
+    const dx = pushSlide.x - pos.x; const dz = pushSlide.z - pos.z;
+    const d = Math.hypot(dx, dz);
+    const step = Math.max(d * Math.min(1, dt * 14), 0.02);
+    if (d <= step || sceneMode !== 'shop') {
+      if (sceneMode === 'shop') { pos.x = pushSlide.x; pos.z = pushSlide.z; }
+      pushSlide = null;
+      return;
+    }
+    pos.x += dx / d * step; pos.z += dz / d * step;
   }
 
   rebuildArchitecture();
@@ -660,6 +694,7 @@ export function createWorld(canvas, state, opts = {}) {
   }
   const shopReturnPos = { x: SHOP.keeper.x, z: SHOP.keeper.z };
   const playerPath = [];
+  queueMicrotask(() => { pushReady = true; });
   const moveMarker = new THREE.Mesh(
     new THREE.RingGeometry(0.16, 0.24, 24),
     new THREE.MeshBasicMaterial({
@@ -4090,6 +4125,7 @@ export function createWorld(canvas, state, opts = {}) {
     }
   });
 
+  let pushCheckAt = 0;
   function tick(dt, now) {
     lastNow = now;
     state.playTime = (state.playTime ?? 0) + dt;
@@ -4111,6 +4147,8 @@ export function createWorld(canvas, state, opts = {}) {
       if (puff.position.x > 28) puff.position.x = -28;
     }
     tickTrees(now);
+    tickPushSlide(dt);
+    if (!pushSlide && ((pushCheckAt += dt) > 0.5)) { pushCheckAt = 0; if (!playerPath.length) pushPlayerClear(); }
     tickTopples(now);
     tickAnimProps(dt);
     syncDisplays();

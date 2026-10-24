@@ -67,11 +67,11 @@ export function furnitureVisualYaw(id, poseRot = FURNITURE_FORWARD) {
   return (poseRot ?? FURNITURE_FORWARD) + furnitureStartYaw(id);
 }
 export const SWAP_PRICE_RATIO = 0.65;
-export const CAULDRON_COST = 1000000;
-export const WHEEL_COST = 100000;
-export const LOOM_COST = 50000;
-export const FLETCH_COST = 50000;
-export const POTTER_COST = 50000;
+export const CAULDRON_COST = 5000000;
+export const WHEEL_COST = 70000;
+export const LOOM_COST = 30000;
+export const FLETCH_COST = 100000;
+export const POTTER_COST = 10000;
 /** Saw logs into planks. Luke's model replaces the procedural bench later. */
 export const SAWMILL_COST = 20000;
 export const FURNACE_COST = 0;
@@ -89,16 +89,17 @@ export const PORTAL_TARGET_WIDTH = PORTAL_TARGET_HEIGHT * (PORTAL_DUMP.x / PORTA
 export const PORTAL_TARGET_DEPTH = PORTAL_TARGET_HEIGHT * (PORTAL_DUMP.z / PORTAL_DUMP.y);
 /** Default preview on the left lawn, off the path and the shop walls. */
 export const PORTAL_HOME = Object.freeze({ x: -11.2, z: 4.2, rot: FURNITURE_FORWARD });
+/** Sorted by gold price; the Stations tab lists them in this order. */
 export const STATION_UNLOCKS = [
   { id: 'furnace', label: 'Furnace', cost: FURNACE_COST },
   { id: 'range', label: 'Cooking Range', cost: RANGE_COST },
-  { id: 'loom', label: 'Loom', cost: LOOM_COST },
-  { id: 'fletch', label: 'Fletching Bench', cost: FLETCH_COST },
   { id: 'potter', label: 'Potter Wheel', cost: POTTER_COST },
   { id: 'sawmill', label: 'Sawmill', cost: SAWMILL_COST },
+  { id: 'loom', label: 'Loom', cost: LOOM_COST },
   { id: 'wheel', label: 'Spinning Wheel', cost: WHEEL_COST },
-  { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
+  { id: 'fletch', label: 'Fletching Bench', cost: FLETCH_COST },
   { id: 'portal', label: 'Portal', cost: PORTAL_COST },
+  { id: 'cauldron', label: 'Cauldron', cost: CAULDRON_COST },
 ];
 
 /** Place a missing furnace on the starter back-wall spot. */
@@ -144,10 +145,11 @@ export const FARMING_PATCH_HALF = 1.44;
  * A gold cost of 0 (included shelf, or a free replacement of a piece the
  * player already owned) does not spend the row. Loading a save never does.
  */
-function buildMaterialRow(nailId, nails, plankId, planks) {
+function buildMaterialRow(nailId, nails, plankId, planks, extra = null) {
   return Object.freeze({
     nails: Object.freeze({ id: nailId, count: nails }),
     planks: Object.freeze({ id: plankId, count: planks }),
+    extra: extra ? Object.freeze({ ...extra }) : null,
   });
 }
 
@@ -155,12 +157,13 @@ export const FURNITURE_BUILD_COSTS = Object.freeze({
   table: buildMaterialRow('bronze_nails', 8, 'plank', 4),
   shelf: buildMaterialRow('iron_nails', 10, 'oak_plank', 3),
   mannequin: buildMaterialRow('steel_nails', 12, 'willow_plank', 2),
-  loom: buildMaterialRow('mithril_nails', 15, 'maple_plank', 4),
-  fletch: buildMaterialRow('mithril_nails', 15, 'maple_plank', 4),
-  potter: buildMaterialRow('mithril_nails', 15, 'maple_plank', 4),
-  wheel: buildMaterialRow('adamant_nails', 20, 'yew_plank', 4),
+  // Stations climb in the same order as their gold price.
+  potter: buildMaterialRow('steel_nails', 12, 'willow_plank', 3),
+  loom: buildMaterialRow('mithril_nails', 12, 'maple_plank', 3),
+  wheel: buildMaterialRow('mithril_nails', 15, 'maple_plank', 4),
+  fletch: buildMaterialRow('adamant_nails', 20, 'yew_plank', 4),
   portal: buildMaterialRow('runite_nails', 25, 'magic_plank', 6),
-  cauldron: buildMaterialRow('dragon_nails', 30, 'magic_plank', 8),
+  cauldron: buildMaterialRow('dragon_nails', 30, 'magic_plank', 8, { id: 'steel_bar', count: 1000 }),
 });
 
 /**
@@ -184,6 +187,9 @@ function partsFromRow(row) {
   }
   if (row.planks?.id && row.planks.count > 0) {
     parts.push({ id: row.planks.id, count: row.planks.count, kind: 'planks' });
+  }
+  if (row.extra?.id && row.extra.count > 0) {
+    parts.push({ id: row.extra.id, count: row.extra.count, kind: 'extra' });
   }
   return parts;
 }

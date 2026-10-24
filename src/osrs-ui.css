@@ -95,3 +95,12 @@
 @media (orientation: portrait) and (pointer: coarse) {
   #materials-toggle.osrs-bag { width: 34px !important; min-width: 0; height: 44px; padding: 0; font-size: 0; }
 }
+/* Skill guide + level-up popup: real item renders instead of glyphs. */
+.guide-item.has-render { background: radial-gradient(circle at 50% 42%, rgba(255, 236, 196, .16), rgba(0, 0, 0, .3)); overflow: hidden; }
+.guide-item.has-render img { width: 34px; height: 34px; object-fit: contain; display: block; image-rendering: auto; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .6)); }
+.guide-row.is-locked .guide-item.has-render { opacity: .85; filter: grayscale(.45); }
+.guide-row.is-next .guide-item.has-render { filter: none; }
+.skill-toast .lu-icons img.lu-render { width: 24px; height: 24px; object-fit: contain; padding: 1px; background: radial-gradient(circle at 50% 42%, #3a2a1a, #1a120a); }
+@media (orientation: portrait) and (pointer: coarse) {
+  .guide-item.has-render img { width: 32px; height: 32px; }
+}

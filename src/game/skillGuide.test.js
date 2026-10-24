@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RECIPES } from './catalog.js';
+import { RECIPES, isCraftHidden } from './catalog.js';
 import { craftedOutputCount, createState, grantMinedMaterial } from './economy.js';
 import { ICONS, defaultTab, nextUnlockLevel, skillGuideShellHtml, sortedRows } from './skillGuide.js';
 import { SKILL_GUIDES } from './skillGuideData.js';
-import { unlockLevelsBySkill } from './skillLevels.js';
+import { unlocksBetween } from './skillLevels.js';
 import { ESSENCE_BONUS_LEVELS, ESSENCE_DOUBLE_LEVEL, SKILLS, xpForLevel } from './skills.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -20,7 +20,9 @@ function reachLevel(state, skillId, level) {
 
 describe('skill guide', () => {
   it('lists every live unlock, and only live unlocks, outside perks and coming soon', () => {
-    const live = unlockLevelsBySkill();
+    // Only what can actually be made: hidden (old-save-only) recipes are left out, like the level-up list.
+    const live = Object.fromEntries(SKILLS.map((s) => [s.id,
+      [...new Set(unlocksBetween(s.id, 0, 99, (id) => isCraftHidden(RECIPES[id])).map((u) => u.level))]]));
     assert.deepEqual(Object.keys(SKILL_GUIDES).sort(), SKILLS.map((skill) => skill.id).sort());
     for (const skill of SKILLS) {
       const guide = SKILL_GUIDES[skill.id];

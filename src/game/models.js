@@ -1806,6 +1806,14 @@ export const MANNEQUIN_WEAR_LIMITS = {
   scaleMax: 3,
 };
 
+/**
+ * Lowest a leg piece may reach. Legs hang from the hips, and the cover scale
+ * alone (hip width / a narrow dump) let long platelegs and chaps run ~0.5 m
+ * below the floor. Height is capped to stay above this, and only the width
+ * and depth are stretched to still hide the hips.
+ */
+export const MANNEQUIN_LEG_FLOOR = 0.04;
+
 /** Closes the gap where the mystic robe bottom sits off the top on a mannequin. */
 export const MYSTIC_ROBE_LIFT = 0.1;
 
@@ -1891,7 +1899,7 @@ function clampFitScale(value) {
  * wood. Paper-thin depth matches that scale. A clamped axis that is still
  * inside the wood is lifted on its own, and still not past the clamp.
  */
-function fitScaleForBox(box, section) {
+function fitScaleForBox(box, section, lift = 0) {
   const size = box.getSize(new THREE.Vector3());
   const need = sectionNeed(section).size;
   const raw = {
@@ -1902,7 +1910,12 @@ function fitScaleForBox(box, section) {
   const thinDepth = size.z < Math.max(size.x, size.y) * MANNEQUIN_THIN_DEPTH;
   let uniform = Math.max(raw.x, raw.y);
   if (!thinDepth) uniform = Math.max(uniform, raw.z);
-  uniform = clampFitScale(uniform);
+  if (section === 'legs') {
+    const top = sectionNeed('legs').top + (lift || 0);
+    const cap = (top - MANNEQUIN_LEG_FLOOR) / Math.max(size.y, 1e-4);
+    uniform = Math.min(uniform, cap);
+  }
+  uniform = section === 'legs' ? Math.min(MANNEQUIN_WEAR_LIMITS.scaleMax, uniform) : clampFitScale(uniform);
   const scale = { x: uniform, y: uniform, z: uniform };
   for (const axis of ['x', 'y', 'z']) {
     if (axis === 'z' && thinDepth) continue;
@@ -1925,7 +1938,8 @@ export function fitMannequinWear(mesh, recipeId) {
   if (box.isEmpty()) return false;
   const size = box.getSize(new THREE.Vector3());
   if (size.x < 1e-4 || size.y < 1e-4 || size.z < 1e-4) return false;
-  const scale = fitScaleForBox(box, section);
+  const lift = recipeId === 'mystic_robe_bottom' ? MYSTIC_ROBE_LIFT : 0;
+  const scale = fitScaleForBox(box, section, lift);
   const need = sectionNeed(section);
   const center = box.getCenter(new THREE.Vector3());
   mesh.scale.set(scale.x, scale.y, scale.z);
@@ -1938,7 +1952,7 @@ export function fitMannequinWear(mesh, recipeId) {
       need.center.z - center.z * scale.z,
     );
   }
-  if (recipeId === 'mystic_robe_bottom') mesh.position.y += MYSTIC_ROBE_LIFT;
+  mesh.position.y += lift;
   return true;
 }
 
@@ -1962,6 +1976,8 @@ export function wareDisplayYaw(id) {
   if (id === 'mystic_robe_top') return Math.PI / 2;
   if (id === 'splitbark_robe_top') return Math.PI;
   if (String(id).endsWith('_dragon_mask')) return Math.PI;
+  // D'hide chaps dumps face -Z: from the front only culled back faces showed.
+  if (String(id).endsWith('_dhide_chaps')) return Math.PI;
   if (String(id).endsWith('_chainbody') && id !== 'dragon_chainbody') return Math.PI;
   return 0;
 }

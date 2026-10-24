@@ -172,6 +172,7 @@ describe('mannequin body and leg fit', () => {
         const center = box.getCenter(new THREE.Vector3());
         assert.ok(Math.abs(center.x) < 1e-3, `${id} center x ${center.x}`);
         assert.ok(Math.abs(center.z) < 1e-3, `${id} center z ${center.z}`);
+        if (section === 'legs') assert.ok(box.min.y >= 0, `${id} reaches below the floor (${box.min.y})`);
       } finally {
         setBundledLook(id, null);
       }

@@ -129,7 +129,7 @@ describe('materials drawer', () => {
     assert.match(css, /\.materials-drawer\.is-open \.materials-toggle \{[^}]*width:\s*26px/);
     assert.match(css, /\.materials-drawer \{[^}]*env\(safe-area-inset-bottom/);
     assert.match(css, /env\(safe-area-inset-top, 0px\) \+ 165px/);
-    assert.match(css, /64px \+ env\(safe-area-inset-bottom, 0px\)/);
+    assert.match(css, /bottom: calc\(var\(--portrait-thumb, 64px\) \+ 8px\)/);
     assert.match(css, new RegExp(MATERIALS_DRAWER_SIDE_QUERY.replace(/[()]/g, '\\$&')));
     assert.match(hud, /MATERIALS_DRAWER_SIDE_QUERY/);
     assert.match(hud, /ownedMaterialsKey\(state\.materials\)/);

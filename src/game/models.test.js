@@ -116,7 +116,7 @@ describe('customer class looks', () => {
     const first = nextBuyerLookId('hedgemage');
     for (let i = 1; i < BUYER_PACKS.hedgemage.length; i += 1) nextBuyerLookId('hedgemage');
     assert.equal(nextBuyerLookId('hedgemage'), first);
-    assert.equal(nextBuyerLookId('kingroald'), null);
+    assert.equal(nextBuyerLookId('kingroald'), 'buyer-king-roald');
     const byId = Object.fromEntries(BUNDLED_PROP_FOLDERS.map((item) => [item.id, item.folder]));
     for (const item of BUYER_PACK_FOLDERS) {
       assert.equal(byId[item.id], item.folder);
@@ -3842,7 +3842,7 @@ describe('rigged buyer looks', () => {
   it('plays Walk and Idle on each rigged adventurer at the player scale', async () => {
     assert.equal(BUYER_MODEL_SCALE, 0.863);
     assert.equal(RIGGED_CLIP_FADE, 0.2);
-    assert.equal(RIGGED_BUYER_MODELS.length, 15);
+    assert.equal(RIGGED_BUYER_MODELS.length, 16);
     const mageScales = Object.fromEntries(
       RIGGED_BUYER_MODELS
         .filter((spec) => spec.lookId.startsWith('buyer-wizard-'))
@@ -3861,6 +3861,7 @@ describe('rigged buyer looks', () => {
         const typeId = spec.lookId.startsWith('buyer-guard-') ? 'mercenary'
           : spec.lookId.startsWith('buyer-ranger-') ? 'ranger'
             : spec.lookId.startsWith('buyer-wizard-') ? 'hedgemage'
+              : spec.lookId === 'buyer-king-roald' ? 'kingroald'
               : 'pilgrim';
         const scale = spec.scale ?? BUYER_MODEL_SCALE;
         const gltf = await loadBuyer(spec.file);

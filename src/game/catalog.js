@@ -25,6 +25,8 @@ export function skyIdForScene(sceneMode, savedSky) {
 
 export const KING_ROALD_MIN = 10 * 60;
 export const KING_ROALD_MAX = 60 * 60;
+/** King Roald pays this multiple of the list price for the priciest item in stock. */
+export const KING_ROALD_PRICE_MULT = 2;
 
 export const HAIR_STYLES = [
   { id: 'bald', label: 'Bald' },
@@ -2141,7 +2143,7 @@ export function decideRequest(customerId, rng = Math.random, state = null, canCr
     if (!recipe) return null;
     return {
       recipeId: recipe.id,
-      gold: recipe.price,
+      gold: recipe.price * KING_ROALD_PRICE_MULT,
       offer: null,
       royal: true,
     };

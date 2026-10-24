@@ -904,7 +904,18 @@ export const RIGGED_BUYER_MODELS = [
     scale: 0.837,
     carryHand: false,
   },
+  {
+    lookId: 'buyer-king-roald',
+    file: 'npc/king_roald_rigged.glb',
+    speed: 0.8290798649720897,
+    height: 1.9272009456363908,
+    scale: 0.863,
+    carryHand: false,
+  },
 ];
+
+/** King Roald always uses his own rigged look (not in BUYER_PACKS, so no dump folder). */
+export const KING_ROALD_LOOK_ID = 'buyer-king-roald';
 /** Both the old shopkeeper and the rig face +Z, so atan2(dx, dz) needs no extra yaw. */
 export const RIGGED_FACING_YAW = 0;
 /** Fist centre in Hand_R local units. The bone origin is the wrist. */
@@ -3880,6 +3891,7 @@ export function resetBuyerCycle() {
 }
 
 export function nextBuyerLookId(typeId) {
+  if (typeId === 'kingroald') return KING_ROALD_LOOK_ID;
   const pack = BUYER_PACKS[typeId];
   if (!pack?.length) return null;
   const i = buyerCycle[typeId] ?? 0;

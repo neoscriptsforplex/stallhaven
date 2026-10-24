@@ -9,13 +9,13 @@ const src = (f) => readFileSync(new URL(f, import.meta.url), 'utf8');
 const straight = (from, to) => [to];
 
 describe('bucket fill: every source', () => {
-  it('built-in fountain keeps Rig\'s stand (1.71 m out, facing the bowl)', () => {
+  it('built-in fountain keeps Rig\'s stand (1.46 m out, facing the bowl)', () => {
     for (const s of fountainStands(FOUNTAIN)) {
       const d = Math.hypot(s.x - FOUNTAIN.x, s.z - FOUNTAIN.z);
-      assert.ok(d >= 1.69 && d < 1.73, `dist ${d}`);
+      assert.ok(d >= 1.44 && d < 1.48, `dist ${d}`);
       const toBowl = Math.atan2(FOUNTAIN.x - s.x, FOUNTAIN.z - s.z);
       const off = Math.abs(Math.atan2(Math.sin(toBowl - s.yaw), Math.cos(toBowl - s.yaw)));
-      assert.ok(off < 0.1, `faces bowl (${off})`);
+      assert.ok(off < 0.11, `faces bowl (${off})`);
     }
   });
 

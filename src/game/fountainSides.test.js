@@ -11,9 +11,9 @@ describe('fountain four sides', () => {
     const st = fountainStands(pose);
     assert.equal(st.length, 4);
     for (const s of st) {
-      assert.ok(Math.hypot(s.x - pose.x, s.z - pose.z) >= 1.69);
+      assert.ok(Math.hypot(s.x - pose.x, s.z - pose.z) >= 1.44);
       const fx = Math.sin(s.yaw); const fz = Math.cos(s.yaw);
-      assert.ok((pose.x - s.x) * fx + (pose.z - s.z) * fz > 1.6);
+      assert.ok((pose.x - s.x) * fx + (pose.z - s.z) * fz > 1.4);
     }
   });
   it('walks to the nearest side from several starts', () => {

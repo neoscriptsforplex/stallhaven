@@ -139,10 +139,10 @@ describe('construction trims (Luke 2026-10-24)', () => {
   });
   it('halves the listed pieces', async () => {
     const mod = await import('./construction.js');
-    for (const id of ['blacksmiths_tools', 'standing_torch', 'crate', 'sacks', 'barrel_of_fish', 'barrel_of_sticks', 'standing_candles', 'double_bed', 'fancy_fireplace', 'fancy_table', 'pots_and_pans', 'bush', 'suit_of_armour', 'sink']) {
+    for (const id of ['blacksmiths_tools', 'standing_torch', 'crate', 'sacks', 'barrel_of_fish', 'barrel_of_sticks', 'standing_candles', 'double_bed', 'fancy_fireplace', 'fancy_table', 'pots_and_pans', 'bush', 'suit_of_armour', 'sink', 'chair', 'fancy_chair', 'bench', 'throne', 'fireplace']) {
       assert.equal(mod.constructionPiece(id).scale, 0.5, id);
     }
-    assert.equal(mod.constructionPiece('chair').scale, undefined);
+    assert.equal(mod.constructionPiece('cabinet').scale, undefined);
   });
 });
 

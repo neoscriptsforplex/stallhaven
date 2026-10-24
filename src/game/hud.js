@@ -156,6 +156,7 @@ import { groupUnlocks, unlockListHtml } from './unlockGroups.js';
 import { createXpOrb } from './xpOrb.js';
 import { autoFit } from './fitPanel.js';
 import { fitPhoneCraft } from './phoneCraftFit.js';
+import { fitBuildDock } from './buildFit.js';
 import {
   brightnessPercent,
   clampBrightness,
@@ -2377,6 +2378,13 @@ export function bindHud(root, state, world) {
     paintBuild();
     buildModal.hidden = false;
     setBuildPressed(true);
+    if (matchMedia(TOUCH_HUD_QUERY).matches) setMaterialsOpen(false);
+    fitBuildDock(buildModal);
+  }
+  if (buildModal) {
+    onLayoutChange(() => { if (!buildModal.hidden) fitBuildDock(buildModal); });
+    // Tab/category switches change content height: refit.
+    buildModal.addEventListener('click', () => requestAnimationFrame(() => { if (!buildModal.hidden) fitBuildDock(buildModal); }));
   }
 
   function closePlace(cancelWorld = false) {

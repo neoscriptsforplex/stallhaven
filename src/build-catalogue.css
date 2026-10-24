@@ -28,7 +28,7 @@
 #build-dock .build-item .meta, #build-dock .build-item .build-detail { margin: 0 0 3px; font-size: .7rem; line-height: 1.25; white-space: normal; }
 #build-dock .build-item button { width: auto; min-width: 0; min-height: 0; padding: 2px 10px; font-size: .74rem; line-height: 1.4; border-radius: 4px; }
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #build-dock.build-sheet { top: auto; max-height: none; width: auto; padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px)); }
   #build-dock > p { display: none; }
   #build-dock .build-main [data-build-pane], #build-dock [data-build-catalogue] { grid-template-columns: 1fr 1fr; gap: 5px; }

@@ -1,3 +1,4 @@
+import { PHONE_QUERY, onLayoutChange } from './layoutQuery.js';
 import {
   ANVIL_TABS,
   FLETCH_TABS,
@@ -226,7 +227,7 @@ export function bindHud(root, state, world) {
   const mapNorth = document.querySelector('[data-map-north]');
   const mapZoomIn = document.querySelector('[data-map-zoom="in"]');
   const mapZoomOut = document.querySelector('[data-map-zoom="out"]');
-  const portraitTouchMedia = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
+  const portraitTouchMedia = window.matchMedia(PHONE_QUERY);
   const materialsDrawer = document.querySelector('#materials-drawer');
   const materialsToggle = document.querySelector('#materials-toggle');
   const materialsPanel = document.querySelector('#materials-panel');
@@ -404,7 +405,7 @@ export function bindHud(root, state, world) {
       const on = name === craftSide;
       return `<button type="button" class="sidetab${on ? ' is-on' : ''}" role="tab" aria-selected="${on ? 'true' : 'false'}" data-side="${escCraft(name)}">${escCraft(name)}<span class="sidetab-count">${open}/${list.length}</span></button>`;
     }).join('');
-    if (window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches) {
+    if (window.matchMedia(PHONE_QUERY).matches) {
       nav.querySelector('.sidetab.is-on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
     }
   }
@@ -614,6 +615,7 @@ export function bindHud(root, state, world) {
     }
   }
   addEventListener('resize', () => { if (!craftModal.hidden) fitCookSheet(craftStation === 'range'); });
+  onLayoutChange(() => { if (!craftModal.hidden) fitCookSheet(craftStation === 'range'); });
   new MutationObserver(() => { if (!craftModal.hidden) fitCookSheet(craftStation === 'range'); })
     .observe(craftModal, { attributes: true, attributeFilter: ['hidden'] });
 
@@ -792,7 +794,7 @@ export function bindHud(root, state, world) {
   });
   document.querySelector('#craft-sidetabs')?.addEventListener('keydown', (event) => {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-    if (window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches) return;
+    if (window.matchMedia(PHONE_QUERY).matches) return;
     const buttons = [...event.currentTarget.querySelectorAll('[data-side]')];
     const index = buttons.indexOf(document.activeElement);
     if (index < 0) return;
@@ -955,7 +957,7 @@ export function bindHud(root, state, world) {
   }
 
   function phoneTapPreview() {
-    return window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches;
+    return window.matchMedia(PHONE_QUERY).matches;
   }
 
   function onCraftHover(event) {
@@ -3956,6 +3958,7 @@ export function bindHud(root, state, world) {
   document.addEventListener('pointercancel', onMaterialsPointer, true);
   materialsSideMedia.addEventListener?.('change', syncMaterialsDrawerPlace);
   window.addEventListener('resize', syncMaterialsDrawerPlace);
+  onLayoutChange(syncMaterialsDrawerPlace);
   if (materialsPanel) materialsPanel.inert = true;
   syncOwnedMaterials();
   syncMaterialsDrawerPlace();
@@ -3988,7 +3991,7 @@ export function bindHud(root, state, world) {
 /** Phone portrait: tuck long paragraphs in sheets/docks behind an About toggle, and use tap wording. */
 function setupPhoneAboutToggles(root) {
   if (typeof window === 'undefined' || !window.matchMedia) return;
-  if (!window.matchMedia('(orientation: portrait) and (pointer: coarse)').matches) return;
+  if (!window.matchMedia(PHONE_QUERY).matches) return;
   const doc = root?.ownerDocument ?? document;
   doc.querySelectorAll('.modal .sheet > p, .expand-dock p').forEach((p) => {
     if (p.closest('details') || p.classList.contains('meta') || p.classList.contains('help-copy')) return;

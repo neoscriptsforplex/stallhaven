@@ -3,7 +3,7 @@
  * Load AFTER src/style.css. Reuses the game's tokens and classes:
  * --panel, --line, --gold, --parchment, --skill-yellow, button, .tabs/.tab,
  * .expand-dock, .skills-head/.skills-grip/.skills-close, .ledger, .modal/.sheet, .game-toast look.
- * Phone rules live only inside @media (orientation: portrait) and (pointer: coarse).
+ * Phone rules live only inside @media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4).
  */
 
 :root {
@@ -414,7 +414,7 @@
 
 /* ---------- Phone portrait ---------- */
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #save-bar #coop-btn { min-width: 0; font-size: 1.15rem; }
   .coop-badge { top: 2px; right: 2px; font-size: 0.6rem; }
 

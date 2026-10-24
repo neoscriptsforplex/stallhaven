@@ -111,7 +111,7 @@
 
 #saves-dock.cs-dock{top:58px;right:16px} /* beat save.css's 64px/12px */
 
-@media (orientation:portrait) and (pointer:coarse){
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4){
   .cs-x{width:32px;height:32px;font-size:.9rem;top:8px;right:8px}
   .cs-back{height:32px;font-size:.86rem}
   /* Bottom sheet above the 7-button bar, height = content (like Heroes/Quests) */

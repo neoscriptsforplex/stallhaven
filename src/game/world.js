@@ -1,3 +1,4 @@
+import { onLayoutChange } from './layoutQuery.js';
 import * as THREE from 'three';
 import {
   ARMOUR_SLOTS,
@@ -1745,6 +1746,7 @@ export function createWorld(canvas, state, opts = {}) {
     renderer.setSize(window.innerWidth, window.innerHeight);
   }
   window.addEventListener('resize', resize);
+  onLayoutChange(resize);
 
   function shopUsePicks() {
     const found = [];

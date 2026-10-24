@@ -438,7 +438,7 @@ describe('minimap', () => {
     const end = css.indexOf('/* Touch only:', start);
     assert.ok(start >= 0 && end > start);
     const block = css.slice(start, end);
-    assert.match(block, /@media \(orientation: portrait\) and \(pointer: coarse\) \{/);
+    assert.match(block, /@media \(orientation: portrait\) and \(pointer: coarse\) and \(max-aspect-ratio: 3\/4\) \{/);
     assert.equal(block.includes('max-width: 720px'), false);
     assert.match(block, /--portrait-strip:\s*36px/);
     assert.match(block, /--portrait-map:\s*112px/);
@@ -452,7 +452,7 @@ describe('minimap', () => {
     assert.match(html, /data-map-close[^>]*aria-label="Close map"/);
     assert.match(html, /data-map-dismiss/);
     assert.match(hud, /Shop Level \$\{xp\.level\}/);
-    assert.match(hud, /matchMedia\('\(orientation: portrait\) and \(pointer: coarse\)'\)/);
+    assert.match(hud, /matchMedia\(PHONE_QUERY\)/);
     assert.match(hud, /minimapBufferPixels\(cssSize, window\.devicePixelRatio \|\| 1\)/);
     assert.match(hud, /setMapOpen\(true\)/);
     assert.match(hud, /setMapOpen\(false\)/);

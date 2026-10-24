@@ -212,8 +212,8 @@ function furnaceStandCandidates(pose) {
   return FURNACE_STAND_TRIES.map((local) => furnaceStandWorld(pose, local));
 }
 
-/** Fountain stand, fountain-local metres: beside a stream, facing +Z (the bowl). */
-export const FOUNTAIN_STAND_LOCAL = { x: 0.147, z: -1.709 };
+/** Fountain stand, fountain-local metres: beside a stream, facing +Z (the bowl). Rig v6: 0.26 m closer than v5. */
+export const FOUNTAIN_STAND_LOCAL = { x: 0.147, z: -1.450 };
 
 /** The four fill stands (S, W, N, E of the bowl), each with the yaw that faces it. */
 export function fountainStands(pose = FOUNTAIN) {

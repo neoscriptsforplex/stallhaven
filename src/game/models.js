@@ -2152,7 +2152,12 @@ export function buildWare(recipeId) {
     '2h': () => addSword(host, tint, 1.38),
     defender: () => addDefender(host, tint),
     kiteshield: () => addDefender(host, tint),
-    full_helm: () => addFullHelm(host, tint),
+    full_helm: () => {
+      addFullHelm(host, tint);
+      // Luke's full helm OBJs fit by max extent (plume + deep visor), so they
+      // read ~1/3 smaller than med helms on tables, shelves and mannequins.
+      host.scale.setScalar(FULL_HELM_DISPLAY_SCALE);
+    },
     med_helm: () => addMedHelm(host, tint),
     platebody: () => addPlatebody(host, tint),
     platelegs: () => addPlatelegs(host, tint),
@@ -2549,6 +2554,9 @@ function addDefender(group, tint) {
   rim.position.y = 0.44;
   group.add(rim);
 }
+
+/** Brings displayed full helms up to the visual size of the matching med helm. */
+export const FULL_HELM_DISPLAY_SCALE = 1.5;
 
 function addFullHelm(group, tint) {
   const plate = metal(tint);

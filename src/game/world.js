@@ -1376,7 +1376,7 @@ export function createWorld(canvas, state, opts = {}) {
     const look = getBundledLook(constructionLookId(id));
     if (look) {
       const mesh = look.clone(true);
-      mesh.scale.setScalar(0.01125);
+      mesh.scale.setScalar(0.01125 * (constructionPiece(id)?.scale ?? 1));
       mesh.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(mesh);
       if (Number.isFinite(box.min.y)) mesh.position.y -= box.min.y;
@@ -1387,7 +1387,9 @@ export function createWorld(canvas, state, opts = {}) {
       new THREE.BoxGeometry(0.55, 0.5, 0.55),
       new THREE.MeshStandardMaterial({ color: tint, roughness: 0.7 }),
     );
-    mesh.position.y = 0.25;
+    const boxScale = constructionPiece(id)?.scale ?? 1;
+    mesh.scale.setScalar(boxScale);
+    mesh.position.y = 0.25 * boxScale;
     return mesh;
   }
 

@@ -93,7 +93,7 @@ import {
   snapToWallGrid,
   stationUnlock,
 } from './layout.js';
-import { readPlacedFurniture } from './construction.js';
+import { readPlacedFurniture, retiredRefund } from './construction.js';
 import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_MIN,
@@ -1932,6 +1932,9 @@ export function applyState(state, data) {
     next.boughtFurniture.farming_patch ?? 0,
     next.furniture.patches.length,
   );
+  for (const [id, count] of Object.entries(retiredRefund(data?.furniture?.placed))) {
+    next.materials[id] = (next.materials[id] ?? 0) + count;
+  }
   state.gold = next.gold;
   state.materials = next.materials;
   state.materialAcc = next.materialAcc;

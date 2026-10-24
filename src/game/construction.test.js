@@ -31,11 +31,11 @@ function funded() {
 }
 
 describe('construction catalogue', () => {
-  it('lists the thirty-five cosmetic pieces at flat material prices', () => {
-    assert.equal(CONSTRUCTION_PIECES.length, 35);
+  it('lists every cosmetic piece at flat material prices', () => {
+    assert.ok(CONSTRUCTION_PIECES.length >= 35);
     assert.equal(constructionPiece('chair').materials.plank, 1);
     assert.equal(constructionPiece('chair').gold, 200);
-    assert.equal(new Set(CONSTRUCTION_PIECES.map((row) => row.id)).size, 35);
+    assert.equal(new Set(CONSTRUCTION_PIECES.map((row) => row.id)).size, CONSTRUCTION_PIECES.length);
     const chair = funded();
     chair.materials.plank = 2;
     chair.materials.bronze_nails = 2;

@@ -191,6 +191,14 @@ export function createSupabaseClient({ url, anonKey, fetchImpl, storage, now = (
       return r.json;
     },
 
+    /** Deletes the account and all online saves (rpc delete_my_account). */
+    async deleteAccount() {
+      const r = await call('/rest/v1/rpc/delete_my_account', { method: 'POST', auth: true, body: {} });
+      if (r.status === 401) throw Object.assign(new Error('signed out'), { signedOut: true });
+      if (!r.ok) throw new Error(`delete account ${r.status}`);
+      persist(null);
+    },
+
     async deleteSlot(slot) {
       const r = await call(`/rest/v1/saves?slot=eq.${Number(slot)}`, { method: 'DELETE', auth: true });
       if (!r.ok && r.status !== 404) throw new Error(`delete ${r.status}`);

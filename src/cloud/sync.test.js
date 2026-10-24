@@ -287,3 +287,21 @@ test('a save from a newer game version is never downloaded or overwritten', asyn
   assert.deepEqual(await old.pull(), { 1: 'newer-version', 2: 'none', 3: 'none' });
   assert.equal(await store.read(1), null);
 });
+
+test('deleteAccount wipes cloud rows, signs out and keeps local slots', async () => {
+  const cloud = createMemoryCloud({ now });
+  const a = await device(cloud);
+  await save(a, 1, 321);
+  await a.sync.pull();
+  assert.equal(cloud.rows.size, 1);
+  cloud.setOffline(true);
+  assert.deepEqual(await a.sync.deleteAccount(), { ok: false, reason: 'offline' });
+  assert.equal(cloud.rows.size, 1);
+  cloud.setOffline(false);
+  assert.deepEqual(await a.sync.deleteAccount(), { ok: true });
+  assert.equal(cloud.rows.size, 0);
+  assert.equal(a.sync.signedIn, false);
+  assert.equal((await a.store.read(1)).gold, 321);
+  assert.ok(a.events.some((e) => e.t === 'cloud_account_deleted'));
+  assert.deepEqual(await a.sync.deleteAccount(), { ok: false, reason: 'expired' });
+});

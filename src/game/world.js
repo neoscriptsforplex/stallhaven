@@ -2187,7 +2187,7 @@ export function createWorld(canvas, state, opts = {}) {
         stopMining();
         return;
       }
-      pushLog(state, `Filled ${got} Buckets of water.`);
+      pushLog(state, `Filled ${got} ${got === 1 ? 'Bucket' : 'Buckets'} of water.`);
       pickHandler?.({ type: 'drew-water', amount: got });
       mining = { ...mining, startedAt: now };
       if (shopkeeper.userData?.clipLocomotion?.gather === 'fillbucket') restartFillBucket(shopkeeper);

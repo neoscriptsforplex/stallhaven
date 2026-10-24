@@ -264,7 +264,7 @@ const set = (lv, name, desc, icon, tint) => ({ lv, name, desc, icon, tint });
 const crafting = {
   tabs: [
     {
-      id: 'robes', label: 'Robes',
+      id: 'magic', label: 'Magic',
       rows: [
         set(3, 'Wizard boots', 'Loom', 'cloth', '#4a62c8'), set(5, 'Wizard hat', 'Loom', 'cloth', '#4a62c8'),
         set(8, 'Wizard robe', 'Loom', 'cloth', '#4a62c8'),
@@ -278,10 +278,15 @@ const crafting = {
         set(74, 'Lunar robe bottom', 'Loom', 'cloth', '#7fa8c8'), set(76, 'Lunar robe top', 'Loom', 'cloth', '#7fa8c8'),
         set(86, 'Ancient gloves & boots', 'Loom', 'cloth', '#c9a24e'), set(87, 'Ancient hat', 'Loom', 'cloth', '#c9a24e'),
         set(88, 'Ancient robe bottom', 'Loom', 'cloth', '#c9a24e'), set(89, 'Ancient robe top', 'Loom', 'cloth', '#c9a24e'),
+        set(12, 'Staff', 'Anvil, 50 logs', 'staff', '#a0703f'),
+        set(36, 'Elemental staves', 'Air, water, earth, fire', 'staff', '#4c8de0'),
+        set(54, 'Battlestaves', 'Air, water, earth, fire', 'staff', '#6a3d8a'),
+        set(84, 'Mystic staves', 'Air, water, earth, fire', 'staff', '#3d5bd9'),
+        set(92, 'Ancient staff', '', 'staff', '#c9a24e'),
       ],
     },
     {
-      id: 'leather', label: "D'hide",
+      id: 'ranged', label: 'Ranged',
       rows: [
         ['Green', 28, '#3f9a5c'], ['Blue', 46, '#4c6fe0'], ['Red', 64, '#c8402e'], ['Black', 78, '#3a3a40'],
       ].flatMap(([c, lv, tint]) => [
@@ -292,14 +297,10 @@ const crafting = {
       ]),
     },
     {
-      id: 'staves', label: 'Staves & more',
+      id: 'materials', label: 'Materials',
       rows: [
         set(1, 'Cloth', 'Weave flax on the loom', 'cloth', '#d8cfb8'), set(1, 'Soft clay', '1 hard clay + 1 bucket of water', 'pot', TIER.clay),
-        set(10, 'Bow string', 'Spinning wheel', 'string', '#e8dcc0'), set(12, 'Staff', 'Anvil, 50 logs', 'staff', '#a0703f'),
-        set(36, 'Elemental staves', 'Air, water, earth, fire', 'staff', '#4c8de0'),
-        set(54, 'Battlestaves', 'Air, water, earth, fire', 'staff', '#6a3d8a'),
-        set(84, 'Mystic staves', 'Air, water, earth, fire', 'staff', '#3d5bd9'),
-        set(92, 'Ancient staff', '', 'staff', '#c9a24e'),
+        set(10, 'Bow string', 'Spinning wheel', 'string', '#e8dcc0'),
       ],
     },
   ],

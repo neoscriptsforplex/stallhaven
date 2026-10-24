@@ -84,7 +84,7 @@ describe('player look UI', () => {
   });
 
   it('labels the shop placement panel Build, not Upgrade', () => {
-    assert.match(html, /id="build-btn"[^>]*>Build</);
+    assert.match(html, /id="build-btn"[^>]*><img class="osrs-ico" src="\.\/icons\/ui\/build\.svg"/);
     assert.match(html, /id="build-btn"[^>]*title="Build"/);
     assert.match(html, /id="build-btn"[^>]*aria-label="Build"/);
     const build = slice(html, 'id="build-dock"', 'id="place-dock"');
@@ -199,12 +199,12 @@ describe('player look UI', () => {
     assert.match(css, /\.modal\s*\{[^}]*pointer-events:\s*auto;/);
   });
 
-  it('shows a +N yield under the gather progress bar', () => {
+  it('no longer shows a +N yield under the gather progress bar', () => {
     const hudBar = slice(html, 'id="active-craft"', 'id="help-modal"');
     const bar = hudBar.indexOf('data-active-craft-bar');
     const yieldAt = hudBar.indexOf('data-active-craft-yield');
-    assert.ok(bar >= 0 && yieldAt > bar, 'yield should sit under the bar');
-    assert.match(hud, /mining\.yield/);
+    assert.ok(bar >= 0 && yieldAt > bar, 'yield slot still sits under the bar');
+    assert.doesNotMatch(hud, /mining\.yield/);
     assert.match(hud, /kind === 'tree'[\s\S]{0,40}'Chop down'/);
   });
 

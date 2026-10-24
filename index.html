@@ -40,6 +40,7 @@
     <link rel="stylesheet" href="./src/save.css" />
     <link rel="stylesheet" href="./src/cloud/cloud-save.css" />
     <link rel="stylesheet" href="./src/build-catalogue.css" />
+    <link rel="stylesheet" href="./src/osrs-ui.css" />
     <script type="importmap">
       {
         "imports": {
@@ -59,14 +60,14 @@
     </div>
 
     <aside id="save-bar" aria-label="Save and load">
-      <button type="button" id="heroes-btn" title="Heroes" aria-label="Heroes" aria-controls="heroes-dock" aria-expanded="false"><svg class="hq-btn-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2.5l7.5 2.8v6.2c0 4.6-3.1 7.8-7.5 9.5-4.4-1.7-7.5-4.9-7.5-9.5V5.3z"/></svg><span class="hq-btn-label">Heroes</span></button>
-      <button type="button" id="quests-btn" title="Quests" aria-label="Quests" aria-controls="quests-dock" aria-expanded="false"><svg class="hq-btn-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6 3h8.2L19 7.8V21H6z"/><path d="M14 3.5V8h4.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span class="hq-btn-label">Quests</span><span class="hq-badge" data-quest-badge hidden>0</span></button>
-      <button type="button" id="skills-btn" title="Skills" aria-label="Skills" aria-controls="skills-dock" aria-expanded="false">Skills</button>
-      <button type="button" id="build-btn" title="Build" aria-label="Build" aria-controls="build-dock" aria-expanded="false">Build</button>
-      <button type="button" id="help-btn" title="Help" aria-label="Help">Help</button>
-      <button type="button" id="music-btn" title="Music" aria-label="Music">♪</button>
-      <button type="button" id="saves-btn" title="Saves" aria-label="Saves" aria-controls="saves-dock" aria-expanded="false"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 3h13l3 3v15H4z"/><rect x="7" y="4.5" width="9" height="5" fill="#24160c"/><rect x="13" y="5.3" width="2" height="3.4"/><rect x="7" y="13" width="10" height="6.5" rx="1" fill="#24160c"/></svg></button>
-      <button type="button" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
+      <button type="button" class="osrs-btn" id="heroes-btn" title="Heroes" aria-label="Heroes" aria-controls="heroes-dock" aria-expanded="false"><img class="osrs-ico" src="./icons/ui/heroes.svg" alt="" /></button>
+      <button type="button" class="osrs-btn" id="quests-btn" title="Quests" aria-label="Quests" aria-controls="quests-dock" aria-expanded="false"><img class="osrs-ico" src="./icons/ui/quests.svg" alt="" /><span class="hq-badge" data-quest-badge hidden>0</span></button>
+      <button type="button" class="osrs-btn" id="skills-btn" title="Skills" aria-label="Skills" aria-controls="skills-dock" aria-expanded="false"><img class="osrs-ico" src="./icons/ui/skills.svg" alt="" /></button>
+      <button type="button" class="osrs-btn" id="build-btn" title="Build" aria-label="Build" aria-controls="build-dock" aria-expanded="false"><img class="osrs-ico" src="./icons/ui/build.svg" alt="" /></button>
+      <button type="button" class="osrs-btn" id="help-btn" title="Help" aria-label="Help"><img class="osrs-ico" src="./icons/ui/help.svg" alt="" /></button>
+      <button type="button" class="osrs-btn" id="music-btn" title="Music" aria-label="Music"><img class="osrs-ico" src="./icons/ui/music.svg" alt="" /></button>
+      <button type="button" class="osrs-btn" id="saves-btn" title="Saves" aria-label="Saves" aria-controls="saves-dock" aria-expanded="false"><img class="osrs-ico" src="./icons/ui/saves.svg" alt="" /></button>
+      <button type="button" class="osrs-btn" id="settings-btn" title="Settings" aria-label="Settings"><img class="osrs-ico" src="./icons/ui/settings.svg" alt="" /></button>
       <input id="load-file" type="file" accept="application/json,.json" hidden />
       <input id="music-file" type="file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav" multiple hidden />
     </aside>
@@ -105,7 +106,8 @@
     </aside>
 
     <div id="materials-drawer" class="materials-drawer">
-      <button type="button" id="materials-toggle" aria-expanded="false" aria-controls="materials-panel" aria-label="Show materials" title="Materials">
+      <button type="button" id="materials-toggle" class="materials-toggle osrs-bag" aria-expanded="false" aria-controls="materials-panel" aria-label="Show inventory" title="Inventory">
+        <img class="osrs-ico" src="./icons/ui/bag.svg" alt="" />
         <span class="materials-arrow materials-arrow-up" aria-hidden="true">↑</span>
         <span class="materials-arrow materials-arrow-down" aria-hidden="true">↓</span>
         <span class="materials-arrow materials-arrow-right" aria-hidden="true">→</span>
@@ -460,6 +462,7 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
         <button type="button" data-more="fullscreen">Fullscreen</button>
       </div>
       <h2>Settings</h2>
+      <button type="button" class="ghost settings-x" data-settings-x aria-label="Close" title="Close">✕</button>
       <button type="button" class="cs-entry" data-settings-saves-open><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 19a5 5 0 0 1-.6-10A6.5 6.5 0 0 1 19 9.5a4.8 4.8 0 0 1-.5 9.5z"/></svg><b>Save files</b><small data-savefiles-summary>Import, export, backup file</small><i>›</i></button>
       <h3>Skybox colour</h3>
       <p class="meta">Fake white clouds sit in every sky. Default is Blue.</p>

@@ -84,24 +84,28 @@ export function skillsDockHtml({ iconBase = defaultIconBase(), hint = 'Tap a ski
 }
 
 /** Level-up banner. Put the returned element anywhere; it removes itself. */
-export function levelUpToastHtml({ skillId, name, level, unlocked = [] }, iconBase = defaultIconBase()) {
+export function levelUpToastHtml({ skillId, name, level, unlocked = [], unlockHtml = '' }, iconBase = defaultIconBase()) {
   const max = level >= MAX_LEVEL;
   const names = (unlocked ?? []).filter(Boolean);
-  const extra = names.length
+  const extra = names.length && !unlockHtml
     ? ` New: ${names.slice(0, 4).join(', ')}${names.length > 4 ? '…' : ''}.`
     : '';
   return `
-    <div class="skill-toast" role="status" data-skill-toast="${skillId}">
+    <div class="skill-toast${unlockHtml ? ' has-unlocks' : ''}" role="status" data-skill-toast="${skillId}">
       <img src="${iconBase}${skillId}.svg" alt="" width="32" height="32" />
       <p><strong>${max ? 'Maxed!' : 'Level up!'}</strong>
-      <span>Your ${name} level is now ${level}.${extra}</span></p>
+      <span>Your ${name} level is now ${level}.${extra}</span></p>${unlockHtml}
     </div>`;
 }
 
-export function showLevelUpToast(event, { host = document.body, iconBase = defaultIconBase(), ms = 3200 } = {}) {
+export function showLevelUpToast(event, { host = document.body, iconBase = defaultIconBase(), ms = event?.unlockHtml ? 5000 : 3200, onClick = null } = {}) {
   const wrap = document.createElement('div');
   wrap.innerHTML = levelUpToastHtml(event, iconBase).trim();
   const toast = wrap.firstElementChild;
+  if (onClick && event?.unlockHtml) {
+    toast.style.cursor = 'pointer';
+    toast.addEventListener('click', () => { onClick(event.skillId); toast.remove(); });
+  }
   host.querySelectorAll('.skill-toast').forEach((old) => old.remove());
   host.appendChild(toast);
   window.setTimeout(() => toast.classList.add('is-leaving'), ms);

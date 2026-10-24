@@ -345,15 +345,18 @@ function visible(row, isHidden) {
 }
 
 /** Names unlocked from `fromLevel` (exclusive) through `toLevel` (inclusive). */
+/** Unlock rows ({ id, name, kind, level }) gained going from fromLevel to toLevel. */
+export function unlocksBetween(skillId, fromLevel, toLevel, isHidden = () => false) {
+  return unlocks.filter((row) => (
+    row.skill === skillId
+    && row.level > fromLevel
+    && row.level <= toLevel
+    && visible(row, isHidden)
+  ));
+}
+
 export function unlockNamesBetween(skillId, fromLevel, toLevel, isHidden = () => false) {
-  return unlocks
-    .filter((row) => (
-      row.skill === skillId
-      && row.level > fromLevel
-      && row.level <= toLevel
-      && visible(row, isHidden)
-    ))
-    .map((row) => row.name);
+  return unlocksBetween(skillId, fromLevel, toLevel, isHidden).map((row) => row.name);
 }
 
 /** "Next unlock: Iron rock (Lv 5)". Empty at 99 or when nothing is left. */

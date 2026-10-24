@@ -1116,10 +1116,17 @@ export function createWorld(canvas, state, opts = {}) {
       alive.add(node.id);
       let mesh = flaxMeshes.get(node.id);
       if (!mesh) {
-        mesh = buildFlaxPlant();
-        mesh.rotation.y = node.yaw ?? 0;
-        attachFlaxPick(mesh, node);
-        flaxGroup.add(mesh);
+        // Same as wheat: the pick sits on an unscaled holder so a scaled
+        // flax model root can't shrink the right-click / long-press box.
+        const holder = new THREE.Group();
+        holder.name = 'flax-holder';
+        const plant = buildFlaxPlant();
+        holder.userData.flaxProcedural = Boolean(plant.userData?.flaxProcedural);
+        plant.rotation.y = node.yaw ?? 0;
+        holder.add(plant);
+        attachFlaxPick(holder, node);
+        flaxGroup.add(holder);
+        mesh = holder;
         flaxMeshes.set(node.id, mesh);
       }
       mesh.position.set(node.x, 0, node.z);

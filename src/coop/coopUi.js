@@ -108,7 +108,8 @@ export function mountCoop({ state, world, hud, autosave } = {}) {
   btn.setAttribute('aria-label', 'Co-op');
   btn.setAttribute('aria-controls', 'coop-dock');
   btn.setAttribute('aria-expanded', 'false');
-  btn.innerHTML = `${ICON}<span class="coop-badge" data-coop-badge hidden></span>`;
+  btn.className = 'osrs-btn';
+  btn.innerHTML = `<img class="osrs-ico" src="${import.meta.env?.BASE_URL ?? './'}icons/ui/coop.svg" alt="" />${ICON}<span class="coop-badge coop-count" data-coop-badge hidden></span>`;
   const music = saveBar.querySelector('#music-btn');
   if (music) music.after(btn);
   else saveBar.append(btn);

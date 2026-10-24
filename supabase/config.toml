@@ -1,0 +1,31 @@
+# Local Supabase CLI stack (supabase start). Not used by the live site.
+project_id = "stallhaven"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[auth]
+site_url = "http://localhost:5173/stallhaven/"
+additional_redirect_urls = ["http://localhost:4173/stallhaven/", "http://localhost:5173/stallhaven/"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+otp_length = 6
+otp_expiry = 3600
+max_frequency = "60s"
+
+[auth.email.template.magic_link]
+subject = "Your Store of Geilenor login link"
+content_path = "./supabase/templates/magic_link.html"

@@ -11,6 +11,9 @@
     <title>RuneCraft - Legends of Gielenor</title>
     <meta name="description" content="Rune Craft. Craft gear into a chest, then trade with travelers at the counter." />
     <meta name="stallhaven-room-server" content="https://stallhaven-coop.stallhaven.workers.dev" />
+    <!-- Online saves (Supabase). The anon key is public by design; RLS protects each player's rows. -->
+    <meta name="stallhaven-supabase-url" content="https://pvihgwdiwpbhsmuytulj.supabase.co" />
+    <meta name="stallhaven-supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2aWhnd2Rpd3BiaHNtdXl0dWxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMTE1MDcsImV4cCI6MjEwNzg4NzUwN30.i71KpVTSVa3xhL9y-l-Kyhb6jotS-B98kcOuQ9ExXxY" />
     <link rel="manifest" href="./public/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./public/apple-touch-icon.png" sizes="180x180" />
     <link rel="icon" type="image/png" sizes="32x32" href="./public/favicon.png" />
@@ -35,6 +38,7 @@
     <link rel="stylesheet" href="./src/style.css" />
     <link rel="stylesheet" href="./src/coop/coop.css" />
     <link rel="stylesheet" href="./src/save.css" />
+    <link rel="stylesheet" href="./src/cloud/cloud-save.css" />
     <script type="importmap">
       {
         "imports": {
@@ -441,6 +445,7 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
         <button type="button" data-more="fullscreen">Fullscreen</button>
       </div>
       <h2>Settings</h2>
+      <button type="button" class="cs-entry" data-settings-saves-open><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 19a5 5 0 0 1-.6-10A6.5 6.5 0 0 1 19 9.5a4.8 4.8 0 0 1-.5 9.5z"/></svg><b>Save files</b><small data-savefiles-summary>Import, export, backup file</small><i>›</i></button>
       <h3>Skybox colour</h3>
       <p class="meta">Fake white clouds sit in every sky. Default is Blue.</p>
       <div class="skybox-grid" data-skybox-list>
@@ -489,15 +494,21 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
         <button type="submit">Enter</button>
       </form>
       <p data-cheat-note class="craft-note" hidden></p>
-      <section class="sv-section" data-settings-saves>
-        <h3>Save files</h3>
-        <p class="meta" data-save-files-note>Back up or move a shop between browsers. Export saves the current slot.</p>
-        <div class="sv-stack">
-          <button type="button" class="sv-ghost" data-save-export>Export save to file</button>
-          <button type="button" class="sv-ghost" data-save-import>Import save file</button>
-        </div>
-      </section>
       <button type="button" class="ghost" data-settings-close>Close</button>
+    </aside>
+
+    <aside id="savefiles-dock" class="cs-dock" role="dialog" aria-label="Save files" hidden>
+      <button type="button" class="cs-back" data-savefiles-back>‹ Settings</button><h2>Save files</h2><button type="button" class="cs-x" data-savefiles-close aria-label="Close">✕</button>
+      <section class="cs-sec" data-cloud-section hidden></section>
+      <section class="cs-sec" data-backup-section>
+        <h3><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 2h9l5 5v15H5z"/><path d="M14 2v5h5" fill="#2a1a10"/></svg>Backup file</h3>
+        <div data-autobackup-body></div>
+      </section>
+      <section class="cs-sec" data-settings-saves>
+        <h3><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 11h11l-4-4 1.4-1.4L19 12l-6.6 6.4L11 17l4-4H4z"/></svg>Move a save</h3>
+        <p class="cs-help" data-save-files-note>Back up or move a shop between browsers. Export saves the current slot.</p>
+        <div class="cs-row"><button type="button" class="sv-ghost" data-save-export>Export Slot 1</button><button type="button" class="sv-ghost" data-save-import>Import file</button></div>
+      </section>
     </aside>
 
     <aside id="saves-dock" class="expand-dock" role="dialog" aria-label="Saves" hidden>

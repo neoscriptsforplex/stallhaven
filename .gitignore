@@ -7,3 +7,6 @@ play-dist
 
 # Milestone snapshots are produced by the Pages workflow, not stored on main.
 versions/*/
+
+.env.local
+.env.*.local

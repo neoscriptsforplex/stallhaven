@@ -731,13 +731,19 @@ export function setSfxLoop(name, on, { gain = 1 } = {}) {
     }
     return false;
   }
-  if (running) return true;
+  if (running) {
+    if (running.level !== gain) {
+      running.level = gain;
+      if (running.src) running.gain.gain.setTargetAtTime(entry.gain * gain, running.ctx.currentTime, 0.15);
+    }
+    return true;
+  }
   const bus = ensureSfxBus();
   if (!bus) return false;
   const g = bus.ctx.createGain();
   g.gain.value = 0;
   g.connect(bus.channels[entry.channel]);
-  const handle = { ctx: bus.ctx, gain: g, src: null, stopped: false };
+  const handle = { ctx: bus.ctx, gain: g, src: null, stopped: false, level: gain };
   sfxLoops.set(name, handle);
   sfxBuffer(entry).then((buf) => {
     if (!buf || handle.stopped) return;
@@ -747,7 +753,7 @@ export function setSfxLoop(name, on, { gain = 1 } = {}) {
     src.connect(g);
     src.start();
     handle.src = src;
-    g.gain.setTargetAtTime(entry.gain * gain, bus.ctx.currentTime, 0.15);
+    g.gain.setTargetAtTime(entry.gain * handle.level, bus.ctx.currentTime, 0.15);
   }).catch(() => {});
   return true;
 }

@@ -7,7 +7,7 @@ import {
   channelForSfx, createRetriggerGuard, loadSoundMix, normalizeSoundMix, parseSfxManifest, pickSfxVariant,
   saveSoundMix, SHORT_SFX_GAIN, DEFAULT_SOUND_MIX,
 } from './sfx.js';
-import { createSfxDirector, intentSound } from './sfxHooks.js';
+import { createSfxDirector, fireCrackleGain, intentSound } from './sfxHooks.js';
 import { buyerShouldWait, buyerSpawnClear, freeStandSpot, BUYER_MIN_GAP } from './customerSim.js';
 import { loadSfxManifest, resetSfxForTests, getSfxGroups, playSfx } from './audio.js';
 
@@ -112,12 +112,24 @@ describe('sfx director', () => {
     d.frame({ stations: [] }, 1);
     assert.equal(loops.get('furnace_loop'), false);
   });
-  it('chops every swing, no footsteps, ambience indoors', () => {
+  it('fire crackle only near a fire, fading with distance', () => {
+    const { d, loops } = rig();
+    d.frame({ indoors: true, sceneMode: 'shop', fireDist: Infinity }, 0);
+    assert.notEqual(loops.get('shop_ambience_loop'), true);
+    d.frame({ fireDist: 1 }, 1);
+    assert.equal(loops.get('shop_ambience_loop'), true);
+    d.frame({ fireDist: 6 }, 2);
+    assert.equal(loops.get('shop_ambience_loop'), false);
+    assert.equal(fireCrackleGain(2), 1);
+    assert.equal(fireCrackleGain(3.5), 0.5);
+    assert.equal(fireCrackleGain(5), 0);
+  });
+  it('chops every swing, no footsteps, ambience near fire', () => {
     const { d, played, loops } = rig();
     for (let t = 0; t <= 3; t += 0.05) d.frame({ mining: { mode: 'chop', startedAt: 0 } }, t);
     assert.ok(played.filter((p) => p === 'tree_chop').length >= 3);
     played.length = 0;
-    for (let i = 0; i < 20; i += 1) d.frame({ player: { x: i * 0.2, z: 0 }, indoors: true, sceneMode: 'shop' }, 10 + i * 0.1);
+    for (let i = 0; i < 20; i += 1) d.frame({ player: { x: i * 0.2, z: 0 }, indoors: true, sceneMode: 'shop', fireDist: 1 }, 10 + i * 0.1);
     assert.ok(!played.some((p) => p.startsWith('footstep')));
     assert.ok(!manifest.some((e) => e.name.startsWith('footstep')));
     assert.equal(loops.get('shop_ambience_loop'), true);

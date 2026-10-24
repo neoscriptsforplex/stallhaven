@@ -3192,7 +3192,7 @@ export function bindHud(root, state, world) {
   settingsDock?.querySelector('[data-settings-x]')?.addEventListener('click', closeSettingsDock);
   if (settingsDock) {
     // Roomy Settings: wide panel, fixed header, scrolling body capped between HUD and button bar.
-    const fitSettings = () => fitScrollDock(settingsDock, { width: 460 });
+    const fitSettings = () => fitScrollDock(settingsDock, { width: 560 });
     new MutationObserver(() => { if (!settingsDock.hidden) fitSettings(); }).observe(settingsDock, { attributes: true, attributeFilter: ['hidden'] });
     onLayoutChange(() => { if (!settingsDock.hidden) fitSettings(); });
     fitSettings();

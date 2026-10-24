@@ -11,7 +11,7 @@
  * like hud.js and skillsPanel.js.
  */
 import { MAX_LEVEL, SKILLS } from './skills.js';
-import { PORTRAIT_QUERY, defaultIconBase, formatXp } from './skillsPanel.js';
+import { PORTRAIT_QUERY, SKILL_ICON_V, defaultIconBase, formatXp } from './skillsPanel.js';
 import { SKILL_GUIDES } from './skillGuideData.js';
 import GUIDE_THUMBS from './guideThumbs.js';
 import { thumbUrl } from './guideRenders.js';
@@ -153,7 +153,7 @@ export function bindSkillGuide({
   }
 
   function paintHead(row) {
-    el.querySelector('[data-guide-icon]').src = `${iconBase}${skillId}.svg`;
+    el.querySelector('[data-guide-icon]').src = `${iconBase}${skillId}.svg${SKILL_ICON_V}`;
     el.querySelector('[data-guide-title]').textContent = row.name;
     el.querySelector('[data-guide-sub]').textContent = SKILLS.find((s) => s.id === skillId)?.trainedBy ?? '';
     el.querySelector('[data-guide-level]').textContent = String(row.level);

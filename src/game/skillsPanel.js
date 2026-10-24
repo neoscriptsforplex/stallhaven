@@ -19,6 +19,7 @@ export const PORTRAIT_QUERY = PHONE_QUERY;
  * Vite serves that folder at BASE_URL. A raw repo-root load (GitHub Pages)
  * still has the public/ prefix, same as minimap and shop textures.
  */
+export const SKILL_ICON_V = "?v=2";
 export function defaultIconBase() {
   let base = './public/';
   try {
@@ -50,7 +51,7 @@ export function skillsDockShellHtml() {
 function tileHtml(skill, iconBase) {
   return `
     <button type="button" class="skill-tile" data-skill="${skill.id}" aria-pressed="false" aria-describedby="skills-tip">
-      <img class="skill-icon" src="${iconBase}${skill.id}.svg" alt="" width="32" height="32" draggable="false" />
+      <img class="skill-icon" src="${iconBase}${skill.id}.svg${SKILL_ICON_V}" alt="" width="32" height="32" draggable="false" />
       <span class="skill-lv" aria-hidden="true" data-skill-lv>1</span>
       <span class="skill-sr" data-skill-sr>${skill.name} level 1</span>
     </button>`;
@@ -93,7 +94,7 @@ export function levelUpToastHtml({ skillId, name, level, unlocked = [], unlockHt
     : '';
   return `
     <div class="skill-toast${unlockHtml ? ' has-unlocks' : ''}" role="status" data-skill-toast="${skillId}">
-      <img src="${iconBase}${skillId}.svg" alt="" width="32" height="32" />
+      <img src="${iconBase}${skillId}.svg${SKILL_ICON_V}" alt="" width="32" height="32" />
       <p><strong>${max ? 'Maxed!' : 'Level up!'}</strong>
       <span>Your ${name} level is now ${level}.${extra}</span></p>${unlockHtml}
     </div>`;
@@ -176,7 +177,7 @@ export function bindSkillsPanel({
     }
     const row = skills.list().find((item) => item.id === id);
     const maxed = row.nextLevelXp == null;
-    tip.querySelector('[data-tip-icon]').src = `${iconBase}${id}.svg`;
+    tip.querySelector('[data-tip-icon]').src = `${iconBase}${id}.svg${SKILL_ICON_V}`;
     tip.querySelector('[data-tip-name]').textContent = row.name;
     tip.querySelector('[data-tip-level]').textContent = `Lv ${row.level}`;
     tip.querySelector('[data-tip-xp]').textContent = formatXp(row.xp);

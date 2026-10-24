@@ -159,9 +159,9 @@ describe('skill xp hooks', () => {
     assert.equal(meetsGatherLevel(state, 'runite'), false);
     assert.equal(xpForPick('flax'), 12);
     assert.equal(xpForPick('wheat'), 15);
-    assert.equal(xpForChop('logs'), 9);
-    assert.equal(xpForChop('oak_logs'), 19);
-    assert.equal(xpForChop('magic_logs'), 365);
+    assert.equal(xpForChop('logs'), 11);
+    assert.equal(xpForChop('oak_logs'), 24);
+    assert.equal(xpForChop('magic_logs'), 456);
     assert.equal(xpForMine('runite'), 505);
     assert.equal(xpForMine('dragon'), 645);
     assert.equal(gatherBlockText('runite'), 'You need a Mining level of 40 to mine this rock.');
@@ -254,3 +254,10 @@ describe('skill xp hooks', () => {
     }
   });
 });
+
+describe('xp balance pass', () => it('bread doubled, flour old bread, woodcutting +25%', async () => {
+  const { xpForCraft, xpForChop } = await import('./skills.js');
+  assert.equal(xpForCraft(RECIPES.bread), 4);
+  assert.equal(xpForCraft(RECIPES.pot_of_flour), 2);
+  assert.equal(xpForChop('maple_logs'), 103);
+}));

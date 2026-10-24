@@ -1825,7 +1825,7 @@ describe('shop XP', () => {
     assert.equal(state.shopLevel, 1);
     assert.equal(state.shopXp, 0);
     finishCraft(state, 'bread');
-    assert.equal(state.shopXp, bread);
+    assert.equal(state.shopXp, Math.max(1, Math.round(bread / 2)), 'shop levels take twice as long');
     assert.equal(state.shopLevel, shopProgress(state.shopXp).level);
     state.shopXp = 0;
     for (let i = 1; i < 200; i += 1) state.shopXp += 5000;

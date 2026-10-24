@@ -256,7 +256,8 @@ export function grantShopXp(state, recipeId) {
     state.shopLevel = SHOP_MAX_LEVEL;
     return 0;
   }
-  const gained = craftXp(recipe);
+  // Shop levels take about twice as long: half XP per craft.
+  const gained = Math.max(1, Math.round(craftXp(recipe) / 2));
   state.shopXp = (state.shopXp ?? 0) + gained;
   const after = shopProgress(state.shopXp);
   state.shopLevel = after.level;

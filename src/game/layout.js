@@ -420,6 +420,9 @@ export function rectHitsPond(cx, cz, hw, hd, pad = 0.1) {
  * Walk blocks for the water: horizontal strips under the ellipse, inset a
  * little so the rim stones stay walkable, with the dock lane cut out.
  */
+/** Extra walk room around the dock planks (m). */
+export const DOCK_WALK_SLACK = 0.12;
+
 export function pondWaterBlocks(inset = 0.18, band = 0.3) {
   const blocks = [];
   const rx = POND.rx - inset;
@@ -433,14 +436,20 @@ export function pondWaterBlocks(inset = 0.18, band = 0.3) {
     if (half < 0.05) continue;
     const minX = POND.x - half;
     const maxX = POND.x + half;
-    const crossesDock = z1 > POND_DOCK.minZ && z0 < POND_DOCK.maxZ;
-    if (crossesDock && minX < POND_DOCK.maxX) {
+    // The lane is cut a little wider (and longer) than the planks: the deck is
+    // under a metre wide, so a body-radius walker sat on its exact edge and
+    // float drift snagged it at the shore end or short of the end stands.
+    const dMinZ = POND_DOCK.minZ - DOCK_WALK_SLACK;
+    const dMaxZ = POND_DOCK.maxZ + DOCK_WALK_SLACK;
+    const dEndX = POND_DOCK.maxX + DOCK_WALK_SLACK;
+    const crossesDock = z1 > dMinZ && z0 < dMaxZ;
+    if (crossesDock && minX < dEndX) {
       // Water south and north of the dock lane, then the open water past its end.
-      if (z0 < POND_DOCK.minZ) blocks.push({ minX, maxX, minZ: z0, maxZ: POND_DOCK.minZ });
-      if (z1 > POND_DOCK.maxZ) blocks.push({ minX, maxX, minZ: POND_DOCK.maxZ, maxZ: z1 });
-      const laneMinZ = Math.max(z0, POND_DOCK.minZ);
-      const laneMaxZ = Math.min(z1, POND_DOCK.maxZ);
-      if (maxX > POND_DOCK.maxX) blocks.push({ minX: POND_DOCK.maxX, maxX, minZ: laneMinZ, maxZ: laneMaxZ });
+      if (z0 < dMinZ) blocks.push({ minX, maxX, minZ: z0, maxZ: dMinZ });
+      if (z1 > dMaxZ) blocks.push({ minX, maxX, minZ: dMaxZ, maxZ: z1 });
+      const laneMinZ = Math.max(z0, dMinZ);
+      const laneMaxZ = Math.min(z1, dMaxZ);
+      if (maxX > dEndX) blocks.push({ minX: dEndX, maxX, minZ: laneMinZ, maxZ: laneMaxZ });
       continue;
     }
     blocks.push({ minX, maxX, minZ: z0, maxZ: z1 });

@@ -40,6 +40,12 @@ import {
 
 export const FLOOR = { minX: -3.72, maxX: 3.72, minZ: -3.18, maxZ: 3.28 };
 export const PLAYER_RADIUS = 0.28;
+/**
+ * Body radius the walker collides with. A touch under the planning radius:
+ * path nodes can sit exactly on a blocker's inflated edge (narrow dock lane,
+ * pond rim strips), and float drift there used to stop the walk dead.
+ */
+export const WALK_COLLIDE_RADIUS = PLAYER_RADIUS - 0.03;
 export const CELL = 0.2;
 export const QUEUE_AISLE = { minX: -0.85, maxX: 0.85, minZ: -1.28, maxZ: 1.55 };
 

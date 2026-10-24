@@ -247,3 +247,38 @@ describe('pond is not walkable', () => {
     }
   });
 });
+
+describe('walking to every fishing spot (incl. dock/jetty stands)', () => {
+  it('plans and actually walks (with collision) to each stand from many starts, then arrives in range', async () => {
+    const { planPlayerWalk, playerObstacles, moveWithCollision, isWalkable, WALK_COLLIDE_RADIUS, PLAYER_RADIUS } = await import('./nav.js');
+    const { POND_DOCK } = await import('./layout.js');
+    const state = createState();
+    const obstacles = playerObstacles(state);
+    const floors = playerWalkFloors([]);
+    const plan = (a, b) => planPlayerWalk(a, b, state, PLAYER_RADIUS);
+    const starts = [{ x: 0, z: 0 }, { x: 2.2, z: 7.4 }, { x: 4.5, z: 11.8 }, { x: 13, z: 8 }, { x: 9, z: 12 }, { x: 9, z: 5.5 }, { x: 6, z: 9 }];
+    const dockStands = FISHING_SPOTS.filter((s) => s.stand.x >= POND_DOCK.minX && s.stand.z >= POND_DOCK.minZ && s.stand.z <= POND_DOCK.maxZ);
+    assert.ok(dockStands.length >= 1, 'has jetty stands');
+    for (const spot of FISHING_SPOTS) {
+      const pose = { x: spot.x, z: spot.z, materialId: spot.materialId };
+      for (const from of starts) {
+        if (!isWalkable(from.x, from.z, obstacles, PLAYER_RADIUS, floors)) continue;
+        const use = resolveStationUse(from, pose, state, plan, 'fishing_spot');
+        assert.equal(use.action, 'walk', `${spot.id} from ${from.x},${from.z}`);
+        const path = [...use.path];
+        let pos = { ...from };
+        for (let i = 0; i < 6000 && path.length; i += 1) {
+          const g = path[0];
+          const dx = g.x - pos.x; const dz = g.z - pos.z; const d = Math.hypot(dx, dz);
+          if (d < 0.08) { path.shift(); continue; }
+          const st = Math.min(2.2 / 60, d);
+          const m = moveWithCollision(pos.x, pos.z, pos.x + dx * st / d, pos.z + dz * st / d, obstacles, WALK_COLLIDE_RADIUS, floors, null);
+          assert.ok(!(m.blocked && Math.hypot(m.x - pos.x, m.z - pos.z) < 1e-4), `${spot.id} from ${from.x},${from.z} stuck at ${pos.x.toFixed(2)},${pos.z.toFixed(2)}`);
+          pos = { x: m.x, z: m.z };
+        }
+        assert.ok(Math.hypot(pos.x - spot.stand.x, pos.z - spot.stand.z) <= 0.32, `${spot.id} arrives`);
+        assert.equal(resolveStationUse(pos, pose, state, plan, 'fishing_spot').action, 'open', `${spot.id} starts on arrival`);
+      }
+    }
+  });
+});

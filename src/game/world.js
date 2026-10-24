@@ -105,6 +105,7 @@ import {
 } from './layout.js';
 import {
   PLAYER_RADIUS,
+  WALK_COLLIDE_RADIUS,
   dungeonMoveObstacles,
   runeFieldMoveObstacles,
   floorsForState,
@@ -2318,7 +2319,7 @@ export function createWorld(canvas, state, opts = {}) {
         nx,
         nz,
         actor.collide.obstacles,
-        PLAYER_RADIUS,
+        WALK_COLLIDE_RADIUS,
         actor.collide.floors,
         actor.collide.release ?? null,
       );
@@ -2515,6 +2516,14 @@ export function createWorld(canvas, state, opts = {}) {
       if (step === 'blocked') {
         playerPath.length = 0;
         moveMarker.visible = false;
+        // Snagged on the way to a station or gather spot: re-plan once from
+        // here rather than leaving the action queued but never started.
+        if (pendingUse && !pendingUse.replanned) {
+          pendingUse.replanned = true;
+          const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
+          const again = planSceneWalk(from, { x: pendingUse.x, z: pendingUse.z, releaseTree: pendingUse.releaseTree });
+          if (again?.length) playerPath.push(...again);
+        }
         return;
       }
       if (step) {

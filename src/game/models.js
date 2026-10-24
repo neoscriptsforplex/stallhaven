@@ -996,6 +996,61 @@ function updateClipLocomotion(mesh, moving, dt) {
     loco.eventPrev = t;
   }
   updateFishingLine(mesh);
+  updateFishingNet(mesh);
+}
+
+/** Fish caught with Rig's small net (NetFish clip) instead of the rod. */
+export const NET_CATCHES = Object.freeze(['raw_shrimp']);
+export function isNetCatch(materialId) {
+  return NET_CATCHES.includes(materialId);
+}
+
+/** Rig's net grip in Hand_R local units (seated 2 cm off the forearm). */
+const FISHING_NET_POS = Object.freeze({ x: -0.01663, y: -0.0633, z: -0.01314 });
+export const FISHING_NET_GRIP = new THREE.Quaternion(0.582946, 0.117128, -0.158382, 0.78827);
+
+/** Parent Rig's net to Hand_R. Hidden until setHeldTool(mesh, 'net'). NetFlex follows NetFish. */
+export function mountFishingNet(mesh, gltf) {
+  const source = gltf?.scene?.getObjectByName?.('SmallFishingNetGrip');
+  const hand = mesh?.getObjectByName?.('Hand_R');
+  if (!source || !hand || mesh.userData?.net) return mesh?.userData?.net ?? null;
+  const net = source.clone(true);
+  net.name = 'SmallFishingNetGrip';
+  net.position.set(FISHING_NET_POS.x, FISHING_NET_POS.y, FISHING_NET_POS.z);
+  net.quaternion.copy(FISHING_NET_GRIP);
+  net.scale.set(1, 1, 1);
+  net.visible = false;
+  net.traverse((child) => {
+    if (child.isMesh) child.frustumCulled = false;
+  });
+  hand.add(net);
+  const clip = THREE.AnimationClip.findByName(gltf.animations ?? [], 'NetFlex');
+  let flex = null;
+  let netMixer = null;
+  if (clip) {
+    netMixer = new THREE.AnimationMixer(net);
+    flex = netMixer.clipAction(clip);
+    flex.play();
+    flex.weight = 0;
+    netMixer.update(0);
+  }
+  mesh.userData.net = net;
+  mesh.userData.netMixer = netMixer;
+  mesh.userData.netFlex = flex;
+  return net;
+}
+
+/** Lock NetFlex to the player's NetFish time so the sag matches the scoop. */
+export function updateFishingNet(mesh) {
+  const flex = mesh?.userData?.netFlex;
+  const netMixer = mesh?.userData?.netMixer;
+  if (!flex || !netMixer) return;
+  const loco = mesh.userData?.clipLocomotion;
+  const netFish = loco?.actions?.netfish;
+  const active = Boolean(mesh.userData.net?.visible && netFish && loco.gather === 'netfish');
+  flex.weight = active ? 1 : 0;
+  if (active) flex.time = netFish.time;
+  netMixer.update(0);
 }
 
 function bindCastFinish(group) {
@@ -1472,6 +1527,7 @@ export function setHeldTool(mesh, tool) {
   if (mesh?.userData?.hatchet) mesh.userData.hatchet.visible = tool === 'hatchet';
   // Fishing rod: shown once a rod is mounted on the hand (Rig's fishing pass).
   if (mesh?.userData?.rod) mesh.userData.rod.visible = tool === 'rod';
+  if (mesh?.userData?.net) mesh.userData.net.visible = tool === 'net';
 }
 
 export function updateMinePose(mesh, dt = 0.016, now = 0) {
@@ -4616,7 +4672,7 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
   const walk = mixer.clipAction(walkClip);
   const idle = mixer.clipAction(idleClip);
   const actions = {};
-  for (const name of ['Mine', 'Chop', 'Pick', 'Fish']) {
+  for (const name of ['Mine', 'Chop', 'Pick', 'Fish', 'NetFish']) {
     const clip = THREE.AnimationClip.findByName(gltf.animations ?? [], name);
     if (!clip) continue;
     const action = mixer.clipAction(clip);
@@ -4695,6 +4751,7 @@ export function wrapRiggedShopkeeper(gltf, opts = {}) {
   group.userData.walkPhase = 0;
   bindCastFinish(group);
   if (opts.fishingRod) mountFishingRod(group, opts.fishingRod);
+  if (opts.fishingNet) mountFishingNet(group, opts.fishingNet);
   return group;
 }
 
@@ -4892,8 +4949,10 @@ export function wrapUploadedPlayer(source, opts = {}) {
     const idle = playClip(mixer, idleClip);
     const actions = {};
     // 'fish' is optional: Rig's fishing clip plays at the pond when the upload has one.
-    for (const name of ['mine', 'chop', 'pick', 'fish', 'cast']) {
-      const clip = findNamedClip(animations, [name], used);
+    for (const name of ['mine', 'chop', 'pick', 'fish', 'cast', 'netfish']) {
+      const clip = name === 'netfish'
+        ? THREE.AnimationClip.findByName(animations, 'NetFish')
+        : findNamedClip(animations, [name], used);
       const action = playClip(mixer, clip);
       if (!action) continue;
       action.enabled = false;
@@ -4919,6 +4978,7 @@ export function wrapUploadedPlayer(source, opts = {}) {
     };
     bindCastFinish(group);
     if (opts.fishingRod) mountFishingRod(group, opts.fishingRod);
+    if (opts.fishingNet) mountFishingNet(group, opts.fishingNet);
   }
 
   group.userData.modelScale = modelScale;

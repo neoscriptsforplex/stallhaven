@@ -301,15 +301,24 @@ describe('outdoor and dungeon extras', () => {
     assert.equal(namedSkeleton, 0);
   });
 
-  it('paints outdoor grass as the flat pre-mottle green', () => {
+  it('textures outdoor grass with grass_v4 at one tile per 32 m', () => {
     const shop = buildShop([]).root;
     let ground = null;
     shop.traverse((child) => {
       if (child.name === 'grass-ground') ground = child;
     });
     assert.ok(ground, 'garden should have a grass ground plane');
-    assert.equal(Boolean(ground.material?.map), false);
-    assert.equal(ground.material?.color?.getHex?.(), 0x4f7a3a);
+    const map = ground.material?.map;
+    assert.ok(map, 'grass should have a texture map');
+    const { width, height } = ground.geometry.parameters;
+    assert.ok(Math.abs(map.repeat.x - width / 32) < 1e-6);
+    assert.ok(Math.abs(map.repeat.y - height / 32) < 1e-6);
+    assert.equal(map.wrapS, THREE.RepeatWrapping);
+    assert.equal(map.wrapT, THREE.RepeatWrapping);
+    assert.equal(map.colorSpace, THREE.SRGBColorSpace);
+    assert.ok(map.anisotropy >= 8);
+    assert.ok(Math.abs(ground.material.roughness - 0.95) < 1e-6);
+    assert.equal(ground.material.metalness, 0);
   });
 
   it('tiles the fountain apron and outdoor path at 0.75 m per flagstone', () => {

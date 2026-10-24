@@ -303,8 +303,50 @@ function writeShopWallUVs(geo, wx, wy, wz) {
   uv.needsUpdate = true;
 }
 
-function grassGroundMat() {
-  return new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 });
+/** One grass_v4 tile covers this many world metres on each axis. */
+export const GRASS_TILE_METRES = 32;
+const GRASS_FILE = 'grass_v4_1024.png';
+let grassImage = null;
+let grassLoading = false;
+const grassPending = [];
+
+function grassTextureUrls() {
+  const raw = assetBaseUrl();
+  const envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  const urls = [`${envBase}textures/${GRASS_FILE}`, `${envBase}public/textures/${GRASS_FILE}`];
+  if (envBase !== './') urls.push(`./textures/${GRASS_FILE}`, `./public/textures/${GRASS_FILE}`);
+  return [...new Set(urls)];
+}
+
+function loadGrassImage() {
+  if (grassLoading || typeof Image === 'undefined') return;
+  grassLoading = true;
+  const urls = grassTextureUrls();
+  const loader = new THREE.TextureLoader();
+  const tryAt = (i) => {
+    if (i >= urls.length) return;
+    try { loader.load(urls[i], (t) => {
+      grassImage = t.image;
+      for (const tex of grassPending) { tex.image = grassImage; tex.needsUpdate = true; }
+      grassPending.length = 0;
+    }, undefined, () => tryAt(i + 1)); } catch { /* no DOM image support */ }
+  };
+  tryAt(0);
+}
+
+/** Base-colour grass_v4 texture, repeated so one tile spans GRASS_TILE_METRES. */
+function grassGroundMat(width = GRASS_TILE_METRES, depth = GRASS_TILE_METRES) {
+  const map = new THREE.Texture();
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.generateMipmaps = true;
+  map.minFilter = THREE.LinearMipmapLinearFilter;
+  map.magFilter = THREE.LinearFilter;
+  map.anisotropy = 8; // three.js clamps to the renderer's max supported
+  map.repeat.set(width / GRASS_TILE_METRES, depth / GRASS_TILE_METRES);
+  if (grassImage) { map.image = grassImage; map.needsUpdate = true; } else { grassPending.push(map); loadGrassImage(); }
+  return new THREE.MeshStandardMaterial({ map, color: 0xffffff, roughness: 0.95, metalness: 0 });
 }
 
 function cobbleMat(repeatX, repeatY, offsetX = 0, offsetY = 0) {
@@ -2820,7 +2862,7 @@ function addGarden(root, cells, expansionIds = [], furniture = null) {
   const grassD = grass.maxZ - grass.minZ;
   const grassMesh = addShadow(new THREE.Mesh(
     new THREE.PlaneGeometry(grassW, grassD),
-    grassGroundMat(),
+    grassGroundMat(grassW, grassD),
   ));
   grassMesh.name = 'grass-ground';
   grassMesh.rotation.x = -Math.PI / 2;
@@ -3455,7 +3497,7 @@ export function buildRuneField() {
   const rect = runeFieldRect();
   const grass = addShadow(new THREE.Mesh(
     new THREE.PlaneGeometry(rect.maxX - rect.minX, rect.maxZ - rect.minZ),
-    new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 }),
+    grassGroundMat(rect.maxX - rect.minX, rect.maxZ - rect.minZ),
   ));
   grass.name = 'grass-ground';
   grass.rotation.x = -Math.PI / 2;

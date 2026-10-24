@@ -90,7 +90,11 @@ export function normalizeAppearance(raw) {
 }
 
 export const OTHER_CHANCE = 0.18;
-export const ASPIRE_CHANCE = 0.25;
+export const ASPIRE_CHANCE = 0.2;
+/** Chance after each arrival that the street goes quiet for a while. */
+export const SPAWN_BREAK_CHANCE = 0.2;
+export const SPAWN_BREAK_MIN = 10;
+export const SPAWN_BREAK_MAX = 30;
 export const MAX_CUSTOMERS = 3;
 export const FIRST_CUSTOMER_DELAY = 4;
 export const SPAWN_GAP_MIN = 6;
@@ -292,7 +296,7 @@ export const MATERIALS = {
   yew_plank: { id: 'yew_plank', name: 'Yew Plank', restock: 0, start: 0, tier: 5, regenEvery: 0, crafted: true, tint: 0x6a3a48 },
   magic_plank: { id: 'magic_plank', name: 'Magic Plank', restock: 0, start: 0, tier: 6, regenEvery: 0, crafted: true, tint: 0x3a6ec8 },
   flax: { id: 'flax', name: 'Flax', restock: 0, start: 5, tier: 1, regenEvery: 0, gathered: true },
-  wheat: { id: 'wheat', name: 'Wheat', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true },
+  wheat: { id: 'wheat', name: 'Wheat', restock: 0, start: 50, tier: 1, regenEvery: 0, gathered: true },
   bow_string: {
     id: 'bow_string',
     name: 'Bow String',
@@ -340,16 +344,16 @@ export const MATERIALS = {
     crafted: true,
     tint: 0xc8d8e8,
   },
-  hide: { id: 'hide', name: 'Hide', restock: 5, start: 8, tier: 1, regenEvery: regenEvery(1) },
-  egg: { id: 'egg', name: 'Egg', restock: 4, start: 4, tier: 1, regenEvery: regenEvery(1) },
+  hide: { id: 'hide', name: 'Hide', restock: 0, start: 5, tier: 1, regenEvery: 0 },
+  egg: { id: 'egg', name: 'Egg', restock: 0, start: 5, tier: 1, regenEvery: 0 },
   flour: { id: 'flour', name: 'Pot of flour', restock: 0, start: 0, tier: 1, regenEvery: 0, crafted: true },
-  pineapple: { id: 'pineapple', name: 'Pineapple', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
-  raspberry: { id: 'raspberry', name: 'Raspberry', restock: 6, start: 3, tier: 1, regenEvery: regenEvery(1) },
-  chocolate: { id: 'chocolate', name: 'Chocolate', restock: 6, start: 2, tier: 1, regenEvery: regenEvery(1) },
+  pineapple: { id: 'pineapple', name: 'Pineapple', restock: 0, start: 5, tier: 1, regenEvery: 0 },
+  raspberry: { id: 'raspberry', name: 'Raspberry', restock: 0, start: 5, tier: 1, regenEvery: 0 },
+  chocolate: { id: 'chocolate', name: 'Chocolate', restock: 0, start: 5, tier: 1, regenEvery: 0 },
   // Raw fish come only from the pond (Fishing). The old bought "Fish" is gone;
   // saves before v13 move it onto Raw salmon (economy.migrateGenericFish).
   raw_shrimp: { id: 'raw_shrimp', name: 'Raw shrimp', restock: 0, start: 0, tier: 1, regenEvery: 0, fished: true, tint: 0xe8a060 },
-  raw_salmon: { id: 'raw_salmon', name: 'Raw salmon', restock: 0, start: 3, tier: 1, regenEvery: 0, fished: true, tint: 0xd98a72 },
+  raw_salmon: { id: 'raw_salmon', name: 'Raw salmon', restock: 0, start: 0, tier: 1, regenEvery: 0, fished: true, tint: 0xd98a72 },
   raw_lobster: { id: 'raw_lobster', name: 'Raw lobster', restock: 0, start: 0, tier: 2, regenEvery: 0, fished: true, tint: 0x3d5a6e },
   raw_monkfish: { id: 'raw_monkfish', name: 'Raw monkfish', restock: 0, start: 0, tier: 3, regenEvery: 0, fished: true, tint: 0x8c7a62 },
   raw_shark: { id: 'raw_shark', name: 'Raw shark', restock: 0, start: 0, tier: 4, regenEvery: 0, fished: true, tint: 0x7d8c98 },
@@ -2124,7 +2128,11 @@ export function scheduleKingRoald(fromSeconds, rng = Math.random) {
   return fromSeconds + KING_ROALD_MIN + rng() * span;
 }
 
-export function decideRequest(customerId, rng = Math.random, state = null) {
+function requestFor(customer, recipe) {
+  return recipe ? { recipeId: recipe.id, gold: recipe.price, offer: customer.offer ?? null } : null;
+}
+
+export function decideRequest(customerId, rng = Math.random, state = null, canCraft = recipeUnlocked, mode = null) {
   const customer = CUSTOMERS[customerId];
   if (customerId === 'kingroald') {
     const recipeId = mostExpensiveChestId(state);
@@ -2142,18 +2150,19 @@ export function decideRequest(customerId, rng = Math.random, state = null) {
     .filter(Boolean)
     .filter((recipe) => recipe.buyers?.includes(customerId))
     .filter((recipe) => recipe.category !== 'potion' || Boolean(state?.furniture?.cauldron));
-  const unlocked = preferred.filter((recipe) => recipeUnlocked(state, recipe));
+  const unlocked = preferred.filter((recipe) => canCraft(state, recipe));
   const maxUnlockedPrice = unlocked.reduce((max, recipe) => Math.max(max, recipe.price ?? 0), 0);
   const maxUnlockedTier = unlocked.reduce((max, recipe) => Math.max(max, recipe.tier ?? 1), 0);
   const aspirational = preferred.filter((recipe) => {
-    const locked = state ? !recipeUnlocked(state, recipe) : (recipe.tier ?? 1) > 1;
+    const locked = state ? !canCraft(state, recipe) : (recipe.tier ?? 1) > 1;
     const pricier = (recipe.price ?? 0) > maxUnlockedPrice;
     const higherTier = (recipe.tier ?? 1) > maxUnlockedTier;
     return locked || pricier || higherTier;
   });
   const nearby = aspirational.filter((recipe) => (recipe.tier ?? 1) <= Math.max(1, maxUnlockedTier) + 2);
   const aspirePool = nearby.length ? nearby : aspirational;
-  const aspire = rng() < ASPIRE_CHANCE && aspirePool.length;
+  if (mode === 'craftable') return unlocked.length ? requestFor(customer, pickWeighted(unlocked, rng)) : null;
+  const aspire = (mode === 'aspire' || rng() < ASPIRE_CHANCE) && aspirePool.length;
   const pool = aspire ? aspirePool : (unlocked.length ? unlocked : preferred);
   const recipe = pickWeighted(pool, rng);
   if (!recipe) return null;

@@ -1240,7 +1240,7 @@ describe('material regen', () => {
   it('picks wheat, mills it into flour, and draws water from the fountain', () => {
     const state = createState();
     assert.equal(MATERIALS.wheat.gathered, true);
-    assert.equal(MATERIALS.wheat.start, 0);
+    assert.equal(MATERIALS.wheat.start, 50);
     assert.equal(grantPickedWheat(state), 1);
     assert.equal(state.materials.wheat, 1);
     placeStation(state, 'range');

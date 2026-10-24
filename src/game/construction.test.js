@@ -31,10 +31,10 @@ function funded() {
 
 describe('construction catalogue', () => {
   it('lists the thirty-four cosmetic pieces at flat material prices', () => {
-    assert.equal(CONSTRUCTION_PIECES.length, 34);
+    assert.equal(CONSTRUCTION_PIECES.length, 33);
     assert.equal(constructionPiece('chair').materials.plank, 1);
     assert.equal(constructionPiece('chair').gold, 200);
-    assert.equal(new Set(CONSTRUCTION_PIECES.map((row) => row.id)).size, 34);
+    assert.equal(new Set(CONSTRUCTION_PIECES.map((row) => row.id)).size, 33);
     const chair = funded();
     chair.materials.plank = 1;
     chair.materials.bronze_nails = 2;
@@ -126,5 +126,21 @@ describe('construction catalogue', () => {
     }
     assert.equal(existsSync(join(root, 'cabinet', 'cabinet.obj')), false);
     assert.equal(existsSync(join(root, 'flag_pole', 'flag_pole.obj')), false);
+  });
+});
+
+describe('construction trims (Luke 2026-10-24)', () => {
+  it('drops the Flag Pole and refunds old placed ones', async () => {
+    const mod = await import('./construction.js');
+    assert.equal(mod.constructionPiece('flag_pole'), null);
+    assert.deepEqual(mod.retiredRefund([{ id: 'flag_pole', x: 0, z: 0 }, { id: 'chair', x: 1, z: 1 }]), { oak_plank: 2, iron_nails: 4 });
+    assert.deepEqual(mod.readPlacedFurniture([{ id: 'flag_pole', x: 0, z: 0 }]), []);
+  });
+  it('halves the listed pieces', async () => {
+    const mod = await import('./construction.js');
+    for (const id of ['blacksmiths_tools', 'standing_torch', 'crate', 'sacks', 'barrel_of_fish', 'barrel_of_sticks', 'standing_candles', 'double_bed', 'fancy_fireplace', 'fancy_table', 'pots_and_pans', 'bush', 'suit_of_armour', 'sink']) {
+      assert.equal(mod.constructionPiece(id).scale, 0.5, id);
+    }
+    assert.equal(mod.constructionPiece('chair').scale, undefined);
   });
 });

@@ -3,7 +3,10 @@ import { completeCrafts, createState, pushLog, tickMaterials, SAVE_VERSION } fro
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
 import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledFishingRod, loadBundledRiggedGoblin, loadBundledRiggedRat, loadBundledRiggedBuyers, loadBundledLooks } from './game/upload.js';
-import { loadBundledMusic, unlockAudio } from './game/audio.js';
+import { enableSfx, getMusicVolume, loadBundledMusic, loadSfxManifest, playSfx, setSfxLoop, unlockAudio } from './game/audio.js';
+import { createSfxDirector } from './game/sfxHooks.js';
+import { installUiSounds, mountSoundSettings, restoreSoundMix } from './game/soundUi.js';
+import { intentBus } from './game/intents.js';
 import { createWorld } from './game/world.js';
 import { normalizeImported, setBundledLooks, setRiggedBuyers } from './game/models.js';
 import { createAutosave, createSlotStore, openBackend, applySlotData } from './game/saveSlots.js';
@@ -342,8 +345,15 @@ async function bootGame() {
     window.stallhaven.uploadsReady = true;
   });
 
+  loadSfxManifest().catch(() => {});
+  restoreSoundMix({ musicVolume: getMusicVolume() });
+  mountSoundSettings();
+  const sfx = createSfxDirector({ play: (id) => playSfx(id), loop: (name, on) => setSfxLoop(name, on) });
+  intentBus.onResult((intent, result) => sfx.onIntent(intent, result, performance.now() / 1000));
   await waitForPlayGesture(() => {
     unlockAudio();
+    enableSfx();
+    installUiSounds();
     const music = hud.tryStartMusic?.();
     if (music && typeof music.catch === 'function') music.catch(() => {});
     world.tick(0, performance.now() / 1000);
@@ -391,6 +401,7 @@ async function bootGame() {
     }
     if (finished.length) world.syncDisplays();
     world.tick(dt, now);
+    if (world.sfxSnapshot) sfx.frame(world.sfxSnapshot(), now);
     hud.render(now);
     requestAnimationFrame(frame);
   }

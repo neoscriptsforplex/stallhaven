@@ -1,0 +1,370 @@
+[
+  {
+    "file": "ui_click_01.ogg",
+    "name": "ui_click_01",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "UI button click"
+  },
+  {
+    "file": "ui_click_02.ogg",
+    "name": "ui_click_02",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "UI button click"
+  },
+  {
+    "file": "panel_open_01.ogg",
+    "name": "panel_open_01",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "Panel/menu opens"
+  },
+  {
+    "file": "panel_close_01.ogg",
+    "name": "panel_close_01",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "Panel/menu closes"
+  },
+  {
+    "file": "coin_01.ogg",
+    "name": "coin_01",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "Coins clink (gold change)"
+  },
+  {
+    "file": "coin_02.ogg",
+    "name": "coin_02",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "Coins clink (gold change)"
+  },
+  {
+    "file": "sale_01.ogg",
+    "name": "sale_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Customer buys an item"
+  },
+  {
+    "file": "customer_enter_01.ogg",
+    "name": "customer_enter_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Shop door bell when customer enters"
+  },
+  {
+    "file": "anvil_hammer_01.ogg",
+    "name": "anvil_hammer_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Hammer strikes anvil (crafting); randomize variants"
+  },
+  {
+    "file": "anvil_hammer_02.ogg",
+    "name": "anvil_hammer_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Hammer strikes anvil (crafting); randomize variants"
+  },
+  {
+    "file": "anvil_hammer_03.ogg",
+    "name": "anvil_hammer_03",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Hammer strikes anvil (crafting); randomize variants"
+  },
+  {
+    "file": "levelup_01.ogg",
+    "name": "levelup_01",
+    "category": "stinger",
+    "volume": 0.9,
+    "loop": false,
+    "use": "Skill level up"
+  },
+  {
+    "file": "quest_complete_01.ogg",
+    "name": "quest_complete_01",
+    "category": "stinger",
+    "volume": 0.9,
+    "loop": false,
+    "use": "Quest completed"
+  },
+  {
+    "file": "tree_chop_01.ogg",
+    "name": "tree_chop_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Axe chop on tree"
+  },
+  {
+    "file": "tree_fall_01.ogg",
+    "name": "tree_fall_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Tree creaks and falls"
+  },
+  {
+    "file": "mining_pick_01.ogg",
+    "name": "mining_pick_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Pickaxe on rock"
+  },
+  {
+    "file": "mining_pick_02.ogg",
+    "name": "mining_pick_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Pickaxe on rock"
+  },
+  {
+    "file": "fishing_splash_01.ogg",
+    "name": "fishing_splash_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Line/fish splash"
+  },
+  {
+    "file": "build_place_01.ogg",
+    "name": "build_place_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Wooden furniture placed"
+  },
+  {
+    "file": "footstep_grass_01.ogg",
+    "name": "footstep_grass_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Footstep on grass"
+  },
+  {
+    "file": "footstep_grass_02.ogg",
+    "name": "footstep_grass_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Footstep on grass"
+  },
+  {
+    "file": "footstep_wood_01.ogg",
+    "name": "footstep_wood_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Footstep on wooden floor"
+  },
+  {
+    "file": "footstep_wood_02.ogg",
+    "name": "footstep_wood_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Footstep on wooden floor"
+  },
+  {
+    "file": "purchase_01.ogg",
+    "name": "purchase_01",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "Station/upgrade bought"
+  },
+  {
+    "file": "potion_mix_01.ogg",
+    "name": "potion_mix_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Herblore potion mixed"
+  },
+  {
+    "file": "sawmill_01.ogg",
+    "name": "sawmill_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Sawmill cut"
+  },
+  {
+    "file": "sawmill_loop.ogg",
+    "name": "sawmill_loop",
+    "category": "world",
+    "volume": 0.8,
+    "loop": true,
+    "use": "Sawmill cut"
+  },
+  {
+    "file": "furnace_01.ogg",
+    "name": "furnace_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Furnace smelt whoosh"
+  },
+  {
+    "file": "furnace_loop.ogg",
+    "name": "furnace_loop",
+    "category": "world",
+    "volume": 0.8,
+    "loop": true,
+    "use": "Furnace smelt whoosh"
+  },
+  {
+    "file": "cooking_range_01.ogg",
+    "name": "cooking_range_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Food on range"
+  },
+  {
+    "file": "cooking_loop.ogg",
+    "name": "cooking_loop",
+    "category": "world",
+    "volume": 0.8,
+    "loop": true,
+    "use": "Sizzle loop while cooking"
+  },
+  {
+    "file": "spinning_wheel_01.ogg",
+    "name": "spinning_wheel_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Spinning wheel"
+  },
+  {
+    "file": "spinning_wheel_loop.ogg",
+    "name": "spinning_wheel_loop",
+    "category": "world",
+    "volume": 0.8,
+    "loop": true,
+    "use": "Spinning wheel"
+  },
+  {
+    "file": "loom_01.ogg",
+    "name": "loom_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Loom weave clack"
+  },
+  {
+    "file": "loom_02.ogg",
+    "name": "loom_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Loom weave clack"
+  },
+  {
+    "file": "coin_sell_01.ogg",
+    "name": "coin_sell_01",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "Player sells: coins into pouch"
+  },
+  {
+    "file": "coin_sell_02.ogg",
+    "name": "coin_sell_02",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "Player sells: coins into pouch"
+  },
+  {
+    "file": "ui_error_01.ogg",
+    "name": "ui_error_01",
+    "category": "ui",
+    "volume": 0.7,
+    "loop": false,
+    "use": "Denied / invalid action"
+  },
+  {
+    "file": "item_pickup_01.ogg",
+    "name": "item_pickup_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Pick up item"
+  },
+  {
+    "file": "item_drop_01.ogg",
+    "name": "item_drop_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Drop item on ground"
+  },
+  {
+    "file": "eat_01.ogg",
+    "name": "eat_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Eat food"
+  },
+  {
+    "file": "eat_02.ogg",
+    "name": "eat_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Eat food"
+  },
+  {
+    "file": "combat_hit_01.ogg",
+    "name": "combat_hit_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Melee hit"
+  },
+  {
+    "file": "combat_hit_02.ogg",
+    "name": "combat_hit_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Melee hit"
+  },
+  {
+    "file": "combat_miss_01.ogg",
+    "name": "combat_miss_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Melee miss swish"
+  },
+  {
+    "file": "shop_ambience_loop.ogg",
+    "name": "shop_ambience_loop",
+    "category": "world",
+    "volume": 0.8,
+    "loop": true,
+    "use": "Shop room tone loop"
+  }
+]

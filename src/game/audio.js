@@ -1,3 +1,11 @@
+import {
+  createRetriggerGuard,
+  DEFAULT_SOUND_MIX,
+  normalizeSoundMix,
+  parseSfxManifest,
+  pickSfxVariant,
+} from './sfx.js';
+
 export const MUSIC_EXTENSIONS = ['mp3', 'wav', 'ogg'];
 export const MUSIC_ACCEPT = '.mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg,audio/x-wav';
 export const BUNDLED_MUSIC_TRACKS = [
@@ -30,6 +38,7 @@ const MUSIC_MIME = [
 let ctx = null;
 let bg = null;
 let volume = 0.75;
+let masterVolume = 1;
 const playlist = [];
 let currentIndex = -1;
 let serial = 1;
@@ -160,7 +169,8 @@ function pickShuffledIndex(from) {
 
 export function setMusicVolume(next) {
   volume = Math.min(1, Math.max(0, Number(next) || 0));
-  if (bg) bg.volume = volume;
+  sfxMix.music = volume;
+  if (bg) bg.volume = volume * masterVolume;
   return volume;
 }
 
@@ -193,7 +203,7 @@ function bindTrack(index) {
   currentIndex = index;
   bg = track.audio;
   bg.loop = loopTrack;
-  bg.volume = volume;
+  bg.volume = volume * masterVolume;
   bindEndedHandler();
   return track;
 }
@@ -204,7 +214,7 @@ export async function playTrackAt(index) {
   bindTrack(index);
   if (!bg) return false;
   bg.playsInline = true;
-  bg.volume = volume;
+  bg.volume = volume * masterVolume;
   kickAudioContext();
   try {
     await bg.play();
@@ -298,7 +308,7 @@ export async function playMusic() {
   bindTrack(currentIndex);
   if (!bg) return false;
   bg.playsInline = true;
-  bg.volume = volume;
+  bg.volume = volume * masterVolume;
   kickAudioContext();
   try {
     await bg.play();
@@ -486,7 +496,7 @@ function resumeHeldContext() {
 
 function resumeHeldMusic() {
   if (!holdMusic || !bg) return;
-  bg.volume = volume;
+  bg.volume = volume * masterVolume;
   let pending;
   try {
     pending = bg.play();
@@ -548,6 +558,218 @@ export function installPageVisibilityAudio() {
   doc?.addEventListener('visibilitychange', onVisibilityChange);
   win?.addEventListener('pagehide', onPageHide);
   win?.addEventListener('pageshow', onPageShow);
+}
+
+/* ---------------- Sound effects (Sfx pack in public/audio/sfx/) ---------------- */
+let sfxGroups = new Map();
+let sfxBase = '';
+let sfxManifestPromise = null;
+let sfxUnlocked = false;
+const sfxBuffers = new Map();
+const sfxPending = new Map();
+const sfxLastPick = new Map();
+const sfxLoops = new Map();
+let sfxBus = null;
+let sfxMix = { ...DEFAULT_SOUND_MIX };
+let sfxRetrigger = createRetriggerGuard();
+
+function sfxBases() {
+  let envBase = './';
+  try {
+    const raw = import.meta.env.BASE_URL || './';
+    envBase = raw.endsWith('/') ? raw : `${raw}/`;
+  } catch {
+    envBase = './';
+  }
+  const roots = [`${envBase}audio/sfx/`, `${envBase}public/audio/sfx/`];
+  if (envBase !== './') roots.push('./audio/sfx/', './public/audio/sfx/');
+  return [...new Set(roots)];
+}
+
+/** Load manifest.json once; resolves to the variant groups (empty on failure). */
+export function loadSfxManifest(fetchFn = typeof fetch === 'function' ? fetch : null) {
+  if (sfxManifestPromise) return sfxManifestPromise;
+  sfxManifestPromise = (async () => {
+    if (!fetchFn) return sfxGroups;
+    for (const base of sfxBases()) {
+      try {
+        const res = await fetchFn(`${base}manifest.json`);
+        if (!res.ok) continue;
+        sfxGroups = parseSfxManifest(await res.json());
+        sfxBase = base;
+        break;
+      } catch {
+        // try the next root
+      }
+    }
+    return sfxGroups;
+  })();
+  return sfxManifestPromise;
+}
+
+export function getSfxGroups() {
+  return sfxGroups;
+}
+
+function ensureSfxBus() {
+  const ac = audio();
+  if (!ac) return null;
+  if (sfxBus && sfxBus.ctx === ac) return sfxBus;
+  const master = ac.createGain();
+  master.connect(ac.destination);
+  const channels = {};
+  for (const key of ['ui', 'world', 'ambience']) {
+    channels[key] = ac.createGain();
+    channels[key].connect(master);
+  }
+  sfxBus = { ctx: ac, master, channels };
+  applySfxMix();
+  return sfxBus;
+}
+
+function applySfxMix() {
+  if (!sfxBus) return;
+  sfxBus.master.gain.value = sfxMix.master;
+  for (const key of ['ui', 'world', 'ambience']) sfxBus.channels[key].gain.value = sfxMix[key];
+}
+
+export function getSoundMix() {
+  return { ...sfxMix };
+}
+
+/** Apply the Settings → Sound mix (music uses master × music). */
+export function setSoundMix(next) {
+  sfxMix = normalizeSoundMix({ ...sfxMix, ...next });
+  masterVolume = sfxMix.master;
+  if (next && 'music' in next) volume = sfxMix.music;
+  if (bg) bg.volume = volume * masterVolume;
+  applySfxMix();
+  return getSoundMix();
+}
+
+async function sfxBuffer(entry) {
+  if (sfxBuffers.has(entry.name)) return sfxBuffers.get(entry.name);
+  if (sfxPending.has(entry.name)) return sfxPending.get(entry.name);
+  const ac = audio();
+  if (!ac || typeof fetch !== 'function') return null;
+  const job = (async () => {
+    for (const file of [entry.file, entry.mp3]) {
+      try {
+        const res = await fetch(`${sfxBase}${file}`);
+        if (!res.ok) continue;
+        const data = await res.arrayBuffer();
+        const buf = await new Promise((resolve, reject) => {
+          const p = ac.decodeAudioData(data, resolve, reject);
+          if (p && typeof p.then === 'function') p.then(resolve, reject);
+        });
+        sfxBuffers.set(entry.name, buf);
+        return buf;
+      } catch {
+        // Safari without Vorbis: fall back to the MP3 copy
+      }
+    }
+    return null;
+  })();
+  sfxPending.set(entry.name, job);
+  return job;
+}
+
+/** Called from the Tap/Click to play gesture: no SFX play before this. Preloads every sound. */
+export function enableSfx() {
+  sfxUnlocked = true;
+  kickAudioContext();
+  ensureSfxBus();
+  loadSfxManifest().then((groups) => {
+    for (const list of groups.values()) for (const entry of list) sfxBuffer(entry);
+  }).catch(() => {});
+}
+
+function sfxAudible(channel) {
+  if (!sfxUnlocked || pageHidden) return false;
+  if (sfxMix.master <= 0 || sfxMix[channel] <= 0) return false;
+  return true;
+}
+
+/** Play one random variant of a sound group ("coin", "anvil_hammer", "levelup"...). */
+export function playSfx(id, { gain = 1, force = false } = {}) {
+  const variants = sfxGroups.get(id);
+  if (!variants?.length) return false;
+  const pick = pickSfxVariant(variants, Math.random, sfxLastPick.get(id));
+  if (!pick || pick.loop || !sfxAudible(pick.channel)) return false;
+  const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  if (!force && sfxRetrigger(id, nowMs)) return false;
+  sfxLastPick.set(id, pick);
+  const bus = ensureSfxBus();
+  if (!bus) return false;
+  if (bus.ctx.state === 'suspended') bus.ctx.resume().catch(() => {});
+  sfxBuffer(pick).then((buf) => {
+    if (!buf || pageHidden) return;
+    const src = bus.ctx.createBufferSource();
+    src.buffer = buf;
+    const g = bus.ctx.createGain();
+    g.gain.value = pick.gain * gain;
+    src.connect(g);
+    g.connect(bus.channels[pick.channel]);
+    src.start();
+  }).catch(() => {});
+  return true;
+}
+
+/** Start/stop a looping sound by its full name ("furnace_loop"). */
+export function setSfxLoop(name, on, { gain = 1 } = {}) {
+  const entry = sfxGroups.get(name)?.[0];
+  const running = sfxLoops.get(name);
+  if (!on || !entry || !sfxUnlocked) {
+    if (running) {
+      running.stopped = true;
+      try {
+        const t = running.ctx.currentTime;
+        running.gain.gain.setTargetAtTime(0, t, 0.08);
+        running.src?.stop(t + 0.4);
+      } catch { /* already stopped */ }
+      sfxLoops.delete(name);
+    }
+    return false;
+  }
+  if (running) return true;
+  const bus = ensureSfxBus();
+  if (!bus) return false;
+  const g = bus.ctx.createGain();
+  g.gain.value = 0;
+  g.connect(bus.channels[entry.channel]);
+  const handle = { ctx: bus.ctx, gain: g, src: null, stopped: false };
+  sfxLoops.set(name, handle);
+  sfxBuffer(entry).then((buf) => {
+    if (!buf || handle.stopped) return;
+    const src = bus.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(g);
+    src.start();
+    handle.src = src;
+    g.gain.setTargetAtTime(entry.gain * gain, bus.ctx.currentTime, 0.15);
+  }).catch(() => {});
+  return true;
+}
+
+export function activeSfxLoops() {
+  return [...sfxLoops.keys()];
+}
+
+/** Test-only: reset SFX state. */
+export function resetSfxForTests() {
+  sfxGroups = new Map();
+  sfxBase = '';
+  sfxManifestPromise = null;
+  sfxUnlocked = false;
+  sfxBuffers.clear();
+  sfxPending.clear();
+  sfxLastPick.clear();
+  sfxLoops.clear();
+  sfxBus = null;
+  sfxMix = { ...DEFAULT_SOUND_MIX };
+  masterVolume = 1;
+  sfxRetrigger = createRetriggerGuard();
 }
 
 installPageVisibilityAudio();

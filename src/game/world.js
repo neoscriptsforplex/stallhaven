@@ -181,7 +181,7 @@ import {
 import { constructionLookId, constructionPiece, pieceHangs } from './construction.js';
 import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
 import { tickPortalJelly } from './portalJelly.js';
-import { addFireLight, animPieceVisual, loadAnimProps, MAX_FIRE_LIGHTS, setCauldronBrewing, tickAnimProp } from './animProps.js';
+import { addFireLight, animPieceVisual, disposeAnimProp, loadAnimProps, MAX_FIRE_LIGHTS, setCauldronBrewing, tickAnimProp } from './animProps.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -1485,6 +1485,7 @@ export function createWorld(canvas, state, opts = {}) {
     while (placedGroup.children.length > rows.length) {
       const old = placedGroup.children[placedGroup.children.length - 1];
       old.removeFromParent();
+      disposeAnimProp(old);
     }
     rows.forEach((row, index) => {
       // Blacksmiths' Tools became a wall piece: old floor-placed ones move to the nearest wall spot if one is close.
@@ -1498,6 +1499,7 @@ export function createWorld(canvas, state, opts = {}) {
       let anchor = placedGroup.children[index];
       if (!anchor || anchor.userData.pieceId !== row.id) {
         anchor?.removeFromParent();
+        disposeAnimProp(anchor);
         anchor = new THREE.Group();
         anchor.name = 'construction';
         anchor.userData.kind = 'construction';
@@ -3989,7 +3991,7 @@ export function createWorld(canvas, state, opts = {}) {
           applyFixturePose('cauldron');
         }
       }
-      while (placedGroup.children.length) placedGroup.children[0].removeFromParent();
+      while (placedGroup.children.length) { const old = placedGroup.children[0]; old.removeFromParent(); disposeAnimProp(old); }
       syncPlacedMeshes();
     } catch (err) {
       console.warn('Animated props skipped:', err?.message || err);

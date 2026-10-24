@@ -13,6 +13,8 @@ export const ANIM_PROP_FILES = {
   fancy_fireplace: 'fancy_fireplace_anim.glb',
   cauldron: 'cauldron_anim.glb',
   lumbridge_fountain: 'lumbridge_fountain_anim.glb',
+  // Upright baked into the vertices (flame +Y, butt at y=0): no roll in code.
+  lit_torch: 'lit_torch_anim.glb',
 };
 
 /** Cap on live fire PointLights: each extra light costs every lit shader. */
@@ -135,6 +137,18 @@ export function setCauldronBrewing(info, brewing) {
     info.idle.reset().play();
     info.brew.crossFadeTo(info.idle, 0.3, false);
   }
+}
+
+/** Stop and release a placed piece's mixer when its anchor is removed. */
+export function disposeAnimProp(root) {
+  root?.traverse?.((child) => {
+    const info = child.userData?.animProp;
+    if (!info) return;
+    info.mixer.stopAllAction();
+    info.mixer.uncacheRoot(child);
+    info.light?.removeFromParent();
+    child.userData.animProp = null;
+  });
 }
 
 export function tickAnimProp(info, dt) {

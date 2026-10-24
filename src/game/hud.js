@@ -1,4 +1,4 @@
-import { PHONE_QUERY, onLayoutChange } from './layoutQuery.js';
+import { PHONE_QUERY, TOUCH_HUD_QUERY, onLayoutChange } from './layoutQuery.js';
 import {
   ANVIL_TABS,
   FLETCH_TABS,
@@ -155,6 +155,7 @@ import { nextUnlockLabel, unlockNamesBetween, unlocksBetween } from './skillLeve
 import { groupUnlocks, unlockListHtml } from './unlockGroups.js';
 import { createXpOrb } from './xpOrb.js';
 import { autoFit } from './fitPanel.js';
+import { fitPhoneCraft } from './phoneCraftFit.js';
 import {
   brightnessPercent,
   clampBrightness,
@@ -227,7 +228,7 @@ export function bindHud(root, state, world) {
   const mapNorth = document.querySelector('[data-map-north]');
   const mapZoomIn = document.querySelector('[data-map-zoom="in"]');
   const mapZoomOut = document.querySelector('[data-map-zoom="out"]');
-  const portraitTouchMedia = window.matchMedia(PHONE_QUERY);
+  const portraitTouchMedia = window.matchMedia(TOUCH_HUD_QUERY);
   const materialsDrawer = document.querySelector('#materials-drawer');
   const materialsToggle = document.querySelector('#materials-toggle');
   const materialsPanel = document.querySelector('#materials-panel');
@@ -618,6 +619,26 @@ export function bindHud(root, state, world) {
   onLayoutChange(() => { if (!craftModal.hidden) fitCookSheet(craftStation === 'range'); });
   new MutationObserver(() => { if (!craftModal.hidden) fitCookSheet(craftStation === 'range'); })
     .observe(craftModal, { attributes: true, attributeFilter: ['hidden'] });
+  // Narrow phone: station windows fit the band between HUD and button bar; drawer stays a tab.
+  let stationWasOpen = false;
+  function syncStationPhone() {
+    const open = [craftModal, potionModal].some((m) => m && !m.hidden);
+    for (const m of [craftModal, potionModal]) if (m) fitPhoneCraft(m);
+    const phone = matchMedia(PHONE_QUERY).matches;
+    document.body.classList.toggle('station-open', open && phone);
+    if (open && phone && !stationWasOpen) setMaterialsOpen(false);
+    stationWasOpen = open;
+    syncMaterialsDrawerPlace();
+  }
+  let stationRaf = 0;
+  const queueStationPhone = () => { if (stationRaf) return; stationRaf = requestAnimationFrame(() => { stationRaf = 0; syncStationPhone(); }); };
+  onLayoutChange(queueStationPhone);
+  addEventListener('resize', queueStationPhone);
+  for (const m of [craftModal, potionModal]) if (m) {
+    new MutationObserver(queueStationPhone).observe(m, { attributes: true, attributeFilter: ['hidden'] });
+    const relist = new MutationObserver(() => { if (!m.hidden && matchMedia(PHONE_QUERY).matches) queueStationPhone(); });
+    for (const el of m.querySelectorAll('#crafts, #potion-crafts, .tabs, [data-craft-note]')) relist.observe(el, el.matches('[data-craft-note], .tabs') ? { childList: true, attributes: true, attributeFilter: ['hidden'] } : { childList: true });
+  }
 
   function paintCrafts() {
     const rangeMode = craftStation === 'range';
@@ -3908,6 +3929,18 @@ export function bindHud(root, state, world) {
 
   function syncMaterialsDrawerPlace() {
     if (!materialsDrawer) return;
+    if (document.body.classList.contains('station-open')) {
+      const m = [craftModal, potionModal].find((x) => x && !x.hidden);
+      const head = m?.querySelector('.craft-sheet > h2')?.getBoundingClientRect();
+      const close = [...(m?.querySelectorAll('.craft-sheet > [data-craft-close].ghost, .craft-sheet > button.ghost:last-of-type') ?? [])].pop()?.getBoundingClientRect();
+      if (head && close) {
+        const top = Math.round(head.bottom + 4), bottom = Math.round(window.innerHeight - close.top + 4);
+        materialsPlaceKey = `st|${top}|${bottom}`;
+        materialsDrawer.style.top = `${top}px`; materialsDrawer.style.bottom = `${bottom}px`;
+        return;
+      }
+    }
+    if (materialsPlaceKey.startsWith('st|')) materialsPlaceKey = '';
     if (!materialsSideMedia.matches) {
       if (materialsPlaceKey !== 'desk') {
         materialsPlaceKey = 'desk';

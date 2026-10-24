@@ -429,7 +429,7 @@ describe('minimap', () => {
     }
   });
 
-  it('keeps the slim portrait strip and collapsible map on touch portrait only', () => {
+  it('keeps the slim strip and collapsible map on every touch device (TOUCH_HUD_QUERY)', () => {
     const root = dirname(fileURLToPath(import.meta.url));
     const css = readFileSync(join(root, '../style.css'), 'utf8');
     const html = readFileSync(join(root, '../../index.html'), 'utf8');
@@ -438,7 +438,8 @@ describe('minimap', () => {
     const end = css.indexOf('/* Touch only:', start);
     assert.ok(start >= 0 && end > start);
     const block = css.slice(start, end);
-    assert.match(block, /@media \(orientation: portrait\) and \(pointer: coarse\) and \(max-aspect-ratio: 3\/4\) \{/);
+    assert.match(block, /@media \(pointer: coarse\) \{ \/\* TOUCH_HUD_QUERY/);
+    assert.match(hud, /matchMedia\(TOUCH_HUD_QUERY\)/);
     assert.equal(block.includes('max-width: 720px'), false);
     assert.match(block, /--portrait-strip:\s*36px/);
     assert.match(block, /--portrait-map:\s*112px/);

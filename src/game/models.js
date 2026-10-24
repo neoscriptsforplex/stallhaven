@@ -1686,6 +1686,22 @@ function buildProceduralAnvil() {
 }
 
 export function buildWallShelf() {
+  const target = buildProceduralWallShelf();
+  const bundled = getBundledLook('shelf');
+  if (!bundled) return target;
+  // The dump is authored on the procedural shelf's exact box, so fit 1:1 and
+  // put it back on the same frame: board tops, wall face and slot anchors stay put.
+  const tbox = measureVisibleBox(target);
+  const mesh = wrapBundledProp(bundled, target, { name: 'shelf', fit: 'max' });
+  mesh.updateMatrixWorld(true);
+  const mbox = measureVisibleBox(mesh);
+  mesh.position.add(tbox.min.clone().sub(mbox.min));
+  mesh.userData.wareY = target.userData.wareY;
+  mesh.userData.shelfSlots = true;
+  return mesh;
+}
+
+function buildProceduralWallShelf() {
   const group = new THREE.Group();
   group.name = 'shelf';
   const boardWood = woodSurface(0x7a5230, 0.86, 1.15, 0.45, 4211);

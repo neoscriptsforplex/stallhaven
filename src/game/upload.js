@@ -393,6 +393,7 @@ export const BUNDLED_PROP_FOLDERS = [
   { id: 'rat', folder: 'rat' },
   { id: 'table', folder: 'table' },
   { id: 'counter', folder: 'counter' },
+  { id: 'shelf', folder: 'shelf' },
   { id: 'tree', folder: 'tree' },
   { id: 'tree-oak', folder: 'trees/oak' },
   { id: 'tree-willow', folder: 'trees/willow' },

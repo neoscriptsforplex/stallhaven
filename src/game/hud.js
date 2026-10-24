@@ -118,6 +118,7 @@ import {
 import {
   CONSTRUCTION_PIECES,
   constructionCategories,
+  shopFurnitureInCategory,
   constructionPiece,
   constructionPlaceBlock,
   missingMaterials,
@@ -2100,7 +2101,7 @@ export function bindHud(root, state, world) {
       `<button type="button" data-build-cat="${name}" class="${name === buildCategory ? 'is-on' : ''}">${name}</button>`
     )).join('');
     for (const article of buildModal.querySelectorAll('[data-shop-furniture]')) {
-      article.hidden = buildTab !== 'furniture' || buildCategory !== 'Shop';
+      article.hidden = buildTab !== 'furniture' || !shopFurnitureInCategory(article.dataset.shopFurniture, buildCategory);
     }
     if (buildCategory === 'Shop') {
       root.innerHTML = '';

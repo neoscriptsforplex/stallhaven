@@ -86,6 +86,20 @@ export function constructionPiece(id) {
   return BY_ID[id] ?? null;
 }
 
+/**
+ * Build-menu categories each Shop furniture card (index.html data-shop-furniture) shows in.
+ * Shelves and mannequins also sit under Storage; nowhere else.
+ */
+export const SHOP_FURNITURE_CATEGORIES = Object.freeze({
+  table: Object.freeze(['Shop']),
+  shelf: Object.freeze(['Shop', 'Storage']),
+  mannequin: Object.freeze(['Shop', 'Storage']),
+});
+
+export function shopFurnitureInCategory(kind, category) {
+  return (SHOP_FURNITURE_CATEGORIES[kind] ?? ['Shop']).includes(category);
+}
+
 export function constructionCategories() {
   const seen = [];
   for (const row of CONSTRUCTION_PIECES) {

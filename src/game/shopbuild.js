@@ -23,6 +23,8 @@ import {
   runeFieldRect,
   runeFieldTreeSpots,
   runeFieldRockSpots,
+  runeFieldMidTreeSpots,
+  runeFieldMidRockSpots,
   runeFieldClearOf,
   RUNE_ALTAR_SPOTS,
   RUNE_FIELD_PORTAL,
@@ -3484,6 +3486,32 @@ export function buildRuneField() {
     rock.rotation.y = rand() * Math.PI * 2;
     sitVisibleOnY(rock, 0);
     rock.raycast = () => {};
+    root.add(rock);
+  }
+  // Decorative middle-band fill (not choppable). Own seed so edge decor is unchanged.
+  const midRand = randAt(4417);
+  for (const spot of runeFieldMidTreeSpots()) {
+    const vary = 1 + (midRand() * 2 - 1) * TREE_SCALE_SPREAD;
+    const tree = buildTree(vary);
+    tree.position.set(spot.x, OUTDOOR_GROUND_Y, spot.z);
+    tree.rotation.y = midRand() * Math.PI * 2;
+    seatTreeOnGround(tree);
+    tree.userData.gardenSide = 'rune';
+    tree.userData.band = 'mid';
+    tree.traverse((child) => {
+      child.raycast = () => {};
+    });
+    root.add(tree);
+  }
+  for (const spot of runeFieldMidRockSpots()) {
+    const rock = buildBoulder(spot.scale ?? 1);
+    rock.position.set(spot.x, 0, spot.z);
+    rock.rotation.y = midRand() * Math.PI * 2;
+    sitVisibleOnY(rock, 0);
+    rock.raycast = () => {};
+    rock.traverse((child) => {
+      child.raycast = () => {};
+    });
     root.add(rock);
   }
   for (let i = 0; i < 8; i += 1) {

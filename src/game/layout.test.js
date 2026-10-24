@@ -103,6 +103,10 @@ import {
   runeFieldClearOf,
   runeFieldTreeSpots,
   runeFieldRockSpots,
+  runeFieldMidTreeSpots,
+  runeFieldMidRockSpots,
+  runeFieldMidClearOf,
+  RUNE_FIELD_ARRIVE,
   ALTAR_OSRS_SCALE,
 } from './layout.js';
 import { FLOOR, gardenObstacles, isWalkable, shopObstacles } from './nav.js';
@@ -787,6 +791,12 @@ describe('rune field', () => {
     for (const spot of [...trees, ...rocks]) {
       assert.equal(runeFieldClearOf(spot), true);
     }
+    const midTrees = runeFieldMidTreeSpots();
+    const midRocks = runeFieldMidRockSpots();
+    assert.ok(midTrees.length >= 5 && midTrees.length <= 8);
+    assert.ok(midRocks.length >= 4 && midRocks.length <= 6);
+    for (const spot of [...midTrees, ...midRocks]) assert.equal(runeFieldMidClearOf(spot), true);
+    assert.equal(runeFieldMidClearOf(RUNE_FIELD_ARRIVE), false);
   });
 });
 

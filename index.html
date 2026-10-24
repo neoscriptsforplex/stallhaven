@@ -39,6 +39,7 @@
     <link rel="stylesheet" href="./src/coop/coop.css" />
     <link rel="stylesheet" href="./src/save.css" />
     <link rel="stylesheet" href="./src/cloud/cloud-save.css" />
+    <link rel="stylesheet" href="./src/build-catalogue.css" />
     <script type="importmap">
       {
         "imports": {
@@ -296,60 +297,70 @@ Android: in Chrome tap the ⋮ menu, then Add to Home screen (or Install app).</
         <div class="build-main">
           <div data-build-pane="stations" hidden>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/furnace.png" alt="" loading="lazy">
         <h3>Furnace</h3>
         <p>Smelt ores into metal bars. Place it on the floor snap grid, then confirm. Free.</p>
         <p data-furnace-status class="meta" hidden></p>
         <button type="button" data-furnace-buy>Place · Free</button>
       </article>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/range.png" alt="" loading="lazy">
         <h3>Cooking Range</h3>
         <p>Bake food. Place it on the floor snap grid, then confirm. Free.</p>
         <p data-range-status class="meta" hidden></p>
         <button type="button" data-range-buy>Place · Free</button>
       </article>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/loom.png" alt="" loading="lazy">
         <h3>Loom</h3>
         <p>Weave flax into cloth, then ranged and magic armour. Place it on the floor snap grid, then confirm.</p>
         <p data-loom-status class="meta">Costs 50,000 gp. Mithril Nails ×15 · Maple Plank ×4.</p>
         <button type="button" data-loom-buy>Buy · 50,000 gp</button>
       </article>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/fletching-bench.png" alt="" loading="lazy">
         <h3>Fletching Bench</h3>
         <p>Craft ranged weapons and ammo. Place it on the floor snap grid, then confirm.</p>
         <p data-fletch-status class="meta">Costs 50,000 gp. Mithril Nails ×15 · Maple Plank ×4.</p>
         <button type="button" data-fletch-buy>Buy · 50,000 gp</button>
       </article>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/potter-wheel.png" alt="" loading="lazy">
         <h3>Potter Wheel</h3>
         <p>Turn soft clay into clay. Place it on the floor snap grid, then confirm.</p>
         <p data-potter-status class="meta">Costs 50,000 gp. Mithril Nails ×15 · Maple Plank ×4.</p>
         <button type="button" data-potter-buy>Buy · 50,000 gp</button>
       </article>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/sawmill.png" alt="" loading="lazy">
         <h3>Sawmill</h3>
         <p>Saw logs into planks. Place it on the floor snap grid, then confirm. Click it afterward to saw.</p>
         <p data-sawmill-status class="meta">Costs 20,000 gp.</p>
         <button type="button" data-sawmill-buy>Buy · 20,000 gp</button>
       </article>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/spinning-wheel.png" alt="" loading="lazy">
         <h3>Spinning Wheel</h3>
         <p>Spin flax into bow string. Place it on the floor snap grid, then confirm. The wheel turns while a string is spinning.</p>
         <p data-wheel-status class="meta">Costs 100,000 gp. Adamant Nails ×20 · Yew Plank ×4.</p>
         <button type="button" data-wheel-buy>Buy · 100,000 gp</button>
       </article>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/cauldron.png" alt="" loading="lazy">
         <h3>Cauldron</h3>
         <p>Unlocks potion crafting. Place it on the floor snap grid, then confirm. Click it afterward to brew.</p>
         <p data-cauldron-status class="meta">Costs 1,000,000 gp. Dragon Nails ×30 · Magic Plank ×8.</p>
         <button type="button" data-cauldron-buy>Buy · 1,000,000 gp</button>
       </article>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/portal.png" alt="" loading="lazy">
         <h3>Portal</h3>
         <p>Opens a grass rune field. Place it on the grass or the floor snap grid, then confirm. Click it afterward to enter.</p>
         <p data-portal-status class="meta">Costs 500,000 gp. Rune Nails ×25 · Magic Plank ×6.</p>
         <button type="button" data-portal-buy>Buy · 500,000 gp</button>
       </article>
       <article class="build-item">
+        <img class="build-thumb" src="./thumbs/build/farming-patch.png" alt="" loading="lazy">
         <h3>Farming Patch</h3>
         <p>An outdoor 2×2 plot. You can own six. Place it on open grass, clear of the path and flower beds, then confirm. Click a placed patch to grow herbs. Right-click it to move or delete it.</p>
         <p data-farming_patch-status class="meta">You can own six farming patches.
@@ -362,18 +373,21 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
             <div data-build-catalogue></div>
             <p data-build-detail class="build-detail" hidden></p>
       <article class="build-item" data-shop-furniture="table">
+        <img class="build-thumb" src="./thumbs/build/table.png" alt="" loading="lazy">
         <h3>Table</h3>
         <p>Buy another display table. There is no maximum. The first extra costs 500g; each further table costs three times the last. Starting tables do not count. Delete up to two tables to replace them for free.</p>
         <p data-table-status class="meta">No maximum. First extra table costs 500g. Bronze Nails ×8 · Plank ×4.</p>
         <button type="button" data-table-buy>Buy · 500 gp</button>
       </article>
       <article class="build-item" data-shop-furniture="shelf">
+        <img class="build-thumb" src="./thumbs/build/shelf.png" alt="" loading="lazy">
         <h3>Shelf</h3>
         <p>Buy another wall shelf. There is no maximum. Place it on open wall. The starting three shelves are included; extras cost 500g, then ×3. Delete a shelf from its right-click menu — a deleted included shelf can be replaced for free until three are placed.</p>
         <p data-shelf-status class="meta">No maximum. First 3 shelves are included. The next costs 500g. Iron Nails ×10 · Oak Plank ×3.</p>
         <button type="button" data-shelf-buy>Buy · 500 gp</button>
       </article>
       <article class="build-item" data-shop-furniture="mannequin">
+        <img class="build-thumb" src="./thumbs/build/mannequin.png" alt="" loading="lazy">
         <h3>Mannequin</h3>
         <p>Buy another armour mannequin. There is no maximum. The first extra costs 500g; each further mannequin costs three times the last. Starting mannequins do not count. Delete up to two mannequins to replace them for free.</p>
         <p data-mannequin-status class="meta">No maximum. First extra mannequin costs 500g. Steel Nails ×12 · Willow Plank ×2.</p>
@@ -382,6 +396,7 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
           </div>
           <div data-build-pane="rooms" hidden>
       <article class="build-item">
+        <span class="build-thumb build-thumb-glyph" aria-hidden="true">🏠</span>
         <h3>Shop Expansion</h3>
         <p>Buy an extra room the same size as the starting shop. Click a gold pad, then confirm. Side rooms clear the trees on that side.</p>
         <p data-expand-status class="meta">Next room costs 500,000g.</p>

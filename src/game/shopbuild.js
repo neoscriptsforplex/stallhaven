@@ -3533,10 +3533,45 @@ export function buildRuneField() {
   return { root, grounds, portal };
 }
 
+/** Pick box inset so it hugs the rock's silhouette instead of its outer corners. */
+export const BOULDER_PICK_INSET = 0.9;
+
+/**
+ * Tight local-space bounds of a boulder's visible meshes (vertex precise), in
+ * the group's own frame. Pick meshes and invisible helpers are skipped.
+ */
+export function boulderVisualBox(group) {
+  group.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(group.matrixWorld).invert();
+  const box = new THREE.Box3();
+  const m = new THREE.Matrix4();
+  const v = new THREE.Vector3();
+  group.traverse((child) => {
+    if (!child.isMesh || child.userData?.kind === 'boulder') return;
+    if (child.material?.visible === false || child.visible === false) return;
+    const pos = child.geometry?.getAttribute?.('position');
+    if (!pos) return;
+    m.multiplyMatrices(inv, child.matrixWorld);
+    for (let i = 0; i < pos.count; i += 1) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(m));
+  });
+  return box;
+}
+
 function attachBoulderPick(group, spot) {
   const s = spot.scale ?? 1;
-  const pick = new THREE.Mesh(new THREE.BoxGeometry(1.35 * s, 1.05 * s, 1.35 * s), pickMat());
-  pick.position.y = 0.48 * s;
+  const box = boulderVisualBox(group);
+  let w = 1.35 * s; let h = 1.05 * s; let d = 1.35 * s;
+  let cx = 0; let cy = 0.48 * s; let cz = 0;
+  if (!box.isEmpty()) {
+    const size = box.getSize(new THREE.Vector3());
+    const c = box.getCenter(new THREE.Vector3());
+    w = Math.max(0.2, size.x * BOULDER_PICK_INSET);
+    d = Math.max(0.2, size.z * BOULDER_PICK_INSET);
+    h = Math.max(0.2, size.y);
+    cx = c.x; cy = c.y; cz = c.z;
+  }
+  const pick = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pickMat());
+  pick.position.set(cx, cy, cz);
   pick.userData.kind = 'boulder';
   pick.userData.materialId = spot.materialId;
   pick.userData.name = spot.name;

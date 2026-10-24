@@ -172,3 +172,14 @@ test('intent bus returns plain values and forwards only accepted intents in co-o
   bus.setRemote(null);
   assert.equal(bus.coop, false);
 }));
+
+test('moveFurniture keeps a moved fixture in co-op rooms', async () => {
+  const { applyIntent } = await import('./intents.js');
+  const { createState } = await import('./economy.js');
+  const state = createState();
+  const r = applyIntent(state, { type: 'moveFurniture', furnitureId: 'chest', pose: { x: 1.25, z: -0.5, rot: 1.5 } }, { coop: true, host: false });
+  assert.equal(r.ok, true);
+  assert.equal(state.furniture.chest.x, 1.25);
+  assert.equal(state.furniture.chest.rot, 1.5);
+  assert.equal(applyIntent(state, { type: 'moveFurniture', furnitureId: 'gold', pose: { x: 0, z: 0 } }, { coop: true }).ok, false);
+});

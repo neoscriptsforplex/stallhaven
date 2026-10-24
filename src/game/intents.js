@@ -91,6 +91,7 @@ export const INTENT_TYPES = Object.freeze([
   'buyFurniture',
   'removePatch',
   'movePatch',
+  'moveFurniture',
   'plantHerb',
   'harvestHerb',
   'placePiece',
@@ -125,6 +126,25 @@ const has = (table, id) => typeof id === 'string' && Object.hasOwn(table, id);
 const okId = (v) => typeof v === 'string' && v.length > 0 && v.length <= MAX_ID;
 const okIndex = (v) => Number.isInteger(v) && v >= 0 && v < 512;
 const okNumber = (v, lim = 200) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= lim;
+
+/** Fixtures that move with Move/Rotate. Pieces and patches have their own intents. */
+const FIXTURE_IDS = new Set([
+  'chest', 'counter', 'rug', 'anvil', 'range', 'cauldron', 'furnace', 'wheel', 'loom',
+  'fletch', 'potter', 'sawmill', 'portal', 'display',
+]);
+
+/** Write a moved fixture's final pose so co-op rooms keep it (it used to be local-only). */
+export function moveFixture(state, furnitureId, index, pose) {
+  if (!state?.furniture || !pose || !FIXTURE_IDS.has(furnitureId)) return false;
+  const row = furnitureId === 'display'
+    ? state.furniture.displays?.[index]
+    : state.furniture[furnitureId];
+  if (!row || typeof row !== 'object') return false;
+  row.x = pose.x;
+  row.z = pose.z;
+  if (Number.isFinite(pose.rot)) row.rot = pose.rot;
+  return true;
+}
 
 function cleanPose(pose) {
   if (!pose || typeof pose !== 'object') return null;
@@ -183,6 +203,10 @@ export function checkIntentShape(intent) {
     case 'removePatch':
     case 'harvestHerb':
       return okIndex(intent.index) ? null : 'bad-index';
+    case 'moveFurniture':
+      if (typeof intent.furnitureId !== 'string' || !FIXTURE_IDS.has(intent.furnitureId)) return 'bad-furniture';
+      if (intent.furnitureId === 'display' && !okIndex(intent.index)) return 'bad-index';
+      return cleanPose(intent.pose) ? null : 'bad-pose';
     case 'movePatch':
       if (!okIndex(intent.index)) return 'bad-index';
       return cleanPose(intent.pose) ? null : 'bad-pose';
@@ -350,6 +374,8 @@ export function applyIntent(state, intent, ctx = {}) {
       return done(buyFurniture(state, intent.furnitureType, coop ? cleanPose(intent.pose) : intent.pose));
     case 'removePatch':
       return done(removeFarmingPatch(state, intent.index));
+    case 'moveFurniture':
+      return done(moveFixture(state, intent.furnitureId, intent.index, cleanPose(intent.pose)));
     case 'movePatch':
       return done(moveFarmingPatch(state, intent.index, coop ? cleanPose(intent.pose) : intent.pose));
     case 'plantHerb':

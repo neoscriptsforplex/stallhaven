@@ -3108,6 +3108,13 @@ export function bindHud(root, state, world) {
   settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
   settingsDock?.querySelector('[data-settings-x]')?.addEventListener('click', closeSettingsDock);
   if (settingsDock) autoFit(settingsDock);
+  settingsDock?.querySelector('[data-settings-unstuck]')?.addEventListener('click', () => {
+    if (world.unstuck?.()) {
+      pushLog(state, 'You shake yourself free.');
+      closeSettingsDock();
+      render(performance.now() / 1000);
+    }
+  });
   const playerFile = settingsDock?.querySelector('[data-player-model-file]');
   settingsDock?.querySelector('[data-player-model-upload]')?.addEventListener('click', () => playerFile?.click());
   playerFile?.addEventListener('change', () => {

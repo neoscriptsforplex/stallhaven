@@ -2196,6 +2196,8 @@ export function createWorld(canvas, state, opts = {}) {
       moveMarker.visible = false;
       return false;
     }
+    // A walk click always ends a gather loop; otherwise the chop pose keeps the player rooted.
+    if (mining) stopMining();
     return applyWalkPath(path);
   }
 
@@ -2743,8 +2745,22 @@ export function createWorld(canvas, state, opts = {}) {
       return false;
     }
     rebuildNav();
+    syncFixtureIntent(moveTarget);
     clearMoveMode();
     return true;
+  }
+
+  /** Tell the room (and the save) where a fixture ended up; pieces/patches confirm through their own intents. */
+  function syncFixtureIntent(target) {
+    if (!target || target.id === 'piece' || target.id === 'farming_patch') return;
+    const pose = target.id === 'display' ? state.furniture.displays?.[target.index] : state.furniture[target.id];
+    if (!pose) return;
+    intentBus.apply({
+      type: 'moveFurniture',
+      furnitureId: target.id,
+      ...(target.id === 'display' ? { index: target.index } : {}),
+      pose: { x: pose.x, z: pose.z, ...(Number.isFinite(pose.rot) ? { rot: pose.rot } : {}) },
+    });
   }
 
   function rotateFurniturePose(target, dir = 1) {
@@ -4285,6 +4301,22 @@ export function createWorld(canvas, state, opts = {}) {
       syncDisplays();
       syncPlacedMeshes();
     },
+    /** Settings "Unstuck": stop everything and stand on a safe spot for this scene. */
+    unstuck() {
+      stopMining();
+      pendingUse = null;
+      playerPath.length = 0;
+      moveMarker.visible = false;
+      const spot = sceneMode === 'dungeon'
+        ? { x: -4.15, z: 0.4 }
+        : sceneMode === 'runefield'
+          ? { x: RUNE_FIELD_ARRIVE.x, z: RUNE_FIELD_ARRIVE.z }
+          : { x: SHOP.keeper.x, z: SHOP.keeper.z };
+      shopkeeper.position.set(spot.x, 0, spot.z);
+      syncStance(shopkeeper);
+      shopkeeper.position.y = shopkeeper.userData.groundY;
+      return true;
+    },
     /** Walk to the chosen fish's spot and keep fishing it. */
     fishFor(materialId) {
       const spot = fishingSpotById(materialId);
@@ -4632,7 +4664,9 @@ export function createWorld(canvas, state, opts = {}) {
       return Boolean(placeNeedsConfirm);
     },
     rotateFurniture(target, dir = 1) {
-      return rotateFurniturePose(target, dir);
+      const ok = rotateFurniturePose(target, dir);
+      if (ok && !moveTarget) syncFixtureIntent(target);
+      return ok;
     },
     isMovingFurniture() {
       return Boolean(moveTarget);

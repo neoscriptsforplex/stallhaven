@@ -497,24 +497,25 @@ function metalLine({
   });
 }
 
+/** OSRS anvil bar costs: 1 dagger/mace/med helm/boots/hatchet/nails/thrownaxe; 2 sword/scimitar/full helm/pickaxe; 3 kite/chain/legs/skirt/2h/spear; 5 platebody. */
 const MELEE_WEAPONS = [
-  { id: 'scimitar', name: 'Scimitar', slot: 'scimitar', shape: 'scimitar' },
+  { id: 'scimitar', name: 'Scimitar', slot: 'scimitar', shape: 'scimitar', metalCost: 2 },
   { id: 'dagger', name: 'Dagger', slot: 'dagger', shape: 'dagger' },
-  { id: 'sword', name: 'Sword', slot: 'sword', shape: 'sword' },
+  { id: 'sword', name: 'Sword', slot: 'sword', shape: 'sword', metalCost: 2 },
   { id: 'mace', name: 'Mace', slot: 'mace', shape: 'mace' },
-  { id: 'spear', name: 'Spear', slot: 'spear', shape: 'spear' },
-  { id: '2h_sword', name: '2H Sword', slot: '2h', shape: '2h' },
+  { id: 'spear', name: 'Spear', slot: 'spear', shape: 'spear', metalCost: 3 },
+  { id: '2h_sword', name: '2H Sword', slot: '2h', shape: '2h', metalCost: 3 },
 ];
 
 const MELEE_ARMOUR = [
-  { id: 'full_helm', name: 'Full Helm', slot: 'helm', shape: 'full_helm' },
+  { id: 'full_helm', name: 'Full Helm', slot: 'helm', shape: 'full_helm', metalCost: 2 },
   { id: 'med_helm', name: 'Med Helm', slot: 'helm', shape: 'med_helm' },
-  { id: 'platebody', name: 'Platebody', slot: 'body', shape: 'platebody', metalCost: 2 },
-  { id: 'platelegs', name: 'Platelegs', slot: 'legs', shape: 'platelegs' },
+  { id: 'platebody', name: 'Platebody', slot: 'body', shape: 'platebody', metalCost: 5 },
+  { id: 'platelegs', name: 'Platelegs', slot: 'legs', shape: 'platelegs', metalCost: 3 },
   { id: 'boots', name: 'Boots', slot: 'boots', shape: 'boots' },
-  { id: 'chainbody', name: 'Chainbody', slot: 'body', shape: 'chainbody' },
-  { id: 'plateskirt', name: 'Plateskirt', slot: 'legs', shape: 'plateskirt' },
-  { id: 'kiteshield', name: 'Kiteshield', slot: 'shield', shape: 'kiteshield' },
+  { id: 'chainbody', name: 'Chainbody', slot: 'body', shape: 'chainbody', metalCost: 3 },
+  { id: 'plateskirt', name: 'Plateskirt', slot: 'legs', shape: 'plateskirt', metalCost: 3 },
+  { id: 'kiteshield', name: 'Kiteshield', slot: 'shield', shape: 'kiteshield', metalCost: 3 },
 ];
 
 for (const piece of MELEE_WEAPONS) {
@@ -1001,7 +1002,7 @@ const RUNE_LINE = [
 
 const TOOL_PIECES = [
   { id: 'hatchet', name: 'Hatchet', slot: 'hatchet', shape: 'hatchet' },
-  { id: 'pickaxe', name: 'Pickaxe', slot: 'pickaxe', shape: 'pickaxe' },
+  { id: 'pickaxe', name: 'Pickaxe', slot: 'pickaxe', shape: 'pickaxe', metalCost: 2 },
 ];
 
 for (const piece of TOOL_PIECES) {

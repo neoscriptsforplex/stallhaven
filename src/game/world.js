@@ -94,6 +94,7 @@ import {
   SHOP_RUG,
   snapToFloor,
   snapToWallGrid,
+  snapToPieceWall,
   placeFloors,
   walkFloors,
 } from './layout.js';
@@ -908,7 +909,10 @@ export function createWorld(canvas, state, opts = {}) {
   function previewFurnitureAt(x, z) {
     if (!moveTarget) return null;
     const kind = placeKindOf(moveTarget);
-    const snapped = kind === 'shelf' || (kind === 'piece' && constructionPiece(moveTarget.pieceId)?.mount === 'wall')
+    const wallPiece = kind === 'piece' && constructionPiece(moveTarget.pieceId)?.mount === 'wall';
+    const snapped = wallPiece
+      ? snapToPieceWall(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
+      : kind === 'shelf'
       ? snapToWallGrid(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
       : kind === 'piece' && moveTarget.snap === false
         ? { x, z }
@@ -917,7 +921,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pose) return snapped;
     pose.x = snapped.x;
     pose.z = snapped.z;
-    if (kind === 'shelf' && snapped.rot != null) pose.rot = snapped.rot;
+    if ((kind === 'shelf' || wallPiece) && snapped.rot != null) pose.rot = snapped.rot;
     applyMovePose(moveTarget);
     highlightSnapCell(snapped.x, snapped.z);
     return snapped;
@@ -1385,6 +1389,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (anim) {
       const box = new THREE.Box3().setFromObject(anim);
       if (Number.isFinite(box.min.y) && !pieceHangs(id)) anim.position.y -= box.min.y;
+      anim.position.y += constructionPiece(id)?.wallY ?? 0;
       return anim;
     }
     const look = getBundledLook(constructionLookId(id));
@@ -1394,6 +1399,7 @@ export function createWorld(canvas, state, opts = {}) {
       mesh.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(mesh);
       if (Number.isFinite(box.min.y) && !pieceHangs(id)) mesh.position.y -= box.min.y;
+      mesh.position.y += constructionPiece(id)?.wallY ?? 0;
       return mesh;
     }
     const tint = constructionPiece(id)?.tint ?? 0xc4a06a;
@@ -2603,7 +2609,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!piece || !pose) return 'That spot is off the shop floor.';
     if (rectHitsPond(pose.x, pose.z, 0.35, 0.35)) return 'That spot overlaps the pond.';
     if (piece.mount === 'wall') {
-      const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], pose.rot);
+      const snapped = snapToPieceWall(pose.x, pose.z, state.expansions ?? [], pose.rot);
       if (Math.hypot((snapped.x ?? pose.x) - pose.x, (snapped.z ?? pose.z) - pose.z) > 0.45) {
         return 'Place it on an open wall.';
       }
@@ -2745,7 +2751,9 @@ export function createWorld(canvas, state, opts = {}) {
     const step = furnitureRotateDelta(kind) * (dir < 0 ? -1 : 1);
     const nextRot = (pose.rot ?? FURNITURE_FORWARD) + step;
     if (kind === 'shelf' || (kind === 'piece' && constructionPiece(target.pieceId)?.mount === 'wall')) {
-      const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot);
+      const snapped = kind === 'shelf'
+        ? snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot)
+        : snapToPieceWall(pose.x, pose.z, state.expansions ?? [], nextRot);
       pose.x = snapped.x;
       pose.z = snapped.z;
       pose.rot = snapped.rot;
@@ -4261,7 +4269,7 @@ export function createWorld(canvas, state, opts = {}) {
         ? portalPlaceFloors(state.expansions ?? [])
         : placeRects;
       const start = row.mount === 'wall'
-        ? snapToWallGrid(home.x, home.z, state.expansions ?? [], FURNITURE_FORWARD)
+        ? snapToPieceWall(home.x, home.z, state.expansions ?? [], FURNITURE_FORWARD)
         : snapToFloor(home.x, home.z, floors);
       placeDraft = {
         id: 'piece',

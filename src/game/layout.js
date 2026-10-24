@@ -1935,6 +1935,79 @@ export function wallShelfMounts(expansionIds = []) {
   return mounts;
 }
 
+const PIECE_WINDOW_HALF = 0.41 + 0.3;
+/** Origin front: door (±0.58), General Store sign (2.35 wide) and both windows. */
+const ORIGIN_FRONT_SKIP = 1.48 + PIECE_WINDOW_HALF;
+
+function splitSkips(minAlong, maxAlong, skips) {
+  let ranges = [[minAlong, maxAlong]];
+  for (const [a, b] of skips) {
+    const next = [];
+    for (const [lo, hi] of ranges) {
+      if (b <= lo || a >= hi) { next.push([lo, hi]); continue; }
+      if (a - lo > 0.3) next.push([lo, a]);
+      if (hi - b > 0.3) next.push([b, hi]);
+    }
+    ranges = next;
+  }
+  return ranges;
+}
+
+/**
+ * Wall-grid mounts for wall-mount Construction pieces: inside every exposed
+ * wall and outside every outer wall. Doors, windows and the shop sign are
+ * skipped on both faces.
+ */
+export function pieceWallMounts(expansionIds = []) {
+  const mounts = [];
+  const outOff = WALL_THICK / 2 + SHELF_FROM_WALL;
+  for (const cell of occupiedCells(expansionIds)) {
+    const c = roomCenter(cell.gx, cell.gz);
+    const interior = roomInteriorFloor(cell.gx, cell.gz);
+    const neigh = neighborsOf(cell.gx, cell.gz, expansionIds);
+    const origin = cell.gx === 0 && cell.gz === 0;
+    const winX = (along) => [along - PIECE_WINDOW_HALF, along + PIECE_WINDOW_HALF];
+    const door = (along) => [along - SHELF_DOOR_HALF, along + SHELF_DOOR_HALF];
+    const frontSkips = neigh.front
+      ? [door(c.x)]
+      : origin
+        ? [[c.x - ORIGIN_FRONT_SKIP, c.x + ORIGIN_FRONT_SKIP]]
+        : [winX(c.x - ROOM_W / 4), winX(c.x + ROOM_W / 4)];
+    const sides = [
+      { wall: 'back', axis: 'x', open: !neigh.back, skips: neigh.back ? [door(c.x)] : [], plane: c.z - ROOM_D / 2, inRot: 0, sign: -1 },
+      { wall: 'front', axis: 'x', open: !neigh.front, skips: frontSkips, plane: c.z + ROOM_D / 2, inRot: Math.PI, sign: 1 },
+      { wall: 'left', axis: 'z', open: !neigh.left, skips: neigh.left ? [door(c.z)] : [winX(c.z)], plane: c.x - ROOM_W / 2, inRot: Math.PI / 2, sign: -1 },
+      { wall: 'right', axis: 'z', open: !neigh.right, skips: neigh.right ? [door(c.z)] : [winX(c.z)], plane: c.x + ROOM_W / 2, inRot: -Math.PI / 2, sign: 1 },
+    ];
+    for (const side of sides) {
+      const lo = side.axis === 'x' ? interior.minX + SHELF_WALL_END_PAD : interior.minZ + SHELF_WALL_END_PAD;
+      const hi = side.axis === 'x' ? interior.maxX - SHELF_WALL_END_PAD : interior.maxZ - SHELF_WALL_END_PAD;
+      const faces = [{ face: 'inside', at: side.plane - side.sign * (WALL_THICK / 2 + SHELF_FROM_WALL), rot: side.inRot }];
+      if (side.open) faces.push({ face: 'outside', at: side.plane + side.sign * outOff, rot: wrapAngle(side.inRot + Math.PI) });
+      for (const f of faces) {
+        for (const [a, b] of splitSkips(lo, hi, side.skips)) {
+          mounts.push({
+            wall: side.wall,
+            face: f.face,
+            axis: side.axis,
+            minAlong: a,
+            maxAlong: b,
+            x: side.axis === 'z' ? f.at : undefined,
+            z: side.axis === 'x' ? f.at : undefined,
+            rot: f.rot,
+          });
+        }
+      }
+    }
+  }
+  return mounts;
+}
+
+/** Snap a wall-mount Construction piece to the nearest inside or outside wall spot. */
+export function snapToPieceWall(x, z, expansionIds = [], preferRot = null) {
+  return snapToMounts(pieceWallMounts(expansionIds), x, z, preferRot);
+}
+
 function wrapAngle(rad) {
   const tau = Math.PI * 2;
   let wrapped = rad % tau;
@@ -1948,7 +2021,10 @@ function angleDiff(a, b) {
 }
 
 export function snapToWallGrid(x, z, expansionIds = [], preferRot = null) {
-  const mounts = wallShelfMounts(expansionIds);
+  return snapToMounts(wallShelfMounts(expansionIds), x, z, preferRot);
+}
+
+function snapToMounts(mounts, x, z, preferRot = null) {
   let best = null;
   let bestScore = Infinity;
   for (const mount of mounts) {

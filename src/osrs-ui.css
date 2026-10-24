@@ -120,3 +120,22 @@ button.settings-x.panel-x, .fish-picker > button.settings-x.panel-x, .furn-menu 
 #settings-dock.fit-panel .settings-x { display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
 button.settings-x.panel-x::after { content: ''; position: absolute; inset: -6px -6px -14px -14px; }
 .modal .sheet > h2, .expand-dock > h2, .fish-picker > p:first-of-type, .sf-pop-title, #furn-menu > :nth-child(2), #inspect-pop > :nth-child(2) { padding-right: 26px; }
+
+/* Settings (dockFit.js): wider, roomier, header + ✕ fixed, body scrolls inside the HUD/bar band. */
+#settings-dock.dock-fit { position: fixed; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; columns: auto; padding: 14px 16px 12px; font-size: 15px; z-index: 30; }
+#settings-dock.dock-fit[hidden] { display: none; }
+#settings-dock.dock-fit > * { flex: 0 0 auto; }
+#settings-dock.dock-fit > h2 { font-size: 1.2rem; margin: 0 30px 10px 0; }
+#settings-dock.dock-fit > .settings-x { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; min-width: 0; padding: 0; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+#settings-dock.dock-fit > [data-settings-close] { display: none; }
+#settings-dock.dock-fit > .settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; }
+#settings-dock.dock-fit .settings-body h3 { font-size: 1rem; margin: 14px 0 4px; }
+#settings-dock.dock-fit .settings-body .meta { font-size: .82rem; line-height: 1.35; }
+#settings-dock.dock-fit .settings-body button { font-size: .92rem; padding: 7px 12px; min-height: 34px; }
+#settings-dock.dock-fit .settings-body .cs-entry { width: 100%; margin-bottom: 6px; }
+#settings-dock.dock-fit .skybox-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+#settings-dock.dock-fit .cheat-form { display: flex; gap: 6px; } #settings-dock.dock-fit .cheat-form input { flex: 1; min-width: 0; font-size: .92rem; padding: 6px 8px; }
+#settings-dock.dock-fit .settings-bright input { width: 100%; }
+#settings-dock.dock-fit.is-compact { padding: 8px 10px; font-size: 14px; }
+#settings-dock.dock-fit.is-compact > h2 { font-size: 1.05rem; margin-bottom: 6px; }
+#settings-dock.dock-fit.is-compact .settings-body button { padding: 5px 10px; min-height: 32px; }

@@ -594,7 +594,7 @@ body {
   .materials-drawer,
   .materials-drawer.is-open {
     top: calc(env(safe-area-inset-top, 0px) + 165px);
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 8px);
+    bottom: calc(var(--portrait-thumb, 64px) + 8px);
   }
 }
 
@@ -1723,11 +1723,12 @@ html.is-booting.is-scene-live #view {
 /* Phone portrait only. Desktop and landscape keep the top-right bar. */
 @media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   :root {
-    --portrait-thumb: 64px;
-    --portrait-thumb: calc(64px + env(safe-area-inset-bottom, 0px));
+    --portrait-thumb: 56px;
+    --portrait-thumb: calc(56px + env(safe-area-inset-bottom, 0px));
   }
 
   #save-bar {
+    position: fixed;
     top: auto;
     right: 0;
     bottom: 0;
@@ -1739,11 +1740,11 @@ html.is-booting.is-scene-live #view {
     grid-auto-columns: minmax(44px, 1fr);
     align-items: stretch;
     gap: 4px;
-    padding: 8px 4px;
+    padding: 6px 4px;
     padding:
-      8px
+      6px
       max(4px, env(safe-area-inset-right, 0px))
-      calc(8px + env(safe-area-inset-bottom, 0px))
+      calc(6px + env(safe-area-inset-bottom, 0px))
       max(4px, env(safe-area-inset-left, 0px));
     background: var(--panel);
     border-top: 1px solid var(--line);

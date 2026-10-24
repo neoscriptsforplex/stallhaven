@@ -679,3 +679,18 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
   }
   return { action: 'blocked' };
 }
+
+/**
+ * Floor-click fallback for dungeon rocks: the closest rock whose own footprint
+ * (near-face radius plus a small margin) holds the point. Never the first rock
+ * in list order, so the big essence rock cannot swallow its neighbours.
+ */
+export function boulderAtFloor(x, z, boulders = [], margin = 0.12) {
+  let best = null;
+  for (const spot of boulders) {
+    const dist = Math.hypot(x - spot.x, z - spot.z);
+    const radius = boulderFaceRadius(spot.materialId) + margin;
+    if (dist <= radius && (!best || dist < best.dist)) best = { spot, dist };
+  }
+  return best?.spot ?? null;
+}

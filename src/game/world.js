@@ -142,6 +142,7 @@ import {
   rangeFaceYaw,
   resolveStationUse,
   stationAtFloor,
+  boulderAtFloor,
 } from './interact.js';
 import {
   buildAdventurer,
@@ -3036,9 +3037,7 @@ export function createWorld(canvas, state, opts = {}) {
         }
       }
       if (sceneMode === 'dungeon') {
-        const spot = DUNGEON_BOULDERS.find((item) => (
-          Math.hypot(point.x - item.x, point.z - item.z) <= (STATION_HIT.boulder.floorR ?? 1.15)
-        ));
+        const spot = boulderAtFloor(point.x, point.z, DUNGEON_BOULDERS);
         if (spot) {
           queueUse('boulder', { x: spot.x, z: spot.z, materialId: spot.materialId });
           return;

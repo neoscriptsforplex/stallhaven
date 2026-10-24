@@ -323,11 +323,18 @@ export function applyCheat(state, raw) {
     }
     return 'maxcape';
   }
-  if (code === 'maxresource') {
+  if (code === 'maxresource' || code === 'maxresources') {
     if (!state.materials) state.materials = {};
     const cap = storageCap(state);
     for (const id of Object.keys(MATERIALS)) state.materials[id] = cap;
     return 'maxresource';
+  }
+  if (code === 'noresources' || code === 'noresource') {
+    if (!state.materials) state.materials = {};
+    for (const id of Object.keys(MATERIALS)) state.materials[id] = 0;
+    for (const id of Object.keys(state.materials)) state.materials[id] = 0;
+    if (state.materialAcc) for (const id of Object.keys(state.materialAcc)) state.materialAcc[id] = 0;
+    return 'noresources';
   }
   if (code === 'onesmallfavour') {
     state.chefHat = true;

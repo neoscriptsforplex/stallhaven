@@ -65,6 +65,7 @@ import {
 import {
   applyState,
   applyCheat,
+  storageCap,
   buyCauldron,
   buyStation,
   canBuyStation,
@@ -1850,6 +1851,21 @@ describe('cheat codes', () => {
     const values = Object.keys(MATERIALS).map((id) => state.materials[id]);
     assert.ok(values.length > 0);
     assert.ok(values.every((v) => v === values[0] && v > 0));
+  });
+  it('maxresources fills every material to the current storage cap', () => {
+    const state = createState();
+    assert.equal(applyCheat(state, 'MaxResources'), 'maxresource');
+    const cap = storageCap(state);
+    assert.ok(cap > 0);
+    assert.ok(Object.keys(MATERIALS).every((id) => state.materials[id] === cap));
+  });
+  it('noresources sets every material to 0 and leaves gold alone', () => {
+    const state = createState();
+    applyCheat(state, 'maxresource');
+    const gold = state.gold;
+    assert.equal(applyCheat(state, 'NoResources'), 'noresources');
+    assert.ok(Object.keys(MATERIALS).every((id) => state.materials[id] === 0));
+    assert.equal(state.gold, gold);
   });
   it('applies motherlode, maxcape, onesmallfavour, and freshstart case-insensitively', () => {
     const state = createState();

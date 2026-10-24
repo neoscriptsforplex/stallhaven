@@ -118,7 +118,7 @@ describe('storage cap', () => {
     assert.match(tick, /gatherFullMessage\(field\.materialId\)/);
     assert.match(tick, /if \(got <= 0\) \{[\s\S]*?gatherFullMessage\(mining\.materialId\)[\s\S]*?stopMining\(\);\s*return;\s*\}/);
     assert.match(world, /function refuseFull\(materialId\)/);
-    assert.match(world, /startTreeTopple\(findGardenPine/);
+    assert.match(world, /startTreeTopple\(fallingTree, now\)\) topplingTrees\.add/);
     assert.match(world, /tickTopples\(now\)/);
     assert.match(hud, /data-storage-upgrade/);
     assert.match(hud, /title="Storage full"/);

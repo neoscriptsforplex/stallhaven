@@ -152,38 +152,6 @@
     "use": "Wooden furniture placed"
   },
   {
-    "file": "footstep_grass_01.ogg",
-    "name": "footstep_grass_01",
-    "category": "world",
-    "volume": 0.8,
-    "loop": false,
-    "use": "Footstep on grass"
-  },
-  {
-    "file": "footstep_grass_02.ogg",
-    "name": "footstep_grass_02",
-    "category": "world",
-    "volume": 0.8,
-    "loop": false,
-    "use": "Footstep on grass"
-  },
-  {
-    "file": "footstep_wood_01.ogg",
-    "name": "footstep_wood_01",
-    "category": "world",
-    "volume": 0.8,
-    "loop": false,
-    "use": "Footstep on wooden floor"
-  },
-  {
-    "file": "footstep_wood_02.ogg",
-    "name": "footstep_wood_02",
-    "category": "world",
-    "volume": 0.8,
-    "loop": false,
-    "use": "Footstep on wooden floor"
-  },
-  {
     "file": "purchase_01.ogg",
     "name": "purchase_01",
     "category": "ui",

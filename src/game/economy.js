@@ -818,6 +818,16 @@ export function discardFromChest(state, recipeId, amount = 1) {
   return n;
 }
 
+/** Throw away owned materials. Returns how many were removed (capped at owned). */
+export function discardMaterial(state, materialId, amount = 1) {
+  const have = Math.max(0, Math.floor(Number(state.materials?.[materialId]) || 0));
+  if (have < 1) return 0;
+  const want = amount === 'all' ? have : Math.max(1, Math.round(Number(amount) || 1));
+  const n = Math.min(have, want);
+  state.materials[materialId] = have - n;
+  return n;
+}
+
 export function backWallShelfIndex() {
   return SHOP.displays.findIndex((spot) => spot.id === 'shelf-center');
 }

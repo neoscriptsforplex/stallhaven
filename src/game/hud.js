@@ -3864,6 +3864,8 @@ export function bindHud(root, state, world) {
 
   function closeMaterialsDrawer() {
     if (!materialsDrawer?.classList.contains('is-open')) return;
+    const mdBox = document.querySelector('[data-mat-discard-box]');
+    if (mdBox) mdBox.hidden = true;
     setMaterialsOpen(false);
   }
 
@@ -3898,7 +3900,45 @@ export function bindHud(root, state, world) {
     row.append(fullBtn, upgradeBtn);
   }
 
+  const matDiscardBox = document.querySelector('[data-mat-discard-box]');
+  let pendingMatDiscard = null;
+  function closeMatDiscard() {
+    pendingMatDiscard = null;
+    if (matDiscardBox) matDiscardBox.hidden = true;
+  }
+  function openMatDiscard(id) {
+    const have = Math.max(0, Math.floor(Number(state.materials?.[id]) || 0));
+    if (!matDiscardBox || have < 1) return;
+    pendingMatDiscard = id;
+    const name = MATERIALS[id]?.name ?? 'this material';
+    const msg = matDiscardBox.querySelector('[data-mat-discard-msg]');
+    if (msg) msg.textContent = `Throw away ${name}? It cannot be undone.`;
+    matDiscardBox.querySelectorAll('[data-mat-discard-amt]').forEach((b) => {
+      const v = b.dataset.matDiscardAmt;
+      b.hidden = v !== 'all' && Number(v) > have;
+      if (v === 'all') b.textContent = `All (${have})`;
+    });
+    matDiscardBox.hidden = false;
+  }
+  matDiscardBox?.addEventListener('click', (event) => {
+    if (event.target.closest('[data-mat-discard-no]')) { closeMatDiscard(); return; }
+    const amtBtn = event.target.closest('[data-mat-discard-amt]');
+    if (!amtBtn || !pendingMatDiscard) return;
+    const id = pendingMatDiscard;
+    const raw = amtBtn.dataset.matDiscardAmt;
+    const have = Math.max(0, Math.floor(Number(state.materials?.[id]) || 0));
+    const amount = raw === 'all' ? have : Math.min(have, Number(raw));
+    if (amount > 0 && intentBus.run({ type: 'discardMaterial', materialId: id, amount })) {
+      pushLog(state, `Discarded ${amount} ${MATERIALS[id]?.name ?? id}.`);
+    }
+    closeMatDiscard();
+    syncOwnedMaterials();
+    render(performance.now() / 1000);
+  });
+
   ownedMaterialsEl?.addEventListener('click', (event) => {
+    const bin = event.target.closest('[data-mat-discard]');
+    if (bin) { openMatDiscard(bin.dataset.matDiscard); return; }
     const full = event.target.closest('[data-storage-full]');
     if (!full) return;
     openStoragePop(full, full.dataset.storageFull);

@@ -109,6 +109,7 @@ import {
   decideAfterWait,
   decidePurchase,
   discardFromChest,
+  discardMaterial,
   hasStock,
   isUnlocked,
   offerChoices,
@@ -2103,6 +2104,18 @@ describe('ores, appearance, king, and chest bin', () => {
     finishCraft(state, 'bread');
     assert.equal(discardFromChest(state, 'bread', 1), 1);
     assert.equal(chestCount(state, 'bread'), 1);
+  });
+
+  it('discards owned materials, capped at what you have', () => {
+    const state = createState();
+    state.materials.logs = 12;
+    assert.equal(discardMaterial(state, 'logs', 10), 10);
+    assert.equal(state.materials.logs, 2);
+    assert.equal(discardMaterial(state, 'logs', 10), 2);
+    assert.equal(state.materials.logs, 0);
+    assert.equal(discardMaterial(state, 'logs', 1), 0);
+    state.materials.flax = 5;
+    assert.equal(discardMaterial(state, 'flax', 'all'), 5);
   });
 
   it('clears the middle back-wall shelf when expanding behind the shop', () => {

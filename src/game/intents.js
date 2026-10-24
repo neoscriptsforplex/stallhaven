@@ -18,6 +18,7 @@ import {
   cancelCrafts,
   clearDisplay,
   discardFromChest,
+  discardMaterial,
   fillStandFromRecipe,
   grantCaughtFish,
   grantChoppedLogs,
@@ -81,6 +82,7 @@ export const INTENT_TYPES = Object.freeze([
   'upgradeChest',
   'placeFromChest',
   'discard',
+  'discardMaterial',
   'placeOnDisplay',
   'clearDisplay',
   'removeFurniture',
@@ -180,6 +182,10 @@ export function checkIntentShape(intent) {
     case 'placeFromChest':
     case 'discard':
       return okId(intent.recipeId) && has(RECIPES, intent.recipeId) ? null : 'bad-recipe';
+    case 'discardMaterial':
+      if (!okId(intent.materialId) || !has(MATERIALS, intent.materialId)) return 'bad-material';
+      if (intent.amount !== 'all' && !okNumber(intent.amount, 1e9)) return 'bad-amount';
+      return null;
     case 'placeOnDisplay':
       if (!okId(intent.recipeId) || !has(RECIPES, intent.recipeId)) return 'bad-recipe';
       if (!okIndex(intent.displayIndex)) return 'bad-index';
@@ -356,6 +362,8 @@ export function applyIntent(state, intent, ctx = {}) {
       return done(placeFromChest(state, intent.recipeId));
     case 'discard':
       return done(discardFromChest(state, intent.recipeId));
+    case 'discardMaterial':
+      return done(discardMaterial(state, intent.materialId, intent.amount));
     case 'placeOnDisplay':
       return done(placeOnDisplay(state, intent.recipeId, intent.displayIndex, intent.slotIndex ?? 0));
     case 'clearDisplay':

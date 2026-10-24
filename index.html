@@ -115,6 +115,15 @@
       </button>
       <div id="materials-panel" class="materials-clip" aria-hidden="true">
         <div class="materials-sheet" role="region" aria-label="Materials">
+          <div class="discard-confirm mat-discard" data-mat-discard-box hidden>
+            <p data-mat-discard-msg></p>
+            <div class="mat-discard-actions">
+              <button type="button" data-mat-discard-amt="1">1</button>
+              <button type="button" data-mat-discard-amt="10">10</button>
+              <button type="button" data-mat-discard-amt="all">All</button>
+              <button type="button" data-mat-discard-no>Keep</button>
+            </div>
+          </div>
           <div id="owned-materials" class="materials-grid" role="list"></div>
         </div>
       </div>

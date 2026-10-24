@@ -1802,9 +1802,6 @@ function buildProceduralWallShelf() {
   return group;
 }
 
-/** Half turn shared by the mannequin form and everything worn on it. */
-export const MANNEQUIN_FACE_YAW = Math.PI;
-
 export function buildArmourStand() {
   const group = new THREE.Group();
   group.name = 'armour-stand';
@@ -1814,9 +1811,6 @@ export function buildArmourStand() {
   geo.computeVertexNormals();
   const form = addShadow(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true })));
   form.name = 'mannequin-form';
-  // The dump's bust faces -Z, opposite every worn item and the shared +Z
-  // furniture front. A half turn here puts worn items on the bust's front.
-  form.rotation.y = MANNEQUIN_FACE_YAW;
   group.add(form);
   group.userData.wareY = 0;
   group.userData.stand = true;
@@ -1833,23 +1827,6 @@ export function buildFurniture(kind) {
   if (kind === 'shelf') return buildWallShelf();
   if (kind === 'stand') return buildArmourStand();
   return buildDefaultTable();
-}
-
-/**
- * Shields come out of the display pose with their strap side forward; on a
- * mannequin the face must point out with the bust (+Z). Wrapped so the half
- * turn is a pure yaw around the stand's pole, whatever the base pose holds.
- */
-export function turnMannequinShield(mesh, slot) {
-  if (slot !== 'shield') return mesh;
-  const turn = new THREE.Group();
-  turn.name = 'mannequin-shield-face';
-  turn.rotation.y = Math.PI;
-  const at = mesh.position.clone();
-  mesh.position.set(-at.x, at.y, -at.z);
-  turn.add(mesh);
-  turn.userData.recipeId = mesh.userData.recipeId;
-  return turn;
 }
 
 export function slotPose(slot) {

@@ -174,7 +174,7 @@ import {
   defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
 } from './models.js';
-import { constructionLookId, constructionPiece } from './construction.js';
+import { constructionLookId, constructionPiece, pieceHangs } from './construction.js';
 import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
 import { tickPortalJelly } from './portalJelly.js';
 import { stepRatWander } from './rats.js';
@@ -1379,7 +1379,7 @@ export function createWorld(canvas, state, opts = {}) {
       mesh.scale.setScalar(0.01125 * (constructionPiece(id)?.scale ?? 1));
       mesh.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(mesh);
-      if (Number.isFinite(box.min.y)) mesh.position.y -= box.min.y;
+      if (Number.isFinite(box.min.y) && !pieceHangs(id)) mesh.position.y -= box.min.y;
       return mesh;
     }
     const tint = constructionPiece(id)?.tint ?? 0xc4a06a;

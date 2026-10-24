@@ -36,6 +36,15 @@ function portraitUrl(npcId, mode) {
   return `${base}portraits/${file}-${mode}.png`;
 }
 
+function assetBase() {
+  let base = './public/';
+  try {
+    const raw = import.meta.env.BASE_URL;
+    if (raw) base = raw.endsWith('/') ? raw : `${raw}/`;
+  } catch { /* unbuilt Pages fallback */ }
+  return base;
+}
+
 function article(label) {
   return /^[aeiou]/i.test(label) ? 'an' : 'a';
 }
@@ -188,6 +197,9 @@ export function bindHeroesPanel({
   }
 
   function questSvg(quest) {
+    if (quest.render) {
+      return `<div class="quest-icon has-render" style="--tint:${quest.tint}"><img src="${assetBase()}${quest.render}" alt="" width="40" height="40" draggable="false"></div>`;
+    }
     const path = ICONS[quest.icon] ?? ICONS.head;
     return `<div class="quest-icon" style="--tint:${quest.tint}"><svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg></div>`;
   }

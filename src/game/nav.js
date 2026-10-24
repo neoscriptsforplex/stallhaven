@@ -12,6 +12,9 @@ import {
   gardenRockSpots,
   runeFieldTreeSpots,
   runeFieldRockSpots,
+  runeFieldMidTreeSpots,
+  runeFieldMidRockSpots,
+  runeFieldBigRockRadius,
   RUNE_ALTAR_SPOTS,
   RUNE_FIELD_PORTAL,
   ALTAR_FOOT,
@@ -345,6 +348,14 @@ export function runeFieldMoveObstacles() {
   }
   for (const rock of runeFieldRockSpots()) {
     const s = 0.45 * (rock.scale ?? 1);
+    blocks.push(rectFromCenter(rock.x, rock.z, s, s));
+  }
+  for (const tree of runeFieldMidTreeSpots()) {
+    const block = treeWalkBlock(TREE_TRUNK_RADIUS);
+    blocks.push(rectFromCenter(tree.x, tree.z, block, block));
+  }
+  for (const rock of runeFieldMidRockSpots()) {
+    const s = runeFieldBigRockRadius(rock.scale) * 1.6;
     blocks.push(rectFromCenter(rock.x, rock.z, s, s));
   }
   return blocks;

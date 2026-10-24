@@ -1539,6 +1539,55 @@ export function runeFieldRockSpots() {
   return RUNE_FIELD_ROCKS.filter(runeFieldClearOf);
 }
 
+/**
+ * Decorative middle-band fill: a few trees and big boulders between the
+ * portal ring and the edge decor. They stay off the portal, altar pads,
+ * the straight portal-to-altar walk lanes, and the arrival spot.
+ */
+export const RUNE_FIELD_LANE_CLEAR = 2.6;
+export function runeFieldMidClearOf(spot, radius = 0) {
+  if (!spot) return false;
+  if (Math.hypot(spot.x, spot.z) < RUNE_PORTAL_CLEAR + 1 + radius) return false;
+  if (Math.abs(spot.x) < RUNE_FIELD_LANE_CLEAR + radius) return false;
+  if (Math.abs(spot.z) < RUNE_FIELD_LANE_CLEAR + radius) return false;
+  if (Math.hypot(spot.x - RUNE_FIELD_ARRIVE.x, spot.z - RUNE_FIELD_ARRIVE.z) < 3 + radius) return false;
+  for (const altar of RUNE_ALTAR_SPOTS) {
+    if (Math.hypot(spot.x - altar.x, spot.z - altar.z) < RUNE_ALTAR_CLEAR + 1 + radius) return false;
+  }
+  if (Math.max(Math.abs(spot.x), Math.abs(spot.z)) > RUNE_FIELD_HALF - 6.5) return false;
+  return true;
+}
+
+const RUNE_FIELD_MID_TREES = [
+  { x: -6.6, z: -6.9 },
+  { x: 7.3, z: -6.1 },
+  { x: 6.1, z: 7.7 },
+  { x: -7.5, z: 6.4 },
+  { x: 8.8, z: -8.9 },
+  { x: -3.9, z: 8.7 },
+];
+
+const RUNE_FIELD_MID_ROCKS = [
+  { x: -5.0, z: -4.4, scale: 2.0 },
+  { x: 4.9, z: -4.2, scale: 1.8 },
+  { x: 4.6, z: 4.9, scale: 2.2 },
+  { x: -4.6, z: 5.4, scale: 1.9 },
+  { x: 8.7, z: 3.4, scale: 2.1 },
+];
+
+/** Footprint radius of a scaled field boulder (matches buildBoulder's 0.32 m base). */
+export function runeFieldBigRockRadius(scale = 1) {
+  return 0.37 * scale;
+}
+
+export function runeFieldMidTreeSpots() {
+  return RUNE_FIELD_MID_TREES.filter((spot) => runeFieldMidClearOf(spot, 0.4));
+}
+
+export function runeFieldMidRockSpots() {
+  return RUNE_FIELD_MID_ROCKS.filter((spot) => runeFieldMidClearOf(spot, runeFieldBigRockRadius(spot.scale)));
+}
+
 function gardenRockOnGrass(spot, expansionIds = []) {
   const grass = gardenBox(expansionIds);
   const pad = gardenRockRadius(spot.scale ?? 1);

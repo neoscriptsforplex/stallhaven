@@ -2,7 +2,8 @@ import { RECIPES } from './game/catalog.js';
 import { completeCrafts, createState, pushLog, tickMaterials, SAVE_VERSION } from './game/economy.js';
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
-import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledFishingRod, loadBundledRiggedGoblin, loadBundledRiggedRat, loadBundledRiggedBuyers, loadBundledLooks } from './game/upload.js';
+import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledFishingRod,
+  loadBundledFishingNet, loadBundledRiggedGoblin, loadBundledRiggedRat, loadBundledRiggedBuyers, loadBundledLooks } from './game/upload.js';
 import { enableSfx, getMusicVolume, loadBundledMusic, loadSfxManifest, playSfx, setSfxLoop, unlockAudio } from './game/audio.js';
 import { createSfxDirector } from './game/sfxHooks.js';
 import { installUiSounds, mountSoundSettings, restoreSoundMix } from './game/soundUi.js';
@@ -177,12 +178,13 @@ async function bootGame() {
   let bundledPlayer = null;
   let riggedPlayer = null;
   let fishingRod = null;
+  let fishingNet = null;
   let riggedGoblin = null;
   let riggedRat = null;
   let riggedBuyers = {};
   let bundledLooks = {};
   try {
-    const [rigged, looks, , goblin, rat, buyers, rod] = await Promise.all([
+    const [rigged, looks, , goblin, rat, buyers, rod, net] = await Promise.all([
       loadBundledRiggedPlayer().catch((err) => {
         console.warn('Rigged player skipped:', err?.message || err);
         return null;
@@ -207,9 +209,14 @@ async function bootGame() {
         console.warn('Fishing rod skipped:', err?.message || err);
         return null;
       }),
+      loadBundledFishingNet().catch((err) => {
+        console.warn('Fishing net skipped:', err?.message || err);
+        return null;
+      }),
     ]);
     riggedPlayer = rigged;
     fishingRod = rod;
+    fishingNet = net;
     riggedGoblin = goblin;
     riggedRat = rat;
     riggedBuyers = buyers ?? {};
@@ -227,7 +234,7 @@ async function bootGame() {
     console.warn('Bundled models skipped; keeping procedural shop.', err?.message || err);
   }
 
-  const world = createWorld(canvas, state, { bundledPlayer, riggedPlayer, riggedGoblin, riggedRat, fishingRod });
+  const world = createWorld(canvas, state, { bundledPlayer, riggedPlayer, riggedGoblin, riggedRat, fishingRod, fishingNet });
   window.stallhaven = {
     world,
     state,

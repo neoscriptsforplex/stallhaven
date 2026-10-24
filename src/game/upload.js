@@ -639,6 +639,11 @@ export async function loadBundledFishingRod() {
   return loadBundledGltf('player/fishing_rod.glb');
 }
 
+/** Rig's small fishing net (NetFlex morph clip). Missing file keeps net catches on the rod. */
+export async function loadBundledFishingNet() {
+  return loadBundledGltf('items/fishing_net/fishing_net.glb');
+}
+
 /** Fetch goblin_rigged.glb. Throws so the caller can keep the old goblin. */
 export async function loadBundledRiggedGoblin() {
   return loadBundledGltf('npc/goblin_rigged.glb');

@@ -166,6 +166,7 @@ import {
   fitMannequinWear,
   slotPose,
   setHeldTool,
+  isNetCatch,
   setGatherClip,
   getBundledLook,
   riggedClipTime,
@@ -507,6 +508,7 @@ export function createWorld(canvas, state, opts = {}) {
   let drawScene = true;
   let riggedPlayerGltf = opts.riggedPlayer ?? null;
   const fishingRodGltf = opts.fishingRod ?? null;
+  const fishingNetGltf = opts.fishingNet ?? null;
   let riggedGoblinGltf = opts.riggedGoblin ?? null;
   let riggedRatGltf = opts.riggedRat ?? null;
   let bundledPlayerSource = opts.bundledPlayer ?? null;
@@ -538,6 +540,7 @@ export function createWorld(canvas, state, opts = {}) {
       height: defaultPlayerWorldHeight(),
       chefHatOn: Boolean(state.chefHat),
       fishingRod: fishingRodGltf,
+      fishingNet: fishingNetGltf,
     });
     customPlayerSource = model;
     customPlayerYaw = yaw180;
@@ -553,6 +556,8 @@ export function createWorld(canvas, state, opts = {}) {
         return wrapRiggedShopkeeper(riggedPlayerGltf, {
           chefHatOn: Boolean(state.chefHat),
           fishingRod: fishingRodGltf,
+          fishingNet: fishingNetGltf,
+      fishingNet: fishingNetGltf,
         });
       } catch (err) {
         console.warn('Rigged player skipped:', err?.message || err);
@@ -2025,10 +2030,12 @@ export function createWorld(canvas, state, opts = {}) {
       z: spot.z,
       faceYaw: Number.isFinite(pose?.faceYaw) ? pose.faceYaw : spot.face,
     };
-    setHeldTool(shopkeeper, 'rod');
+    // Net catches (shrimp) scoop with Rig's NetFish + net; rod catches keep Cast/Fish.
+    const useNet = isNetCatch(spot.materialId) && setGatherClip(shopkeeper, 'netfish') && shopkeeper.userData?.net;
+    setHeldTool(shopkeeper, useNet ? 'net' : 'rod');
     faceGather({ x: spot.x, z: spot.z, faceYaw: mining.faceYaw });
     // Rig's player clip named "fish" plays when the rig has one; otherwise the mine loop pose.
-    setGatherClip(shopkeeper, 'fish');
+    if (!useNet) setGatherClip(shopkeeper, 'fish');
   }
 
   function syncTreeVisuals() {

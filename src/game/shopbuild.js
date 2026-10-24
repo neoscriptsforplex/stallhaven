@@ -2197,7 +2197,8 @@ function mountOutdoorTree(visual) {
 }
 
 /** How far under the lawn plane the lowest root vertex should sit, in metres. */
-const TREE_ROOT_SINK = 0.015;
+// Deep enough that the trunk base, not just the lowest root tip, meets the lawn.
+export const TREE_ROOT_SINK = 0.08;
 const GRASS_PLANE_Y = -0.02;
 
 /**
@@ -3372,6 +3373,8 @@ function attachTreeStump(tree) {
   face.position.y = height + 0.01;
   stump.add(face);
   stump.visible = false;
+  // The pine group was sunk to bury its roots; keep the stump's base on the grass.
+  stump.position.y = GRASS_PLANE_Y - 0.01 - (tree.position?.y ?? 0);
   tree.add(stump);
 }
 

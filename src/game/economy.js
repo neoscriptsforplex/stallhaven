@@ -443,6 +443,19 @@ export function chestHasSpace(state, extra = 1) {
   return chestTotal(state) + extra <= chestCapacity(state);
 }
 
+/** True when the station that makes this recipe is placed (anvil and altars always count). */
+export function recipeStationOwned(state, recipeId) {
+  const recipe = RECIPES[recipeId];
+  if (!recipe) return false;
+  if (recipe.category === 'potion' && !ownsCauldron(state)) return false;
+  if (recipe.category === 'food' && !ownsRange(state)) return false;
+  if (recipe.category === 'smelt' && !ownsFurnace(state)) return false;
+  if (recipe.category === 'spin' && !ownsWheel(state)) return false;
+  const station = stationForRecipe(recipe);
+  if (['loom', 'fletch', 'potter', 'sawmill'].includes(station) && !ownsStation(state, station)) return false;
+  return true;
+}
+
 export function isUnlocked(state, recipeId) {
   const recipe = RECIPES[recipeId];
   if (!recipe) return false;

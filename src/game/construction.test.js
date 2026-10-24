@@ -32,10 +32,10 @@ function funded() {
 
 describe('construction catalogue', () => {
   it('lists the thirty-four cosmetic pieces at flat material prices', () => {
-    assert.equal(CONSTRUCTION_PIECES.length, 33);
+    assert.equal(CONSTRUCTION_PIECES.length, 34);
     assert.equal(constructionPiece('chair').materials.plank, 1);
     assert.equal(constructionPiece('chair').gold, 200);
-    assert.equal(new Set(CONSTRUCTION_PIECES.map((row) => row.id)).size, 33);
+    assert.equal(new Set(CONSTRUCTION_PIECES.map((row) => row.id)).size, 34);
     const chair = funded();
     chair.materials.plank = 1;
     chair.materials.bronze_nails = 2;
@@ -193,4 +193,40 @@ it('bundled wall shelf is empty and its planks carry the shelf slot anchors', as
     assert.ok(below != null && y - below > 0 && y - below < 0.1, `slot ${pose.x},${pose.y} rests on a plank`);
     assert.ok(Math.abs(pose.x) < 0.675 && pose.z > -0.155 && pose.z < 0.19);
   }
+});
+
+describe('garden bush (outdoor)', () => {
+  it('is a buyable Outdoor piece that places on outdoor ground', async () => {
+    const { constructionCategories } = await import('./construction.js');
+    const { portalPlaceFloors, placeFloors } = await import('./layout.js');
+    const row = constructionPiece('garden_bush');
+    assert.ok(row);
+    assert.equal(row.category, 'Outdoor');
+    assert.equal(row.mount, 'outdoor');
+    assert.equal(row.gold, 120);
+    assert.ok(constructionCategories().includes('Outdoor'));
+    assert.deepEqual(CONSTRUCTION_PIECES.filter((p) => p.id === 'garden_bush').map((p) => p.category), ['Outdoor']);
+    // The outdoor placement start (grass by the shop) is on the outdoor floors but off the shop floor.
+    const inside = (rects, x, z) => rects.some((r) => x >= r.minX + 0.15 && x <= r.maxX - 0.15 && z >= r.minZ + 0.15 && z <= r.maxZ - 0.15);
+    assert.ok(inside(portalPlaceFloors([]), 4.2, 10.2));
+    assert.ok(!inside(placeFloors([]), 4.2, 10.2));
+  });
+
+  it('ships an original low-poly model sitting on the floor with a centred pivot', async () => {
+    const { readFileSync } = await import('node:fs');
+    const obj = readFileSync(new URL('../../public/models/furniture/garden_bush/garden_bush.obj', import.meta.url), 'utf8');
+    const v = obj.split('\n').filter((l) => l.startsWith('v ')).map((l) => l.split(/\s+/).slice(1).map(Number));
+    const tris = obj.split('\n').filter((l) => l.startsWith('f ')).length;
+    assert.ok(tris < 300, `${tris} tris`);
+    const ax = (i) => [Math.min(...v.map((p) => p[i])), Math.max(...v.map((p) => p[i]))];
+    const [y0, y1] = ax(1);
+    assert.equal(y0, 0);
+    const h = y1 * 0.01125;
+    assert.ok(h >= 0.8 && h <= 1.0, `height ${h}`);
+    for (const i of [0, 2]) {
+      const [a, b] = ax(i);
+      assert.ok(Math.abs(a + b) < 0.5);
+      assert.ok(b - a <= 128 * 1.0, 'about one tile');
+    }
+  });
 });

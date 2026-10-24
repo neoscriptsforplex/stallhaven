@@ -23,6 +23,7 @@
 
 import { RECIPES } from './catalog.js';
 import { MELEE_SMITH_LEVELS, RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
+import { CONSTRUCTION_GUIDE } from './construction.js';
 import { ESSENCE_DOUBLE_LEVEL, FISHING_LEVELS, MINING_LEVELS, WOODCUTTING_LEVELS } from './skills.js';
 
 export const TIER = {
@@ -315,11 +316,7 @@ const construction = {
       id: 'builds', label: 'Builds',
       rows: [
         { lv: 1, name: 'Rooms & stations', desc: 'XP for every paid placement', icon: 'house', tint: TIER.gold },
-        { lv: 5, name: 'Wall Plant', desc: 'Outside wall decor', icon: 'leaf', tint: '#6fbf5a', soon: true },
-        { lv: 12, name: 'Utensil Rack', desc: 'Inside wall decor', icon: 'house', tint: '#b8874a', soon: true },
-        { lv: 20, name: 'Pot Shelf', desc: 'Inside wall decor', icon: 'pot', tint: TIER.clay, soon: true },
-        { lv: 28, name: 'Window Box', desc: 'Inside wall decor', icon: 'leaf', tint: '#9ac85a', soon: true },
-        { lv: 35, name: 'Leaded glass windows', desc: 'Upgrade every shop window', icon: 'window', tint: '#5fae6a', soon: true },
+        ...CONSTRUCTION_GUIDE,
       ],
     },
   ],

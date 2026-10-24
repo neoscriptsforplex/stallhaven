@@ -162,6 +162,7 @@ import {
   slotPose,
   setHeldTool,
   setGatherClip,
+  getBundledLook,
   riggedClipTime,
   updateMinePose,
   updateWalkPose,
@@ -173,6 +174,7 @@ import {
   defaultPlayerWorldHeight,
   PLAYER_WORLD_SCALE,
 } from './models.js';
+import { constructionLookId, constructionPiece } from './construction.js';
 import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
 import { tickPortalJelly } from './portalJelly.js';
 import { stepRatWander } from './rats.js';
@@ -816,11 +818,13 @@ export function createWorld(canvas, state, opts = {}) {
   function poseOf(target) {
     if (!target) return null;
     if (placeDraft && target.id === placeDraft.id) {
-      const indexOk = (target.id !== 'display' && target.id !== 'farming_patch')
+      const indexOk = (target.id !== 'display' && target.id !== 'farming_patch' && target.id !== 'piece')
         || target.index === placeDraft.index
-        || (target.id === 'farming_patch' && placeDraft.index == null);
+        || (target.id === 'farming_patch' && placeDraft.index == null)
+        || (target.id === 'piece' && (target.index == null || target.index === placeDraft.index));
       if (indexOk) return placeDraft;
     }
+    if (target.id === 'piece') return state.furniture.placed?.[target.index] ?? null;
     if (target.id === 'farming_patch') return state.furniture.patches?.[target.index] ?? null;
     return target.id === 'display'
       ? state.furniture.displays[target.index]
@@ -831,6 +835,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!target) return;
     if (target.id === 'display') applyDisplayPose(target.index);
     else if (target.id === 'farming_patch') applyPatchGhost();
+    else if (target.id === 'piece') applyPieceGhost();
     else applyFixturePose(target.id);
   }
 
@@ -902,9 +907,11 @@ export function createWorld(canvas, state, opts = {}) {
   function previewFurnitureAt(x, z) {
     if (!moveTarget) return null;
     const kind = placeKindOf(moveTarget);
-    const snapped = kind === 'shelf'
+    const snapped = kind === 'shelf' || (kind === 'piece' && constructionPiece(moveTarget.pieceId)?.mount === 'wall')
       ? snapToWallGrid(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
-      : snapToFloor(x, z, activePlaceRects());
+      : kind === 'piece' && moveTarget.snap === false
+        ? { x, z }
+        : snapToFloor(x, z, activePlaceRects());
     const pose = poseOf(moveTarget);
     if (!pose) return snapped;
     pose.x = snapped.x;
@@ -929,6 +936,10 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = moveTarget ? placeKindOf(moveTarget) : null;
     const refreshGrid = kind === 'portal' || kind === 'farming_patch';
     if (kind === 'farming_patch') clearPatchGhost();
+    if (kind === 'piece') {
+      clearPieceGhost();
+      syncPlacedMeshes();
+    }
     moveTarget = null;
     moveOrigin = null;
     placeNeedsConfirm = false;
@@ -1344,6 +1355,106 @@ export function createWorld(canvas, state, opts = {}) {
   patchGroup.name = 'farming-patches';
   scene.add(patchGroup);
   let patchGhost = null;
+  const placedGroup = new THREE.Group();
+  placedGroup.name = 'construction-pieces';
+  scene.add(placedGroup);
+  let pieceGhost = null;
+
+  function clearPieceGhost() {
+    if (!pieceGhost) return;
+    pieceGhost.removeFromParent();
+    pieceGhost.traverse((child) => {
+      if (!child.isMesh) return;
+      child.geometry?.dispose?.();
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of mats) mat?.dispose?.();
+    });
+    pieceGhost = null;
+  }
+
+  function pieceVisual(id) {
+    const look = getBundledLook(constructionLookId(id));
+    if (look) {
+      const mesh = look.clone(true);
+      mesh.scale.setScalar(0.01125);
+      mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      if (Number.isFinite(box.min.y)) mesh.position.y -= box.min.y;
+      return mesh;
+    }
+    const tint = constructionPiece(id)?.tint ?? 0xc4a06a;
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 0.5, 0.55),
+      new THREE.MeshStandardMaterial({ color: tint, roughness: 0.7 }),
+    );
+    mesh.position.y = 0.25;
+    return mesh;
+  }
+
+  function applyPieceGhost() {
+    const pose = placeDraft?.id === 'piece' ? placeDraft : null;
+    if (!pose) return;
+    if (!pieceGhost || pieceGhost.userData.pieceId !== pose.pieceId) {
+      clearPieceGhost();
+      pieceGhost = new THREE.Group();
+      pieceGhost.name = 'construction-ghost';
+      pieceGhost.userData.pieceId = pose.pieceId;
+      const visual = pieceVisual(pose.pieceId);
+      visual.traverse((child) => {
+        if (!child.isMesh) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        child.material = mats.map((mat) => {
+          const next = mat?.clone?.() ?? mat;
+          if (next) {
+            next.transparent = true;
+            next.opacity = 0.55;
+          }
+          return next;
+        });
+      });
+      pieceGhost.add(visual);
+      scene.add(pieceGhost);
+    }
+    pieceGhost.position.set(pose.x, 0, pose.z);
+    pieceGhost.rotation.y = pose.rot ?? 0;
+  }
+
+  function syncPlacedMeshes() {
+    const moving = placeDraft?.id === 'piece' ? placeDraft.index : null;
+    const rows = state.furniture?.placed ?? [];
+    while (placedGroup.children.length > rows.length) {
+      const old = placedGroup.children[placedGroup.children.length - 1];
+      old.removeFromParent();
+    }
+    rows.forEach((row, index) => {
+      let anchor = placedGroup.children[index];
+      if (!anchor || anchor.userData.pieceId !== row.id) {
+        anchor?.removeFromParent();
+        anchor = new THREE.Group();
+        anchor.name = 'construction';
+        anchor.userData.kind = 'construction';
+        anchor.userData.pieceId = row.id;
+        anchor.userData.index = index;
+        const visual = pieceVisual(row.id);
+        visual.traverse((child) => {
+          if (!child.isMesh) return;
+          child.userData.kind = 'construction';
+          child.userData.index = index;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        anchor.add(visual);
+        placedGroup.add(anchor);
+      }
+      anchor.userData.index = index;
+      anchor.visible = moving !== index;
+      anchor.position.set(row.x, 0, row.z);
+      anchor.rotation.y = row.rot ?? 0;
+      anchor.traverse((child) => {
+        if (child.isMesh) child.userData.index = index;
+      });
+    });
+  }
 
   function releasePatchObject(object) {
     if (!object) return;
@@ -1432,6 +1543,7 @@ export function createWorld(canvas, state, opts = {}) {
 
   patchesReady = true;
   syncPatchMeshes();
+  syncPlacedMeshes();
 
   function pickCrop(crop) {
     if (crop === 'wheat') {
@@ -1558,6 +1670,9 @@ export function createWorld(canvas, state, opts = {}) {
     });
     patchGroup?.traverse((child) => {
       if (child.userData?.kind === 'farming_patch') found.push(child);
+    });
+    placedGroup?.traverse((child) => {
+      if (child.userData?.kind === 'construction') found.push(child);
     });
     return found;
   }
@@ -2452,7 +2567,36 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = placeKindOf(target);
     if (kind === 'portal') return portalPlaceFloors(state.expansions ?? []);
     if (kind === 'farming_patch' || kind === 'patch') return patchPlaceFloors(state.expansions ?? []);
+    if (kind === 'piece' && constructionPiece(target?.pieceId)?.mount === 'outdoor') {
+      return portalPlaceFloors(state.expansions ?? []);
+    }
     return placeRects;
+  }
+
+  function piecePlaceReason(pose) {
+    const piece = constructionPiece(moveTarget?.pieceId);
+    if (!piece || !pose) return 'That spot is off the shop floor.';
+    if (rectHitsPond(pose.x, pose.z, 0.35, 0.35)) return 'That spot overlaps the pond.';
+    if (piece.mount === 'wall') {
+      const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], pose.rot);
+      if (Math.hypot((snapped.x ?? pose.x) - pose.x, (snapped.z ?? pose.z) - pose.z) > 0.45) {
+        return 'Place it on an open wall.';
+      }
+      return null;
+    }
+    const floors = piece.mount === 'outdoor'
+      ? portalPlaceFloors(state.expansions ?? [])
+      : placeFloors(state.expansions ?? []);
+    const on = floors.some((rect) => (
+      pose.x >= rect.minX + 0.15 && pose.x <= rect.maxX - 0.15
+      && pose.z >= rect.minZ + 0.15 && pose.z <= rect.maxZ - 0.15
+    ));
+    if (!on) {
+      return piece.mount === 'outdoor'
+        ? 'Place it on the floor or the grass.'
+        : 'That spot is off the shop floor.';
+    }
+    return null;
   }
 
   function patchPlaceReason(pose) {
@@ -2490,6 +2634,7 @@ export function createWorld(canvas, state, opts = {}) {
       : { id: target.id };
     const blocks = liveObstacles(state, SHOP, skip);
     const floors = activePlaceRects(target);
+    if (kind === 'piece') return piecePlaceReason(pose);
     if (kind === 'farming_patch' || kind === 'patch') {
       const grass = patchPlaceReason(pose);
       if (grass) return grass;
@@ -2518,7 +2663,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (!slot) return null;
       return { x: slot.anchor.position.x, z: slot.anchor.position.z, rot: slot.anchor.rotation.y };
     }
-    if (moveTarget.id === 'farming_patch') return poseOf(moveTarget);
+    if (moveTarget.id === 'farming_patch' || moveTarget.id === 'piece') return poseOf(moveTarget);
     const slot = fixtureMeshes[moveTarget.id];
     if (!slot) return poseOf(moveTarget);
     return {
@@ -2574,7 +2719,7 @@ export function createWorld(canvas, state, opts = {}) {
     const kind = placeKindOf(target);
     const step = furnitureRotateDelta(kind) * (dir < 0 ? -1 : 1);
     const nextRot = (pose.rot ?? FURNITURE_FORWARD) + step;
-    if (kind === 'shelf') {
+    if (kind === 'shelf' || (kind === 'piece' && constructionPiece(target.pieceId)?.mount === 'wall')) {
       const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot);
       pose.x = snapped.x;
       pose.z = snapped.z;
@@ -2584,6 +2729,7 @@ export function createWorld(canvas, state, opts = {}) {
     }
     if (target.id === 'display') applyDisplayPose(target.index);
     else if (target.id === 'farming_patch') applyPatchGhost();
+    else if (target.id === 'piece') applyPieceGhost();
     else applyFixturePose(target.id);
     rebuildNav();
     return true;
@@ -2676,6 +2822,10 @@ export function createWorld(canvas, state, opts = {}) {
     }
     if (picked) {
       const data = picked.object.userData;
+      if (data.kind === 'construction' && !placeNeedsConfirm) {
+        pickHandler?.({ type: 'construction-select', index: data.index });
+        return;
+      }
       if (data.kind === 'trapdoor') {
         const hatch = gardenTrapdoorSpot(state.expansions ?? []);
         queueUse('trapdoor', hatch ?? { x: shopkeeper.position.x, z: shopkeeper.position.z });
@@ -4036,6 +4186,61 @@ export function createWorld(canvas, state, opts = {}) {
     refreshFurniture() {
       applyAllPoses();
       syncDisplays();
+      syncPlacedMeshes();
+    },
+    beginPlacePiece(pieceId) {
+      const row = constructionPiece(pieceId);
+      if (!row) return;
+      const home = row.mount === 'outdoor'
+        ? { x: 4.2, z: 10.2 }
+        : { x: 0.4, z: 0.8 };
+      const floors = row.mount === 'outdoor'
+        ? portalPlaceFloors(state.expansions ?? [])
+        : placeRects;
+      const start = row.mount === 'wall'
+        ? snapToWallGrid(home.x, home.z, state.expansions ?? [], FURNITURE_FORWARD)
+        : snapToFloor(home.x, home.z, floors);
+      placeDraft = {
+        id: 'piece',
+        pieceId,
+        index: null,
+        x: start.x,
+        z: start.z,
+        rot: start.rot ?? FURNITURE_FORWARD,
+      };
+      moveTarget = { id: 'piece', pieceId, snap: true };
+      placeNeedsConfirm = true;
+      expandMode = false;
+      if (padGroup) padGroup.visible = false;
+      moveOrigin = null;
+      applyPieceGhost();
+      setSnapGridVisible(row.mount !== 'outdoor');
+      highlightSnapCell(start.x, start.z);
+    },
+    beginMovePiece(index) {
+      const row = state.furniture?.placed?.[index];
+      const piece = row ? constructionPiece(row.id) : null;
+      if (!row || !piece) return;
+      placeDraft = {
+        id: 'piece',
+        pieceId: row.id,
+        index,
+        x: row.x,
+        z: row.z,
+        rot: row.rot ?? FURNITURE_FORWARD,
+      };
+      moveTarget = { id: 'piece', pieceId: row.id, index, moving: true, snap: true };
+      placeNeedsConfirm = true;
+      expandMode = false;
+      if (padGroup) padGroup.visible = false;
+      moveOrigin = { x: row.x, z: row.z, rot: row.rot ?? FURNITURE_FORWARD };
+      syncPlacedMeshes();
+      applyPieceGhost();
+      setSnapGridVisible(piece.mount !== 'outdoor');
+      highlightSnapCell(row.x, row.z);
+    },
+    setPieceSnap(on) {
+      if (moveTarget?.id === 'piece') moveTarget.snap = Boolean(on);
     },
     setChestOpen(open) {
       chestOpen = Boolean(open);

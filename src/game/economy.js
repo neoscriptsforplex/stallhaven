@@ -93,6 +93,7 @@ import {
   snapToWallGrid,
   stationUnlock,
 } from './layout.js';
+import { readPlacedFurniture } from './construction.js';
 import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_MIN,
@@ -125,7 +126,7 @@ export {
   DEFAULT_BRIGHTNESS,
 };
 
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 /** Ore counts were copied onto bars before save version 11. Later saves must not run that again. */
 const ORE_BAR_MIGRATION_VERSION = 11;
 export const OLD_DEFAULT_DISPLAYS = 8;
@@ -1874,6 +1875,7 @@ export function applyState(state, data) {
           pose && typeof pose.x === 'number' && typeof pose.z === 'number'
         )).slice(0, FARMING_PATCH_CAP).map((pose) => readPatch(pose))
         : [],
+      placed: readPlacedFurniture(data.furniture.placed),
       displays: migrateStarterMannequins(next.displays.map((display, index) => {
         const fallback = defaults.displays[index] ?? {
           x: 0,
@@ -1892,6 +1894,7 @@ export function applyState(state, data) {
     next.furniture.displays.push({ x: 0, z: 0.8, rot: FURNITURE_FORWARD });
   }
   if (!Array.isArray(next.furniture.patches)) next.furniture.patches = [];
+  if (!Array.isArray(next.furniture.placed)) next.furniture.placed = [];
   next.boughtFurniture.farming_patch = Math.max(
     next.boughtFurniture.farming_patch ?? 0,
     next.furniture.patches.length,

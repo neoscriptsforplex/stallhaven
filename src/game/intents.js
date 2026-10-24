@@ -55,6 +55,12 @@ import {
 } from './catalog.js';
 import { meetsGatherLevel, xpForChop, xpForFish, xpForMine, xpForPick } from './skills.js';
 import {
+  moveConstruction,
+  pickupConstruction,
+  placeConstruction,
+  sellConstruction,
+} from './construction.js';
+import {
   emptyHeroQuestState,
   collectQuest,
   grantQuestReward,
@@ -86,6 +92,10 @@ export const INTENT_TYPES = Object.freeze([
   'movePatch',
   'plantHerb',
   'harvestHerb',
+  'placePiece',
+  'movePiece',
+  'pickupPiece',
+  'sellPiece',
   'gather',
   'hireHero',
   'startQuest',
@@ -177,6 +187,13 @@ export function checkIntentShape(intent) {
     case 'plantHerb':
       if (!okIndex(intent.index)) return 'bad-index';
       return okId(intent.recipeId) && GROW_BY_ID[intent.recipeId] ? null : 'bad-herb';
+    case 'placePiece':
+      return okId(intent.pieceId) && cleanPose(intent.pose) ? null : 'bad-piece';
+    case 'movePiece':
+      return okIndex(intent.index) && cleanPose(intent.pose) ? null : 'bad-piece';
+    case 'pickupPiece':
+    case 'sellPiece':
+      return okIndex(intent.index) ? null : 'bad-piece';
     case 'gather':
       if (!['mine', 'chop', 'pick', 'water', 'fish'].includes(intent.mode)) return 'bad-mode';
       if (intent.mode !== 'water' && (!okId(intent.materialId) || !has(MATERIALS, intent.materialId))) return 'bad-material';
@@ -258,6 +275,9 @@ export function applyIntent(state, intent, ctx = {}) {
   if (coop) {
     const bad = checkIntentShape(intent);
     if (bad) return fail(bad);
+    if (['placePiece', 'movePiece', 'pickupPiece', 'sellPiece'].includes(intent.type) && ctx.host !== true) {
+      return fail('host-only');
+    }
   } else if (!intent || !INTENT_TYPES.includes(intent.type)) {
     return fail('unknown-type');
   }
@@ -336,6 +356,14 @@ export function applyIntent(state, intent, ctx = {}) {
         : harvestHerb(state, intent.index, now);
       return done(value);
     }
+    case 'placePiece':
+      return done(placeConstruction(state, intent.pieceId, intent.pose));
+    case 'movePiece':
+      return done(moveConstruction(state, intent.index, intent.pose));
+    case 'pickupPiece':
+      return done(pickupConstruction(state, intent.index));
+    case 'sellPiece':
+      return done(sellConstruction(state, intent.index));
     case 'gather': {
       if (coop) {
         if (intent.mode !== 'water' && !meetsGatherLevel(state, intent.materialId)) return fail('level');

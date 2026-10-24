@@ -3733,3 +3733,42 @@ html.is-booting.is-scene-live #view {
 @media (orientation: portrait) and (pointer: coarse) {
   #settings-dock .more-quick { display: grid; }
 }
+
+.build-sheet {
+  width: fit-content;
+  max-width: min(640px, 94vw);
+  scrollbar-width: none;
+}
+.build-sheet::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.build-tabs, .build-side, .placed-bar .row { display: flex; flex-wrap: wrap; gap: 6px; }
+.build-tabs button.is-on, .build-side button.is-on { outline: 2px solid #e7c56a; }
+.build-layout { display: flex; gap: 10px; align-items: flex-start; }
+.build-side { display: flex; flex-direction: column; gap: 4px; }
+.build-detail .is-missing { color: #e07070; }
+.build-detail .is-have { color: #b7d98a; }
+.placed-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 16;
+  width: fit-content;
+  max-width: 94vw;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(36, 22, 12, 0.94);
+  color: #f3e6cf;
+}
+.placed-bar[hidden] { display: none; }
+@media (orientation: portrait) and (pointer: coarse) {
+  #build-dock.build-sheet, .placed-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--portrait-thumb, 64px);
+    transform: none;
+    width: auto;
+    max-width: none;
+    border-radius: 16px 16px 0 0;
+  }
+}

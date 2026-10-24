@@ -914,6 +914,7 @@ export function defaultFurniture() {
     portal: null,
     rug: { x: shopRugPose().x, z: shopRugPose().z, rot: FURNITURE_FORWARD },
     patches: [],
+    placed: [],
     displays: SHOP.displays.map((spot) => (
       (spot.kind ?? 'table') === 'shelf'
         ? snapToWallGrid(spot.x, spot.z, [])
@@ -969,6 +970,7 @@ export function cloneFurniture(furniture = defaultFurniture()) {
     rug: { ...(furniture.rug ?? defaults.rug) },
     displays: (furniture.displays ?? defaults.displays).map((pose) => ({ ...pose })),
     patches: (furniture.patches ?? []).map((pose) => ({ ...pose })),
+    placed: (furniture.placed ?? []).map((pose) => ({ ...pose })),
   };
 }
 

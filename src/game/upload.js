@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { BUYER_PACK_FOLDERS, CRAFT_ORE_FOLDERS, recipeList } from './catalog.js';
+import { CONSTRUCTION_PIECES } from './construction.js';
 import { LUKE_MODEL_FOLDERS } from './gearlooks.js';
 import { MODEL_ASSET_REV } from './modelrev.js';
 import { classifyModelFiles, formatUploadLabel } from './modelfiles.js';
@@ -441,6 +442,7 @@ export const BUNDLED_PROP_FOLDERS = [
   ...CRAFT_ORE_FOLDERS,
   ...BUYER_PACK_FOLDERS,
   ...LUKE_MODEL_FOLDERS,
+  ...CONSTRUCTION_PIECES.map((row) => ({ id: `furn-${row.id}`, folder: `furniture/${row.id}` })),
 ];
 
 export async function parseBundledPlayerBuffers(objBuffer, mtlBuffer) {

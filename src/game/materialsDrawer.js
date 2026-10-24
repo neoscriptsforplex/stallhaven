@@ -3,6 +3,8 @@
  * Counts of zero stay hidden. Swatches cover ores, bars, logs, essence, and crafts.
  */
 import { METALS, formatGold, materialList } from './catalog.js';
+import MATERIAL_THUMBS from './materialThumbs.js';
+import { thumbUrl } from './guideRenders.js';
 
 /** Coarse pointers, and narrow portrait windows, use the left-edge drawer. */
 export const MATERIALS_DRAWER_SIDE_QUERY =
@@ -70,6 +72,7 @@ export function ownedMaterials(materials) {
       name: mat.name,
       count,
       swatch: tintHex(materialTint(mat)),
+      icon: MATERIAL_THUMBS[mat.id] ? thumbUrl(MATERIAL_THUMBS[mat.id]) : null,
     });
   }
   return rows;
@@ -86,7 +89,9 @@ export function materialsDrawerHtml(materials, cap = 250) {
   return rows.map((mat) => {
     const full = mat.count >= limit;
     return `<div class="mat materials-row${full ? ' is-full' : ''}" role="listitem" data-owned="${escapeHtml(mat.id)}">` +
-      `<span class="mat-swatch" style="background:${mat.swatch}" aria-hidden="true"></span>` +
+      (mat.icon
+        ? `<img class="mat-icon" src="${escapeHtml(mat.icon)}" alt="" aria-hidden="true" loading="lazy" decoding="async" draggable="false">`
+        : `<span class="mat-swatch" style="background:${mat.swatch}" aria-hidden="true"></span>`) +
       `<span class="mat-name">${escapeHtml(mat.name)}</span>` +
       `<span class="mat-count">×${formatGold(mat.count)}</span>` +
       (full ? `<button type="button" class="sf-full" data-storage-full="${escapeHtml(mat.id)}" title="Storage full">FULL</button>` : '') +

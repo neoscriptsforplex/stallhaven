@@ -377,6 +377,17 @@ body {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
+/* Model render in place of the swatch: same box, picture contained and centred. */
+.mat-icon {
+  width: 0.72rem;
+  height: 0.72rem;
+  flex: none;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  pointer-events: none;
+}
+
 /* Materials drawer. Desktop: tab at the bottom centre, list slides up (max 25vh).
    Phones and narrow portrait: tab on the left edge, list slides out (max 25vw).
    Coarse pointers (portrait and landscape) open that side list at double width,
@@ -3924,7 +3935,7 @@ html.is-booting.is-scene-live #view {
   cursor: pointer;
 }
 .materials-row .sf-full + .mat-bin { margin-left: 4px; }
-.mat-discard { margin: 6px 8px 0; padding: 8px; }
+.mat-discard { margin: 6px 8px 0; padding: 8px; position: sticky; top: 0; z-index: 5; }
 .mat-discard-actions { display: flex; flex-wrap: wrap; gap: 4px; }
 .mat-discard-actions button { min-height: 32px; min-width: 40px; }
 @media (pointer: coarse) {
@@ -3955,4 +3966,5 @@ html.is-booting.is-scene-live #view {
   }
   .materials-row .sf-full::before { content: 'F'; font-size: 0.56rem; line-height: 14px; display: block; text-align: center; letter-spacing: 0; }
   .materials-drawer .mat-swatch { display: none; }
+  .materials-drawer .mat-icon { width: 14px; height: 14px; }
 }

@@ -355,7 +355,7 @@ async function bootGame() {
   loadSfxManifest().catch(() => {});
   restoreSoundMix({ musicVolume: getMusicVolume() });
   mountSoundSettings();
-  const sfx = createSfxDirector({ play: (id) => playSfx(id), loop: (name, on, gain = 1) => setSfxLoop(name, on, { gain }) });
+  const sfx = createSfxDirector({ play: (id, opts) => playSfx(id, opts), loop: (name, on, gain = 1) => setSfxLoop(name, on, { gain }) });
   intentBus.onResult((intent, result) => sfx.onIntent(intent, result, performance.now() / 1000));
   await waitForPlayGesture(() => {
     unlockAudio();

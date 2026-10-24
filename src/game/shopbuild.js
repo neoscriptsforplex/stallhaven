@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { addTuftMeshes, pickTuftVariant } from './grassTufts.js';
 import {
   EXPANSION_PADS,
   FOUNTAIN,
@@ -3134,59 +3135,27 @@ function buildProceduralTrapdoor() {
 
 function addLushGrass(root, grass, expansionIds, rand, furniture = null) {
   const clusters = gardenGrassClusters(expansionIds, furniture);
-  const bladeGeo = new THREE.ConeGeometry(0.016, 1, 4);
-  bladeGeo.translate(0, 0.5, 0);
-  const greens = [
-    new THREE.MeshStandardMaterial({
-      color: 0x3a7a30,
-      roughness: 0.92,
-      side: THREE.DoubleSide,
-    }),
-    new THREE.MeshStandardMaterial({
-      color: 0x4a8a38,
-      roughness: 0.9,
-      side: THREE.DoubleSide,
-    }),
-    new THREE.MeshStandardMaterial({
-      color: 0x2e6828,
-      roughness: 0.94,
-      side: THREE.DoubleSide,
-    }),
-  ];
   const dummy = new THREE.Object3D();
-  const tip = new THREE.Vector3();
-  const buckets = greens.map(() => []);
+  const buckets = [[], [], [], []];
   for (const cluster of clusters) {
-    const n = cluster.blades;
+    const n = 2 + Math.floor(rand() * 2);
+    const size = 0.8 + (cluster.scale - 0.68) * 0.4;
     for (let i = 0; i < n; i += 1) {
-      const x = cluster.x + (rand() - 0.5) * 0.4;
-      const z = cluster.z + (rand() - 0.5) * 0.4;
+      const x = cluster.x + (rand() - 0.5) * 0.5;
+      const z = cluster.z + (rand() - 0.5) * 0.5;
       if (!keepGardenSpot({ x, z, side: 'edge' }, expansionIds)) continue;
       if (pointHitsTrapdoor(x, z)) continue;
-      const h = (0.14 + rand() * 0.46) * cluster.scale;
-      dummy.position.set(x, 0, z);
-      dummy.rotation.set((rand() - 0.5) * 0.38, rand() * Math.PI * 2, (rand() - 0.5) * 0.48);
-      dummy.scale.set(0.65 + rand() * 0.55, h, 0.65 + rand() * 0.55);
+      const s = size * (0.8 + rand() * 0.4);
+      if (segmentHitsTrapdoor(x, z, x, z, 0.55 + 0.12 * s)) continue;
+      dummy.position.set(x, GRASS_PLANE_Y, z);
+      dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+      dummy.scale.set(s, s * (0.85 + rand() * 0.3), s);
       dummy.updateMatrix();
-      tip.set(0, 1, 0).applyMatrix4(dummy.matrix);
-      if (segmentHitsTrapdoor(x, z, tip.x, tip.z, 0.55)) continue;
-      buckets[Math.floor(rand() * buckets.length)].push(dummy.matrix.clone());
+      buckets[pickTuftVariant(rand)].push({ matrix: dummy.matrix.clone(), tint: 0.88 + rand() * 0.2 });
     }
   }
   void grass;
-  for (let i = 0; i < buckets.length; i += 1) {
-    const mats = buckets[i];
-    if (!mats.length) continue;
-    const mesh = new THREE.InstancedMesh(bladeGeo, greens[i], mats.length);
-    mesh.name = 'grass';
-    mesh.userData.kind = 'grass';
-    mesh.castShadow = false;
-    mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
-    for (let j = 0; j < mats.length; j += 1) mesh.setMatrixAt(j, mats[j]);
-    mesh.instanceMatrix.needsUpdate = true;
-    root.add(mesh);
-  }
+  addTuftMeshes(root, buckets);
 }
 
 export function buildShop(expansionIds = [], furniture = null) {
@@ -3435,15 +3404,8 @@ function runeFieldGrassBlocked(x, z) {
 /** Same blade clumps as the shop lawn, on a jittered grid over the whole field. */
 function addRuneFieldGrass(root, rand) {
   const rect = runeFieldRect();
-  const bladeGeo = new THREE.ConeGeometry(0.016, 1, 4);
-  bladeGeo.translate(0, 0.5, 0);
-  const greens = [
-    new THREE.MeshStandardMaterial({ color: 0x3a7a30, roughness: 0.92, side: THREE.DoubleSide }),
-    new THREE.MeshStandardMaterial({ color: 0x4a8a38, roughness: 0.9, side: THREE.DoubleSide }),
-    new THREE.MeshStandardMaterial({ color: 0x2e6828, roughness: 0.94, side: THREE.DoubleSide }),
-  ];
   const dummy = new THREE.Object3D();
-  const buckets = greens.map(() => []);
+  const buckets = [[], [], [], []];
   const cell = 1.15;
   const width = rect.maxX - rect.minX;
   const depth = rect.maxZ - rect.minZ;
@@ -3456,36 +3418,23 @@ function addRuneFieldGrass(root, rand) {
       const cx = rect.minX + (c + 0.18 + rand() * 0.64) * dx;
       const cz = rect.minZ + (r + 0.18 + rand() * 0.64) * dz;
       if (runeFieldGrassBlocked(cx, cz)) continue;
-      const blades = 10 + Math.floor(rand() * 8);
-      const scale = 0.68 + rand() * 1.05;
-      for (let i = 0; i < blades; i += 1) {
-        const x = cx + (rand() - 0.5) * 0.4;
-        const z = cz + (rand() - 0.5) * 0.4;
+      const n = 2 + Math.floor(rand() * 2);
+      const size = 0.8 + rand() * 0.42;
+      for (let i = 0; i < n; i += 1) {
+        const x = cx + (rand() - 0.5) * 0.5;
+        const z = cz + (rand() - 0.5) * 0.5;
         if (x < rect.minX || x > rect.maxX || z < rect.minZ || z > rect.maxZ) continue;
         if (runeFieldGrassBlocked(x, z)) continue;
-        const h = (0.14 + rand() * 0.46) * scale;
-        dummy.position.set(x, 0, z);
-        dummy.rotation.set((rand() - 0.5) * 0.38, rand() * Math.PI * 2, (rand() - 0.5) * 0.48);
-        dummy.scale.set(0.65 + rand() * 0.55, h, 0.65 + rand() * 0.55);
+        const s = size * (0.8 + rand() * 0.4);
+        dummy.position.set(x, GRASS_PLANE_Y, z);
+        dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+        dummy.scale.set(s, s * (0.85 + rand() * 0.3), s);
         dummy.updateMatrix();
-        buckets[Math.floor(rand() * buckets.length)].push(dummy.matrix.clone());
+        buckets[pickTuftVariant(rand)].push({ matrix: dummy.matrix.clone(), tint: 0.88 + rand() * 0.2 });
       }
     }
   }
-  for (let i = 0; i < buckets.length; i += 1) {
-    const mats = buckets[i];
-    if (!mats.length) continue;
-    const mesh = new THREE.InstancedMesh(bladeGeo, greens[i], mats.length);
-    mesh.name = 'grass';
-    mesh.userData.kind = 'grass';
-    mesh.castShadow = false;
-    mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
-    mesh.raycast = () => {};
-    for (let j = 0; j < mats.length; j += 1) mesh.setMatrixAt(j, mats[j]);
-    mesh.instanceMatrix.needsUpdate = true;
-    root.add(mesh);
-  }
+  addTuftMeshes(root, buckets);
 }
 
 /** Open grass field: centre return portal, one altar at each edge, trees and rocks between them. */

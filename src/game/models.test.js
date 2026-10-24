@@ -908,7 +908,7 @@ describe('outdoor and dungeon extras', () => {
         bins.set(key, (bins.get(key) ?? 0) + 1);
       }
     });
-    assert.ok(count > 4000, `rune field grass ${count}`);
+    assert.ok(count > 1500, `rune field grass tufts ${count}`);
     let occupied = 0;
     for (let r = 0; r < 8; r += 1) {
       for (let c = 0; c < 8; c += 1) {

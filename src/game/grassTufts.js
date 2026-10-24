@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import { isTouchHud } from './layoutQuery.js';
+
+/** Touch devices keep this share of tufts (perf on phones/tablets). */
+export const TOUCH_TUFT_DENSITY = 0.45;
+const CHUNK_M = 6;
+const chunks = new Set();
 
 /**
  * Chunky OSRS-style grass tufts (Model Man, model-swaps/grass). Flat per-face sRGB colours,
@@ -36,29 +42,57 @@ export function pickTuftVariant(rand) {
   return Math.floor(((r - 0.08) / 0.92) * 3) % 3;
 }
 
-/** Turn per-variant {matrix, tint} lists into InstancedMeshes named 'grass'. */
-export function addTuftMeshes(root, buckets) {
+/** Turn per-variant {matrix, tint} lists into chunked InstancedMeshes named 'grass'.
+ *  Chunks (6 m cells) frustum-cull offscreen and can be hidden by distance (updateGrassLod). */
+export function addTuftMeshes(root, buckets, density = isTouchHud() ? TOUCH_TUFT_DENSITY : 1) {
   const geos = grassTuftGeometries();
   const material = new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide,
   });
   const color = new THREE.Color();
+  const p = new THREE.Vector3();
   buckets.forEach((items, v) => {
-    if (!items.length) return;
-    const mesh = new THREE.InstancedMesh(geos[v], material, items.length);
-    mesh.name = 'grass';
-    mesh.userData.kind = 'grass';
-    mesh.castShadow = false;
-    mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
-    mesh.raycast = () => {};
+    const cells = new Map();
     items.forEach((it, j) => {
-      mesh.setMatrixAt(j, it.matrix);
-      color.setScalar(it.tint);
-      mesh.setColorAt(j, color);
+      if (density < 1 && ((j * 2654435761) >>> 0) % 1000 >= density * 1000) return;
+      p.setFromMatrixPosition(it.matrix);
+      const key = `${Math.floor(p.x / CHUNK_M)},${Math.floor(p.z / CHUNK_M)}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push(it);
     });
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    root.add(mesh);
+    for (const list of cells.values()) {
+      const mesh = new THREE.InstancedMesh(geos[v], material, list.length);
+      mesh.name = 'grass';
+      mesh.userData.kind = 'grass';
+      mesh.userData.grassChunk = true;
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.raycast = () => {};
+      list.forEach((it, j) => {
+        mesh.setMatrixAt(j, it.matrix);
+        color.setScalar(it.tint);
+        mesh.setColorAt(j, color);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      mesh.frustumCulled = true;
+      mesh.userData.center = mesh.boundingSphere.center.clone();
+      mesh.userData.radius = mesh.boundingSphere.radius;
+      mesh.addEventListener?.('removed', () => chunks.delete(mesh));
+      chunks.add(mesh);
+      root.add(mesh);
+    }
   });
+}
+
+const wp = new THREE.Vector3();
+/** Hide grass chunks farther than maxDist (metres) from the camera. Infinity = show all. */
+export function updateGrassLod(camera, maxDist) {
+  for (const m of chunks) {
+    if (!m.parent) { chunks.delete(m); continue; }
+    if (!Number.isFinite(maxDist)) { m.visible = true; continue; }
+    wp.copy(m.userData.center).applyMatrix4(m.parent.matrixWorld);
+    m.visible = wp.distanceTo(camera.position) - m.userData.radius < maxDist;
+  }
 }

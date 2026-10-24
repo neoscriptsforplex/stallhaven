@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { isTouchHud } from './layoutQuery.js';
 import { addTuftMeshes, pickTuftVariant } from './grassTufts.js';
 import {
   EXPANSION_PADS,
@@ -344,7 +345,7 @@ function grassGroundMat(width = GRASS_TILE_METRES, depth = GRASS_TILE_METRES) {
   map.generateMipmaps = true;
   map.minFilter = THREE.LinearMipmapLinearFilter;
   map.magFilter = THREE.LinearFilter;
-  map.anisotropy = 8; // three.js clamps to the renderer's max supported
+  map.anisotropy = isTouchHud() ? 2 : 8; // lower on touch devices for perf; three.js clamps to max
   map.repeat.set(width / GRASS_TILE_METRES, depth / GRASS_TILE_METRES);
   if (grassImage) { map.image = grassImage; map.needsUpdate = true; } else { grassPending.push(map); loadGrassImage(); }
   return new THREE.MeshStandardMaterial({ map, color: 0xffffff, roughness: 0.95, metalness: 0 });

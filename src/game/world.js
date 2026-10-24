@@ -193,6 +193,7 @@ import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 import { mountDisplayBasePose } from './craftpreview.js';
+import { ghostifyPieceVisual } from './pieceGhost.js';
 import { BUYER_MAX_WAIT, browseWait, buyerShouldWait, buyerSpawnClear, freeStandSpot, nextSpawnTime, pickBrowseStops, planCustomerSpawn, rescheduleKing } from './customerSim.js';
 import { intentBus } from './intents.js';
 import { createRemoteKeepers } from './remoteKeepers.js';
@@ -1416,7 +1417,7 @@ export function createWorld(canvas, state, opts = {}) {
     pieceGhost.removeFromParent();
     pieceGhost.traverse((child) => {
       if (!child.isMesh) return;
-      child.geometry?.dispose?.();
+      // Geometry is shared with the cached bundled model; only the cloned ghost materials are ours.
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       for (const mat of mats) mat?.dispose?.();
     });
@@ -1499,19 +1500,7 @@ export function createWorld(canvas, state, opts = {}) {
       pieceGhost = new THREE.Group();
       pieceGhost.name = 'construction-ghost';
       pieceGhost.userData.pieceId = pose.pieceId;
-      const visual = pieceVisual(pose.pieceId);
-      visual.traverse((child) => {
-        if (!child.isMesh) return;
-        const mats = Array.isArray(child.material) ? child.material : [child.material];
-        child.material = mats.map((mat) => {
-          const next = mat?.clone?.() ?? mat;
-          if (next) {
-            next.transparent = true;
-            next.opacity = 0.55;
-          }
-          return next;
-        });
-      });
+      const visual = ghostifyPieceVisual(pieceVisual(pose.pieceId), constructionPiece(pose.pieceId)?.tint);
       pieceGhost.add(visual);
       scene.add(pieceGhost);
     }

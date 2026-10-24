@@ -108,12 +108,16 @@ export function animPieceVisual(id, scale) {
   return mesh;
 }
 
+export const FIRE_LIGHT_REACH = Object.freeze({ fire: 0.5 });
+
 /** Add the fire PointLight on the placed group (full metres, not under the scaled root). */
 export function addFireLight(anchor, visual) {
   const info = visual?.userData?.animProp;
   if (!info?.fireLight || info.light) return null;
   const fl = info.fireLight;
-  const light = new THREE.PointLight(fl.color, fl.intensity, fl.distance_m, fl.decay ?? 2);
+  // Campfire is shown at half size (Rig/Luke 2026-10-24), so its light reach halves too.
+  const reach = FIRE_LIGHT_REACH[info.id] ?? 1;
+  const light = new THREE.PointLight(fl.color, fl.intensity, fl.distance_m * reach, fl.decay ?? 2);
   light.castShadow = false;
   light.name = 'fire-light';
   const pos = new THREE.Vector3();

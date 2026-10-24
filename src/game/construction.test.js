@@ -75,14 +75,14 @@ describe('construction catalogue', () => {
   it('moves without spending and keeps the piece in the save', () => {
     assert.equal(SAVE_VERSION, 15);
     const state = funded();
-    placeConstruction(state, 'bush', { x: -2, z: 9, rot: 0.2 });
+    placeConstruction(state, 'garden_bush', { x: -2, z: 9, rot: 0.2 });
     const xp = state.skills.getXp('construction');
     assert.equal(moveConstruction(state, 0, { x: -1, z: 8, rot: 1 }), true);
     assert.equal(state.skills.getXp('construction'), xp);
-    assert.equal(state.materials.flax, 38);
+    assert.equal(state.materials.flax, 37);
     const next = createState();
     assert.equal(applyState(next, serializeState(state)), true);
-    assert.deepEqual(next.furniture.placed[0], { id: 'bush', x: -1, z: 8, rot: 1, paid: 1000 });
+    assert.deepEqual(next.furniture.placed[0], { id: 'garden_bush', x: -1, z: 8, rot: 1, paid: 1000 });
     const old = serializeState(createState());
     old.version = 13;
     delete old.furniture.placed;
@@ -142,7 +142,7 @@ describe('construction trims (Luke 2026-10-24)', () => {
   });
   it('shrinks the listed pieces to two thirds', async () => {
     const mod = await import('./construction.js');
-    for (const id of ['standing_torch', 'crate', 'sacks', 'standing_candles', 'double_bed', 'basic_bed', 'fancy_fireplace', 'fancy_table', 'bush', 'suit_of_armour', 'sink', 'chair', 'fancy_chair', 'bench', 'throne', 'fireplace']) {
+    for (const id of ['standing_torch', 'crate', 'sacks', 'standing_candles', 'double_bed', 'basic_bed', 'fancy_fireplace', 'fancy_table', 'suit_of_armour', 'sink', 'chair', 'fancy_chair', 'bench', 'throne', 'fireplace']) {
       assert.equal(mod.constructionPiece(id).scale, 2 / 3, id);
     }
     assert.equal(mod.constructionPiece('pots_and_pans').scale, 1 / 3);

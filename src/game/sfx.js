@@ -103,6 +103,6 @@ export function saveSoundMix(storage, mix) {
 }
 
 /** Station id → its craft loop, or a one-shot that repeats while crafting. */
-export const STATION_LOOPS = Object.freeze({ sawmill: 'sawmill_loop', furnace: 'furnace_loop', range: 'cooking_loop', wheel: 'spinning_wheel_loop' });
-export const STATION_REPEATS = Object.freeze({ anvil: { id: 'anvil_hammer', every: 0.9 }, loom: { id: 'loom', every: 1.6 }, cauldron: { id: 'potion_mix', every: 3.2 } });
-export const STATION_STARTS = Object.freeze({ sawmill: 'sawmill', furnace: 'furnace', range: 'cooking_range', wheel: 'spinning_wheel' });
+export const STATION_LOOPS = Object.freeze({ sawmill: 'sawmill_loop', furnace: 'furnace_loop', range: 'cooking_loop', wheel: 'spinning_wheel_loop', potter: 'spinning_wheel_loop' });
+export const STATION_REPEATS = Object.freeze({ anvil: { id: 'anvil_hammer', every: 0.9 }, fletch: { id: 'anvil_hammer', every: 0.9 }, loom: { id: 'loom', every: 1.6 }, cauldron: { id: 'potion_mix', every: 3.2 } });
+export const STATION_STARTS = Object.freeze({ sawmill: 'sawmill', furnace: 'furnace', range: 'cooking_range', wheel: 'spinning_wheel', potter: 'spinning_wheel' });

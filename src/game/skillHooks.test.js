@@ -82,6 +82,7 @@ describe('skill xp hooks', () => {
 
     placeStation(state, 'range');
     state.materials.wheat = 1;
+    state.materials.water = 1;
     assert.equal(finishCraft(state, 'pot_of_flour'), 2);
     assert.equal(state.skills.getXp('cooking'), 2);
 

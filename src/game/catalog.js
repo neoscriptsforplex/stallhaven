@@ -367,7 +367,7 @@ export const MATERIALS = {
   ranarr: { id: 'ranarr', name: 'Ranarr', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0xc8d45a },
   lantadyme: { id: 'lantadyme', name: 'Lantadyme', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x5a3a8a },
   dwarf_weed: { id: 'dwarf_weed', name: 'Dwarf weed', restock: 0, start: 0, tier: 1, regenEvery: 0, gathered: true, herb: true, tint: 0x2a4a28 },
-  water: { id: 'water', name: 'Bucket of water', restock: 0, start: 12, tier: 1, regenEvery: 0, drawn: true },
+  water: { id: 'water', name: 'Bucket of Water', restock: 0, start: 12, tier: 1, regenEvery: 0, drawn: true },
   essence: { id: 'essence', name: 'Essence', restock: 0, start: 10, tier: 1, regenEvery: 0 },
   dwarven_plans: {
     id: 'dwarven_plans',
@@ -1145,7 +1145,7 @@ addRecipe({
   previousId: null,
   unlockNeed: 0,
   tier: 1,
-  cost: { materials: { wheat: 1 }, gold: 0 },
+  cost: { materials: { wheat: 1, water: 1 }, gold: 0 },
   time: 2,
   price: 0,
   buyers: [],

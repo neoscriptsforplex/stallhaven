@@ -2115,6 +2115,13 @@ export function buildWare(recipeId) {
     orb: 0xc8d8ee,
     egg: 0xf2e2b0,
     water: 0x3a7ec8,
+    guam: 0x1f6b1f,
+    marrentill: 0x3a8a45,
+    tarromin: 0x6a9a3a,
+    harralander: 0x8a6a28,
+    ranarr: 0xc8d45a,
+    lantadyme: 0x5a3a8a,
+    dwarf_weed: 0x2a4a28,
   };
   if (!recipe && materialTokenTint[recipeId] != null) {
     const host = new THREE.Group();

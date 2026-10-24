@@ -109,6 +109,7 @@ import {
   decideAfterWait,
   decidePurchase,
   discardFromChest,
+  discardMaterial,
   hasStock,
   isUnlocked,
   offerChoices,
@@ -212,7 +213,7 @@ describe('stall economy', () => {
     assert.equal(MATERIALS.soft_clay.restock, 0);
     assert.equal(MATERIALS.soft_clay.regenEvery, 0);
     assert.equal(MATERIALS.hard_clay.crafted, undefined);
-    assert.equal(MATERIALS.water.name, 'Bucket of water');
+    assert.equal(MATERIALS.water.name, 'Bucket of Water');
     assert.equal(MATERIALS.water.restock, 0);
     assert.equal(CUSTOMERS.pilgrim.offer, null);
     assert.equal(state.materials.logs, 0);
@@ -1236,8 +1237,11 @@ describe('material regen', () => {
     assert.equal(recipesForTab('food')[0].id, 'pot_of_flour');
     assert.equal(RECIPES.pot_of_flour.name, 'Pot of flour');
     assert.equal(CUSTOMERS.pilgrim.prefers.includes('pot_of_flour'), false);
+    assert.deepEqual(RECIPES.pot_of_flour.cost.materials, { wheat: 1, water: 1 });
+    const waterBefore = state.materials.water;
     assert.equal(startCraft(state, 'pot_of_flour', 0), true);
     assert.equal(state.materials.wheat, 50);
+    assert.equal(state.materials.water, waterBefore - 1);
     assert.deepEqual(completeCrafts(state, 2), ['pot_of_flour']);
     assert.equal(state.materials.flour, 1);
     assert.equal(state.chest.pot_of_flour, undefined);
@@ -2103,6 +2107,18 @@ describe('ores, appearance, king, and chest bin', () => {
     finishCraft(state, 'bread');
     assert.equal(discardFromChest(state, 'bread', 1), 1);
     assert.equal(chestCount(state, 'bread'), 1);
+  });
+
+  it('discards owned materials, capped at what you have', () => {
+    const state = createState();
+    state.materials.logs = 12;
+    assert.equal(discardMaterial(state, 'logs', 10), 10);
+    assert.equal(state.materials.logs, 2);
+    assert.equal(discardMaterial(state, 'logs', 10), 2);
+    assert.equal(state.materials.logs, 0);
+    assert.equal(discardMaterial(state, 'logs', 1), 0);
+    state.materials.flax = 5;
+    assert.equal(discardMaterial(state, 'flax', 'all'), 5);
   });
 
   it('clears the middle back-wall shelf when expanding behind the shop', () => {

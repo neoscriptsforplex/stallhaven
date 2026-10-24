@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { RECIPES, isCraftOreId } from './catalog.js';
+import { GROW_RECIPES, RECIPES, isCraftOreId } from './catalog.js';
+
+/** Herb products grown in farming patches preview as their bundled herb model. */
+const HERB_PREVIEW_IDS = new Set(GROW_RECIPES.map((r) => r.product));
 import { buildWare } from './models.js';
 
 const _box = new THREE.Box3();
@@ -211,7 +214,7 @@ export function createCraftPreview(canvas) {
   }
 
   function show(id) {
-    const next = RECIPES[id] || isCraftOreId(id) ? id : null;
+    const next = RECIPES[id] || isCraftOreId(id) || HERB_PREVIEW_IDS.has(id) ? id : null;
     if (next === recipeId) return;
     recipeId = next;
     if (mesh) {

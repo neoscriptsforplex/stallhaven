@@ -555,7 +555,7 @@ export function materialIsFull(state, materialId) {
   return isMaterialFull(state?.materials, materialId, storageCap(state));
 }
 
-/** "Logs full." / "Bucket of water full." Shared by chop, mine, pick, fountain, and later fishing. */
+/** "Logs full." / "Bucket of Water full." Shared by chop, mine, pick, fountain, and later fishing. */
 export function gatherFullMessage(materialId) {
   const name = MATERIALS[materialId]?.name ?? 'Storage';
   return `${name} full.`;
@@ -815,6 +815,16 @@ export function discardFromChest(state, recipeId, amount = 1) {
   if (left) state.chest[recipeId] = left;
   else delete state.chest[recipeId];
   if (state.ready) state.ready = chestReadyIds(state);
+  return n;
+}
+
+/** Throw away owned materials. Returns how many were removed (capped at owned). */
+export function discardMaterial(state, materialId, amount = 1) {
+  const have = Math.max(0, Math.floor(Number(state.materials?.[materialId]) || 0));
+  if (have < 1) return 0;
+  const want = amount === 'all' ? have : Math.max(1, Math.round(Number(amount) || 1));
+  const n = Math.min(have, want);
+  state.materials[materialId] = have - n;
   return n;
 }
 

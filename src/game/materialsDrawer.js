@@ -90,6 +90,7 @@ export function materialsDrawerHtml(materials, cap = 250) {
       `<span class="mat-name">${escapeHtml(mat.name)}</span>` +
       `<span class="mat-count">×${formatGold(mat.count)}</span>` +
       (full ? `<button type="button" class="sf-full" data-storage-full="${escapeHtml(mat.id)}" title="Storage full">FULL</button>` : '') +
+      `<button type="button" class="mat-bin" data-mat-discard="${escapeHtml(mat.id)}" title="Throw away" aria-label="Throw away ${escapeHtml(mat.name)}">🗑</button>` +
       '</div>';
   }).join('');
 }

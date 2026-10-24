@@ -38,9 +38,9 @@
 }
 
 /* 1b. Bag drawer toggle */
-.materials-toggle.osrs-bag { background: linear-gradient(180deg, #6e5b45 0 10%, #4a3b2b 10% 85%, #2a2016 85%); border: 2px solid #0e0905; border-bottom: none; width: 46px; height: 30px; display: grid; place-items: center; }
+.materials-toggle.osrs-bag { background: linear-gradient(180deg, #6e5b45 0 10%, #4a3b2b 10% 85%, #2a2016 85%); border: 2px solid #0e0905; border-bottom: none; width: 46px; height: 40px; display: grid; place-items: center; }
 .materials-toggle.osrs-bag .materials-arrow { display: none !important; }
-.materials-toggle.osrs-bag img { width: 24px; height: 24px; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.6)); }
+.materials-toggle.osrs-bag img { width: 28px; height: 28px; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.6)); }
 .materials-drawer.is-open .materials-toggle.osrs-bag { background: linear-gradient(180deg, #7a3a22 0 10%, #5e2a18 10% 85%, #3a180c 85%); }
 @media (orientation: portrait) and (pointer: coarse) {
   .materials-toggle.osrs-bag { width: 32px; height: 44px; border: 2px solid #0e0905; border-left: none; }

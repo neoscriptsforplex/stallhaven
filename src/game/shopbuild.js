@@ -1484,6 +1484,8 @@ function addWallVines(root, center) {
 export const RANGE_WORLD_SCALE = 2;
 /** Dump wooden plate is Y 0–16 of the 224-tall Cooking range mesh. */
 export const RANGE_PLATE_FRAC = 16 / 224;
+/** Metres of the base plate left showing above the floor. */
+export const RANGE_PLATE_SHOW = 0.05;
 
 function applyRangeWorldScale(mesh) {
   mesh.scale.multiplyScalar(RANGE_WORLD_SCALE);
@@ -1500,7 +1502,7 @@ function sinkRangePlate(mesh) {
   const box = measureVisibleBox(mesh);
   const height = box.max.y - box.min.y;
   if (!Number.isFinite(height) || height <= 0) return mesh;
-  mesh.position.y -= height * RANGE_PLATE_FRAC;
+  mesh.position.y -= height * RANGE_PLATE_FRAC - RANGE_PLATE_SHOW;
   mesh.userData.floorY = mesh.position.y;
   return mesh;
 }

@@ -25,7 +25,7 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'barrel_of_fish', name: 'Barrel of Fish', category: 'Storage', mount: 'outdoor', level: 1, gold: 250, tint: 0x8a6848, materials: { plank: 2, bronze_nails: 2 } }),
   piece({ id: 'barrel_of_sticks', name: 'Barrel of Sticks', category: 'Storage', mount: 'outdoor', level: 1, gold: 200, tint: 0x7a5a32, materials: { plank: 2, bronze_nails: 2 } }),
   piece({ id: 'old_bookshelf', name: 'Old Bookshelf', category: 'Storage', mount: 'outdoor', level: 10, gold: 900, tint: 0x6a4a30, materials: { oak_plank: 4, iron_nails: 6 } }),
-  piece({ id: 'fire', name: 'Fire', category: 'Light', mount: 'outdoor', level: 5, gold: 100, tint: 0xe07030, materials: { logs: 2 } }),
+  piece({ id: 'fire', scale: 0.5, name: 'Fire', category: 'Light', mount: 'outdoor', level: 5, gold: 100, tint: 0xe07030, materials: { logs: 2 } }),
   piece({ id: 'fireplace', scale: 2 / 3, name: 'Fireplace', category: 'Light', mount: 'outdoor', level: 1, gold: 1200, tint: 0x8a4030, materials: { willow_plank: 2, steel_nails: 6 } }),
   piece({ id: 'fancy_fireplace', scale: 2 / 3, name: 'Fancy Fireplace', category: 'Light', mount: 'outdoor', level: 1, gold: 2500, tint: 0xa05030, materials: { maple_plank: 3, mithril_nails: 8 } }),
   piece({ id: 'standing_candles', scale: 2 / 3, name: 'Standing Candles', category: 'Light', mount: 'outdoor', level: 60, gold: 300, tint: 0xe8d090, materials: { plank: 1, bronze_nails: 2 } }),
@@ -37,7 +37,6 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'tapestry', name: 'Tapestry', category: 'Wall', mount: 'wall', level: 28, gold: 1000, tint: 0x8a3a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
   piece({ id: 'tapestry_pole', name: 'Tapestry Pole', category: 'Storage', mount: 'outdoor', level: 28, gold: 500, tint: 0x8a6840, materials: { oak_plank: 1, iron_nails: 4 } }),
   piece({ id: 'landscape', hang: true, name: 'Landscape', category: 'Wall', mount: 'wall', level: 35, gold: 1200, tint: 0x5a8a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
-  piece({ id: 'bush', scale: 2 / 3, name: 'Bush', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 50, tint: 0x4a8a3a, materials: { flax: 2 } }),
   piece({ id: 'garden_bush', name: 'Garden Bush', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 120, tint: 0x4a7a2a, materials: { flax: 3 } }),
   piece({ id: 'flag_pole', scale: 0.5, name: 'Flag Pole', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 400, tint: 0xc04040, materials: { oak_plank: 2, iron_nails: 4 } }),
   piece({ id: 'statue', name: 'Statue', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 3000, tint: 0xb0b0b8, materials: { yew_plank: 2, adamant_nails: 6 } }),
@@ -52,6 +51,7 @@ export const CONSTRUCTION_PIECES = Object.freeze([
 
 /** Pieces taken out of the Build menu. Old saves get these materials back. */
 export const RETIRED_PIECES = Object.freeze({
+  bush: Object.freeze({ name: 'Bush', gold: 50, materials: Object.freeze({ flax: 2 }) }),
 });
 
 /** Materials owed for retired pieces still listed in an old save. */

@@ -38,17 +38,16 @@ export function cleanSlotName(raw) {
     .trim();
 }
 
-/** "Luke's Shop", or "Luke's Shop 2" when that name is already used by another slot. */
+/** "Shop 1", or the next free "Shop N" when that name is already used by another slot. */
+// eslint-disable-next-line no-unused-vars
 export function defaultSlotName(meta, slot, owner = DEFAULT_OWNER) {
-  const base = `${owner}'s Shop`;
   const used = new Set(
     Object.entries(meta?.slots ?? {})
       .filter(([k]) => Number(k) !== slot)
       .map(([, v]) => (v?.name ?? '').toLowerCase()),
   );
-  if (!used.has(base.toLowerCase())) return base;
-  for (let i = 2; ; i += 1) {
-    const name = `${base} ${i}`;
+  for (let i = 1; ; i += 1) {
+    const name = `Shop ${i}`;
     if (!used.has(name.toLowerCase())) return name;
   }
 }

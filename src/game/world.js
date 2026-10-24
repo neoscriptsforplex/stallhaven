@@ -1962,7 +1962,8 @@ export function createWorld(canvas, state, opts = {}) {
   function fellChoppedTree(x, z, now) {
     const result = completeTreeChop(x, z, now);
     if (!result.felled) return false;
-    startTreeTopple(findGardenPine(x, z), now);
+    const fallingTree = findGardenPine(x, z);
+    if (startTreeTopple(fallingTree, now)) topplingTrees.add(fallingTree);
     syncTreeVisuals();
     rebuildNav();
     if (
@@ -1985,15 +1986,14 @@ export function createWorld(canvas, state, opts = {}) {
     rebuildNav();
   }
 
+  // Only trees mid-fall are ticked, instead of walking the whole scene every frame.
+  const topplingTrees = new Set();
   function tickTopples(now) {
-    const visit = (root) => {
-      root?.traverse((child) => {
-        if (child.name !== 'pine' || !child.userData?.toppling) return;
-        tickTreeTopple(child, now);
-      });
-    };
-    visit(architecture);
-    visit(runeField?.root);
+    if (!topplingTrees.size) return;
+    for (const tree of topplingTrees) {
+      if (!tree?.userData?.toppling) { topplingTrees.delete(tree); continue; }
+      if (tickTreeTopple(tree, now)) topplingTrees.delete(tree);
+    }
   }
 
   function startFountainFill(pose) {

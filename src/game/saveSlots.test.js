@@ -143,7 +143,7 @@ test('the old single autosave key moves into slot 1 once and is deleted', async 
   assert.equal(await store.migrateLegacy(), 1);
   assert.equal(local.getItem(AUTOSAVE_KEY), null);
   assert.equal((await store.read(1)).gold, 4321);
-  assert.equal(store.meta.slots['1'].name, "Luke's Shop");
+  assert.equal(store.meta.slots['1'].name, 'Shop 1');
   assert.equal(store.meta.lastSlot, 1);
   assert.equal(await store.migrateLegacy(), null);
 });
@@ -151,10 +151,10 @@ test('the old single autosave key moves into slot 1 once and is deleted', async 
 test('migration picks the first empty slot when slot 1 is taken', async () => {
   const { local, store } = setup();
   await store.loadMeta();
-  await store.write(1, autosaveData(createState(), 0), "Luke's Shop");
+  await store.write(1, autosaveData(createState(), 0), 'Shop 1');
   local.setItem(AUTOSAVE_KEY, JSON.stringify(autosaveData(createState(), 0)));
   assert.equal(await store.migrateLegacy(), 2);
-  assert.equal(store.meta.slots['2'].name, "Luke's Shop 2");
+  assert.equal(store.meta.slots['2'].name, 'Shop 2');
   assert.equal(store.meta.lastSlot, 1);
 });
 
@@ -182,14 +182,14 @@ test('slot data round-trips crafts as time left and the shop name', async () => 
 
 /* ---------- naming ---------- */
 
-test('names are cleaned, capped and default to a unique Luke\'s Shop', () => {
+test('names are cleaned, capped and default to a unique Shop N', () => {
   assert.equal(cleanSlotName('  Rune   <b>Corner</b>  '), 'Rune bCorner/b');
   assert.equal(cleanSlotName('x'.repeat(50)).length, 32);
   assert.equal(cleanSlotName('   '), '');
-  const meta = { slots: { 1: { name: "Luke's Shop" }, 2: { name: "Luke's Shop 2" } } };
-  assert.equal(defaultSlotName({ slots: {} }, 1), "Luke's Shop");
-  assert.equal(defaultSlotName(meta, 3), "Luke's Shop 3");
-  assert.equal(defaultSlotName(meta, 1), "Luke's Shop", 'a slot does not clash with its own name');
+  const meta = { slots: { 1: { name: 'Shop 1' }, 2: { name: 'Shop 2' } } };
+  assert.equal(defaultSlotName({ slots: {} }, 1), 'Shop 1');
+  assert.equal(defaultSlotName(meta, 3), 'Shop 3');
+  assert.equal(defaultSlotName(meta, 1), 'Shop 1', 'a slot does not clash with its own name');
 });
 
 test('rename edits the slot card name only for filled slots', async () => {

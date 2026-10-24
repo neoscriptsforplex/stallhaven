@@ -1,0 +1,97 @@
+/* ===== Store of Geilenor · OSRS icon pass (Youi draft) ===== */
+:root { --stone-hi:#6e5b45; --stone:#4a3b2b; --stone-lo:#2a2016; --stone-edge:#0e0905; }
+
+/* 1. Stone icon buttons (all top-bar buttons) */
+#save-bar button.osrs-btn {
+  position: relative; min-width: 0; width: 40px; height: 40px; padding: 0;
+  display: grid; place-items: center;
+  border: 2px solid var(--stone-edge); border-radius: 4px;
+  background: linear-gradient(180deg, var(--stone-hi) 0 8%, var(--stone) 8% 85%, var(--stone-lo) 85%);
+  box-shadow: inset 1px 1px 0 rgba(255,235,200,.22), inset -1px -1px 0 rgba(0,0,0,.45), 0 2px 0 rgba(0,0,0,.4);
+  color: transparent;
+}
+#save-bar button.osrs-btn:hover { filter: brightness(1.15); }
+#save-bar button.osrs-btn[aria-expanded="true"], #save-bar button.osrs-btn.is-on {
+  background: linear-gradient(180deg, #7a3a22 0 8%, #5e2a18 8% 85%, #3a180c 85%);
+  box-shadow: inset 1px 1px 0 rgba(0,0,0,.5), inset 0 0 0 1px #c9a24e;
+}
+#save-bar button.osrs-btn > img.osrs-ico { width: 28px; height: 28px; image-rendering: pixelated; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.6)); pointer-events: none; }
+#save-bar button.osrs-btn > svg, #save-bar button.osrs-btn .hq-btn-label, #save-bar button.osrs-btn .osrs-txt { display: none; }
+#save-bar button.osrs-btn .hq-badge { position: absolute; top: -5px; right: -5px; color: #fff; }
+#save-bar button#coop-btn.osrs-btn .coop-count { position: absolute; bottom: -3px; right: -2px; font: 700 10px/1 system-ui; color: #ffd94a; text-shadow: 1px 1px 0 #000; }
+
+/* 8. Desktop: strip moves to bottom right (not phone portrait) */
+@media not ((orientation: portrait) and (pointer: coarse)) {
+  #save-bar {
+    top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); right: max(12px, env(safe-area-inset-right, 0px));
+    gap: 3px; padding: 5px; border: 2px solid var(--stone-edge); border-radius: 6px;
+    background: linear-gradient(#3a2d20, #241a10); box-shadow: inset 0 0 0 1px #6e5b45, 0 6px 18px rgba(0,0,0,.45);
+  }
+  /* docks that opened under the top bar now open above the strip */
+  .expand-dock, .cs-dock { top: auto; bottom: 72px; right: 12px; }
+}
+
+/* Phone portrait: same bar, icons only */
+@media (orientation: portrait) and (pointer: coarse) {
+  #save-bar button.osrs-btn { width: auto; height: auto; min-height: 44px; }
+  #save-bar button.osrs-btn > img.osrs-ico { width: 30px; height: 30px; }
+}
+
+/* 1b. Bag drawer toggle */
+.materials-toggle.osrs-bag { background: linear-gradient(180deg, #6e5b45 0 10%, #4a3b2b 10% 85%, #2a2016 85%); border: 2px solid #0e0905; border-bottom: none; width: 46px; height: 30px; display: grid; place-items: center; }
+.materials-toggle.osrs-bag .materials-arrow { display: none !important; }
+.materials-toggle.osrs-bag img { width: 24px; height: 24px; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.6)); }
+.materials-drawer.is-open .materials-toggle.osrs-bag { background: linear-gradient(180deg, #7a3a22 0 10%, #5e2a18 10% 85%, #3a180c 85%); }
+@media (orientation: portrait) and (pointer: coarse) {
+  .materials-toggle.osrs-bag { width: 32px; height: 44px; border: 2px solid #0e0905; border-left: none; }
+}
+
+/* 10. No "+N" under the gathering bar */
+.active-craft-yield { display: none !important; }
+
+/* 11. XP orb + drops */
+.xp-orb-wrap { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 12; display: flex; flex-direction: column; align-items: center; pointer-events: none; transition: opacity .4s; }
+.xp-orb-wrap[data-idle] { opacity: 0; }
+.xp-orb { --p: .4; pointer-events: auto; position: relative; width: 52px; height: 52px; border-radius: 50%;
+  background: conic-gradient(#ffd94a calc(var(--p) * 360deg), #2a1d12 0); border: 2px solid #0e0905;
+  box-shadow: 0 0 0 2px #6e5b45, 0 0 0 4px #0e0905, 0 4px 10px rgba(0,0,0,.5); cursor: help; }
+.xp-orb::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #5e4a36, #2a1d12 70%); border: 2px solid #0e0905; }
+.xp-orb img { position: absolute; inset: 11px; width: 26px; height: 26px; filter: drop-shadow(1px 1px 0 #000); }
+.xp-orb-total { margin-top: 6px; padding: 1px 8px; border: 1px solid #0e0905; border-radius: 3px; background: rgba(42,29,18,.85); color: #fff; font: 700 12px/1.3 system-ui; text-shadow: 1px 1px 0 #000; }
+.xp-drops { position: absolute; top: 62px; left: 50%; width: 0; height: 120px; }
+.xp-drop { position: absolute; left: 34px; top: 80px; display: flex; gap: 4px; align-items: center; white-space: nowrap; color: #fff; font: 700 14px/1 system-ui; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; animation: xp-rise 1.6s linear forwards; }
+.xp-drop img { width: 16px; height: 16px; }
+@keyframes xp-rise { from { transform: translateY(0); opacity: 1; } 80% { opacity: 1; } to { transform: translateY(-110px); opacity: 0; } }
+.xp-orb-tip { pointer-events: none; margin-top: 6px; min-width: 170px; padding: 6px 9px; border: 2px solid #0e0905; border-radius: 4px; background: #3a2d20; box-shadow: inset 0 0 0 1px #6e5b45; color: #f3e2c0; font: 12px/1.45 system-ui; }
+.xp-orb-tip b { color: #ffd94a; } .xp-orb-tip[hidden] { display: none; }
+.xp-orb-tip .row { display: flex; justify-content: space-between; gap: 12px; }
+@media (orientation: portrait) and (pointer: coarse) {
+  .xp-orb-wrap { top: calc(46px + env(safe-area-inset-top, 0px)); left: auto; right: 10px; transform: none; }
+  .xp-orb { width: 44px; height: 44px; } .xp-orb img { inset: 9px; width: 22px; height: 22px; }
+  .xp-drops { left: auto; right: 54px; } .xp-drop { left: auto; right: 0; }
+}
+
+/* 13. Settings (and every .expand-dock): fit with no scrollbar */
+.expand-dock.fit-panel { overflow: visible; max-height: none; }
+@media (max-height: 820px) and (min-width: 700px) {
+  #settings-dock.fit-panel { width: min(600px, calc(100vw - 24px)); columns: 2 260px; column-gap: 18px; }
+  #settings-dock.fit-panel > * { break-inside: avoid; }
+  #settings-dock.fit-panel > h2, #settings-dock.fit-panel > .cs-entry { column-span: all; }
+}
+#settings-dock.fit-panel .settings-x { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; min-width: 0; padding: 0; font-size: 12px; line-height: 1; }
+#settings-dock.fit-panel > [data-settings-close] { display: none; }
+
+/* 14. Level-up popup with unlocks */
+.skill-toast.has-unlocks { grid-template-columns: 36px auto; max-width: min(400px, calc(100vw - 24px)); pointer-events: auto; padding: 10px 14px 10px 10px; }
+.skill-toast .lu-unlocks { grid-column: 1 / -1; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(227,179,74,.35); }
+.skill-toast .lu-head { margin: 0 0 4px; color: #ffd94a; font: 700 11px/1 system-ui; letter-spacing: .08em; text-transform: uppercase; }
+.skill-toast .lu-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.skill-toast .lu-list li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px; color: #f3e2c0; font-size: 0.82rem; }
+.skill-toast .lu-icons { display: flex; } .skill-toast .lu-icons img, .skill-toast .lu-icons i { width: 20px; height: 20px; margin-right: -4px; border: 1px solid #0e0905; border-radius: 3px; background: #2a1d12; display: grid; place-items: center; font-style: normal; font-size: 13px; }
+.skill-toast .lu-count { color: #c8b48a; font-size: .74rem; }
+.skill-toast .lu-more { color: #c8b48a; font-size: .74rem; margin: 3px 0 0; }
+.materials-toggle.osrs-bag > span { display: none !important; }
+#settings-dock.fit-panel .cheat-form { display: flex; gap: 6px; } #settings-dock.fit-panel .cheat-form input { flex: 1; min-width: 0; }
+@media (orientation: portrait) and (pointer: coarse) {
+  #materials-toggle.osrs-bag { width: 34px !important; min-width: 0; height: 44px; padding: 0; font-size: 0; }
+}

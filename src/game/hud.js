@@ -145,7 +145,10 @@ import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequi
 import { bindSkillsPanel, showLevelUpToast } from './skillsPanel.js';
 import { bindSkillGuide } from './skillGuide.js';
 import { bindHeroesPanel } from './heroesPanel.js';
-import { nextUnlockLabel, unlockNamesBetween } from './skillLevels.js';
+import { nextUnlockLabel, unlockNamesBetween, unlocksBetween } from './skillLevels.js';
+import { groupUnlocks, unlockListHtml } from './unlockGroups.js';
+import { createXpOrb } from './xpOrb.js';
+import { autoFit } from './fitPanel.js';
 import {
   brightnessPercent,
   clampBrightness,
@@ -3018,6 +3021,8 @@ export function bindHud(root, state, world) {
     else openSettings();
   });
   settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
+  settingsDock?.querySelector('[data-settings-x]')?.addEventListener('click', closeSettingsDock);
+  if (settingsDock) autoFit(settingsDock);
   const playerFile = settingsDock?.querySelector('[data-player-model-file]');
   settingsDock?.querySelector('[data-player-model-upload]')?.addEventListener('click', () => playerFile?.click());
   playerFile?.addEventListener('change', () => {
@@ -3178,6 +3183,7 @@ export function bindHud(root, state, world) {
     },
   });
   skillGuide = bindSkillGuide({ skills, panel: skillsPanel });
+  createXpOrb({ skills, host: document.body });
   heroesPanel = bindHeroesPanel({
     state,
     offerFullscreen: shouldOfferFullscreen(fullscreenEnv()),
@@ -3207,7 +3213,8 @@ export function bindHud(root, state, world) {
       ? ` New: ${unlocked.slice(0, 6).join(', ')}${unlocked.length > 6 ? '…' : ''}.`
       : '';
     pushLog(state, `Congratulations, your ${event.name} level is now ${event.level}.${extra}`);
-    showLevelUpToast({ ...event, unlocked });
+    const unlockHtml = unlockListHtml(groupUnlocks(unlocksBetween(event.skillId, event.from, event.level, hiddenCraft), RECIPES));
+    showLevelUpToast({ ...event, unlocked, unlockHtml }, { onClick: (id) => skillGuide?.open?.(id) });
   });
 
   world.onPick((event) => {
@@ -3559,10 +3566,7 @@ export function bindHud(root, state, world) {
         activeCraft.hidden = false;
         if (activeCraftName) activeCraftName.textContent = `${mining.verb ?? 'Mining'} ${mining.name}`;
         activeCraft.style.setProperty('--t', String(mining.t ?? 0));
-        if (activeCraftYield) {
-          activeCraftYield.hidden = false;
-          activeCraftYield.textContent = `+${mining.yield ?? 0}`;
-        }
+        if (activeCraftYield) activeCraftYield.hidden = true;
       } else if (busyId) {
         const progress = craftProgress(state, busyId, now);
         activeCraft.hidden = false;
@@ -3660,7 +3664,7 @@ export function bindHud(root, state, world) {
     if (!materialsDrawer) return;
     materialsDrawer.classList.toggle('is-open', open);
     materialsToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
-    materialsToggle?.setAttribute('aria-label', open ? 'Hide materials' : 'Show materials');
+    materialsToggle?.setAttribute('aria-label', open ? 'Hide inventory' : 'Show inventory');
     if (materialsPanel) {
       materialsPanel.setAttribute('aria-hidden', open ? 'false' : 'true');
       materialsPanel.inert = !open;

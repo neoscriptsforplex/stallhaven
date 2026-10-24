@@ -2865,3 +2865,14 @@ describe('OSRS anvil bar costs', () => {
     assert.equal(recipeCost(RECIPES.iron_nails).materials.iron_bar, 1);
   });
 });
+
+describe('rune crafting needs the portal', () => {
+  it('blocks runes until a portal is placed', () => {
+    const state = createState();
+    state.materials.essence = 1000;
+    delete state.furniture.portal;
+    assert.match(craftBlockReason(state, 'air_rune'), /portal/i);
+    state.furniture.portal = { x: 0, z: 0, rot: 0 };
+    assert.doesNotMatch(craftBlockReason(state, 'air_rune') || '', /portal/i);
+  });
+});

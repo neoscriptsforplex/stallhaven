@@ -19,6 +19,7 @@ import {
   heroQuest,
   heroTitle,
   idleHeroes,
+  questLockReason,
   questProgress,
   questStatus,
   readyQuests,
@@ -278,6 +279,15 @@ export function bindHeroesPanel({
     const status = questStatus(state.hq, quest.id, now);
     const rewards = `<div class="quest-rewards">${rewardChips(quest.rewards)}</div>`;
     const title = `<div class="quest-title"><strong>${esc(quest.enemy)}</strong><span class="meta">${esc(formatDuration(quest.duration))}</span></div>`;
+    const lock = status === 'idle' ? questLockReason(state.hq, quest.id, state.skills?.getLevel?.('crafting') ?? 1) : '';
+    if (lock) {
+      return `<article class="quest-card is-locked" data-quest="${quest.id}">
+        ${questSvg(quest)}
+        ${title}
+        ${rewards}
+        <div class="quest-side"><span class="quest-hint">🔒 ${esc(lock)}</span></div>
+      </article>`;
+    }
     if (status === 'idle') {
       const idle = idleHeroes(state.hq);
       if (pickedHero && !idle.includes(pickedHero)) pickedHero = null;
@@ -373,7 +383,7 @@ export function bindHeroesPanel({
       pickedHero ?? '',
       hired.map((cls) => cls.id).join(','),
       idleHeroes(state.hq).join(','),
-      ...rows.map((quest) => `${quest.id}:${questStatus(state.hq, quest.id, now)}:${state.hq.quests.active[quest.id]?.heroId ?? ''}`),
+      ...rows.map((quest) => `${quest.id}:${questStatus(state.hq, quest.id, now)}:${state.hq.quests.active[quest.id]?.heroId ?? ''}:${questLockReason(state.hq, quest.id, state.skills?.getLevel?.('crafting') ?? 1)}`),
     ].join('|');
     if (sig !== questHtml) {
       questHtml = sig;

@@ -256,7 +256,7 @@ function gatherXp(state, intent) {
 function applyQuestIntent(state, intent) {
   if (!state.hq) state.hq = emptyHeroQuestState();
   const now = Date.now();
-  if (intent.type === 'startQuest') return done(startQuest(state.hq, intent.questId, intent.heroId, now));
+  if (intent.type === 'startQuest') return done(startQuest(state.hq, intent.questId, intent.heroId, now, state.skills?.getLevel?.('crafting') ?? 1));
   if (intent.type === 'recallQuest') return done(recallQuest(state.hq, intent.questId));
   const ids = intent.questId === 'all' ? readyQuests(state.hq, now) : [intent.questId];
   const rows = [];

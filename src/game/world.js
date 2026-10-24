@@ -1,4 +1,5 @@
 import { onLayoutChange } from './layoutQuery.js';
+import { graphicsProfile, getGraphicsLevel, onGraphicsChange, initGraphicsSettings } from './graphics.js';
 import * as THREE from 'three';
 import {
   ARMOUR_SLOTS,
@@ -341,7 +342,6 @@ export function createWorld(canvas, state, opts = {}) {
   let localActivityListener = null;
   let rebuildRemoteKeepers = null;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -377,6 +377,26 @@ export function createWorld(canvas, state, opts = {}) {
   sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 48;
+  const applyGraphics = () => {
+    const g = graphicsProfile(getGraphicsLevel(), window.devicePixelRatio || 1);
+    renderer.setPixelRatio(g.pixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    if (renderer.shadowMap.enabled !== g.shadows) {
+      renderer.shadowMap.enabled = g.shadows;
+      scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); });
+    }
+    sun.castShadow = g.shadows;
+    if (sun.shadow.mapSize.x !== g.shadowMap) {
+      sun.shadow.mapSize.set(g.shadowMap, g.shadowMap);
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+    }
+    camera.far = g.far;
+    camera.updateProjectionMatrix();
+  };
+  applyGraphics();
+  onGraphicsChange(applyGraphics);
+  initGraphicsSettings();
   sun.shadow.camera.left = -22;
   sun.shadow.camera.right = 22;
   sun.shadow.camera.top = 22;

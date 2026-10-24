@@ -133,6 +133,7 @@ const fishing = {
   tabs: [{
     id: 'pond', label: 'Pond',
     rows: [
+      ['raw_shrimp', 'Raw shrimp', '#e8a060'],
       ['raw_salmon', 'Raw salmon', '#d98a72'],
       ['raw_lobster', 'Raw lobster', '#3d5a6e'],
       ['raw_monkfish', 'Raw monkfish', '#8c7a62'],
@@ -246,7 +247,7 @@ const cooking = {
   tabs: [{
     id: 'food', label: 'Food',
     rows: [
-      [1, 'Pot of flour', 'Mill wheat'], [1, 'Bread'], [10, 'Salmon'], [20, 'Pizza'], [30, 'Pie'], [35, 'Cake'],
+      [1, 'Pot of flour', 'Mill wheat'], [1, 'Bread'], [1, 'Shrimp'], [25, 'Salmon'], [20, 'Pizza'], [30, 'Pie'], [35, 'Cake'],
       [40, 'Lobster'], [47, 'Fish pie'], [50, 'Chocolate cake'], [60, 'Curry'], [62, 'Monkfish'],
       [80, 'Shark'], [84, 'Anglerfish'], [95, 'Summer pie'],
     ].map(([lv, name, desc]) => ({ lv, name, desc: desc ?? 'Cook on the range', icon: 'food', tint: '#e0a050' }))

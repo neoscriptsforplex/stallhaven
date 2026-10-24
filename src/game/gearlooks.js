@@ -78,6 +78,7 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'maple_logs', folder: 'materials/maple-logs' },
   { id: 'yew_logs', folder: 'materials/yew-logs' },
   { id: 'magic_logs', folder: 'materials/magic-logs' },
+  { id: 'raw_shrimp', folder: 'materials/raw-shrimp' },
   { id: 'raw_salmon', folder: 'materials/raw-salmon' },
   { id: 'raw_lobster', folder: 'materials/raw-lobster' },
   { id: 'raw_monkfish', folder: 'materials/raw-monkfish' },

@@ -2795,6 +2795,7 @@ function addProceduralFood(group, recipe) {
     cake: () => addCake(group, tint),
     pie: () => addPie(group, tint, 0xb45a4a),
     fish_pie: () => addPie(group, tint, 0x7a9aaa),
+    shrimp: () => addShrimp(group, tint),
     salmon: () => addFish(group, tint, 1),
     lobster: () => addLobster(group, tint),
     chocolate_cake: () => addCake(group, tint, 0x3a2218),
@@ -3080,6 +3081,17 @@ function addCake(group, tint, icingColor = 0xf4e8d0) {
   const icing = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.12, 0.03, 12), cloth(icingColor)));
   icing.position.y = 0.12;
   group.add(icing);
+}
+
+function addShrimp(group, tint) {
+  const bundled = getBundledLook('raw_shrimp');
+  if (bundled) {
+    const standIn = new THREE.Group();
+    addFish(standIn, tint, 0.55);
+    group.add(wrapBundledProp(bundled, standIn, { name: 'raw_shrimp', fit: 'max' }));
+    return;
+  }
+  addFish(group, tint, 0.55);
 }
 
 function addFish(group, tint, scale = 1, lantern = false) {

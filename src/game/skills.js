@@ -182,14 +182,16 @@ export const WOODCUTTING_LEVELS = Object.freeze({
 export const ESSENCE_DOUBLE_LEVEL = 50;
 
 /**
- * Fishing spot unlocks at the pond. Salmon has no requirement (Luke's "lvl 0";
- * skills start at 1).
+ * Fishing spot unlocks. OSRS levels for the fish this game actually has.
+ * OSRS 1 is this game's 1 (skills do not start at 0). Anglerfish is not on
+ * that list, so it stays the top spot at 80.
  */
 export const FISHING_LEVELS = Object.freeze({
-  raw_salmon: 1,
-  raw_lobster: 20,
-  raw_monkfish: 40,
-  raw_shark: 60,
+  raw_shrimp: 1,
+  raw_salmon: 30,
+  raw_lobster: 40,
+  raw_monkfish: 62,
+  raw_shark: 76,
   raw_anglerfish: 80,
 });
 
@@ -224,8 +226,8 @@ export const GATHER_NODES = Object.freeze([
   { id: 'adamant', name: 'Adamantite rock', skill: 'mining', level: MINING_LEVELS.adamant, xp: 240 },
   { id: 'runite', name: 'Runite rock', skill: 'mining', level: MINING_LEVELS.runite, xp: 505 },
   { id: 'dragon', name: 'Dragon rock', skill: 'mining', level: MINING_LEVELS.dragon, xp: 645 },
-  // XP per completed catch bar, on the woodcutting curve by unlock level
-  // (pine 9 @1, yew 175 @60, magic 365 @75). Yields step down like the rocks.
+  // One fish per completed catch bar. XP still rises with the spot.
+  { id: 'raw_shrimp', name: 'Shrimp fishing spot', skill: 'fishing', level: FISHING_LEVELS.raw_shrimp, xp: 8 },
   { id: 'raw_salmon', name: 'Salmon fishing spot', skill: 'fishing', level: FISHING_LEVELS.raw_salmon, xp: 10 },
   { id: 'raw_lobster', name: 'Lobster fishing spot', skill: 'fishing', level: FISHING_LEVELS.raw_lobster, xp: 26 },
   { id: 'raw_monkfish', name: 'Monkfish fishing spot', skill: 'fishing', level: FISHING_LEVELS.raw_monkfish, xp: 70 },

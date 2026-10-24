@@ -354,11 +354,12 @@ function fishingSpot(id, materialId, name, water, stand) {
 }
 
 /**
- * Five fishing spots, one fish each, like one rock per ore. `x/z` is the
- * bubbling water the line drops into; `stand` is where the feet go (shore or
- * dock end) and `face` the yaw toward the water. Levels live in skills.js.
+ * One fishing spot per fish, like one rock per ore. `x/z` is the bubbling
+ * water the line drops into; `stand` is where the feet go (shore or dock end)
+ * and `face` the yaw toward the water. Levels live in skills.js.
  */
 export const FISHING_SPOTS = Object.freeze([
+  fishingSpot('shrimp', 'raw_shrimp', 'Shrimp fishing spot', { x: 7.9, z: 7.85 }, { x: 6.55, z: 8.4 }),
   fishingSpot('salmon', 'raw_salmon', 'Salmon fishing spot', { x: 8.05, z: 8.6 }, { x: 7.25, z: 8.6 }),
   fishingSpot('lobster', 'raw_lobster', 'Lobster fishing spot', { x: 9.7, z: 7.25 }, { x: 9.7, z: 6.02 }),
   fishingSpot('monkfish', 'raw_monkfish', 'Monkfish fishing spot', { x: 10.85, z: 8.2 }, { x: 12.05, z: 8.2 }),

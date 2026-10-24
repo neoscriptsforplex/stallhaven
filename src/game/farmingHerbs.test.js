@@ -158,7 +158,7 @@ describe('herb patches', () => {
   });
 
   it('replaces the generic herb with seven real ones', () => {
-    assert.equal(SAVE_VERSION, 14);
+    assert.equal(SAVE_VERSION, 15);
     assert.equal(MATERIALS.herbs, undefined);
     assert.equal(MATERIALS.guam.start, 8);
     assert.equal(MATERIALS.guam.restock, 0);

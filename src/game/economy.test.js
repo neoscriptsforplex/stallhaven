@@ -788,7 +788,7 @@ describe('catalog', () => {
     assert.equal(RECIPES.wizard_robe.name, 'Wizard Robe');
     assert.equal(RECIPES.bronze_arrows.name, 'Bronze Arrows');
     assert.equal(RECIPES.dragon_arrows.name, 'Dragon Arrows');
-    assert.equal(recipes.filter((r) => r.category === 'food').length, 14);
+    assert.equal(recipes.filter((r) => r.category === 'food').length, 15);
     assert.equal(recipes.filter((r) => r.category === 'potion').length, 8);
     assert.ok(RECIPES.salmon.price < RECIPES.cake.price);
     assert.ok(RECIPES.cake.price < RECIPES.lobster.price);
@@ -799,7 +799,8 @@ describe('catalog', () => {
     assert.ok(RECIPES.shark.price < RECIPES.summer_pie.price);
     assert.ok(RECIPES.summer_pie.price < RECIPES.anglerfish.price);
     assert.equal(RECIPES.cake.previousId, 'pizza');
-    assert.equal(RECIPES.salmon.previousId, 'bread');
+    assert.equal(RECIPES.shrimp.previousId, 'bread');
+    assert.equal(RECIPES.salmon.previousId, 'shrimp');
     assert.equal(RECIPES.lobster.previousId, 'salmon');
     assert.equal(RECIPES.chocolate_cake.previousId, 'lobster');
     assert.equal(recipeCost(RECIPES.chocolate_cake).materials.chocolate, 1);
@@ -945,7 +946,7 @@ describe('catalog', () => {
     assert.ok(food.some((r) => r.id === 'bread'));
     assert.ok(food.some((r) => r.id === 'salmon'));
     assert.ok(food.some((r) => r.id === 'anglerfish'));
-    assert.equal(food.length, 14);
+    assert.equal(food.length, 15);
     assert.equal(food[0].id, 'pot_of_flour');
     assert.equal(RECIPES.pot_of_flour.outputMaterial, 'flour');
     assert.deepEqual(RECIPES.pot_of_flour.buyers, []);
@@ -1530,15 +1531,16 @@ describe('furnace and spinning wheel', () => {
   it('unlocks feast foods by Cooking level', () => {
     const state = createState();
     placeStation(state, 'range');
+    assert.equal(isUnlocked(state, 'shrimp'), true);
     assert.equal(isUnlocked(state, 'salmon'), false);
     assert.equal(isUnlocked(state, 'pizza'), false);
     state.craftCounts.bread = 20;
     assert.equal(isUnlocked(state, 'salmon'), false);
-    reachLevel(state, 'cooking', RECIPES.salmon.requires.level);
-    assert.equal(isUnlocked(state, 'salmon'), true);
-    assert.equal(isUnlocked(state, 'pizza'), false);
     reachLevel(state, 'cooking', RECIPES.pizza.requires.level);
     assert.equal(isUnlocked(state, 'pizza'), true);
+    assert.equal(isUnlocked(state, 'salmon'), false);
+    reachLevel(state, 'cooking', RECIPES.salmon.requires.level);
+    assert.equal(isUnlocked(state, 'salmon'), true);
     assert.equal(isUnlocked(state, 'cake'), false);
     assert.equal(isUnlocked(state, 'lobster'), false);
     reachLevel(state, 'cooking', RECIPES.cake.requires.level);
@@ -1546,6 +1548,7 @@ describe('furnace and spinning wheel', () => {
     assert.equal(isUnlocked(state, 'lobster'), false);
     reachLevel(state, 'cooking', RECIPES.lobster.requires.level);
     assert.equal(isUnlocked(state, 'lobster'), true);
+    assert.ok(CUSTOMERS.pilgrim.prefers.includes('shrimp'));
     assert.ok(CUSTOMERS.pilgrim.prefers.includes('salmon'));
     assert.ok(CUSTOMERS.pilgrim.prefers.includes('anglerfish'));
     assert.equal(state.materials.chocolate, MATERIALS.chocolate.start);

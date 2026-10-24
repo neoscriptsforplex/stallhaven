@@ -3116,8 +3116,9 @@ export function bindHud(root, state, world) {
       paintBuild();
     } else if (result === 'onesmallfavour') {
       world.setChefHat(true);
-    } else if (result === 'maxcape') {
+    } else if (result === 'maxcape' || result === 'maxresource') {
       paintCrafts();
+      paintBuild();
     }
     const messages = {
       motherlode: 'Motherlode: +1,000,000 gp.',
@@ -3128,6 +3129,7 @@ export function bindHud(root, state, world) {
       freshstart: 'Fresh start. All progress reset.',
       maxcape: 'Maxcape: every craft line is unlocked.',
       onesmallfavour: 'A chef hat sits on your head.',
+      maxresource: 'Maxresource: every material is filled to your storage cap.',
     };
     if (note) {
       note.hidden = false;

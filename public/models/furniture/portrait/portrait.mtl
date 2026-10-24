@@ -10,3 +10,7 @@ newmtl c4
 Kd 0.6078 0.4980 0.0235
 newmtl c5
 Kd 0.8196 0.6745 0.0314
+
+newmtl painting
+Kd 1 1 1
+map_Kd portrait_painting.png

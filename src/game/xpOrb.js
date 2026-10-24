@@ -3,7 +3,7 @@ import { SKILLS, progressForXp, levelForXp, MAX_LEVEL } from './skills.js';
 const NAME = Object.fromEntries(SKILLS.map((s) => [s.id, s.name]));
 const fmt = (n) => Math.round(n).toLocaleString();
 
-export function createXpOrb({ skills, host = document.body, iconBase = `${import.meta.env?.BASE_URL ?? '/'}icons/skills/`, idleMs = 6000 }) {
+export function createXpOrb({ skills, host = document.body, iconBase = `${import.meta.env?.BASE_URL ?? './public/'}icons/skills/`, idleMs = 6000 }) {
   const wrap = document.createElement('div');
   wrap.className = 'xp-orb-wrap'; wrap.dataset.idle = '';
   wrap.innerHTML = `<button type="button" class="xp-orb" aria-label="XP orb"><img alt="" /></button>

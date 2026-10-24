@@ -2260,6 +2260,9 @@ export function createWorld(canvas, state, opts = {}) {
     shopkeeper.rotation.y = turnYaw(shopkeeper.rotation.y, counterLookYaw(), dt);
   }
 
+  /** Final point of the current walk, so a snag mid-route can re-plan once. */
+  let walkGoal = null;
+
   function applyWalkPath(path) {
     if (!path?.length) return false;
     servingAtCounter = false;
@@ -2267,6 +2270,7 @@ export function createWorld(canvas, state, opts = {}) {
     playerPath.length = 0;
     playerPath.push(...path);
     const goal = path[path.length - 1];
+    walkGoal = { x: goal.x, z: goal.z, replanned: false };
     moveMarker.position.set(goal.x, 0.1, goal.z);
     moveMarker.visible = true;
     localMoveListener?.({ x: goal.x, z: goal.z, scene: sceneMode });
@@ -2523,6 +2527,15 @@ export function createWorld(canvas, state, opts = {}) {
           const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
           const again = planSceneWalk(from, { x: pendingUse.x, z: pendingUse.z, releaseTree: pendingUse.releaseTree });
           if (again?.length) playerPath.push(...again);
+        } else if (!pendingUse && walkGoal && !walkGoal.replanned) {
+          // Plain walk (e.g. past the fountain) snagged on a corner: re-plan once.
+          walkGoal.replanned = true;
+          const from = { x: shopkeeper.position.x, z: shopkeeper.position.z };
+          const again = planSceneWalk(from, walkGoal);
+          if (again?.length) {
+            playerPath.push(...again);
+            moveMarker.visible = true;
+          }
         }
         return;
       }

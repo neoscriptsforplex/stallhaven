@@ -1487,7 +1487,7 @@ export const RANGE_WORLD_SCALE = 2;
 /** Dump wooden plate is Y 0–16 of the 224-tall Cooking range mesh. */
 export const RANGE_PLATE_FRAC = 16 / 224;
 /** Metres of the base plate left showing above the floor. */
-export const RANGE_PLATE_SHOW = 0.05;
+export const RANGE_PLATE_SHOW = 0.14;
 
 function applyRangeWorldScale(mesh) {
   mesh.scale.multiplyScalar(RANGE_WORLD_SCALE);

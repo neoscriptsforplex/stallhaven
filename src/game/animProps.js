@@ -12,6 +12,7 @@ export const ANIM_PROP_FILES = {
   fireplace: 'fireplace_anim.glb',
   fancy_fireplace: 'fancy_fireplace_anim.glb',
   cauldron: 'cauldron_anim.glb',
+  lumbridge_fountain: 'lumbridge_fountain_anim.glb',
 };
 
 /** Cap on live fire PointLights: each extra light costs every lit shader. */
@@ -82,7 +83,7 @@ export function attachAnimProp(mesh, id) {
     if (brewClip) info.brew = mixer.clipAction(brewClip);
     info.idle?.play();
   } else {
-    const burn = findClip(src.animations, 'Burn');
+    const burn = findClip(src.animations, 'Burn') ?? findClip(src.animations, 'Flow');
     if (burn) mixer.clipAction(burn).play();
     const fl = fireLightSpec(mesh);
     if (fl) {

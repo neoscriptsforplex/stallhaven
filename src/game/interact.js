@@ -3,7 +3,7 @@ import { PLAYER_RADIUS, isWalkable, planPlayerWalk, playerObstacles } from './na
 import { FOUNTAIN, fishingSpotById, furnitureHalfSize, furnitureVisualYaw, playerWalkFloors, PORTAL_TARGET_HEIGHT, POTTER_SIZE, TREE_TRUNK_RADIUS } from './layout.js';
 
 export const USE_STATIONS = ['anvil', 'chest', 'range', 'furnace', 'cauldron', 'wheel', 'loom', 'fletch', 'potter', 'sawmill', 'portal'];
-export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder', 'fountain', 'farming_patch', 'fishing_spot']);
+export const USE_KINDS = new Set([...USE_STATIONS, 'trapdoor', 'ladder', 'boulder', 'fountain', 'pond', 'farming_patch', 'fishing_spot']);
 
 function stationHit(kind, height, pickY) {
   const { hw, hd } = furnitureHalfSize(kind);
@@ -218,12 +218,37 @@ export const FOUNTAIN_STAND_LOCAL = { x: 0.147, z: -1.709 };
 /** The four fill stands (S, W, N, E of the bowl), each with the yaw that faces it. */
 export function fountainStands(pose = FOUNTAIN) {
   const out = [];
+  // Placed fountains carry their own rot (anchor yaw) and scale (× the 0.01125 dump scale).
+  const rot = Number.isFinite(pose?.rot) ? pose.rot : 0;
+  const k0 = Number.isFinite(pose?.scale) && pose.scale > 0 ? pose.scale : 1;
   for (let k = 0; k < 4; k += 1) {
-    const yaw = (k * Math.PI) / 2;
+    const yaw = rot + (k * Math.PI) / 2;
     const c = Math.cos(yaw); const s = Math.sin(yaw);
-    const { x, z } = FOUNTAIN_STAND_LOCAL;
+    const x = FOUNTAIN_STAND_LOCAL.x * k0; const z = FOUNTAIN_STAND_LOCAL.z * k0;
     out.push({ x: (pose?.x ?? 0) + x * c + z * s, z: (pose?.z ?? 0) - x * s + z * c, yaw });
   }
+  return out;
+}
+
+/**
+ * Pond fill stands: dry shore points round the water, nearest to `target` first,
+ * each facing the water. `inWater(x, z)` says whether a point is pond/dock.
+ */
+export function pondStands(target, inWater, canStand, center = target) {
+  const out = [];
+  for (let a = 0; a < 32; a += 1) {
+    const ang = (a * Math.PI) / 16;
+    const dx = Math.sin(ang); const dz = Math.cos(ang);
+    for (let r = 0.2; r < 8; r += 0.1) {
+      const x = center.x + dx * r; const z = center.z + dz * r;
+      if (inWater(x, z)) continue;
+      const sx = x + dx * 0.35; const sz = z + dz * 0.35;
+      if (canStand && !canStand(sx, sz)) break;
+      out.push({ x: sx, z: sz, yaw: Math.atan2(-dx, -dz) });
+      break;
+    }
+  }
+  out.sort((p, q) => Math.hypot(p.x - target.x, p.z - target.z) - Math.hypot(q.x - target.x, q.z - target.z));
   return out;
 }
 
@@ -613,6 +638,19 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
       return { action: 'walk', path, dest, face };
     }
     return { action: 'blocked', dest, face };
+  }
+  if (kind === 'pond') {
+    const spots = (pose.stands ?? []).slice(0, 12);
+    if (!spots.length) return { action: 'blocked' };
+    for (const dest of spots) {
+      if (isNearPoint(from, dest, 0.45)) return { action: 'open', dest, face: dest.yaw };
+    }
+    for (const dest of spots) {
+      const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
+      const end = path[path.length - 1];
+      if (end && Math.hypot(end.x - dest.x, end.z - dest.z) <= 0.3) return { action: 'walk', path, dest, face: dest.yaw };
+    }
+    return { action: 'blocked', dest: spots[0], face: spots[0].yaw };
   }
   if (kind === 'fountain') {
     const spots = fountainStands(pose).filter((d) => !canStand || canStand(d.x, d.z));

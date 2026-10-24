@@ -70,6 +70,8 @@ import {
   rectHitsPond,
   pondBlocksSpot,
   pointInPond,
+  pointOnDock,
+  POND,
   FARMING_PATCH_HALF,
   FLAX_RESPAWN_SEC,
   runeFieldTreeSpots,
@@ -145,6 +147,7 @@ import {
   pickUseHit,
   rangeFaceYaw,
   resolveStationUse,
+  pondStands,
   stationAtFloor,
   boulderAtFloor,
 } from './interact.js';
@@ -2128,6 +2131,28 @@ export function createWorld(canvas, state, opts = {}) {
     startFountainFill(pose);
   }
 
+  /** Placed Construction fountain (any rot/scale): same four stands + FillBucket as the built-in one. */
+  function isFountainPiece(index) {
+    return state.furniture?.placed?.[index]?.id === 'lumbridge_fountain';
+  }
+  function fillAtFountainPiece(index) {
+    const row = state.furniture?.placed?.[index];
+    if (!row || row.id !== 'lumbridge_fountain') return false;
+    queueUse('fountain', { x: row.x, z: row.z, rot: row.rot ?? 0, scale: constructionPiece(row.id)?.scale ?? 1 });
+    return true;
+  }
+  /** Pond: walk to the nearest dry shore point the player can stand on, face the water, fill. */
+  function fillAtPond(point) {
+    const target = point && Number.isFinite(point.x) ? point : { x: POND.x, z: POND.z };
+    const blocks = playerObstacles(state);
+    const canStand = (x, z) => isWalkable(x, z, blocks, PLAYER_RADIUS, playerFloors);
+    const stands = pondStands(target, (x, z) => pointInPond(x, z, 0.05) || pointOnDock(x, z, 0.05), canStand,
+      pointInPond(target.x, target.z) ? target : { x: POND.x, z: POND.z });
+    if (!stands.length) return false;
+    queueUse('pond', { x: target.x, z: target.z, stands });
+    return true;
+  }
+
   function startPicking(pose) {
     const field = pickCrop(pose?.materialId === 'wheat' ? 'wheat' : 'flax');
     const node = field.nodes.find((item) => item.id === pose?.plantId && item.alive);
@@ -2373,7 +2398,7 @@ export function createWorld(canvas, state, opts = {}) {
       ? WHEAT_ARRIVE
       : type === 'flax'
         ? FLAX_ARRIVE
-        : type === 'fountain'
+        : type === 'fountain' || type === 'pond'
           ? 0.45
           : type === 'trapdoor' || type === 'ladder'
             ? 1.35
@@ -2391,14 +2416,14 @@ export function createWorld(canvas, state, opts = {}) {
     const canStand = (x, z) => isWalkable(x, z, standBlocks, PLAYER_RADIUS, standFloors);
     const plan = resolveStationUse(from, pose, state, planSceneWalk, type, canStand);
     const gatherKind = type === 'tree' || type === 'boulder' || type === 'flax' || type === 'wheat' || type === 'fishing_spot';
-    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'furnace' || type === 'fletch' || type === 'ladder' || gatherKind || type === 'fountain' || type === 'farming_patch';
+    const standFront = type === 'counter' || type === 'chest' || type === 'range' || type === 'furnace' || type === 'fletch' || type === 'ladder' || gatherKind || type === 'fountain' || type === 'pond' || type === 'farming_patch';
     const faceYaw = plan.face != null
       ? plan.face
       : type === 'range' ? rangeFaceYaw(pose)
         : type === 'furnace' ? furnaceFaceYaw(pose)
           : type === 'fletch' ? fletchFaceYaw(pose)
             : null;
-    const standArrive = type === 'fountain'
+    const standArrive = type === 'fountain' || type === 'pond'
       ? 0.45
       : gatherKind
         ? (type === 'flax' || type === 'wheat' ? 0.22 : 0.32)
@@ -2455,7 +2480,7 @@ export function createWorld(canvas, state, opts = {}) {
         playClick('ui');
         return;
       }
-      if (type === 'fountain') {
+      if (type === 'fountain' || type === 'pond') {
         fillFromFountain(aimed);
         playClick('ui');
         return;
@@ -2501,7 +2526,7 @@ export function createWorld(canvas, state, opts = {}) {
     else if (type === 'tree') startChopping(pose);
     else if (type === 'fishing_spot') startFishing(pose);
     else if (type === 'flax' || type === 'wheat') startPicking(pose);
-    else if (type === 'fountain') fillFromFountain(pose);
+    else if (type === 'fountain' || type === 'pond') fillFromFountain(pose);
     else pickHandler?.({ type, element, patchIndex });
   }
 
@@ -2969,7 +2994,7 @@ export function createWorld(canvas, state, opts = {}) {
     ) {
       // The whole pond is one click target: open the fish picker.
       playClick('ui');
-      pickHandler?.({ type: 'fish-picker', clientX: event.clientX, clientY: event.clientY });
+      pickHandler?.({ type: 'fish-picker', clientX: event.clientX, clientY: event.clientY, x: floorPoint?.x ?? picked?.object.userData?.x, z: floorPoint?.z ?? picked?.object.userData?.z });
       return;
     }
     if (clickLeavesGather(mining, floorPoint, picked?.object.userData?.kind ?? null)) {
@@ -2987,6 +3012,10 @@ export function createWorld(canvas, state, opts = {}) {
     }
     if (picked) {
       const data = picked.object.userData;
+      if (data.kind === 'construction' && !placeNeedsConfirm && isFountainPiece(data.index)) {
+        fillAtFountainPiece(data.index);
+        return;
+      }
       if (data.kind === 'construction' && !placeNeedsConfirm) {
         pickHandler?.({ type: 'construction-select', index: data.index });
         return;
@@ -3307,7 +3336,14 @@ export function createWorld(canvas, state, opts = {}) {
       });
       return;
     }
-    if (!picked) return;
+    if (!picked) {
+      const pondPoint = sceneMode === 'shop' ? floorClickPoint(hits) : null;
+      if (pondPoint && pointInPond(pondPoint.x, pondPoint.z, 0.35)) {
+        playClick('ui');
+        pickHandler?.({ type: 'fish-picker', clientX: event.clientX, clientY: event.clientY, x: pondPoint.x, z: pondPoint.z });
+      }
+      return;
+    }
     const data = picked.object.userData;
     if (data.kind === 'boulder') {
       playClick('ui');
@@ -4557,6 +4593,9 @@ export function createWorld(canvas, state, opts = {}) {
     onPick(handler) {
       pickHandler = handler;
     },
+    fillAtFountainPiece(index) { return fillAtFountainPiece(index); },
+    isFountainPiece(index) { return isFountainPiece(index); },
+    fillAtPond(point) { return fillAtPond(point); },
     useBoulder(pose) {
       if (!pose) return;
       if (pose.kind === 'tree') {

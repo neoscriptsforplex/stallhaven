@@ -2147,7 +2147,7 @@ export function bindHud(root, state, world) {
     root.innerHTML = rows.map((row) => {
       const blocked = constructionPlaceBlock(state, row.id);
       const level = state.skills?.getLevel?.('construction') ?? 1;
-      const thumb = `${import.meta.env.BASE_URL}thumbs/build/${row.id.replace(/_/g, '-')}.png`;
+      const thumb = `${compassBase}thumbs/build/${row.id.replace(/_/g, '-')}.png`;
       return `<article class="build-item" title="${row.name}. Level ${row.level} Construction.">
         <img class="build-thumb" src="${thumb}" alt="" loading="lazy">
         <h3>${row.name}</h3>

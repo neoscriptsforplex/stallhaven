@@ -179,7 +179,11 @@ export function gardenObstacles(expansionIds = []) {
   const blocks = [];
   if (keepFountain(expansionIds)) {
     const size = (FOUNTAIN.radius + 0.22) * 2;
-    blocks.push(rectFromCenter(FOUNTAIN.x, FOUNTAIN.z, size, size));
+    // Round bowl as a plus of two rects: a full square's corners poked ~0.4 m
+    // past the rim, so walking past diagonally snagged on air.
+    const cut = size * 0.6;
+    blocks.push(rectFromCenter(FOUNTAIN.x, FOUNTAIN.z, size, cut));
+    blocks.push(rectFromCenter(FOUNTAIN.x, FOUNTAIN.z, cut, size));
   }
   for (const tree of gardenTreeSpots(expansionIds)) {
     // A standing trunk blocks the body. A stump does not: the walk block is

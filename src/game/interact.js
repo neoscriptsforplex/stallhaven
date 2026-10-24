@@ -212,6 +212,21 @@ function furnaceStandCandidates(pose) {
   return FURNACE_STAND_TRIES.map((local) => furnaceStandWorld(pose, local));
 }
 
+/** Fountain stand, fountain-local metres: beside a stream, facing +Z (the bowl). */
+export const FOUNTAIN_STAND_LOCAL = { x: 0.147, z: -1.709 };
+
+/** The four fill stands (S, W, N, E of the bowl), each with the yaw that faces it. */
+export function fountainStands(pose = FOUNTAIN) {
+  const out = [];
+  for (let k = 0; k < 4; k += 1) {
+    const yaw = (k * Math.PI) / 2;
+    const c = Math.cos(yaw); const s = Math.sin(yaw);
+    const { x, z } = FOUNTAIN_STAND_LOCAL;
+    out.push({ x: (pose?.x ?? 0) + x * c + z * s, z: (pose?.z ?? 0) - x * s + z * c, yaw });
+  }
+  return out;
+}
+
 /** A ground click this far from the node is a walk, not another swing. */
 export const GATHER_LEAVE_RADIUS = 0.55;
 
@@ -600,28 +615,22 @@ export function resolveStationUse(from, pose, state, planFn = planPlayerWalk, ki
     return { action: 'blocked', dest, face };
   }
   if (kind === 'fountain') {
-    const reach = (FOUNTAIN.radius ?? 0.7) + 0.65;
-    const offsets = [
-      [0, reach],
-      [0, -reach],
-      [reach, 0],
-      [-reach, 0],
-      [reach * 0.72, reach * 0.72],
-      [-reach * 0.72, reach * 0.72],
-      [reach * 0.72, -reach * 0.72],
-      [-reach * 0.72, -reach * 0.72],
-    ];
-    const spots = offsets
-      .map(([dx, dz]) => ({ x: pose.x + dx, z: pose.z + dz }))
-      .filter((dest) => !canStand || canStand(dest.x, dest.z));
+    const spots = fountainStands(pose).filter((d) => !canStand || canStand(d.x, d.z));
+    if (!spots.length) return { action: 'blocked', dest: fountainStands(pose)[0], face: 0 };
     for (const dest of spots) {
-      if (isNearPoint(from, dest, 0.45)) return { action: 'open', dest };
+      if (isNearPoint(from, dest, 0.45)) return { action: 'open', dest, face: dest.yaw };
     }
+    let best = null;
     for (const dest of spots) {
       const path = planFn(from, dest, state, PLAYER_RADIUS) ?? [];
-      if (path.length) return { action: 'walk', path, dest };
+      const end = path[path.length - 1];
+      if (!end || Math.hypot(end.x - dest.x, end.z - dest.z) > 0.3) continue;
+      let len = 0; let px = from.x; let pz = from.z;
+      for (const p of path) { len += Math.hypot(p.x - px, p.z - pz); px = p.x; pz = p.z; }
+      if (!best || len < best.len) best = { len, path, dest };
     }
-    return { action: 'blocked', dest: spots[0] ?? { x: pose.x, z: pose.z + reach } };
+    if (best) return { action: 'walk', path: best.path, dest: best.dest, face: best.dest.yaw };
+    return { action: 'blocked', dest: spots[0], face: spots[0].yaw };
   }
   if (kind === 'farming_patch') {
     const reach = furnitureHalfSize('patch').hw + 0.45;

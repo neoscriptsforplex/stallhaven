@@ -644,6 +644,11 @@ export async function loadBundledFishingNet() {
   return loadBundledGltf('items/fishing_net/fishing_net.glb');
 }
 
+/** Rig's bucket for FillBucket (Fill morph clip). Missing file keeps the pick pose. */
+export async function loadBundledFillBucket() {
+  return loadBundledGltf('items/bucket_fill/bucket_fill.glb');
+}
+
 /** Fetch goblin_rigged.glb. Throws so the caller can keep the old goblin. */
 export async function loadBundledRiggedGoblin() {
   return loadBundledGltf('npc/goblin_rigged.glb');

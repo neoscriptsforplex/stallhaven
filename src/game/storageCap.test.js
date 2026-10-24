@@ -34,7 +34,7 @@ describe('storage cap', () => {
     assert.equal(grantChoppedLogs(state), 0);
     assert.equal(state.materials.logs, 250);
     assert.equal(gatherFullMessage('logs'), 'Logs full.');
-    assert.equal(gatherFullMessage('water'), 'Bucket of water full.');
+    assert.equal(gatherFullMessage('water'), 'Bucket of Water full.');
     assert.equal(gatherFullMessage('flax'), 'Flax full.');
     state.materials.flax = 250;
     assert.equal(grantPickedFlax(state), 0);

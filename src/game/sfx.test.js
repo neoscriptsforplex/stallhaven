@@ -104,6 +104,17 @@ describe('sfx director', () => {
     d.frame({ gold: 30 }, 2.05);
     assert.deepEqual(played, ['coin', 'coin_sell']);
   });
+  it('plays the anvil hammer while fletching', () => {
+    const { d, played } = rig();
+    d.frame({ stations: ['fletch'] }, 0);
+    assert.ok(played.includes('anvil_hammer'));
+  });
+  it('plays the spinning wheel at the potter\'s wheel', () => {
+    const { d, loops, played } = rig();
+    d.frame({ stations: ['potter'] }, 0);
+    assert.equal(loops.get('spinning_wheel_loop'), true);
+    assert.ok(played.includes('spinning_wheel'));
+  });
   it('runs station loops only while crafting there', () => {
     const { d, loops, played } = rig();
     d.frame({ stations: ['furnace', 'anvil'] }, 0);

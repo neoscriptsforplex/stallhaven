@@ -555,7 +555,7 @@ export function materialIsFull(state, materialId) {
   return isMaterialFull(state?.materials, materialId, storageCap(state));
 }
 
-/** "Logs full." / "Bucket of water full." Shared by chop, mine, pick, fountain, and later fishing. */
+/** "Logs full." / "Bucket of Water full." Shared by chop, mine, pick, fountain, and later fishing. */
 export function gatherFullMessage(materialId) {
   const name = MATERIALS[materialId]?.name ?? 'Storage';
   return `${name} full.`;

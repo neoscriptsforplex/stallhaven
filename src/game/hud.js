@@ -569,7 +569,7 @@ export function bindHud(root, state, world) {
         ? `<button type="button" class="sf-full" data-storage-full="${escCraft(recipe.product)}" title="Storage full">FULL</button><button type="button" class="sf-link" data-storage-upgrade>Upgrade chest</button>`
         : '';
       return `
-        <article class="craft-row${locked || busy ? ' is-locked' : ''}${full && !growing ? ' is-full' : ''}" data-herb-row="${recipe.id}">
+        <article class="craft-row${locked || busy ? ' is-locked' : ''}${full && !growing ? ' is-full' : ''}" data-herb-row="${recipe.id}" data-craft-row="${escCraft(recipe.product)}">
           <button type="button" class="craft${ready ? ' is-ready' : ''}" data-herb="${recipe.id}" data-herb-phase="${phase}"${disabled ? ' disabled' : ''}${full && !growing ? ' title="Storage full"' : ''}>
             <strong>${escCraft(ready ? `Harvest ${recipe.name}` : recipe.name)}</strong>
             <span class="meta">${escCraft(meta)}</span>

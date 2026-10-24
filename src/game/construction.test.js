@@ -158,3 +158,37 @@ describe('wall art', () => {
     assert.equal(pieceHangs('chair'), false);
   });
 });
+
+it('shelf and mannequin cards show only under Shop and Storage', async () => {
+  const { shopFurnitureInCategory, constructionCategories } = await import('./construction.js');
+  const { readFileSync } = await import('node:fs');
+  const all = ['Shop', ...constructionCategories()];
+  for (const kind of ['shelf', 'mannequin']) {
+    assert.deepEqual(all.filter((cat) => shopFurnitureInCategory(kind, cat)), ['Shop', 'Storage']);
+  }
+  assert.deepEqual(all.filter((cat) => shopFurnitureInCategory('table', cat)), ['Shop']);
+  const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+  for (const kind of ['table', 'shelf', 'mannequin']) {
+    assert.match(html, new RegExp(`data-shop-furniture="${kind}"`));
+  }
+});
+
+it('bundled wall shelf is empty and its planks carry the shelf slot anchors', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { shelfSlotPoses } = await import('./catalog.js');
+  const obj = readFileSync(new URL('../../public/models/shelf/shelf.obj', import.meta.url), 'utf8');
+  const verts = obj.split('\n').filter((l) => l.startsWith('v ')).map((l) => l.split(/\s+/).slice(1).map((n) => Number(n) * 0.01125));
+  const mats = new Set(obj.split('\n').filter((l) => l.startsWith('usemtl')).map((l) => l.split(/\s+/)[1]));
+  assert.deepEqual([...mats].sort(), ['back', 'bracket', 'plank', 'plank_side', 'plank_top']);
+  const ys = verts.map((v) => v[1]);
+  assert.ok(Math.abs(Math.min(...ys) - 0.92) < 1e-3 && Math.abs(Math.max(...ys) - 1.74) < 1e-3);
+  const wareY = 1.64;
+  const tops = [1.595, 1.135];
+  for (const top of tops) assert.ok(ys.some((y) => Math.abs(y - top) < 1e-3), `plank top ${top}`);
+  for (const pose of shelfSlotPoses()) {
+    const y = wareY + pose.y;
+    const below = tops.filter((t) => t <= y).sort((a, b) => b - a)[0];
+    assert.ok(below != null && y - below > 0 && y - below < 0.1, `slot ${pose.x},${pose.y} rests on a plank`);
+    assert.ok(Math.abs(pose.x) < 0.675 && pose.z > -0.155 && pose.z < 0.19);
+  }
+});

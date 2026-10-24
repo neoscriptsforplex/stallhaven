@@ -1,0 +1,15 @@
+newmtl back
+Kd 0.2900 0.2350 0.1100
+
+newmtl plank
+Kd 0.4200 0.3450 0.1650
+
+newmtl plank_top
+Kd 0.4550 0.3800 0.1800
+
+newmtl plank_side
+Kd 0.3800 0.3100 0.1500
+
+newmtl bracket
+Kd 0.3300 0.2650 0.1250
+

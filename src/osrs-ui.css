@@ -104,3 +104,9 @@
 @media (orientation: portrait) and (pointer: coarse) {
   .guide-item.has-render img { width: 32px; height: 32px; }
 }
+
+/* Top-right ✕ added to panels (same look as the Settings ✕). The ::after pad widens the tap target without growing the panel. */
+.modal .sheet { position: relative; }
+button.settings-x.panel-x { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; min-width: 0; padding: 0; margin: 0; font-size: 12px; line-height: 1; z-index: 2; }
+button.settings-x.panel-x::after { content: ''; position: absolute; inset: -6px -6px -14px -14px; }
+.modal .sheet > h2, .expand-dock > h2, .fish-picker > p:first-of-type, .sf-pop-title, #furn-menu > :nth-child(2), #inspect-pop > :nth-child(2) { padding-right: 26px; }

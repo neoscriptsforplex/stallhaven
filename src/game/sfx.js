@@ -5,7 +5,7 @@
 
 /** Sounds that are peak-limited before they reach the loudness target (Sfx NOTES.md): ~+2.5 dB. */
 export const SHORT_SFX_GAIN = 10 ** (2.5 / 20);
-const SHORT_GROUPS = new Set(['ui_click', 'tree_chop', 'footstep_grass', 'footstep_wood', 'anvil_hammer', 'mining_pick', 'panel_open', 'panel_close']);
+const SHORT_GROUPS = new Set(['ui_click', 'tree_chop', 'anvil_hammer', 'mining_pick', 'panel_open', 'panel_close']);
 
 /** Mixer channels shown in Settings → Sound. */
 export const SOUND_CHANNELS = ['master', 'music', 'ui', 'world', 'ambience'];

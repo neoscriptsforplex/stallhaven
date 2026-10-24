@@ -16,8 +16,8 @@ const sfxDir = join(root, 'public/audio/sfx');
 const manifest = JSON.parse(readFileSync(join(sfxDir, 'manifest.json'), 'utf8'));
 
 describe('sfx manifest', () => {
-  it('ships all 46 sounds with OGG + MP3 files', () => {
-    assert.equal(manifest.length, 46);
+  it('ships all 42 sounds with OGG + MP3 files', () => {
+    assert.equal(manifest.length, 42);
     for (const e of manifest) {
       assert.ok(existsSync(join(sfxDir, e.file)), e.file);
       assert.ok(existsSync(join(sfxDir, 'mp3', e.file.replace('.ogg', '.mp3'))), e.file);
@@ -26,7 +26,7 @@ describe('sfx manifest', () => {
   it('groups variants', () => {
     const g = parseSfxManifest(manifest);
     assert.equal(g.get('anvil_hammer').length, 3);
-    for (const id of ['coin', 'coin_sell', 'mining_pick', 'footstep_grass', 'footstep_wood', 'ui_click', 'loom', 'eat', 'combat_hit']) {
+    for (const id of ['coin', 'coin_sell', 'mining_pick', 'ui_click', 'loom', 'eat', 'combat_hit']) {
       assert.equal(g.get(id).length, 2, id);
     }
     assert.equal(g.get('tree_chop').length, 1);
@@ -112,13 +112,14 @@ describe('sfx director', () => {
     d.frame({ stations: [] }, 1);
     assert.equal(loops.get('furnace_loop'), false);
   });
-  it('chops every swing, footsteps by surface, ambience indoors', () => {
+  it('chops every swing, no footsteps, ambience indoors', () => {
     const { d, played, loops } = rig();
     for (let t = 0; t <= 3; t += 0.05) d.frame({ mining: { mode: 'chop', startedAt: 0 } }, t);
     assert.ok(played.filter((p) => p === 'tree_chop').length >= 3);
     played.length = 0;
     for (let i = 0; i < 20; i += 1) d.frame({ player: { x: i * 0.2, z: 0 }, indoors: true, sceneMode: 'shop' }, 10 + i * 0.1);
-    assert.ok(played.length >= 4 && played.every((p) => p === 'footstep_wood'));
+    assert.ok(!played.some((p) => p.startsWith('footstep')));
+    assert.ok(!manifest.some((e) => e.name.startsWith('footstep')));
     assert.equal(loops.get('shop_ambience_loop'), true);
   });
 });

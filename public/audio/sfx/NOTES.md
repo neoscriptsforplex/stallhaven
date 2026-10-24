@@ -16,8 +16,6 @@ All sounds were synthesized from scratch in Python (numpy/scipy) by generate_sfx
 - mining_pick_01/02: a hard metallic tink plus a gravelly noise tail.
 - fishing_splash_01: a plop, a noise splash and randomized rising-pitch bubbles.
 - build_place_01: a heavy wooden thud with a small secondary knock.
-- footstep_grass_01/02 (v2): 40 randomized grain impulses filtered to 0.5–4.5 kHz for crunch, plus a low heel thump. There is much less hiss than v1.
-- footstep_wood_01/02: a wooden knock at 190 / 165 Hz plus a low scuff.
 - purchase_01: a cascade of five coins, a wooden thunk and a three-note bell (C E G).
 
 ## Added in v2 (lo-fi style)

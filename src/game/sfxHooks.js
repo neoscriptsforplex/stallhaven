@@ -6,8 +6,6 @@ import { STATION_LOOPS, STATION_REPEATS, STATION_STARTS } from './sfx.js';
 
 export const CHOP_SWING_SEC = 0.75;
 export const MINE_SWING_SEC = 0.8;
-export const FOOTSTEP_STRIDE = 0.62;
-export const FOOTSTEP_MIN_GAP = 0.26;
 
 /** Intent → sound when it succeeds. */
 const INTENT_OK = {
@@ -55,9 +53,6 @@ export function createSfxDirector({ play, loop }) {
   const repeatAt = new Map();
   let swing = null;
   let lastFishStart = null;
-  let lastPos = null;
-  let stepDist = 0;
-  let lastStepAt = -Infinity;
   let ambience = false;
 
   function onIntent(intent, result, now) {
@@ -102,21 +97,6 @@ export function createSfxDirector({ play, loop }) {
       if (lastFishStart !== m.startedAt) play('fishing_splash');
       lastFishStart = m.startedAt;
     } else lastFishStart = null;
-    // Footsteps: grass outside, wood inside.
-    if (snap.player) {
-      if (lastPos) {
-        const d = Math.hypot(snap.player.x - lastPos.x, snap.player.z - lastPos.z);
-        if (d < 1.5) stepDist += d; // ignore teleports
-        if (stepDist >= FOOTSTEP_STRIDE) {
-          stepDist = 0;
-          if (now - lastStepAt >= FOOTSTEP_MIN_GAP) {
-            play(snap.indoors ? 'footstep_wood' : 'footstep_grass');
-            lastStepAt = now;
-          }
-        }
-      }
-      lastPos = { x: snap.player.x, z: snap.player.z };
-    }
     const amb = Boolean(snap.indoors && snap.sceneMode === 'shop');
     if (amb !== ambience) {
       loop('shop_ambience_loop', amb);

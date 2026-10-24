@@ -590,7 +590,7 @@ body {
   }
 }
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   .materials-drawer,
   .materials-drawer.is-open {
     top: calc(env(safe-area-inset-top, 0px) + 165px);
@@ -1690,7 +1690,7 @@ html.is-booting.is-scene-live #view {
   }
 }
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   .sheet.craft-sheet,
   #potion-modal .sheet.craft-sheet {
     overflow-y: auto;
@@ -1721,7 +1721,7 @@ html.is-booting.is-scene-live #view {
 }
 
 /* Phone portrait only. Desktop and landscape keep the top-right bar. */
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   :root {
     --portrait-thumb: 64px;
     --portrait-thumb: calc(64px + env(safe-area-inset-bottom, 0px));
@@ -1801,7 +1801,7 @@ html.is-booting.is-scene-live #view {
 }
 
 /* Phone portrait: dynamic viewport, so the browser toolbar does not cover full-height UI. */
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   html,
   body {
     height: 100vh;
@@ -1895,7 +1895,7 @@ html.is-booting.is-scene-live #view {
   }
 }
 
-@media (orientation: portrait) and (pointer: coarse) and (max-width: 720px) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) and (max-width: 720px) {
   #hud {
     top: calc(8px + env(safe-area-inset-top, 0px));
     left: calc(8px + env(safe-area-inset-left, 0px));
@@ -1906,7 +1906,7 @@ html.is-booting.is-scene-live #view {
 }
 
 /* Phone portrait: coins, level and XP in one strip; minimap collapses to a corner. */
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #hud {
     --portrait-strip: 36px;
     --portrait-map: 112px;
@@ -2098,7 +2098,7 @@ html.is-booting.is-scene-live #view {
  * Stallhaven Skills panel.
  * Append to src/style.css (or import after it). Uses the existing tokens:
  * --panel, --line, --gold, --parchment and the .expand-dock / .xp-bar styles.
- * Phone portrait rules are all inside @media (orientation: portrait) and (pointer: coarse),
+ * Phone portrait rules are all inside @media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4),
  * so desktop and landscape are unchanged by them.
  */
 
@@ -2432,7 +2432,7 @@ html.is-booting.is-scene-live #view {
 
 /* ---------- Phone portrait: slide-up sheet above the bottom bar ---------- */
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   /* Eight buttons now share the bottom bar. Let them shrink rather than overflow on 360px phones. */
   #save-bar {
     grid-auto-columns: minmax(0, 1fr);
@@ -2575,7 +2575,7 @@ html.is-booting.is-scene-live #view {
   to { transform: translateY(0); }
 }
 
-@media (orientation: portrait) and (pointer: coarse) and (prefers-reduced-motion: reduce) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) and (prefers-reduced-motion: reduce) {
   #skills-dock.skills-dock {
     animation: none;
   }
@@ -2622,7 +2622,7 @@ html.is-booting.is-scene-live #view {
 #hud .game-log li:nth-child(n+3) { opacity: 0.5; }
 #hud .active-craft { width: 100%; }
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #hud { width: auto; max-width: none; }
   #hud .ledger { box-sizing: border-box; width: 100%; }
   #hud .minimap-wrap { width: var(--portrait-map); }
@@ -2652,7 +2652,7 @@ html.is-booting.is-scene-live #view {
   }
 }
 
-@media (orientation: portrait) and (pointer: coarse) and (max-width: 720px) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) and (max-width: 720px) {
   #hud { width: auto; max-width: none; max-height: none; }
 }
 
@@ -2745,7 +2745,7 @@ html.is-booting.is-scene-live #view {
   }
 }
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #hud .minimap-wrap {
     --ring: 4px;
     top: calc(100% + 12px);
@@ -2780,7 +2780,7 @@ html.is-booting.is-scene-live #view {
 
 /* Desktop craft panel: the pre-tab layout, sized to its content.
    Phone portrait rules above and below are left alone. */
-@media not ((orientation: portrait) and (pointer: coarse)) {
+@media not ((orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4)) {
   #craft-modal,
   #potion-modal {
     overflow-x: hidden;
@@ -2899,7 +2899,7 @@ html.is-booting.is-scene-live #view {
 .sidetab-count { opacity: 0.75; font-variant-numeric: tabular-nums; }
 .craft-mats-line { display: block; grid-column: 1 / -1; }
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   .craft-body,
   .craft-body.no-side {
     grid-template-columns: 1fr;
@@ -2919,7 +2919,7 @@ html.is-booting.is-scene-live #view {
 /*
  * Stallhaven skill guide. Load after style.css (uses --panel, --line, --gold, --parchment,
  * .panel, .xp-bar, .skills-close, .skill-sr and --skill-yellow from the Skills panel CSS).
- * Phone portrait rules sit inside @media (orientation: portrait) and (pointer: coarse).
+ * Phone portrait rules sit inside @media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4).
  */
 
 :root {
@@ -3294,7 +3294,7 @@ html.is-booting.is-scene-live #view {
 
 /* ---------- Phone portrait: full-height bottom sheet ---------- */
 
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   /* Guide mode: tapping a tile opens the guide, so the empty detail card shrinks to a one-line hint. */
   .skills-dock.has-guide .skill-tip,
   .skills-dock.has-guide:not(.has-tip) .skill-tip {
@@ -3439,7 +3439,7 @@ html.is-booting.is-scene-live #view {
 /*
  * Heroes + Quests UI (draft). Load after src/style.css.
  * Tokens come from the game: --panel, --line, --gold, --parchment, --skill-yellow.
- * Phone rules live only inside @media (orientation: portrait) and (pointer: coarse).
+ * Phone rules live only inside @media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4).
  */
 :root {
   --hq-green: #7fd46a;
@@ -3661,7 +3661,7 @@ html.is-booting.is-scene-live #view {
 .sf-craft .sheet.craft-sheet { width: min(560px, calc(100vw - 24px)); }
 
 /* ---------- Phone portrait: bottom sheets ---------- */
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   /* 7 slots on the bar: Skills, Build, Heroes, Quests, Music, Co-op, More. Help/Save/Load/Fullscreen move into More. */
   #save-bar #help-btn, #save-bar #saves-btn, #save-bar #expand-btn { display: none; }
   #save-bar #heroes-btn, #save-bar #quests-btn, #save-bar #coop-btn { min-width: 0; }
@@ -3730,7 +3730,7 @@ html.is-booting.is-scene-live #view {
 
 .more-quick { display: none; }
 #heroes-dock.hq-dock[hidden], #quests-dock.hq-dock[hidden], #hero-picker[hidden] { display: none; }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #settings-dock .more-quick { display: grid; }
 }
 
@@ -3760,7 +3760,7 @@ html.is-booting.is-scene-live #view {
   color: #f3e6cf;
 }
 .placed-bar[hidden] { display: none; }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #build-dock.build-sheet, .placed-bar {
     position: fixed;
     left: 0;
@@ -3784,7 +3784,7 @@ html.is-booting.is-scene-live #view {
 .craft-have { font-size: 0.78rem; color: #cbb48a; }
 
 /* ---------- Phone portrait: modals and side docks as slide-up bottom sheets ---------- */
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   .modal { place-items: end stretch; align-items: end; justify-items: stretch; }
   .modal > .sheet {
     width: 100%; max-width: none; margin: 0;
@@ -3836,7 +3836,7 @@ html.is-booting.is-scene-live #view {
 }
 #craft-modal.is-cook .craft-qty { flex-direction: row; align-items: center; gap: 2px; }
 #craft-modal.is-cook .craft-qty button { min-width: 1.9rem; min-height: 1.4rem; padding: 1px 4px; font-size: 0.64rem; }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   /* Phone: tap a dish, craft 1x/5x/Max from the preview (Step 8), so tiles drop the qty column. */
   #craft-modal.is-cook .craft-qty { display: none; }
   #craft-modal.is-cook .craft-row { grid-template-columns: 1fr; }
@@ -3846,14 +3846,14 @@ html.is-booting.is-scene-live #view {
 }
 /* Open dishes: the meta line already lists mats · time · price, so drop the duplicate mats line. */
 #craft-modal.is-cook .craft-row:not(.is-locked) .craft-mats-line { display: none; }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #craft-modal.is-cook #crafts { gap: 3px 4px; }
   #craft-modal.is-cook .craft-row.is-locked .craft-mats-line { display: none; }
 }
 /* Cooking range: compact materials strip so the sheet fits with no scrollbar. */
 #craft-modal.is-cook .craft-mats { gap: 3px; margin: 0 0 4px; padding: 2px 0; max-height: none; overflow: visible; }
 #craft-modal.is-cook .craft-mats > * { font-size: 0.66rem; padding: 1px 5px; min-height: 0; line-height: 1.3; }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #craft-modal.is-cook .craft-mats > * { font-size: 0.6rem; padding: 0 4px; }
   #craft-modal.is-cook .craft-mats { margin: 0 0 2px; }
 }
@@ -3864,7 +3864,7 @@ html.is-booting.is-scene-live #view {
 #quests-dock{max-height:none;height:auto}
 #quests-dock .quest-list,#quests-dock .craft-sidetabs{max-height:none;overflow:visible}
 #quests-dock [data-quests-close]{width:24px;height:24px;min-height:0;padding:0;font-size:14px;line-height:1;align-self:start;justify-self:end}
-@media (orientation: portrait) and (pointer: coarse){
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4){
   .quest-icon.has-render img{width:36px;height:36px}
   #quests-dock.hq-dock{height:auto;max-height:none;overflow:visible}
   #quests-dock .craft-sidetabs{overflow-x:auto;overflow-y:hidden;flex-wrap:wrap}

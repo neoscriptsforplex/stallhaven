@@ -21,7 +21,7 @@
 #save-bar button#coop-btn.osrs-btn .coop-count { position: absolute; bottom: -3px; right: -2px; font: 700 10px/1 system-ui; color: #ffd94a; text-shadow: 1px 1px 0 #000; }
 
 /* 8. Desktop: strip moves to bottom right (not phone portrait) */
-@media not ((orientation: portrait) and (pointer: coarse)) {
+@media not ((orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4)) {
   #save-bar {
     top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); right: max(12px, env(safe-area-inset-right, 0px));
     gap: 3px; padding: 5px; border: 2px solid var(--stone-edge); border-radius: 6px;
@@ -32,7 +32,7 @@
 }
 
 /* Phone portrait: same bar, icons only */
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #save-bar button.osrs-btn { width: auto; height: auto; min-height: 44px; }
   #save-bar button.osrs-btn > img.osrs-ico { width: 30px; height: 30px; }
 }
@@ -42,7 +42,7 @@
 .materials-toggle.osrs-bag .materials-arrow { display: none !important; }
 .materials-toggle.osrs-bag img { width: 28px; height: 28px; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.6)); }
 .materials-drawer.is-open .materials-toggle.osrs-bag { background: linear-gradient(180deg, #7a3a22 0 10%, #5e2a18 10% 85%, #3a180c 85%); }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   .materials-toggle.osrs-bag { width: 32px; height: 44px; border: 2px solid #0e0905; border-left: none; }
 }
 
@@ -65,7 +65,7 @@
 .xp-orb-tip { pointer-events: none; margin-top: 6px; min-width: 170px; padding: 6px 9px; border: 2px solid #0e0905; border-radius: 4px; background: #3a2d20; box-shadow: inset 0 0 0 1px #6e5b45; color: #f3e2c0; font: 12px/1.45 system-ui; }
 .xp-orb-tip b { color: #ffd94a; } .xp-orb-tip[hidden] { display: none; }
 .xp-orb-tip .row { display: flex; justify-content: space-between; gap: 12px; }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   .xp-orb-wrap { top: calc(46px + env(safe-area-inset-top, 0px)); left: auto; right: 10px; transform: none; }
   .xp-orb { width: 44px; height: 44px; } .xp-orb img { inset: 9px; width: 22px; height: 22px; }
   .xp-drops { left: auto; right: 54px; } .xp-drop { left: auto; right: 0; }
@@ -92,7 +92,7 @@
 .skill-toast .lu-more { color: #c8b48a; font-size: .74rem; margin: 3px 0 0; }
 .materials-toggle.osrs-bag > span { display: none !important; }
 #settings-dock.fit-panel .cheat-form { display: flex; gap: 6px; } #settings-dock.fit-panel .cheat-form input { flex: 1; min-width: 0; }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   #materials-toggle.osrs-bag { width: 34px !important; min-width: 0; height: 44px; padding: 0; font-size: 0; }
 }
 /* Skill guide + level-up popup: real item renders instead of glyphs. */
@@ -101,7 +101,7 @@
 .guide-row.is-locked .guide-item.has-render { opacity: .85; filter: grayscale(.45); }
 .guide-row.is-next .guide-item.has-render { filter: none; }
 .skill-toast .lu-icons img.lu-render { width: 24px; height: 24px; object-fit: contain; padding: 1px; background: radial-gradient(circle at 50% 42%, #3a2a1a, #1a120a); }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   .guide-item.has-render img { width: 32px; height: 32px; }
 }
 

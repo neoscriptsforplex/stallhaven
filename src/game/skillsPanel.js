@@ -1,3 +1,4 @@
+import { PHONE_QUERY } from './layoutQuery.js';
 /**
  * Stallhaven Skills panel: markup (template strings + data-* hooks) and wiring.
  *
@@ -11,7 +12,7 @@
 import { MAX_LEVEL, SKILLS } from './skills.js';
 
 /** Same query the portrait CSS uses, so JS and CSS agree on "phone portrait". */
-export const PORTRAIT_QUERY = '(orientation: portrait) and (pointer: coarse)';
+export const PORTRAIT_QUERY = PHONE_QUERY;
 
 /**
  * Icons live in public/icons/skills/.

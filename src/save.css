@@ -43,7 +43,7 @@
 .sv-coopnote::before{content:"";width:7px;height:7px;border-radius:50%;background:#9fe09a}
 .sv-coopnote.is-guest::before{background:#8fb7e8}
 #saves-dock,#settings-dock.sv-settings{right:12px;top:64px}
-@media (orientation:portrait) and (pointer:coarse){
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4){
   .sv-slots{grid-template-columns:1fr;gap:10px}
   .sv-card{min-height:0}
   .sv-card.is-empty{flex-direction:row;padding:16px}

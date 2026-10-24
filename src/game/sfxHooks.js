@@ -47,7 +47,7 @@ export function intentSound(intent, result) {
 }
 
 /** Fire pieces whose crackle the player hears up close. */
-export const FIRE_PIECES = new Set(['fire', 'fireplace', 'fancy_fireplace']);
+export const FIRE_PIECES = new Set(['fire', 'fireplace', 'fancy_fireplace', 'fire_outdoor', 'fireplace_light', 'fancy_fireplace_light']);
 export const FIRE_FULL_DIST = 2;
 export const FIRE_SILENT_DIST = 5;
 

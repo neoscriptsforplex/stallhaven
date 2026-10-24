@@ -28,6 +28,8 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'fire', scale: 0.5, name: 'Fire', category: 'Light', mount: 'outdoor', level: 5, gold: 100, tint: 0xe07030, materials: { logs: 2 } }),
   piece({ id: 'fireplace', scale: 2 / 3, name: 'Fireplace', category: 'Decor', mount: 'outdoor', level: 1, gold: 1200, tint: 0x8a4030, materials: { willow_plank: 2, steel_nails: 6 } }),
   piece({ id: 'fancy_fireplace', scale: 2 / 3, name: 'Fancy Fireplace', category: 'Decor', mount: 'outdoor', level: 1, gold: 2500, tint: 0xa05030, materials: { maple_plank: 3, mithril_nails: 8 } }),
+  // Model Man's fancy rug (Luke approved). Flat walk-over Decor: pieces never block movement.
+  piece({ id: 'fancy_rug', scale: 2 / 3, name: 'Fancy Rug', category: 'Decor', mount: 'outdoor', level: 1, gold: 100000, buildGold: 100000, tint: 0x6b0a04, materials: { cloth: 20, flax: 20 } }),
   piece({ id: 'standing_candles', scale: 2 / 3, name: 'Standing Candles', category: 'Decor', mount: 'outdoor', level: 60, gold: 300, tint: 0xe8d090, materials: { plank: 1, bronze_nails: 2 } }),
   piece({ id: 'lit_torch', wallY: 1.1, roll: Math.PI / 2, scale: 0.5, name: 'Lit Torch', category: 'Decor', mount: 'wall', level: 1, gold: 150, tint: 0xe8a040, materials: { logs: 1 } }),
   piece({ id: 'standing_torch', scale: 2 / 3, name: 'Standing Torch', category: 'Light', mount: 'outdoor', level: 1, gold: 200, tint: 0xd09040, materials: { logs: 1, bronze_nails: 2 } }),
@@ -45,6 +47,10 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   // Outdoor-tab copies: same model, cost, level and XP as the Decor piece, outside walls only.
   piece({ id: 'lit_torch_outdoor', model: 'lit_torch', wallFace: 'outside', wallY: 1.1, roll: Math.PI / 2, scale: 0.5, name: 'Lit Torch', category: 'Outdoor', mount: 'wall', level: 1, gold: 150, tint: 0xe8a040, materials: { logs: 1 } }),
   piece({ id: 'window_box_outdoor', model: 'window_box', hang: true, wallFace: 'outside', wallY: -0.146, name: 'Window Box', category: 'Outdoor', mount: 'wall', level: 28, gold: 900, tint: 0x6a8a3a, materials: { oak_plank: 4, iron_nails: 6 } }),
+  piece({ id: 'fire_outdoor', model: 'fire', scale: 0.5, name: 'Fire', category: 'Outdoor', mount: 'outdoor', level: 5, gold: 100, tint: 0xe07030, materials: { logs: 2 } }),
+  // Light-tab copies of the Decor fireplaces: same model, cost, level and XP.
+  piece({ id: 'fireplace_light', model: 'fireplace', scale: 2 / 3, name: 'Fireplace', category: 'Light', mount: 'outdoor', level: 1, gold: 1200, tint: 0x8a4030, materials: { willow_plank: 2, steel_nails: 6 } }),
+  piece({ id: 'fancy_fireplace_light', model: 'fancy_fireplace', scale: 2 / 3, name: 'Fancy Fireplace', category: 'Light', mount: 'outdoor', level: 1, gold: 2500, tint: 0xa05030, materials: { maple_plank: 3, mithril_nails: 8 } }),
   piece({ id: 'garden_bush', name: 'Garden Bush', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 120, tint: 0x4a7a2a, materials: { flax: 3 } }),
   piece({ id: 'flag_pole', scale: 0.5, name: 'Flag Pole', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 400, tint: 0xc04040, materials: { oak_plank: 2, iron_nails: 4 } }),
   piece({ id: 'statue', name: 'Statue', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 3000, tint: 0xb0b0b8, materials: { yew_plank: 2, adamant_nails: 6 } }),
@@ -76,7 +82,7 @@ export function retiredRefund(saved) {
 
 const BY_ID = Object.fromEntries(CONSTRUCTION_PIECES.map((row) => [row.id, row]));
 
-/** Model/thumbnail id for a piece: Outdoor copies share their Decor original's model. */
+/** Model/thumbnail id for a piece: Outdoor/Light copies share their original's model. */
 export function pieceModelId(id) {
   return BY_ID[id]?.model ?? id;
 }
@@ -163,9 +169,10 @@ export function constructionXpFor(row) {
 /** Gold per Construction unlock level charged to place a piece (on top of materials). */
 export const BUILD_GOLD_PER_LEVEL = 1000;
 
-/** Gold to place one piece: 1,000 × unlock level. Pieces flagged `free: true` cost no gold. */
+/** Gold to place one piece: 1,000 × unlock level. Pieces flagged `free: true` cost no gold; `buildGold` overrides. */
 export function constructionBuildGold(row) {
   if (!row || row.free === true) return 0;
+  if (Number.isFinite(row.buildGold)) return Math.max(0, Math.floor(row.buildGold));
   return BUILD_GOLD_PER_LEVEL * Math.max(1, Math.floor(Number(row.level) || 1));
 }
 

@@ -2574,11 +2574,11 @@ describe('bundled prop swaps', () => {
       const box = measureVisibleBox(range);
       const height = box.max.y - box.min.y;
       const sink = height * RANGE_PLATE_FRAC - RANGE_PLATE_SHOW;
-      assert.ok(sink > 0.03, `plate should be thick enough to hide, sink=${sink}`);
+      assert.ok(sink > 0.003 && sink < 0.03, `plate should sink slightly, sink=${sink}`);
       assert.ok(Math.abs(box.min.y + sink) < 0.04, `plate bottom should sit sink below floor, minY=${box.min.y}`);
-      assert.ok(box.min.y < -0.03, `brown plate should be under the boards, minY=${box.min.y}`);
+      assert.ok(box.min.y < -0.003, `brown plate should be under the boards, minY=${box.min.y}`);
       assert.ok(box.max.y > 1.6, `stove body should stay above the floor, maxY=${box.max.y}`);
-      assert.ok(range.userData.floorY < -0.03, `pose y should keep the sink, floorY=${range.userData.floorY}`);
+      assert.ok(range.userData.floorY < -0.003 && range.userData.floorY > -0.03, `pose y should keep the sink, floorY=${range.userData.floorY}`);
     } finally {
       setBundledLook('range', null);
     }

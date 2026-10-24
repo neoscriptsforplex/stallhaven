@@ -1,0 +1,42 @@
+newmtl rug_red
+Kd 0.4196 0.0392 0.0157
+Ka 0 0 0
+Ks 0 0 0
+d 1
+illum 1
+
+newmtl rug_dark
+Kd 0.2157 0.0196 0.0039
+Ka 0 0 0
+Ks 0 0 0
+d 1
+illum 1
+
+newmtl rug_maroon
+Kd 0.3020 0.0275 0.0118
+Ka 0 0 0
+Ks 0 0 0
+d 1
+illum 1
+
+newmtl gold
+Kd 0.8235 0.6784 0.0353
+Ka 0 0 0
+Ks 0 0 0
+d 1
+illum 1
+
+newmtl gold_dark
+Kd 0.6235 0.5098 0.0235
+Ka 0 0 0
+Ks 0 0 0
+d 1
+illum 1
+
+newmtl tassel
+Kd 0.7451 0.6118 0.0314
+Ka 0 0 0
+Ks 0 0 0
+d 1
+illum 1
+

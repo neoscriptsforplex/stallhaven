@@ -2293,7 +2293,11 @@ export function bindHud(root, state, world) {
     const rotateBtn = placeModal.querySelector('[data-place-rotate]');
     const snapBtn = placeModal.querySelector('[data-place-snap]');
     const piecePlace = Boolean(pendingPlace.pieceId);
-    if (rotateBtn) rotateBtn.hidden = !piecePlace;
+    if (rotateBtn) {
+      // Stations, shelves, tables and stands rotate while placing too (90° steps); patches don't turn.
+      rotateBtn.hidden = !piecePlace && pendingPlace.type === 'farming_patch';
+      rotateBtn.textContent = piecePlace ? 'Rotate' : 'Rotate 90°';
+    }
     if (snapBtn) {
       snapBtn.hidden = !piecePlace;
       snapBtn.textContent = pieceSnap ? 'Snap on' : 'Snap off';
@@ -2497,13 +2501,27 @@ export function bindHud(root, state, world) {
     const pieceBtn = event.target.closest('[data-piece]');
     if (pieceBtn && !pieceBtn.disabled) startPiecePlace(pieceBtn.dataset.piece);
   });
-  placeModal.querySelector('[data-place-rotate]')?.addEventListener('click', () => {
-    world.rotateFurniture?.({
-      id: 'piece',
-      pieceId: pendingPlace?.pieceId,
-      index: pendingPlace?.index ?? null,
-    });
+  function rotatePendingPlace() {
+    if (!pendingPlace) return;
+    if (pendingPlace.pieceId) {
+      world.rotateFurniture?.({
+        id: 'piece',
+        pieceId: pendingPlace.pieceId,
+        index: pendingPlace.index ?? null,
+      });
+    } else if (pendingPlace.type !== 'farming_patch') {
+      world.rotatePlacing?.(1);
+    }
     render(performance.now() / 1000);
+  }
+  placeModal.querySelector('[data-place-rotate]')?.addEventListener('click', rotatePendingPlace);
+  // Desktop: R rotates whatever is being placed.
+  window.addEventListener('keydown', (event) => {
+    if (event.key !== 'r' && event.key !== 'R') return;
+    if (!pendingPlace || placeModal.hidden || event.ctrlKey || event.metaKey || event.altKey) return;
+    const tag = event.target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || event.target?.isContentEditable) return;
+    rotatePendingPlace();
   });
   placeModal.querySelector('[data-place-snap]')?.addEventListener('click', () => {
     pieceSnap = !pieceSnap;

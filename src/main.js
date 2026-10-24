@@ -7,6 +7,8 @@ import { enableSfx, getMusicVolume, loadBundledMusic, loadSfxManifest, playSfx, 
 import { createSfxDirector } from './game/sfxHooks.js';
 import { installUiSounds, mountSoundSettings, restoreSoundMix } from './game/soundUi.js';
 import { intentBus } from './game/intents.js';
+import { mountTutorial, shouldAutoStart } from './game/tutorial.js';
+import { tutorialEmit } from './game/tutorialEvents.js';
 import { createWorld } from './game/world.js';
 import { normalizeImported, setBundledLooks, setRiggedBuyers } from './game/models.js';
 import { createAutosave, createSlotStore, openBackend, applySlotData } from './game/saveSlots.js';
@@ -362,6 +364,20 @@ async function bootGame() {
   mountSoundSettings();
   const sfx = createSfxDirector({ play: (id, opts) => playSfx(id, opts), loop: (name, on, gain = 1) => setSfxLoop(name, on, { gain }) });
   intentBus.onResult((intent, result) => sfx.onIntent(intent, result, performance.now() / 1000));
+  // New-player tutorial: events from intents (placed:<station>, sold); crafted:<recipe> fires in frame().
+  const tutorial = mountTutorial({
+    getState: () => state,
+    getWorld: () => world,
+    onChange: () => hud.render(performance.now() / 1000),
+  });
+  window.Tutorial = tutorial;
+  window.stallhaven.tutorial = tutorial;
+  intentBus.onResult((intent, result) => {
+    if (!result?.ok) return;
+    if (intent.type === 'buyStation') tutorialEmit(`placed:${intent.stationId}`);
+    else if (intent.type === 'buyFurniture') tutorialEmit(`placed:${intent.furnitureType}`);
+    else if (intent.type === 'sell') tutorialEmit('sold');
+  });
   await waitForPlayGesture(() => {
     unlockAudio();
     enableSfx();
@@ -400,6 +416,13 @@ async function bootGame() {
   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
   world.tick(0, performance.now() / 1000);
   hideBootCover({ immediate: true });
+  // Brand-new saves start the tutorial; old saves were grandfathered as done (Replay is in Help).
+  if (shouldAutoStart(state) && !window.stallhaven.coop?.isGuest?.()) {
+    // The tutorial replaces the first-visit Help sheet.
+    const help = document.querySelector('#help-modal');
+    if (help && !help.hidden) help.querySelector('[data-dismiss]')?.click();
+    tutorial.start(0);
+  }
 
   let last = performance.now();
   function frame(nowMs) {
@@ -410,6 +433,7 @@ async function bootGame() {
     const finished = completeCrafts(state, now);
     finished.forEach((id, i) => {
       pushLog(state, craftDoneMessage(state, id, finished.amounts?.[i]));
+      tutorialEmit(`crafted:${id}`);
     });
     if (finished.length) world.syncDisplays();
     world.tick(dt, now);

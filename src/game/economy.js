@@ -409,6 +409,8 @@ export function createState() {
   }
   return {
     gold: START_GOLD,
+    // New saves run the new-player tutorial; loaded saves without the flag are grandfathered as done.
+    tutorialDone: false,
     materials,
     materialAcc: emptyMaterialAcc(materials),
     crafts: {},
@@ -1727,6 +1729,7 @@ export function serializeState(state) {
   return {
     version: SAVE_VERSION,
     gold: state.gold,
+    tutorialDone: Boolean(state.tutorialDone),
     materials: { ...state.materials },
     materialAcc: { ...(state.materialAcc ?? {}) },
     chest: { ...state.chest },
@@ -2049,6 +2052,8 @@ export function applyState(state, data) {
   state.playTime = next.playTime;
   state.shopName = next.shopName;
   state.kingRoaldAt = next.kingRoaldAt;
+  // Saves from before the tutorial existed never get forced into it (Replay stays in Help).
+  state.tutorialDone = typeof data?.tutorialDone === 'boolean' ? data.tutorialDone : true;
   state.ready = [];
   claimLoadedDisplays(state);
   refreshShowcases(state);

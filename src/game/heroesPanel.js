@@ -104,7 +104,7 @@ export function bindHeroesPanel({
         <p class="hero-name">${heroName(state.hq, cls.id)}</p>
         <p class="hero-look">Look: ${HERO_NPC_NAMES[state.hq.heroes[cls.id].npcId] ?? ''}</p>
         ${pill}
-        <div class="hero-actions">${action}</div>
+        <div class="hero-actions">${action}<button type="button" class="hero-retire" data-retire="${cls.id}">Retire</button></div>
       </article>`;
     }
     if (status === 'next') {
@@ -488,6 +488,17 @@ export function bindHeroesPanel({
   });
 
   heroesDock.addEventListener('click', (event) => {
+    const retire = event.target.closest('[data-retire]');
+    if (retire) {
+      const classId = retire.dataset.retire;
+      const name = heroName(state.hq, classId);
+      if (!window.confirm(`Retire ${name}? They leave for good and any quest they are on is lost.`)) return;
+      if (!intentBus.run({ type: 'retireHero', classId })) return;
+      log?.(`${name} retires.`);
+      saveQuestProgress();
+      afterQuestChange();
+      return;
+    }
     const hire = event.target.closest('[data-hire]');
     if (hire && !hire.disabled) {
       openPicker(hire.dataset.hire);

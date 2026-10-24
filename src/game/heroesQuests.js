@@ -189,6 +189,16 @@ export function hireHero(state, hq, classId, npcId, rand = Math.random) {
   return true;
 }
 
+/** Retire a hired hero: frees the class slot and drops their running quest (no reward). */
+export function retireHero(hq, classId) {
+  if (!hq?.heroes?.[classId]) return false;
+  for (const [questId, run] of Object.entries(hq.quests?.active ?? {})) {
+    if (run.heroId === classId) delete hq.quests.active[questId];
+  }
+  hq.heroes[classId] = null;
+  return true;
+}
+
 // ---------- Quests ----------
 
 /** 'idle' | 'running' | 'ready' */

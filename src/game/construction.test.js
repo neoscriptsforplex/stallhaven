@@ -37,16 +37,16 @@ describe('construction catalogue', () => {
     assert.equal(constructionPiece('chair').gold, 200);
     assert.equal(new Set(CONSTRUCTION_PIECES.map((row) => row.id)).size, 35);
     const chair = funded();
-    chair.materials.plank = 1;
+    chair.materials.plank = 2;
     chair.materials.bronze_nails = 2;
     const before = chair.skills.getXp('construction');
-    assert.equal(placeConstruction(chair, 'chair', { x: 1, z: 1, rot: 0 }), true);
+    assert.equal(placeConstruction(chair, 'crate', { x: 1, z: 1, rot: 0 }), true);
     assert.equal(chair.materials.plank, 0);
     assert.equal(chair.materials.bronze_nails, 0);
     assert.equal(chair.gold, funded().gold);
     assert.equal(chair.furniture.placed.length, 1);
-    assert.equal(chair.skills.getXp('construction') - before, constructionXpFor(constructionPiece('chair')));
-    assert.equal(placeConstruction(chair, 'chair', { x: 2, z: 1, rot: 0 }), false);
+    assert.equal(chair.skills.getXp('construction') - before, constructionXpFor(constructionPiece('crate')));
+    assert.equal(placeConstruction(chair, 'crate', { x: 2, z: 1, rot: 0 }), false);
   });
 
   it('picks materials back up and sells for half the gold', () => {

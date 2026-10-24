@@ -181,6 +181,23 @@ export const WOODCUTTING_LEVELS = Object.freeze({
 /** Essence rocks grant two essence once Mining reaches this level. */
 export const ESSENCE_DOUBLE_LEVEL = 50;
 
+/** Each level here adds one more essence per filled mining bar (1 → 5 at 99). */
+export const ESSENCE_BONUS_LEVELS = Object.freeze([25, 50, 75, 99]);
+
+/** Essence per filled mining bar at a Mining level. */
+export function essencePerBar(level = 1) {
+  return 1 + ESSENCE_BONUS_LEVELS.filter((lv) => level >= lv).length;
+}
+
+/** Farming levels where a single pick gives 2 instead of 1. */
+export const DOUBLE_PICK_LEVELS = Object.freeze({ flax: 15, wheat: 40 });
+
+/** Flax or wheat from one finished pick at a Farming level. */
+export function pickYieldFor(crop, level = 1) {
+  const need = DOUBLE_PICK_LEVELS[crop];
+  return need != null && level >= need ? 2 : 1;
+}
+
 /**
  * Fishing spot unlocks. OSRS levels for the fish this game actually has.
  * OSRS 1 is this game's 1 (skills do not start at 0). Anglerfish is not on

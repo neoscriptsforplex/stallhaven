@@ -67,6 +67,7 @@ import {
   hireHero,
   readyQuests,
   recallQuest,
+  retireHero,
   startQuest,
 } from './heroesQuests.js';
 
@@ -101,6 +102,7 @@ export const INTENT_TYPES = Object.freeze([
   'startQuest',
   'collectQuest',
   'recallQuest',
+  'retireHero',
   'cheat',
 ]);
 
@@ -206,6 +208,8 @@ export function checkIntentShape(intent) {
       return intent.questId === 'all' || okId(intent.questId) ? null : 'bad-quest';
     case 'recallQuest':
       return okId(intent.questId) ? null : 'bad-quest';
+    case 'retireHero':
+      return typeof intent.classId === 'string' && intent.classId.length <= 24 ? null : 'bad-class';
     case 'cheat':
       return typeof intent.code === 'string' && intent.code.length <= 40 ? null : 'bad-code';
     default:
@@ -227,8 +231,8 @@ function gatherAmount(state, intent) {
       return grantChoppedLogs(state, chopYield(intent.materialId), intent.materialId);
     case 'pick':
       return intent.materialId === 'wheat'
-        ? grantPickedWheat(state, WHEAT_YIELD)
-        : grantPickedFlax(state, FLAX_YIELD);
+        ? grantPickedWheat(state)
+        : grantPickedFlax(state);
     case 'water':
       return grantFountainWater(state, FOUNTAIN_WATER_YIELD);
     case 'fish':
@@ -387,6 +391,9 @@ export function applyIntent(state, intent, ctx = {}) {
     case 'collectQuest':
     case 'recallQuest':
       return applyQuestIntent(state, intent);
+    case 'retireHero':
+      if (!state.hq) return fail('no-hero');
+      return done(retireHero(state.hq, intent.classId));
     case 'cheat':
       if (coop) return fail('cheats-off');
       return done(applyCheat(state, intent.code));

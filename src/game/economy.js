@@ -58,6 +58,8 @@ import {
   xpForMine,
   xpFromCraftHistory,
   ESSENCE_DOUBLE_LEVEL,
+  essencePerBar,
+  pickYieldFor,
 } from './skills.js';
 import { RUNE_DOUBLE_LEVEL_MULT } from './skillLevels.js';
 import { emptyHeroQuestState, isMaterialFull, materialCap, normalizeHeroQuestState } from './heroesQuests.js';
@@ -1530,11 +1532,16 @@ function grantMaterial(state, materialId, amount) {
   return add;
 }
 
-/** Essence rocks give 2 essence once Mining is 50 or higher. Other rocks do not. */
+/** Essence per filled bar: 1, then +1 at Mining 25, 50, 75 and 99. Other rocks are unchanged. */
 export function minedGrantAmount(state, materialId, amount = mineYield(materialId)) {
   const n = Math.max(0, Math.round(Number(amount) || 0));
-  if (materialId === 'essence' && (state.skills?.getLevel?.('mining') ?? 1) >= ESSENCE_DOUBLE_LEVEL) return n * 2;
+  if (materialId === 'essence') return n * essencePerBar(state.skills?.getLevel?.('mining') ?? 1);
   return n;
+}
+
+/** Flax or wheat per finished pick: 2 from Farming 15 (flax) or 40 (wheat). */
+export function pickYield(state, crop) {
+  return pickYieldFor(crop === 'wheat' ? 'wheat' : 'flax', state?.skills?.getLevel?.('farming') ?? 1);
 }
 
 export function grantMinedMaterial(state, materialId, amount = mineYield(materialId)) {
@@ -1561,11 +1568,11 @@ export function grantCaughtFish(state, materialId, amount = fishYield(materialId
   return grantMaterial(state, materialId, amount);
 }
 
-export function grantPickedFlax(state, amount = FLAX_YIELD) {
+export function grantPickedFlax(state, amount = pickYield(state, 'flax')) {
   return grantMaterial(state, 'flax', amount);
 }
 
-export function grantPickedWheat(state, amount = WHEAT_YIELD) {
+export function grantPickedWheat(state, amount = pickYield(state, 'wheat')) {
   return grantMaterial(state, 'wheat', amount);
 }
 

@@ -3772,3 +3772,13 @@ html.is-booting.is-scene-live #view {
     border-radius: 16px 16px 0 0;
   }
 }
+
+/* Youi gameplay batch: retire button, quest rewards fit, craft inventory line */
+.hero-actions .hero-retire { padding: 2px 8px; font-size: 0.7rem; justify-self: end; background: linear-gradient(#7a3020, #4a1a10); border-color: #c55; color: #f2c0b0; }
+.hero-actions .hero-retire:hover { background: linear-gradient(#9c4429, #682616); }
+.quest-rewards .mat { white-space: nowrap; }
+.quest-card .quest-rewards { grid-column: 2 / 3; overflow: visible; }
+.away-sheet { max-height: none; height: auto; overflow: visible; }
+.away-list { max-height: none; overflow: visible; }
+.away-row p { overflow-wrap: anywhere; }
+.craft-have { font-size: 0.78rem; color: #cbb48a; }

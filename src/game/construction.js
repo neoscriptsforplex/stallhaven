@@ -11,22 +11,23 @@ const piece = (row) => Object.freeze({
 });
 
 export const CONSTRUCTION_PIECES = Object.freeze([
-  piece({ id: 'chair', scale: 2 / 3, name: 'Chair', category: 'Seating', mount: 'floor', level: 1, gold: 200, tint: 0x8a5a32, materials: { plank: 1, bronze_nails: 2 } }),
-  piece({ id: 'fancy_chair', scale: 2 / 3, name: 'Fancy Chair', category: 'Seating', mount: 'floor', level: 1, gold: 600, tint: 0x6a4428, materials: { oak_plank: 2, iron_nails: 4 } }),
-  piece({ id: 'bench', scale: 2 / 3, name: 'Bench', category: 'Seating', mount: 'floor', level: 1, gold: 400, tint: 0x8a6840, materials: { oak_plank: 2, iron_nails: 4 } }),
-  piece({ id: 'throne', scale: 2 / 3, name: 'Throne', category: 'Seating', mount: 'floor', level: 1, gold: 5000, tint: 0xc4a24a, materials: { magic_plank: 4, dragon_nails: 8 } }),
-  piece({ id: 'fancy_table', scale: 2 / 3, name: 'Fancy Table', category: 'Tables', mount: 'floor', level: 1, gold: 800, tint: 0xc4a06a, materials: { oak_plank: 3, iron_nails: 6 } }),
-  piece({ id: 'double_bed', scale: 2 / 3, name: 'Double Bed', category: 'Beds', mount: 'floor', level: 1, gold: 1500, tint: 0x6a3a4a, materials: { willow_plank: 4, steel_nails: 8 } }),
+  piece({ id: 'chair', scale: 2 / 3, name: 'Chair', category: 'Seating', mount: 'floor', level: 5, gold: 200, tint: 0x8a5a32, materials: { plank: 1, bronze_nails: 2 } }),
+  piece({ id: 'fancy_chair', scale: 2 / 3, name: 'Fancy Chair', category: 'Seating', mount: 'floor', level: 60, gold: 600, tint: 0x6a4428, materials: { oak_plank: 2, iron_nails: 4 } }),
+  piece({ id: 'bench', scale: 2 / 3, name: 'Bench', category: 'Seating', mount: 'floor', level: 20, gold: 400, tint: 0x8a6840, materials: { oak_plank: 2, iron_nails: 4 } }),
+  piece({ id: 'throne', scale: 2 / 3, name: 'Throne', category: 'Seating', mount: 'floor', level: 99, gold: 5000, tint: 0xc4a24a, materials: { magic_plank: 4, dragon_nails: 8 } }),
+  piece({ id: 'basic_table', scale: 2 / 3, name: 'Basic Table', category: 'Tables', mount: 'outdoor', level: 1, gold: 150, tint: 0xa07848, materials: { plank: 2, bronze_nails: 2 } }),
+  piece({ id: 'fancy_table', scale: 2 / 3, name: 'Fancy Table', category: 'Tables', mount: 'floor', level: 65, gold: 800, tint: 0xc4a06a, materials: { oak_plank: 3, iron_nails: 6 } }),
+  piece({ id: 'double_bed', scale: 2 / 3, name: 'Double Bed', category: 'Beds', mount: 'floor', level: 50, gold: 1500, tint: 0x6a3a4a, materials: { willow_plank: 4, steel_nails: 8 } }),
   piece({ id: 'cabinet', scale: 2 / 3, name: 'Cabinet', category: 'Storage', mount: 'floor', level: 1, gold: 700, tint: 0xa08050, materials: { oak_plank: 3, iron_nails: 6 } }),
   piece({ id: 'crate', scale: 2 / 3, name: 'Crate', category: 'Storage', mount: 'floor', level: 1, gold: 150, tint: 0xb09060, materials: { plank: 2, bronze_nails: 2 } }),
-  piece({ id: 'sacks', scale: 2 / 3, name: 'Sacks', category: 'Storage', mount: 'floor', level: 1, gold: 100, tint: 0xc2b48a, materials: { plank: 1 } }),
-  piece({ id: 'barrel_of_fish', name: 'Barrel of Fish', category: 'Storage', mount: 'floor', level: 1, gold: 250, tint: 0x8a6848, materials: { plank: 2, bronze_nails: 2 } }),
-  piece({ id: 'barrel_of_sticks', name: 'Barrel of Sticks', category: 'Storage', mount: 'floor', level: 1, gold: 200, tint: 0x7a5a32, materials: { plank: 2, bronze_nails: 2 } }),
-  piece({ id: 'old_bookshelf', name: 'Old Bookshelf', category: 'Storage', mount: 'floor', level: 1, gold: 900, tint: 0x6a4a30, materials: { oak_plank: 4, iron_nails: 6 } }),
-  piece({ id: 'fire', name: 'Fire', category: 'Light', mount: 'outdoor', level: 1, gold: 100, tint: 0xe07030, materials: { logs: 2 } }),
+  piece({ id: 'sacks', scale: 2 / 3, name: 'Sacks', category: 'Storage', mount: 'outdoor', level: 1, gold: 100, tint: 0xc2b48a, materials: { plank: 1 } }),
+  piece({ id: 'barrel_of_fish', name: 'Barrel of Fish', category: 'Storage', mount: 'outdoor', level: 1, gold: 250, tint: 0x8a6848, materials: { plank: 2, bronze_nails: 2 } }),
+  piece({ id: 'barrel_of_sticks', name: 'Barrel of Sticks', category: 'Storage', mount: 'outdoor', level: 1, gold: 200, tint: 0x7a5a32, materials: { plank: 2, bronze_nails: 2 } }),
+  piece({ id: 'old_bookshelf', name: 'Old Bookshelf', category: 'Storage', mount: 'floor', level: 10, gold: 900, tint: 0x6a4a30, materials: { oak_plank: 4, iron_nails: 6 } }),
+  piece({ id: 'fire', name: 'Fire', category: 'Light', mount: 'outdoor', level: 5, gold: 100, tint: 0xe07030, materials: { logs: 2 } }),
   piece({ id: 'fireplace', scale: 2 / 3, name: 'Fireplace', category: 'Light', mount: 'floor', level: 1, gold: 1200, tint: 0x8a4030, materials: { willow_plank: 2, steel_nails: 6 } }),
   piece({ id: 'fancy_fireplace', scale: 2 / 3, name: 'Fancy Fireplace', category: 'Light', mount: 'floor', level: 1, gold: 2500, tint: 0xa05030, materials: { maple_plank: 3, mithril_nails: 8 } }),
-  piece({ id: 'standing_candles', scale: 2 / 3, name: 'Standing Candles', category: 'Light', mount: 'floor', level: 1, gold: 300, tint: 0xe8d090, materials: { plank: 1, bronze_nails: 2 } }),
+  piece({ id: 'standing_candles', scale: 2 / 3, name: 'Standing Candles', category: 'Light', mount: 'floor', level: 60, gold: 300, tint: 0xe8d090, materials: { plank: 1, bronze_nails: 2 } }),
   piece({ id: 'lit_torch', name: 'Lit Torch', category: 'Light', mount: 'outdoor', level: 1, gold: 150, tint: 0xe8a040, materials: { logs: 1 } }),
   piece({ id: 'standing_torch', scale: 2 / 3, name: 'Standing Torch', category: 'Light', mount: 'outdoor', level: 1, gold: 200, tint: 0xd09040, materials: { logs: 1, bronze_nails: 2 } }),
   piece({ id: 'portrait', hang: true, name: 'Portrait', category: 'Wall', mount: 'wall', level: 5, gold: 400, tint: 0xc8b090, materials: { oak_plank: 1, iron_nails: 2 } }),
@@ -66,14 +67,21 @@ export function retiredRefund(saved) {
 
 const BY_ID = Object.fromEntries(CONSTRUCTION_PIECES.map((row) => [row.id, row]));
 
-/** Skill-guide rows that replace the old coming-soon wall decor. */
-export const CONSTRUCTION_GUIDE = Object.freeze([
-  { lv: 5, name: 'Portrait', desc: 'Wall decor', icon: 'house', tint: '#c8b090' },
-  { lv: 12, name: 'Cooking Shelves', desc: 'Wall decor', icon: 'house', tint: '#b8874a' },
-  { lv: 20, name: 'Pots and Pans', desc: 'Wall decor', icon: 'pot', tint: '#a0a0a8' },
-  { lv: 28, name: 'Tapestry', desc: 'Wall decor', icon: 'house', tint: '#8a3a4a' },
-  { lv: 35, name: 'Landscape', desc: 'Wall decor', icon: 'leaf', tint: '#5a8a4a' },
-]);
+const GUIDE_ICONS = Object.freeze({ pots_and_pans: 'pot', landscape: 'leaf' });
+const GUIDE_DESC = Object.freeze({ Wall: 'Wall decor' });
+
+/** Skill-guide rows: every Build-menu piece that needs more than Construction 1. */
+export const CONSTRUCTION_GUIDE = Object.freeze(
+  CONSTRUCTION_PIECES.filter((row) => row.level > 1)
+    .sort((a, b) => a.level - b.level)
+    .map((row) => ({
+      lv: row.level,
+      name: row.name,
+      desc: GUIDE_DESC[row.category] ?? row.category,
+      icon: GUIDE_ICONS[row.id] ?? 'house',
+      tint: `#${row.tint.toString(16).padStart(6, '0')}`,
+    })),
+);
 
 export const CONSTRUCTION_UNLOCKS = Object.freeze(
   CONSTRUCTION_PIECES.filter((row) => row.level > 1).map((row) => ({

@@ -8,7 +8,7 @@ import { craftedOutputCount, createState, grantMinedMaterial } from './economy.j
 import { ICONS, defaultTab, nextUnlockLevel, skillGuideShellHtml, sortedRows } from './skillGuide.js';
 import { SKILL_GUIDES } from './skillGuideData.js';
 import { unlockLevelsBySkill } from './skillLevels.js';
-import { ESSENCE_DOUBLE_LEVEL, SKILLS, xpForLevel } from './skills.js';
+import { ESSENCE_BONUS_LEVELS, ESSENCE_DOUBLE_LEVEL, SKILLS, xpForLevel } from './skills.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
 
@@ -41,9 +41,9 @@ describe('skill guide', () => {
   });
 
   it('marks double essence and double runes at the live thresholds', () => {
-    const mining = SKILL_GUIDES.mining.tabs[0].rows.find((row) => row.perk);
-    assert.equal(mining.lv, ESSENCE_DOUBLE_LEVEL);
-    assert.equal(mining.soon, undefined);
+    const mining = SKILL_GUIDES.mining.tabs[0].rows.filter((row) => row.perk);
+    assert.deepEqual(mining.map((row) => row.lv), [...ESSENCE_BONUS_LEVELS]);
+    assert.ok(mining.every((row) => row.soon === undefined));
     const runes = ['air_rune', 'water_rune', 'earth_rune', 'fire_rune'];
     const perks = SKILL_GUIDES.runecrafting.tabs[0].rows.filter((row) => row.perk);
     assert.deepEqual(
@@ -54,7 +54,7 @@ describe('skill guide', () => {
     state.materials.essence = 0;
     assert.equal(grantMinedMaterial(state, 'essence'), 1);
     reachLevel(state, 'mining', ESSENCE_DOUBLE_LEVEL);
-    assert.equal(grantMinedMaterial(state, 'essence'), 2);
+    assert.equal(grantMinedMaterial(state, 'essence'), 3);
     assert.equal(craftedOutputCount(state, RECIPES.air_rune), 1);
     reachLevel(state, 'runecrafting', RECIPES.air_rune.requires.level * 2);
     assert.equal(craftedOutputCount(state, RECIPES.air_rune), 2);

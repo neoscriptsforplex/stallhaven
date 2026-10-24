@@ -38,7 +38,7 @@ import {
   stationForRecipe,
 } from './catalog.js';
 import { materialsDrawerBlocksPoint } from './materialsDrawer.js';
-import { createFountainFill, gatherFullMessage, grantPickedFlax, grantPickedWheat, hasStock, materialIsFull, miningBarAmount, pushLog, storageCap } from './economy.js';
+import { pickYield, createFountainFill, gatherFullMessage, grantPickedFlax, grantPickedWheat, hasStock, materialIsFull, miningBarAmount, pushLog, storageCap } from './economy.js';
 import { gatherBlockText, meetsGatherLevel } from './skills.js';
 import {
   FURNITURE_FORWARD,
@@ -1572,7 +1572,7 @@ export function createWorld(canvas, state, opts = {}) {
         kind: 'wheat',
         name: 'Wheat',
         materialId: 'wheat',
-        yield: WHEAT_YIELD,
+        yield: pickYield(state, 'wheat'),
         duration: WHEAT_DURATION,
         grant: grantPickedWheat,
         sync: syncWheatMeshes,
@@ -1586,7 +1586,7 @@ export function createWorld(canvas, state, opts = {}) {
       kind: 'flax',
       name: 'Flax',
       materialId: 'flax',
-      yield: FLAX_YIELD,
+      yield: pickYield(state, 'flax'),
       duration: FLAX_DURATION,
       grant: grantPickedFlax,
       sync: syncFlaxMeshes,

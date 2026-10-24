@@ -114,6 +114,7 @@ import {
   stationCost,
   unlockRemaining,
   upgradeChest,
+  chestCount,
 } from './economy.js';
 import {
   CONSTRUCTION_PIECES,
@@ -797,7 +798,16 @@ export function bindHud(root, state, world) {
     if (craftPreview) craftPreview.show(recipeId);
     const label = recipe?.name ?? MATERIALS[recipeId]?.name ?? 'Select or hover a recipe.';
     const craftName = craftModal.querySelector('[data-craft-preview-name]');
-    if (craftName) craftName.textContent = label;
+    if (craftName) {
+      craftName.textContent = label;
+      if (recipe) {
+        const have = recipe.outputMaterial ? (state.materials?.[recipe.outputMaterial] ?? 0) : chestCount(state, recipeId);
+        const line = document.createElement('span');
+        line.className = 'craft-have';
+        line.textContent = `In inventory: ${Math.max(0, Math.floor(have))}`;
+        craftName.append(document.createElement('br'), line);
+      }
+    }
     syncQtyHint(recipeId);
   }
 

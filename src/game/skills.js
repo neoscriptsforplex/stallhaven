@@ -190,6 +190,12 @@ export function essencePerBar(level = 1) {
 }
 
 /** Farming levels where a single pick gives 2 instead of 1. */
+/** Farming level where every bucket fill (fountains and pond) gives 2 buckets instead of 1. */
+export const DOUBLE_WATER_LEVEL = 25;
+export function waterYieldFor(level = 1) {
+  return level >= DOUBLE_WATER_LEVEL ? 2 : 1;
+}
+
 export const DOUBLE_PICK_LEVELS = Object.freeze({ flax: 15, wheat: 40 });
 
 /** Flax or wheat from one finished pick at a Farming level. */

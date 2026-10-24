@@ -58,6 +58,11 @@ jobs:
         with:
           enablement: true
 
+      - name: Mirror public/ to site root
+        # Pages serves the repo unbuilt, so ./icons, ./music, ./textures, ./models etc
+        # (Vite public/ paths) must also exist at the root. No-clobber keeps repo files.
+        run: cp -rn public/. .
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

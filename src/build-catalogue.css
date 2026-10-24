@@ -38,3 +38,24 @@
   #build-dock .build-item button { padding: 3px 9px; min-height: 26px; }
 }
 #build-dock .build-thumb-glyph { display: grid; place-items: center; font-size: 26px; }
+
+/* Touch fit (buildFit.js): panel sits between HUD and button bar; only the item list scrolls. */
+#build-dock.build-fit { background: rgba(30, 19, 10, 0.97); position: fixed; right: auto; bottom: auto; transform: none; margin: 0; max-width: none; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; z-index: 40; border-radius: 12px; animation: none; }
+#build-dock.build-fit[hidden] { display: none; }
+#build-dock.build-fit > * { flex: 0 0 auto; }
+#build-dock.build-fit > .build-layout { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; display: flex; flex-direction: column; }
+#build-dock.build-fit .build-side { flex: 0 0 auto; }
+#build-dock.build-fit .build-main { flex: 1 1 auto; }
+#build-dock.build-fit .build-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+#build-dock.build-fit .build-item h3, #build-dock.build-fit .build-item .meta { overflow-wrap: anywhere; }
+#build-dock.build-fit .build-main [data-build-pane], #build-dock.build-fit [data-build-catalogue] { grid-template-columns: repeat(auto-fill, minmax(min(196px, 100%), 1fr)); }
+#build-dock.build-fit.is-tight { padding: 8px; }
+#build-dock.build-fit.is-tight > h2 { font-size: 1rem; margin-bottom: 4px; }
+#build-dock.build-fit.is-tight > p { display: none; }
+#build-dock.build-fit.is-tight .build-tabs, #build-dock.build-fit.is-tight .build-side { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; margin-bottom: 6px; }
+#build-dock.build-fit.is-tight .build-tabs::-webkit-scrollbar, #build-dock.build-fit.is-tight .build-side::-webkit-scrollbar { display: none; }
+#build-dock.build-fit.is-tight .build-main [data-build-pane], #build-dock.build-fit.is-tight [data-build-catalogue] { grid-template-columns: 1fr 1fr; gap: 5px; }
+#build-dock.build-fit.is-tight .build-thumb { max-width: 64px; max-height: 64px; }
+@media (max-width: 359px) {
+  #build-dock.build-fit.is-tight .build-main [data-build-pane], #build-dock.build-fit.is-tight [data-build-catalogue] { grid-template-columns: 1fr; }
+}

@@ -290,8 +290,8 @@ describe('layout numbers', () => {
     const right = gardenTreeSpots(['right']);
     assert.equal(right.some((spot) => spot.side === 'right' || spot.side === 'front-right'), false);
     assert.ok(right.some((spot) => spot.side === 'left'));
-    assert.equal(WHEEL_COST, 100000);
-    assert.equal(CAULDRON_COST, 1000000);
+    assert.equal(WHEEL_COST, 70000);
+    assert.equal(CAULDRON_COST, 5000000);
     const woods = ['oak', 'willow', 'maple', 'yew', 'magic'];
     for (const wood of woods) {
       assert.equal(origin.filter((spot) => spot.wood === wood).length, 2, wood);
@@ -803,9 +803,9 @@ describe('furniture build costs', () => {
     for (const station of STATION_UNLOCKS) {
       if (station.cost === 0 || station.id === 'sawmill') continue;
       const parts = furnitureBuildParts(station.id);
-      assert.equal(parts.length, 2, station.id);
+      assert.equal(parts.length, station.id === 'cauldron' ? 3 : 2, station.id);
     }
-    const order = ['table', 'shelf', 'mannequin', 'loom', 'fletch', 'potter', 'wheel', 'portal', 'cauldron'];
+    const order = ['table', 'shelf', 'mannequin', 'potter', 'loom', 'wheel', 'fletch', 'portal', 'cauldron'];
     const nailTier = {
       bronze_nails: 1,
       iron_nails: 2,
@@ -881,5 +881,19 @@ describe('potter wheel 2x (Luke 2026-10-24)', () => {
       const hit = r.minX < o.maxX && r.maxX > o.minX && r.minZ < o.maxZ && r.maxZ > o.minZ;
       assert.equal(hit, false, id);
     }
+  });
+});
+
+describe('station price pass', () => {
+  it('prices stations per spec and sorts the tab by price', () => {
+    const cost = Object.fromEntries(STATION_UNLOCKS.map((s) => [s.id, s.cost]));
+    assert.equal(cost.potter, 10000);
+    assert.equal(cost.loom, 30000);
+    assert.equal(cost.wheel, 70000);
+    assert.equal(cost.fletch, 100000);
+    assert.equal(cost.cauldron, 5000000);
+    const costs = STATION_UNLOCKS.map((s) => s.cost);
+    assert.deepEqual(costs, [...costs].sort((a, b) => a - b));
+    assert.deepEqual(furnitureBuildParts('cauldron').find((p) => p.kind === 'extra'), { id: 'steel_bar', count: 1000, kind: 'extra' });
   });
 });

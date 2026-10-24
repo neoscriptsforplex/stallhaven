@@ -256,7 +256,8 @@ export function grantShopXp(state, recipeId) {
     state.shopLevel = SHOP_MAX_LEVEL;
     return 0;
   }
-  const gained = craftXp(recipe);
+  // Shop levels take about twice as long: half XP per craft.
+  const gained = Math.max(1, Math.round(craftXp(recipe) / 2));
   state.shopXp = (state.shopXp ?? 0) + gained;
   const after = shopProgress(state.shopXp);
   state.shopLevel = after.level;
@@ -584,6 +585,9 @@ export function craftBlockReason(state, recipeId) {
   }
   if (stationForRecipe(recipe) === 'potter' && !ownsStation(state, 'potter')) {
     return 'Place a Potter Wheel from Build to soften hard clay.';
+  }
+  if (recipe.category === 'rune' && !ownsStation(state, 'portal')) {
+    return 'Place the portal from Build to craft runes.';
   }
   if (stationForRecipe(recipe) === 'sawmill' && !ownsStation(state, 'sawmill')) {
     return 'Place a sawmill from Build to saw logs into planks.';

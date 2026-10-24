@@ -141,6 +141,8 @@ import { clampMapZoom, compassAssetUrl, compassNeedleDegrees, drawMinimap, mapTo
 import { boulderInspect, fishingInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
 import { intentBus } from './intents.js';
 import { createCraftPreview } from './craftpreview.js';
+import { gatherLevelRequirement } from './skills.js';
+import { FISHING_SPOTS } from './layout.js';
 import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
 import { bindSkillsPanel, showLevelUpToast } from './skillsPanel.js';
 import { bindSkillGuide } from './skillGuide.js';
@@ -1774,10 +1776,51 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   }
 
+  let fishPicker = null;
+  const LAST_FISH_KEY = 'stallhaven.lastFish';
+  function hideFishPicker() {
+    if (fishPicker) fishPicker.hidden = true;
+  }
+  /** Pond click: every fish with its level; the pick walks over and keeps fishing it. */
+  function showFishPicker(clientX, clientY) {
+    if (!fishPicker) {
+      fishPicker = document.createElement('div');
+      fishPicker.className = 'furn-menu fish-picker';
+      fishPicker.setAttribute('role', 'menu');
+      document.body.appendChild(fishPicker);
+      fishPicker.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('[data-fish]');
+        if (!btn || btn.disabled) return;
+        try { localStorage.setItem(LAST_FISH_KEY, btn.dataset.fish); } catch { /* private mode */ }
+        hideFishPicker();
+        world.fishFor?.(btn.dataset.fish);
+      });
+      document.addEventListener('pointerdown', (ev) => {
+        if (fishPicker && !fishPicker.hidden && !fishPicker.contains(ev.target)) hideFishPicker();
+      }, true);
+    }
+    let last = null;
+    try { last = localStorage.getItem(LAST_FISH_KEY); } catch { /* private mode */ }
+    const level = skillLevelOf(state, 'fishing');
+    fishPicker.innerHTML = `<p>Fish for…</p>${FISHING_SPOTS.map((spot) => {
+      const req = gatherLevelRequirement(spot.materialId);
+      const need = req?.level ?? 1;
+      const locked = level < need;
+      const name = MATERIALS[spot.materialId]?.name ?? spot.name;
+      return `<button type="button" data-fish="${spot.materialId}"${locked ? ' disabled' : ''}${spot.materialId === last ? ' class="is-last"' : ''}>${locked ? '🔒 ' : ''}${name} <small>Lv ${need}</small></button>`;
+    }).join('')}`;
+    fishPicker.hidden = false;
+    const w = 200;
+    fishPicker.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, clientX - w / 2))}px`;
+    fishPicker.style.top = `${Math.max(8, Math.min(window.innerHeight - 280, clientY - 20))}px`;
+  }
+
   function showFurnMenu(target, clientX, clientY) {
     furnTarget = target;
+    const pieceRow = target.id === 'piece' ? constructionPiece(state.furniture?.placed?.[target.index]?.id) : null;
     furnMenu.querySelector('[data-furn-name]').textContent = (
-      target.id === 'chest' ? 'Chest'
+      pieceRow ? pieceRow.name
+      : target.id === 'chest' ? 'Chest'
         : target.id === 'anvil' ? 'Anvil'
           : target.id === 'range' ? 'Cooking Range'
             : target.id === 'cauldron' ? 'Cauldron'
@@ -1833,9 +1876,9 @@ export function bindHud(root, state, world) {
     const canDelete = target.id === 'display'
       && (deleteKind === 'shelf' || deleteKind === 'table' || deleteKind === 'stand')
       && !state.displays[target.index]?.removed;
-    if (deleteBtn) deleteBtn.hidden = !(canDelete || target.id === 'farming_patch');
+    if (deleteBtn) deleteBtn.hidden = !(canDelete || target.id === 'farming_patch' || pieceRow);
     const rotateBtn = furnMenu.querySelector('[data-furn-rotate]');
-    if (rotateBtn) rotateBtn.hidden = target.id === 'farming_patch';
+    if (rotateBtn) rotateBtn.hidden = target.id === 'farming_patch' || pieceRow?.mount === 'wall';
     const moveBtn = furnMenu.querySelector('[data-furn-move]');
     if (moveBtn) moveBtn.textContent = target.id === 'farming_patch' ? 'Move' : 'Move Furniture';
     furnMenu.hidden = false;
@@ -2151,7 +2194,7 @@ export function bindHud(root, state, world) {
       return `<article class="build-item" title="${row.name}. Level ${row.level} Construction.">
         <img class="build-thumb" src="${thumb}" alt="" loading="lazy">
         <h3>${row.name}</h3>
-        <p class="meta">Level ${row.level} Construction${level < row.level ? ' · locked' : ''} · ${row.mount === 'wall' ? 'Wall' : row.mount === 'outdoor' ? 'Indoor or outdoor' : 'Floor'}</p>
+        <p class="meta">Level ${row.level} Construction${level < row.level ? ' · locked' : ''} · ${row.mount === 'wall' ? 'Wall · inside or outside' : row.mount === 'outdoor' ? 'Indoor or outdoor' : 'Floor'}</p>
         <p class="build-detail">${pieceNeedLine(row)}</p>
         <button type="button" data-piece="${row.id}" ${blocked ? 'disabled' : ''}>Place</button>
       </article>`;
@@ -2410,7 +2453,9 @@ export function bindHud(root, state, world) {
   placedBar?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-placed]');
     if (!button) return;
-    const action = button.dataset.placed;
+    runPlacedAction(button.dataset.placed, button);
+  });
+  function runPlacedAction(action, button = null) {
     if (action === 'done') {
       closePlacedBar();
       return;
@@ -2425,7 +2470,7 @@ export function bindHud(root, state, world) {
     if (action === 'snap') {
       pieceSnap = !pieceSnap;
       world.setPieceSnap?.(pieceSnap);
-      button.textContent = pieceSnap ? 'Snap on' : 'Snap off';
+      if (button) button.textContent = pieceSnap ? 'Snap on' : 'Snap off';
       return;
     }
     if (action === 'rotate') {
@@ -2465,7 +2510,15 @@ export function bindHud(root, state, world) {
         render(performance.now() / 1000);
       }
     }
-  });
+  }
+  /** Right-click menu on a placed Construction piece: Move, Rotate, Delete (pick up). */
+  function runPieceMenu(target, action) {
+    if (target?.id !== 'piece' || !state.furniture?.placed?.[target.index]) return false;
+    selectedPiece = target.index;
+    runPlacedAction(action);
+    if (action !== 'move') closePlacedBar();
+    return true;
+  }
   function confirmPendingPlace() {
     if (!pendingPlace) return;
     const check = world.tryConfirmPlace?.() ?? { ok: Boolean(world.getPlacePose()), pose: world.getPlacePose() };
@@ -2581,8 +2634,24 @@ export function bindHud(root, state, world) {
     if (event.target === inspectPop) hideInspect();
   });
   furnMenu.querySelector('[data-furn-close]').addEventListener('click', hideFurnMenu);
-  furnMenu.querySelector('[data-furn-move]').addEventListener('click', () => startMove(furnTarget));
-  furnMenu.querySelector('[data-furn-rotate]').addEventListener('click', () => doRotate(furnTarget));
+  furnMenu.querySelector('[data-furn-move]').addEventListener('click', () => {
+    if (furnTarget?.id === 'piece') {
+      const target = furnTarget;
+      hideFurnMenu();
+      runPieceMenu(target, 'move');
+      return;
+    }
+    startMove(furnTarget);
+  });
+  furnMenu.querySelector('[data-furn-rotate]').addEventListener('click', () => {
+    if (furnTarget?.id === 'piece') {
+      const target = furnTarget;
+      hideFurnMenu();
+      runPieceMenu(target, 'rotate');
+      return;
+    }
+    doRotate(furnTarget);
+  });
   furnMenu.querySelector('[data-furn-upgrade]')?.addEventListener('click', () => {
     hideFurnMenu();
     openUpgrade();
@@ -2613,6 +2682,10 @@ export function bindHud(root, state, world) {
   furnMenu.querySelector('[data-furn-delete]')?.addEventListener('click', () => {
     const target = furnTarget;
     hideFurnMenu();
+    if (target?.id === 'piece') {
+      runPieceMenu(target, 'pickup');
+      return;
+    }
     if (target?.id === 'farming_patch') {
       const patch = state.furniture?.patches?.[target.index];
       if (!patch) return;
@@ -3035,6 +3108,13 @@ export function bindHud(root, state, world) {
   settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
   settingsDock?.querySelector('[data-settings-x]')?.addEventListener('click', closeSettingsDock);
   if (settingsDock) autoFit(settingsDock);
+  settingsDock?.querySelector('[data-settings-unstuck]')?.addEventListener('click', () => {
+    if (world.unstuck?.()) {
+      pushLog(state, 'You shake yourself free.');
+      closeSettingsDock();
+      render(performance.now() / 1000);
+    }
+  });
   const playerFile = settingsDock?.querySelector('[data-player-model-file]');
   settingsDock?.querySelector('[data-player-model-upload]')?.addEventListener('click', () => playerFile?.click());
   playerFile?.addEventListener('change', () => {
@@ -3245,6 +3325,10 @@ export function bindHud(root, state, world) {
     }
     if (event.type === 'construction-select') {
       openPlacedBar(event.index);
+      return;
+    }
+    if (event.type === 'fish-picker') {
+      showFishPicker(event.clientX, event.clientY);
       return;
     }
     if (event.type === 'fishing-inspect') {

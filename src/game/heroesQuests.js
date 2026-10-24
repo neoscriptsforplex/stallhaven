@@ -72,6 +72,17 @@ export const QUEST_TABS = [
   { id: 'dragon', label: 'Dragon Hide' },
 ];
 
+/** Each tab opens after this many total completions of the tab before it. */
+export const QUEST_TAB_UNLOCK = Object.freeze({
+  min15: Object.freeze({ tab: 'min1', count: 50 }),
+  min30: Object.freeze({ tab: 'min15', count: 40 }),
+  hr1: Object.freeze({ tab: 'min30', count: 30 }),
+  day1: Object.freeze({ tab: 'hr1', count: 20 }),
+});
+
+/** Dragonhide quests need this Crafting level. */
+export const DRAGON_QUEST_CRAFTING = Object.freeze({ green_dragon: 25, blue_dragon: 45, red_dragon: 50, black_dragon: 75 });
+
 const ORES = ['bronze', 'iron', 'steel', 'mithril', 'adamant', 'runite', 'dragon'];
 const each = (ids, n) => Object.fromEntries(ids.map((id) => [id, n]));
 
@@ -216,13 +227,35 @@ export function questProgress(hq, questId, now = Date.now()) {
   return { t: total > 0 ? 1 - left / total : 1, msLeft: left };
 }
 
+/** Total completions of every quest in one tab. */
+export function tabCompletions(hq, tabId) {
+  return QUESTS.filter((q) => q.tab === tabId).reduce((sum, q) => sum + (hq?.quests?.done?.[q.id] ?? 0), 0);
+}
+
+/** '' when the quest can start, else why it is locked. */
+export function questLockReason(hq, questId, craftingLevel = 1) {
+  const quest = QUEST_BY_ID[questId];
+  if (!quest) return 'Unknown quest.';
+  const gate = QUEST_TAB_UNLOCK[quest.tab];
+  if (gate) {
+    const have = tabCompletions(hq, gate.tab);
+    if (have < gate.count) {
+      const label = QUEST_TABS.find((t) => t.id === gate.tab)?.label ?? gate.tab;
+      return `Finish ${gate.count - have} more ${label} quests to unlock.`;
+    }
+  }
+  const need = DRAGON_QUEST_CRAFTING[questId];
+  if (need && craftingLevel < need) return `Needs Crafting level ${need}.`;
+  return '';
+}
+
 export function idleHeroes(hq) {
   return HERO_CLASSES.filter((cls) => hq.heroes[cls.id] && !heroQuest(hq, cls.id)).map((cls) => cls.id);
 }
 
-export function startQuest(hq, questId, heroId, now = Date.now()) {
+export function startQuest(hq, questId, heroId, now = Date.now(), craftingLevel = 1) {
   const quest = QUEST_BY_ID[questId];
-  if (!quest || hq.quests.active[questId] || !hq.heroes[heroId] || heroQuest(hq, heroId)) return false;
+  if (!quest || questLockReason(hq, questId, craftingLevel) || hq.quests.active[questId] || !hq.heroes[heroId] || heroQuest(hq, heroId)) return false;
   hq.quests.active[questId] = { heroId, startedAt: now, endsAt: now + quest.duration };
   return true;
 }

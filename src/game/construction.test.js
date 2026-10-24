@@ -142,7 +142,7 @@ describe('construction trims (Luke 2026-10-24)', () => {
       assert.equal(mod.constructionPiece(id).scale, 2 / 3, id);
     }
     assert.equal(mod.constructionPiece('pots_and_pans').scale, 1 / 3);
-    assert.equal(mod.constructionPiece('pots_and_pans').mount, 'floor');
+    assert.equal(mod.constructionPiece('pots_and_pans').mount, 'outdoor');
     assert.equal(mod.constructionPiece('cabinet').scale, 2 / 3);
     assert.equal(mod.constructionPiece('barrel_of_fish').scale, undefined);
     assert.equal(mod.constructionPiece('barrel_of_sticks').scale, undefined);
@@ -227,5 +227,38 @@ describe('garden bush (outdoor)', () => {
       assert.ok(Math.abs(a + b) < 0.5);
       assert.ok(b - a <= 128 * 1.0, 'about one tile');
     }
+  });
+});
+
+describe('place anywhere', () => {
+  it('every catalogue piece places inside and outside; wall pieces snap to both faces', async () => {
+    const { pieceWallMounts, snapToPieceWall, ROOM_W, ROOM_D } = await import('./layout.js');
+    const mounts = pieceWallMounts([]);
+    assert.ok(mounts.some((m) => m.face === 'inside'));
+    assert.ok(mounts.some((m) => m.face === 'outside'));
+    const front = ROOM_D / 2;
+    // Door, sign and windows on the origin front wall are never a mount span.
+    for (const m of mounts.filter((row) => row.wall === 'front')) {
+      for (const bad of [0, -1.48, 1.48]) assert.ok(bad < m.minAlong || bad > m.maxAlong, `front ${m.face} covers ${bad}`);
+    }
+    for (const m of mounts.filter((row) => row.wall === 'left' || row.wall === 'right')) {
+      assert.ok(0 < m.minAlong || 0 > m.maxAlong, 'side window');
+    }
+    for (const row of CONSTRUCTION_PIECES) {
+      assert.ok(['outdoor', 'wall'].includes(row.mount), `${row.id} mount ${row.mount}`);
+      if (row.mount !== 'wall') continue;
+      const inside = snapToPieceWall(-1, -2.9, [], 0);
+      assert.ok(inside.z < 0 && inside.z > -3.3 && inside.rot === 0, `${row.id} inside back wall`);
+      const outside = snapToPieceWall(-3, front + 0.5, [], Math.PI);
+      assert.ok(outside.z > front, `${row.id} outside front wall`);
+      assert.ok(Math.abs(outside.x) > 2.19 - 1e-6, `${row.id} outside skips door/sign/windows`);
+      const side = snapToPieceWall(-ROOM_W / 2 - 0.4, 2.5, [], -Math.PI / 2);
+      assert.ok(side.x < -ROOM_W / 2, `${row.id} outside left wall`);
+    }
+    assert.equal(constructionPiece('lit_torch').mount, 'wall');
+    const shelves = constructionPiece('cooking_shelves');
+    assert.equal(shelves.mount, 'outdoor');
+    assert.equal(shelves.hw, 0.61);
+    assert.equal(shelves.hd, 0.23);
   });
 });

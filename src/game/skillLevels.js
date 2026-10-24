@@ -156,9 +156,9 @@ const LEVELS = {
   ranging_potion: row('herblore', 65, 280),
   magic_potion: row('herblore', 75, 500),
 
-  // Milling wheat. Same station and pace as bread, so Cooking 1 for 2 XP.
+  // Milling wheat pays bread's old 2 XP; bread itself pays double (4).
   pot_of_flour: row('cooking', 1, 2),
-  bread: row('cooking', 1, 2),
+  bread: row('cooking', 1, 4),
   shrimp: row('cooking', 1, 3),
   salmon: row('cooking', 25, 4),
   pizza: row('cooking', 20, 8),

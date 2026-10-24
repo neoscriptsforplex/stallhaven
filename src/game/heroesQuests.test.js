@@ -185,3 +185,27 @@ test('a co-op patch keeps this browser lastSeenAt', async () => {
   assert.equal(state.hq.lastSeenAt, 12345);
   assert.equal(state.hq.quests.active.cow.heroId, 'adventurer');
 });
+
+test("quest unlocks", async (t) => {
+  await t.test("gates tabs on completions of the tab before and dragons on Crafting", async () => {
+    const { emptyHeroQuestState, questLockReason, startQuest } = await import('./heroesQuests.js');
+    const hq = emptyHeroQuestState();
+    hq.heroes.adventurer = { npcId: 'x', name: 'A', hiredAt: 0 };
+    assert.equal(questLockReason(hq, 'imp'), '');
+    assert.match(questLockReason(hq, 'goblin'), /50 more/);
+    assert.equal(startQuest(hq, 'goblin', 'adventurer', 0), false);
+    hq.quests.done.imp = 30; hq.quests.done.cow = 20;
+    assert.equal(questLockReason(hq, 'goblin'), '');
+    assert.match(questLockReason(hq, 'giant_rat'), /40 more/);
+    hq.quests.done.goblin = 40;
+    assert.equal(questLockReason(hq, 'giant_rat'), '');
+    hq.quests.done.giant_rat = 30;
+    assert.equal(questLockReason(hq, 'ghost'), '');
+    assert.match(questLockReason(hq, 'vampyre'), /20 more/);
+    assert.match(questLockReason(hq, 'green_dragon', 24), /Crafting level 25/);
+    assert.equal(questLockReason(hq, 'green_dragon', 25), '');
+    assert.match(questLockReason(hq, 'blue_dragon', 44), /45/);
+    assert.match(questLockReason(hq, 'red_dragon', 49), /50/);
+    assert.match(questLockReason(hq, 'black_dragon', 74), /75/);
+  });
+});

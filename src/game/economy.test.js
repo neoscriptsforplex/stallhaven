@@ -393,7 +393,7 @@ describe('unlock lines', () => {
     assert.equal(isUnlocked(state, 'iron_sword'), false);
     reachLevel(state, 'smithing', RECIPES.iron_sword.requires.level);
     assert.equal(isUnlocked(state, 'iron_sword'), true);
-    state.materials.iron_bar = 1;
+    state.materials.iron_bar = 2;
     assert.equal(canCraft(state, 'iron_sword'), true);
   });
 
@@ -939,7 +939,7 @@ describe('catalog', () => {
     assert.ok(ranged.some((r) => r.id === 'shortbow'));
     assert.equal(recipeCost(RECIPES.shortbow).materials.bow_string, 1);
     assert.equal(recipeCost(RECIPES.dragon_crossbow).materials.bow_string, 1);
-    assert.equal(recipeCost(RECIPES.bronze_sword).materials.bronze_bar, 1);
+    assert.equal(recipeCost(RECIPES.bronze_sword).materials.bronze_bar, 2);
     assert.equal(recipeCost(RECIPES.bronze_sword).materials.bronze, undefined);
     assert.ok(ranged.some((r) => r.id === 'bronze_arrows'));
     assert.ok(ranged.some((r) => r.id === 'green_dragon_mask'));
@@ -1825,7 +1825,7 @@ describe('shop XP', () => {
     assert.equal(state.shopLevel, 1);
     assert.equal(state.shopXp, 0);
     finishCraft(state, 'bread');
-    assert.equal(state.shopXp, bread);
+    assert.equal(state.shopXp, Math.max(1, Math.round(bread / 2)), 'shop levels take twice as long');
     assert.equal(state.shopLevel, shopProgress(state.shopXp).level);
     state.shopXp = 0;
     for (let i = 1; i < 200; i += 1) state.shopXp += 5000;
@@ -2173,7 +2173,7 @@ describe('anvil tools', () => {
       const pickaxe = RECIPES[`${metal.id}_pickaxe`];
       assert.equal(recipeCost(hatchet).materials[`${metal.id}_bar`], 1, hatchet.id);
       assert.equal(recipeCost(hatchet).materials[metal.id], undefined, hatchet.id);
-      assert.equal(recipeCost(pickaxe).materials[`${metal.id}_bar`], 1, pickaxe.id);
+      assert.equal(recipeCost(pickaxe).materials[`${metal.id}_bar`], 2, pickaxe.id);
     }
     const state = createState();
     assert.equal(isUnlocked(state, 'bronze_hatchet'), false);
@@ -2412,23 +2412,23 @@ describe('potion sell prices', () => {
 describe('craft batches', () => {
   it('queues five affordable crafts and finishes them in sequence', () => {
     const state = createState();
-    reachLevel(state, 'smithing', RECIPES.bronze_sword.requires.level);
+    reachLevel(state, 'smithing', RECIPES.bronze_dagger.requires.level);
     state.materials.bronze_bar = 8;
-    assert.equal(maxCraftActions(state, 'bronze_sword'), 8);
-    assert.equal(startCraftBatch(state, 'bronze_sword', 5, 0), 5);
+    assert.equal(maxCraftActions(state, 'bronze_dagger'), 8);
+    assert.equal(startCraftBatch(state, 'bronze_dagger', 5, 0), 5);
     assert.equal(state.materials.bronze_bar, 3);
-    assert.equal(state.crafts.bronze_sword.left, 5);
-    assert.equal(state.chest.bronze_sword, undefined);
+    assert.equal(state.crafts.bronze_dagger.left, 5);
+    assert.equal(state.chest.bronze_dagger, undefined);
     assert.deepEqual(completeCrafts(state, 2.9), []);
-    assert.deepEqual(completeCrafts(state, 3), ['bronze_sword']);
-    assert.equal(state.chest.bronze_sword, 1);
-    assert.equal(state.crafts.bronze_sword.left, 4);
-    assert.deepEqual(completeCrafts(state, 3 + RECIPES.bronze_sword.time * 4), [
-      'bronze_sword', 'bronze_sword', 'bronze_sword', 'bronze_sword',
+    assert.deepEqual(completeCrafts(state, 3), ['bronze_dagger']);
+    assert.equal(state.chest.bronze_dagger, 1);
+    assert.equal(state.crafts.bronze_dagger.left, 4);
+    assert.deepEqual(completeCrafts(state, 3 + RECIPES.bronze_dagger.time * 4), [
+      'bronze_dagger', 'bronze_dagger', 'bronze_dagger', 'bronze_dagger',
     ]);
-    assert.equal(state.chest.bronze_sword, 5);
-    assert.equal(state.crafts.bronze_sword, undefined);
-    assert.equal(state.craftCounts.bronze_sword, 5);
+    assert.equal(state.chest.bronze_dagger, 5);
+    assert.equal(state.crafts.bronze_dagger, undefined);
+    assert.equal(state.craftCounts.bronze_dagger, 5);
   });
 
   it('caps Max by materials and does not craft locked tiers', () => {
@@ -2447,19 +2447,19 @@ describe('craft batches', () => {
 
   it('cancels a mid-batch craft, refunds leftover actions, and keeps finished items', () => {
     const state = createState();
-    reachLevel(state, 'smithing', RECIPES.bronze_sword.requires.level);
+    reachLevel(state, 'smithing', RECIPES.bronze_dagger.requires.level);
     state.materials.bronze_bar = 5;
-    assert.equal(startCraftBatch(state, 'bronze_sword', 5, 0), 5);
+    assert.equal(startCraftBatch(state, 'bronze_dagger', 5, 0), 5);
     assert.equal(state.materials.bronze_bar, 0);
-    assert.deepEqual(completeCrafts(state, RECIPES.bronze_sword.time), ['bronze_sword']);
-    assert.equal(state.chest.bronze_sword, 1);
-    assert.equal(state.crafts.bronze_sword.left, 4);
-    assert.equal(busyCraftId(state), 'bronze_sword');
-    assert.equal(cancelCraft(state, 'bronze_sword'), 4);
-    assert.equal(state.crafts.bronze_sword, undefined);
+    assert.deepEqual(completeCrafts(state, RECIPES.bronze_dagger.time), ['bronze_dagger']);
+    assert.equal(state.chest.bronze_dagger, 1);
+    assert.equal(state.crafts.bronze_dagger.left, 4);
+    assert.equal(busyCraftId(state), 'bronze_dagger');
+    assert.equal(cancelCraft(state, 'bronze_dagger'), 4);
+    assert.equal(state.crafts.bronze_dagger, undefined);
     assert.equal(busyCraftId(state), null);
-    assert.equal(state.chest.bronze_sword, 1);
-    assert.equal(state.craftCounts.bronze_sword, 1);
+    assert.equal(state.chest.bronze_dagger, 1);
+    assert.equal(state.craftCounts.bronze_dagger, 1);
     assert.equal(state.materials.bronze_bar, 4);
     assert.equal(cancelCrafts(state), 0);
   });
@@ -2848,3 +2848,31 @@ describe('furniture nails and planks', () => {
   });
 });
 
+
+describe('OSRS anvil bar costs', () => {
+  it('uses 1/2/3/5 bars by piece', () => {
+    const want = {
+      dagger: 1, mace: 1, med_helm: 1, boots: 1, hatchet: 1, thrownaxe: 1,
+      sword: 2, scimitar: 2, full_helm: 2, pickaxe: 2,
+      kiteshield: 3, chainbody: 3, platelegs: 3, plateskirt: 3, '2h_sword': 3, spear: 3,
+      platebody: 5,
+    };
+    for (const [piece, n] of Object.entries(want)) {
+      const r = RECIPES[`iron_${piece}`];
+      if (!r) continue;
+      assert.equal(recipeCost(r).materials.iron_bar, n, piece);
+    }
+    assert.equal(recipeCost(RECIPES.iron_nails).materials.iron_bar, 1);
+  });
+});
+
+describe('rune crafting needs the portal', () => {
+  it('blocks runes until a portal is placed', () => {
+    const state = createState();
+    state.materials.essence = 1000;
+    delete state.furniture.portal;
+    assert.match(craftBlockReason(state, 'air_rune'), /portal/i);
+    state.furniture.portal = { x: 0, z: 0, rot: 0 };
+    assert.doesNotMatch(craftBlockReason(state, 'air_rune') || '', /portal/i);
+  });
+});

@@ -66,6 +66,8 @@ import {
   gardenTreeSpots,
   patchHitsTreeOrRock,
   rectHitsPond,
+  pondBlocksSpot,
+  pointInPond,
   FARMING_PATCH_HALF,
   FLAX_RESPAWN_SEC,
   runeFieldTreeSpots,
@@ -94,6 +96,7 @@ import {
   SHOP_RUG,
   snapToFloor,
   snapToWallGrid,
+  snapToPieceWall,
   placeFloors,
   walkFloors,
 } from './layout.js';
@@ -908,7 +911,10 @@ export function createWorld(canvas, state, opts = {}) {
   function previewFurnitureAt(x, z) {
     if (!moveTarget) return null;
     const kind = placeKindOf(moveTarget);
-    const snapped = kind === 'shelf' || (kind === 'piece' && constructionPiece(moveTarget.pieceId)?.mount === 'wall')
+    const wallPiece = kind === 'piece' && constructionPiece(moveTarget.pieceId)?.mount === 'wall';
+    const snapped = wallPiece
+      ? snapToPieceWall(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
+      : kind === 'shelf'
       ? snapToWallGrid(x, z, state.expansions ?? [], poseOf(moveTarget)?.rot)
       : kind === 'piece' && moveTarget.snap === false
         ? { x, z }
@@ -917,7 +923,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!pose) return snapped;
     pose.x = snapped.x;
     pose.z = snapped.z;
-    if (kind === 'shelf' && snapped.rot != null) pose.rot = snapped.rot;
+    if ((kind === 'shelf' || wallPiece) && snapped.rot != null) pose.rot = snapped.rot;
     applyMovePose(moveTarget);
     highlightSnapCell(snapped.x, snapped.z);
     return snapped;
@@ -1065,6 +1071,7 @@ export function createWorld(canvas, state, opts = {}) {
       const z = grass.minZ + 1.4 + Math.random() * (grass.maxZ - grass.minZ - 2.8);
       if (pointOnFloors(x, z, floors, 0.45)) continue;
       if (pointHitsShop(x, z, state.expansions ?? [], 1.05)) continue;
+      if (pondBlocksSpot(x, z, 0.6)) continue;
       if (Math.abs(x) < 1.55 && z > 3.4) continue;
       if (from) {
         if (from.x < -2 && x > 1.2) continue;
@@ -1385,6 +1392,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (anim) {
       const box = new THREE.Box3().setFromObject(anim);
       if (Number.isFinite(box.min.y) && !pieceHangs(id)) anim.position.y -= box.min.y;
+      anim.position.y += constructionPiece(id)?.wallY ?? 0;
       return anim;
     }
     const look = getBundledLook(constructionLookId(id));
@@ -1394,6 +1402,7 @@ export function createWorld(canvas, state, opts = {}) {
       mesh.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(mesh);
       if (Number.isFinite(box.min.y) && !pieceHangs(id)) mesh.position.y -= box.min.y;
+      mesh.position.y += constructionPiece(id)?.wallY ?? 0;
       return mesh;
     }
     const tint = constructionPiece(id)?.tint ?? 0xc4a06a;
@@ -1650,7 +1659,7 @@ export function createWorld(canvas, state, opts = {}) {
       const t = Math.min(1, step / dist);
       const nx = pos.x + dx * t;
       const nz = pos.z + dz * t;
-      if (pointHitsShop(nx, nz, state.expansions ?? [], 0.95) || pointOnFloors(nx, nz, floors, 0.4)) {
+      if (pointHitsShop(nx, nz, state.expansions ?? [], 0.95) || pointOnFloors(nx, nz, floors, 0.4) || pondBlocksSpot(nx, nz, 0.3)) {
         gob.goal = grassWanderPoint({ x: pos.x, z: pos.z });
         gob.waitUntil = now + 0.35;
         continue;
@@ -2187,6 +2196,8 @@ export function createWorld(canvas, state, opts = {}) {
       moveMarker.visible = false;
       return false;
     }
+    // A walk click always ends a gather loop; otherwise the chop pose keeps the player rooted.
+    if (mining) stopMining();
     return applyWalkPath(path);
   }
 
@@ -2603,7 +2614,7 @@ export function createWorld(canvas, state, opts = {}) {
     if (!piece || !pose) return 'That spot is off the shop floor.';
     if (rectHitsPond(pose.x, pose.z, 0.35, 0.35)) return 'That spot overlaps the pond.';
     if (piece.mount === 'wall') {
-      const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], pose.rot);
+      const snapped = snapToPieceWall(pose.x, pose.z, state.expansions ?? [], pose.rot);
       if (Math.hypot((snapped.x ?? pose.x) - pose.x, (snapped.z ?? pose.z) - pose.z) > 0.45) {
         return 'Place it on an open wall.';
       }
@@ -2734,8 +2745,22 @@ export function createWorld(canvas, state, opts = {}) {
       return false;
     }
     rebuildNav();
+    syncFixtureIntent(moveTarget);
     clearMoveMode();
     return true;
+  }
+
+  /** Tell the room (and the save) where a fixture ended up; pieces/patches confirm through their own intents. */
+  function syncFixtureIntent(target) {
+    if (!target || target.id === 'piece' || target.id === 'farming_patch') return;
+    const pose = target.id === 'display' ? state.furniture.displays?.[target.index] : state.furniture[target.id];
+    if (!pose) return;
+    intentBus.apply({
+      type: 'moveFurniture',
+      furnitureId: target.id,
+      ...(target.id === 'display' ? { index: target.index } : {}),
+      pose: { x: pose.x, z: pose.z, ...(Number.isFinite(pose.rot) ? { rot: pose.rot } : {}) },
+    });
   }
 
   function rotateFurniturePose(target, dir = 1) {
@@ -2745,7 +2770,9 @@ export function createWorld(canvas, state, opts = {}) {
     const step = furnitureRotateDelta(kind) * (dir < 0 ? -1 : 1);
     const nextRot = (pose.rot ?? FURNITURE_FORWARD) + step;
     if (kind === 'shelf' || (kind === 'piece' && constructionPiece(target.pieceId)?.mount === 'wall')) {
-      const snapped = snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot);
+      const snapped = kind === 'shelf'
+        ? snapToWallGrid(pose.x, pose.z, state.expansions ?? [], nextRot)
+        : snapToPieceWall(pose.x, pose.z, state.expansions ?? [], nextRot);
       pose.x = snapped.x;
       pose.z = snapped.z;
       pose.rot = snapped.rot;
@@ -2832,6 +2859,16 @@ export function createWorld(canvas, state, opts = {}) {
 
     const picked = hitFurniture(hits);
     const floorPoint = floorClickPoint(hits);
+    const pickedKind = picked?.object.userData?.kind ?? null;
+    if (
+      sceneMode === 'shop'
+      && (pickedKind === 'fishing_spot' || (!picked && floorPoint && pointInPond(floorPoint.x, floorPoint.z, 0.35)))
+    ) {
+      // The whole pond is one click target: open the fish picker.
+      playClick('ui');
+      pickHandler?.({ type: 'fish-picker', clientX: event.clientX, clientY: event.clientY });
+      return;
+    }
     if (clickLeavesGather(mining, floorPoint, picked?.object.userData?.kind ?? null)) {
       pendingUse = null;
       if (setMoveTarget(floorPoint.x, floorPoint.z)) {
@@ -3151,6 +3188,19 @@ export function createWorld(canvas, state, opts = {}) {
       pickHandler?.({
         type: 'furn-menu',
         furniture: { id: 'rug' },
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+      return;
+    }
+    const pieceHit = picked?.object.userData.kind === 'construction'
+      ? picked
+      : !picked ? hits.find((hit) => hit.object.userData.kind === 'construction') : null;
+    if (pieceHit && Number.isInteger(pieceHit.object.userData.index)) {
+      playClick('ui');
+      pickHandler?.({
+        type: 'furn-menu',
+        furniture: { id: 'piece', index: pieceHit.object.userData.index },
         clientX: event.clientX,
         clientY: event.clientY,
       });
@@ -4251,6 +4301,29 @@ export function createWorld(canvas, state, opts = {}) {
       syncDisplays();
       syncPlacedMeshes();
     },
+    /** Settings "Unstuck": stop everything and stand on a safe spot for this scene. */
+    unstuck() {
+      stopMining();
+      pendingUse = null;
+      playerPath.length = 0;
+      moveMarker.visible = false;
+      const spot = sceneMode === 'dungeon'
+        ? { x: -4.15, z: 0.4 }
+        : sceneMode === 'runefield'
+          ? { x: RUNE_FIELD_ARRIVE.x, z: RUNE_FIELD_ARRIVE.z }
+          : { x: SHOP.keeper.x, z: SHOP.keeper.z };
+      shopkeeper.position.set(spot.x, 0, spot.z);
+      syncStance(shopkeeper);
+      shopkeeper.position.y = shopkeeper.userData.groundY;
+      return true;
+    },
+    /** Walk to the chosen fish's spot and keep fishing it. */
+    fishFor(materialId) {
+      const spot = fishingSpotById(materialId);
+      if (!spot) return false;
+      queueUse('fishing_spot', { x: spot.x, z: spot.z, materialId: spot.materialId });
+      return true;
+    },
     beginPlacePiece(pieceId) {
       const row = constructionPiece(pieceId);
       if (!row) return;
@@ -4261,7 +4334,7 @@ export function createWorld(canvas, state, opts = {}) {
         ? portalPlaceFloors(state.expansions ?? [])
         : placeRects;
       const start = row.mount === 'wall'
-        ? snapToWallGrid(home.x, home.z, state.expansions ?? [], FURNITURE_FORWARD)
+        ? snapToPieceWall(home.x, home.z, state.expansions ?? [], FURNITURE_FORWARD)
         : snapToFloor(home.x, home.z, floors);
       placeDraft = {
         id: 'piece',
@@ -4591,7 +4664,9 @@ export function createWorld(canvas, state, opts = {}) {
       return Boolean(placeNeedsConfirm);
     },
     rotateFurniture(target, dir = 1) {
-      return rotateFurniturePose(target, dir);
+      const ok = rotateFurniturePose(target, dir);
+      if (ok && !moveTarget) syncFixtureIntent(target);
+      return ok;
     },
     isMovingFurniture() {
       return Boolean(moveTarget);

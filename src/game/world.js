@@ -1,4 +1,5 @@
 import { onLayoutChange } from './layoutQuery.js';
+import { updateGrassLod } from './grassTufts.js';
 import { graphicsProfile, getGraphicsLevel, onGraphicsChange, initGraphicsSettings } from './graphics.js';
 import * as THREE from 'three';
 import {
@@ -387,6 +388,7 @@ export function createWorld(canvas, state, opts = {}) {
   sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 48;
+  let grassLodDist = Infinity;
   const applyGraphics = () => {
     const g = graphicsProfile(getGraphicsLevel(), window.devicePixelRatio || 1);
     renderer.setPixelRatio(g.pixelRatio);
@@ -401,6 +403,7 @@ export function createWorld(canvas, state, opts = {}) {
       sun.shadow.map?.dispose();
       sun.shadow.map = null;
     }
+    grassLodDist = g.grassDist;
     camera.far = g.far;
     camera.updateProjectionMatrix();
   };
@@ -4292,7 +4295,7 @@ export function createWorld(canvas, state, opts = {}) {
       loomFx.update(dt);
     }
     for (const fx of magicSparkles) fx.update(dt);
-    if (drawScene) renderer.render(scene, camera);
+    if (drawScene) { updateGrassLod(camera, grassLodDist); renderer.render(scene, camera); }
   }
 
   function replaceShopkeeperMesh(next) {

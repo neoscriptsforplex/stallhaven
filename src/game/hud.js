@@ -141,6 +141,8 @@ import { clampMapZoom, compassAssetUrl, compassNeedleDegrees, drawMinimap, mapTo
 import { boulderInspect, fishingInspect, flaxInspect, treeInspect, wheatInspect } from './shopbuild.js';
 import { intentBus } from './intents.js';
 import { createCraftPreview } from './craftpreview.js';
+import { gatherLevelRequirement } from './skills.js';
+import { FISHING_SPOTS } from './layout.js';
 import { createSkills, gatherInspectTitle, levelRequirementText, meetsLevelRequirement, skillLevelOf } from './skills.js';
 import { bindSkillsPanel, showLevelUpToast } from './skillsPanel.js';
 import { bindSkillGuide } from './skillGuide.js';
@@ -1774,6 +1776,45 @@ export function bindHud(root, state, world) {
     render(performance.now() / 1000);
   }
 
+  let fishPicker = null;
+  const LAST_FISH_KEY = 'stallhaven.lastFish';
+  function hideFishPicker() {
+    if (fishPicker) fishPicker.hidden = true;
+  }
+  /** Pond click: every fish with its level; the pick walks over and keeps fishing it. */
+  function showFishPicker(clientX, clientY) {
+    if (!fishPicker) {
+      fishPicker = document.createElement('div');
+      fishPicker.className = 'furn-menu fish-picker';
+      fishPicker.setAttribute('role', 'menu');
+      document.body.appendChild(fishPicker);
+      fishPicker.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('[data-fish]');
+        if (!btn || btn.disabled) return;
+        try { localStorage.setItem(LAST_FISH_KEY, btn.dataset.fish); } catch { /* private mode */ }
+        hideFishPicker();
+        world.fishFor?.(btn.dataset.fish);
+      });
+      document.addEventListener('pointerdown', (ev) => {
+        if (fishPicker && !fishPicker.hidden && !fishPicker.contains(ev.target)) hideFishPicker();
+      }, true);
+    }
+    let last = null;
+    try { last = localStorage.getItem(LAST_FISH_KEY); } catch { /* private mode */ }
+    const level = skillLevelOf(state, 'fishing');
+    fishPicker.innerHTML = `<p>Fish for…</p>${FISHING_SPOTS.map((spot) => {
+      const req = gatherLevelRequirement(spot.materialId);
+      const need = req?.level ?? 1;
+      const locked = level < need;
+      const name = MATERIALS[spot.materialId]?.name ?? spot.name;
+      return `<button type="button" data-fish="${spot.materialId}"${locked ? ' disabled' : ''}${spot.materialId === last ? ' class="is-last"' : ''}>${locked ? '🔒 ' : ''}${name} <small>Lv ${need}</small></button>`;
+    }).join('')}`;
+    fishPicker.hidden = false;
+    const w = 200;
+    fishPicker.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, clientX - w / 2))}px`;
+    fishPicker.style.top = `${Math.max(8, Math.min(window.innerHeight - 280, clientY - 20))}px`;
+  }
+
   function showFurnMenu(target, clientX, clientY) {
     furnTarget = target;
     const pieceRow = target.id === 'piece' ? constructionPiece(state.furniture?.placed?.[target.index]?.id) : null;
@@ -3277,6 +3318,10 @@ export function bindHud(root, state, world) {
     }
     if (event.type === 'construction-select') {
       openPlacedBar(event.index);
+      return;
+    }
+    if (event.type === 'fish-picker') {
+      showFishPicker(event.clientX, event.clientY);
       return;
     }
     if (event.type === 'fishing-inspect') {

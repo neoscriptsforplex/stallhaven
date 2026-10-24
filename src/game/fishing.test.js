@@ -225,3 +225,24 @@ describe('pond water fx', () => {
     assert.equal(root.children.length, 0);
   });
 });
+
+describe('pond is not walkable', () => {
+  it('player obstacles cover open water, and buyer routes never cross it', async () => {
+    const { isWalkable, playerObstacles } = await import('./nav.js');
+    const { buyerCobbleRoute, pondBlocksSpot, POND } = await import('./layout.js');
+    const { createState } = await import('./economy.js');
+    const state = createState();
+    assert.equal(isWalkable(POND.x + 1, POND.z + 0.8, playerObstacles(state)), false);
+    for (const ids of [[], ['left', 'right', 'back']]) {
+      const route = buyerCobbleRoute(ids);
+      const pts = [route.spawn, ...route.toDoor];
+      for (let i = 1; i < pts.length; i += 1) {
+        for (let t = 0; t <= 1; t += 0.05) {
+          const x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t;
+          const z = pts[i - 1].z + (pts[i].z - pts[i - 1].z) * t;
+          assert.equal(pondBlocksSpot(x, z, 0.3), false);
+        }
+      }
+    }
+  });
+});

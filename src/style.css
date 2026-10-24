@@ -3807,3 +3807,17 @@ html.is-booting.is-scene-live #view {
 @keyframes phone-sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .modal > .sheet, .expand-dock { animation: none; } }
 .quest-card.is-locked { opacity: 0.6; filter: grayscale(0.5); }
+
+.fish-picker {
+  position: fixed;
+  z-index: 40;
+}
+
+.fish-picker button {
+  display: flex;
+  justify-content: space-between;
+}
+
+.fish-picker button.is-last {
+  outline: 2px solid var(--gold);
+}

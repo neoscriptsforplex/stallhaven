@@ -66,6 +66,8 @@ import {
   gardenTreeSpots,
   patchHitsTreeOrRock,
   rectHitsPond,
+  pondBlocksSpot,
+  pointInPond,
   FARMING_PATCH_HALF,
   FLAX_RESPAWN_SEC,
   runeFieldTreeSpots,
@@ -1069,6 +1071,7 @@ export function createWorld(canvas, state, opts = {}) {
       const z = grass.minZ + 1.4 + Math.random() * (grass.maxZ - grass.minZ - 2.8);
       if (pointOnFloors(x, z, floors, 0.45)) continue;
       if (pointHitsShop(x, z, state.expansions ?? [], 1.05)) continue;
+      if (pondBlocksSpot(x, z, 0.6)) continue;
       if (Math.abs(x) < 1.55 && z > 3.4) continue;
       if (from) {
         if (from.x < -2 && x > 1.2) continue;
@@ -1656,7 +1659,7 @@ export function createWorld(canvas, state, opts = {}) {
       const t = Math.min(1, step / dist);
       const nx = pos.x + dx * t;
       const nz = pos.z + dz * t;
-      if (pointHitsShop(nx, nz, state.expansions ?? [], 0.95) || pointOnFloors(nx, nz, floors, 0.4)) {
+      if (pointHitsShop(nx, nz, state.expansions ?? [], 0.95) || pointOnFloors(nx, nz, floors, 0.4) || pondBlocksSpot(nx, nz, 0.3)) {
         gob.goal = grassWanderPoint({ x: pos.x, z: pos.z });
         gob.waitUntil = now + 0.35;
         continue;
@@ -2840,6 +2843,16 @@ export function createWorld(canvas, state, opts = {}) {
 
     const picked = hitFurniture(hits);
     const floorPoint = floorClickPoint(hits);
+    const pickedKind = picked?.object.userData?.kind ?? null;
+    if (
+      sceneMode === 'shop'
+      && (pickedKind === 'fishing_spot' || (!picked && floorPoint && pointInPond(floorPoint.x, floorPoint.z, 0.35)))
+    ) {
+      // The whole pond is one click target: open the fish picker.
+      playClick('ui');
+      pickHandler?.({ type: 'fish-picker', clientX: event.clientX, clientY: event.clientY });
+      return;
+    }
     if (clickLeavesGather(mining, floorPoint, picked?.object.userData?.kind ?? null)) {
       pendingUse = null;
       if (setMoveTarget(floorPoint.x, floorPoint.z)) {
@@ -4271,6 +4284,13 @@ export function createWorld(canvas, state, opts = {}) {
       applyAllPoses();
       syncDisplays();
       syncPlacedMeshes();
+    },
+    /** Walk to the chosen fish's spot and keep fishing it. */
+    fishFor(materialId) {
+      const spot = fishingSpotById(materialId);
+      if (!spot) return false;
+      queueUse('fishing_spot', { x: spot.x, z: spot.z, materialId: spot.materialId });
+      return true;
     },
     beginPlacePiece(pieceId) {
       const row = constructionPiece(pieceId);

@@ -60,7 +60,7 @@ describe('materials drawer', () => {
     assert.match(html, /Bronze Bar/);
     assert.equal(html.includes('Bronze Ore'), false);
     assert.equal(html.includes('data-restock'), false);
-    assert.match(materialsDrawerHtml({ wheat: 1 }), new RegExp(`background:${tintHex(materialTint(MATERIALS.wheat))}`)); // no render: swatch
+    assert.match(materialsDrawerHtml({ wheat: 1 }), /class="mat-icon" src="[^"]*item-wheat\.png"/); // every material now has a model render
     assert.equal(tintHex(materialTint(MATERIALS.bronze_bar)), tintHex(METALS[0].tint));
     assert.equal(materialsDrawerHtml({ flax: 0 }), '<p class="materials-empty">No materials yet.</p>');
     assert.equal(materialsDrawerHtml({ bronze_nails: 0, dragon_nails: 0 }).includes('Nails'), false);

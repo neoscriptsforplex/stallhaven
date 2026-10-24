@@ -282,3 +282,18 @@ describe('walking to every fishing spot (incl. dock/jetty stands)', () => {
     }
   });
 });
+
+describe('raspberry -> redberries rename', () => {
+  it('carries saved raspberries over to redberries', () => {
+    const saved = serializeState(createState());
+    delete saved.materials.redberries;
+    saved.materials.raspberry = 17;
+    const next = createState();
+    assert.equal(applyState(next, saved), true);
+    assert.equal(next.materials.redberries, 17);
+    assert.equal(next.materials.raspberry, undefined);
+    assert.equal(MATERIALS.redberries.name, 'Redberries');
+    assert.equal(MATERIALS.raspberry, undefined);
+    assert.equal(RECIPES.pie.name, 'Redberry Pie');
+  });
+});

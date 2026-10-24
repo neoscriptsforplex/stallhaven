@@ -350,7 +350,7 @@ export const MATERIALS = {
   egg: { id: 'egg', name: 'Egg', restock: 0, start: 5, tier: 1, regenEvery: 0 },
   flour: { id: 'flour', name: 'Pot of flour', restock: 0, start: 0, tier: 1, regenEvery: 0, crafted: true },
   pineapple: { id: 'pineapple', name: 'Pineapple', restock: 0, start: 5, tier: 1, regenEvery: 0 },
-  raspberry: { id: 'raspberry', name: 'Raspberry', restock: 0, start: 5, tier: 1, regenEvery: 0 },
+  redberries: { id: 'redberries', name: 'Redberries', restock: 0, start: 5, tier: 1, regenEvery: 0 },
   chocolate: { id: 'chocolate', name: 'Chocolate', restock: 0, start: 5, tier: 1, regenEvery: 0 },
   // Raw fish come only from the pond (Fishing). The old bought "Fish" is gone;
   // saves before v13 move it onto Raw salmon (economy.migrateGenericFish).
@@ -1077,7 +1077,7 @@ RUNE_LINE.forEach((rune, index) => {
 const COOK_LINE = [
   { id: 'shrimp', name: 'Shrimp', lv: 1, price: 1000, mats: { raw_shrimp: 1 }, tint: 0xf0b070, time: 2 },
   { id: 'bread', name: 'Bread', lv: 1, price: 1050, mats: { flour: 1, egg: 1, water: 1 }, tint: 0xc4a05a, time: 3 },
-  { id: 'pie', name: 'Redberry Pie', lv: 10, price: 1200, mats: { flour: 1, water: 1, raspberry: 1 }, tint: 0xb45a4a, time: 4 },
+  { id: 'pie', name: 'Redberry Pie', lv: 10, price: 1200, mats: { flour: 1, water: 1, redberries: 1 }, tint: 0xb45a4a, time: 4 },
   { id: 'salmon', name: 'Salmon', lv: 25, price: 1700, mats: { raw_salmon: 1 }, tint: 0xe07a4a, time: 3 },
   { id: 'plain_pizza', name: 'Pizza', lv: 35, price: 2100, mats: { flour: 1, water: 1, egg: 1 }, tint: 0xd8a850, time: 5, shape: 'pizza' },
   { id: 'lobster', name: 'Lobster', lv: 40, price: 2350, mats: { raw_lobster: 1 }, tint: 0xc45a32, time: 5 },
@@ -1089,7 +1089,7 @@ const COOK_LINE = [
   { id: 'pizza', name: 'Pineapple Pizza', lv: 65, price: 4100, mats: { flour: 1, water: 1, egg: 1, pineapple: 1 }, tint: 0xd4a04a, time: 8 },
   { id: 'shark', name: 'Shark', lv: 80, price: 5750, mats: { raw_shark: 1 }, tint: 0x6a7a88, time: 9 },
   { id: 'anglerfish', name: 'Anglerfish', lv: 84, price: 6250, mats: { raw_anglerfish: 1 }, tint: 0xc8a04a, time: 12 },
-  { id: 'summer_pie', name: 'Summer Pie', lv: 95, price: 8000, mats: { flour: 1, water: 1, raspberry: 1, pineapple: 1 }, tint: 0xe8a04a, time: 10 },
+  { id: 'summer_pie', name: 'Summer Pie', lv: 95, price: 8000, mats: { flour: 1, water: 1, redberries: 1, pineapple: 1 }, tint: 0xe8a04a, time: 10 },
 ];
 
 /** Sell price: 1,000 gp at Lv 1 rising x8 to ~8,000 gp at Lv 95 (nearest 50), set per dish in COOK_LINE. */

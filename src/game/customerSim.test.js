@@ -108,7 +108,7 @@ test('asks mostly for things the shop can craft now', async () => {
 });
 test('quest-only and fishing-only starting stock', async () => {
   const { MATERIALS } = await import('./catalog.js');
-  for (const id of ['raspberry', 'pineapple', 'chocolate', 'hide', 'egg']) {
+  for (const id of ['redberries', 'pineapple', 'chocolate', 'hide', 'egg']) {
     assert.equal(MATERIALS[id].start, 5, id);
     assert.ok(!MATERIALS[id].restock && !MATERIALS[id].regenEvery, id);
   }

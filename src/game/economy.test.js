@@ -948,11 +948,11 @@ describe('catalog', () => {
     assert.equal(recipeCost(RECIPES.pizza).materials.egg, 1);
     assert.equal(recipeCost(RECIPES.pizza).materials.water, 1);
     assert.equal(recipeCost(RECIPES.cake).materials.water, 1);
-    assert.equal(recipeCost(RECIPES.pie).materials.raspberry, 1);
+    assert.equal(recipeCost(RECIPES.pie).materials.redberries, 1);
     assert.equal(recipeCost(RECIPES.fish_pie).materials.water, 1);
     assert.equal(recipeCost(RECIPES.chocolate_cake).materials.egg, 1);
     assert.equal(recipeCost(RECIPES.chocolate_cake).materials.water, 1);
-    assert.equal(recipeCost(RECIPES.summer_pie).materials.raspberry, 1);
+    assert.equal(recipeCost(RECIPES.summer_pie).materials.redberries, 1);
     assert.equal(recipeCost(RECIPES.summer_pie).materials.water, 1);
     assert.ok(!melee.some((r) => r.category === 'food'));
     assert.ok(!melee.some((r) => r.combatClass === 'tools'));

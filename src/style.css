@@ -3922,3 +3922,29 @@ html.is-booting.is-scene-live #view {
 @media (pointer: coarse) {
   .materials-row .mat-bin { min-width: 32px; min-height: 28px; }
 }
+
+/* Drawer rows never scroll sideways: the name truncates, bin is a fixed 28px square with a 36px hit area. */
+.materials-grid { grid-template-columns: repeat(auto-fill, minmax(min(9.25rem, 100%), 1fr)); }
+.materials-drawer .materials-grid { grid-template-columns: minmax(0, 1fr); overflow-x: hidden; }
+.materials-row { min-width: 0; flex-wrap: nowrap; }
+.materials-row .mat-name { flex: 1 1 auto; min-width: 0; }
+.materials-row .mat-count { flex: none; }
+.materials-row .mat-bin {
+  position: relative; flex: 0 0 28px; width: 28px; height: 28px; min-width: 28px; min-height: 28px;
+  padding: 0; display: inline-flex; align-items: center; justify-content: center;
+}
+.materials-row .mat-bin::after { content: ''; position: absolute; inset: -4px; }
+.mat-discard-actions button { flex: 1 1 40px; }
+@media (pointer: coarse) {
+  .materials-row .mat-bin { min-width: 28px; min-height: 28px; }
+}
+@media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
+  .materials-row.is-full { flex-wrap: nowrap; }
+}
+@media (max-width: 359px) {
+  .materials-row .sf-full {
+    font-size: 0; padding: 0; width: 14px; min-width: 14px; height: 14px; border-radius: 7px; margin-left: 0; flex: none;
+  }
+  .materials-row .sf-full::before { content: 'F'; font-size: 0.56rem; line-height: 14px; display: block; text-align: center; letter-spacing: 0; }
+  .materials-drawer .mat-swatch { display: none; }
+}

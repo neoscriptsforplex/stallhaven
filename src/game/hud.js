@@ -1210,10 +1210,12 @@ export function bindHud(root, state, world) {
     const cap = storageCap(state);
     const pop = document.createElement('div');
     pop.className = 'sf-pop';
-    pop.innerHTML = `<p class="sf-pop-title"><b>${escCraft(name)}</b> <span>${formatGold(have)} / ${formatGold(cap)}</span></p>`
+    pop.innerHTML = '<button type="button" class="ghost settings-x panel-x" data-storage-x aria-label="Close" title="Close">✕</button>'
+      + `<p class="sf-pop-title"><b>${escCraft(name)}</b> <span>${formatGold(have)} / ${formatGold(cap)}</span></p>`
       + '<p>Storage is full. Upgrade the chest to hold more.</p>'
       + '<button type="button" class="sf-upgrade" data-storage-upgrade>Upgrade chest</button>'
       + '<p class="sf-pop-meta">250 per chest level, up to 2,500.</p>';
+    pop.querySelector('[data-storage-x]').addEventListener('click', closeStoragePop);
     document.body.appendChild(pop);
     const rect = anchor.getBoundingClientRect();
     const width = pop.offsetWidth || 270;
@@ -1816,6 +1818,7 @@ export function bindHud(root, state, world) {
       fishPicker.setAttribute('role', 'menu');
       document.body.appendChild(fishPicker);
       fishPicker.addEventListener('click', (ev) => {
+        if (ev.target.closest('[data-fish-x]')) { hideFishPicker(); return; }
         const btn = ev.target.closest('[data-fish]');
         if (!btn || btn.disabled) return;
         try { localStorage.setItem(LAST_FISH_KEY, btn.dataset.fish); } catch { /* private mode */ }
@@ -1829,7 +1832,7 @@ export function bindHud(root, state, world) {
     let last = null;
     try { last = localStorage.getItem(LAST_FISH_KEY); } catch { /* private mode */ }
     const level = skillLevelOf(state, 'fishing');
-    fishPicker.innerHTML = `<p>Fish for…</p>${FISHING_SPOTS.map((spot) => {
+    fishPicker.innerHTML = `<button type="button" class="ghost settings-x panel-x" data-fish-x aria-label="Close" title="Close">✕</button><p>Fish for…</p>${FISHING_SPOTS.map((spot) => {
       const req = gatherLevelRequirement(spot.materialId);
       const need = req?.level ?? 1;
       const locked = level < need;
@@ -3464,6 +3467,35 @@ export function bindHud(root, state, world) {
     if (event.target === helpModal) closeHelp();
   });
   document.querySelector('#help-btn')?.addEventListener('click', openHelp);
+
+  /* Small top-right ✕ on panels that only had a bottom Close/Cancel. It clicks that existing button, so closing behaves exactly as before. */
+  [
+    ['#help-modal .sheet', '[data-dismiss]'],
+    ['#music-dock', '[data-music-close]'],
+    ['#chest-modal .sheet', '[data-chest-close]'],
+    ['#trade-modal .sheet', '[data-trade-close]'],
+    ['#offer-modal .sheet', '[data-offer-cancel]'],
+    ['#import-modal .sheet', '[data-cancel]'],
+    ['#chest-upgrade-modal .sheet', '[data-upgrade-close]'],
+    ['#expand-dock', '[data-expand-close]'],
+    ['#place-dock', '[data-place-cancel]'],
+    ['#display-modal .sheet', '[data-display-cancel]'],
+    ['#fill-modal .sheet', '[data-fill-cancel]'],
+    ['#inspect-pop', '[data-inspect-close]'],
+    ['#furn-menu', '[data-furn-close]'],
+  ].forEach(([panelSel, closeSel]) => {
+    const panel = document.querySelector(panelSel);
+    const closer = panel?.querySelector(closeSel);
+    if (!panel || !closer || panel.querySelector(':scope > .panel-x')) return;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'ghost settings-x panel-x';
+    x.setAttribute('aria-label', 'Close');
+    x.title = 'Close';
+    x.textContent = '✕';
+    x.addEventListener('click', (ev) => { ev.stopPropagation(); closer.click(); });
+    panel.prepend(x);
+  });
   setModalOpen();
 
   // Save/Load moved to the Saves panel and Settings → Save files (src/game/saveUi.js).

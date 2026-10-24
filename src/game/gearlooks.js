@@ -87,6 +87,8 @@ export const LUKE_MODEL_FOLDERS = [
   { id: 'saw_plank', folder: 'materials/plank' },
   { id: 'saw_oak_plank', folder: 'materials/oak-plank' },
   { id: 'egg', folder: 'materials/egg' },
+  { id: 'hide', folder: 'materials/hide' },
+  { id: 'wheat', folder: 'wheat' },
   { id: 'water', folder: 'materials/water' },
   { id: 'fletch', folder: 'fletch' },
   { id: 'green_dhide', folder: 'materials/green-dhide' },

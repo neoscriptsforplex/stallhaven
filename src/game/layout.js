@@ -1279,6 +1279,7 @@ function patchBlocksTree(x, z, radius, furniture) {
 }
 
 function treeSpotFree(x, z, spot, kept, expansionIds, rocks, grass, furniture) {
+  if (inWheatField(x, z, expansionIds, 1.0)) return false;
   const crown = treeSitRadius(spot);
   const chop = treeChopClear(spot);
   if (x < grass.minX + chop + 0.8 || x > grass.maxX - chop - 0.8) return false;
@@ -1368,8 +1369,19 @@ export function gardenTreeSpots(expansionIds = [], opts = {}) {
   ];
   const rocks = gardenRockSpots(expansionIds);
   const kept = [];
-  for (const spot of spots) {
+  const field = wheatFieldRect(expansionIds);
+  const displaced = [];
+  for (const raw of spots) {
+    // Trees on the wheat field move to the lawn just behind it.
+    const onField = Math.abs(raw.x - field.x) <= field.hw + 0.8 && Math.abs(raw.z - field.z) <= field.hd + 0.8;
+    // Plain pines on the field are cleared; wood trees move just behind it.
+    if (onField && !raw.wood) continue;
+    const spot = onField ? { ...raw, z: field.z - field.hd - 1.8 } : raw;
     const settled = settleGardenTree(spot, kept, rocks, grass, expansionIds);
+    if (Math.abs(settled.x - field.x) <= field.hw + 0.4 && Math.abs(settled.z - field.z) <= field.hd + 0.4) {
+      if (spot.wood) displaced.push(spot.wood);
+      continue;
+    }
     if (!keepGardenSpot(settled, expansionIds)) continue;
     if (pondBlocksSpot(settled.x, settled.z, treeSitRadius(settled) * 0.8)) continue;
     if (!gardenSpotClearOfBeds(settled, expansionIds)) continue;
@@ -1378,6 +1390,10 @@ export function gardenTreeSpots(expansionIds = [], opts = {}) {
     ));
     if (stillInRock) continue;
     kept.push(settled);
+  }
+  for (const wood of displaced) {
+    const spot = fallbackTreeSpot(wood, kept, expansionIds, grass, rocks, opts.furniture ?? null);
+    if (spot) kept.push(spot);
   }
   ensureGardenTreeTypes(kept, expansionIds, grass, rocks, opts.furniture ?? null);
   return kept;
@@ -1422,6 +1438,14 @@ export function gardenRockSpots(expansionIds = []) {
     { x: 11.9, z: 11.45, scale: 2.4, side: 'right' },
     { x: 0.2, z: -7.35, scale: 2.95, side: 'rear' },
   ];
+  // Boulders on the wheat field move to the lawn just behind it.
+  const field = wheatFieldRect(expansionIds);
+  for (const spot of spots) {
+    const pad = gardenRockRadius(spot.scale) + 0.4;
+    if (Math.abs(spot.x - field.x) <= field.hw + pad && Math.abs(spot.z - field.z) <= field.hd + pad) {
+      spot.z = field.z - field.hd - pad - 0.4;
+    }
+  }
   return spots.filter((spot) => (
     keepGardenSpot(spot, expansionIds)
     && gardenSpotClearOfBeds(spot, expansionIds)
@@ -1626,6 +1650,7 @@ export function flaxSpotBlocked(x, z, expansionIds = [], { occupied = [], furnit
   if (x < grass.minX + FLAX_EDGE || x > grass.maxX - FLAX_EDGE) return true;
   if (z < grass.minZ + FLAX_EDGE || z > grass.maxZ - FLAX_EDGE) return true;
   if (!keepGardenSpot({ x, z, side: 'edge' }, expansionIds)) return true;
+  if (inWheatField(x, z, expansionIds, 0.5)) return true;
   if (pointOnFloors(x, z, walkFloors(expansionIds), 0.4)) return true;
   if (pointHitsTrapdoor(x, z, FLAX_TRAP_CLEAR)) return true;
   for (const tree of gardenTreeSpots(expansionIds)) {
@@ -1684,17 +1709,89 @@ export function rollFlaxSpots(expansionIds = [], opts = {}) {
   return spots;
 }
 
-/** Outdoor wheat clumps. Same pick/respawn rules as flax, wider so the stalks do not overlap. */
-export const WHEAT_COUNT = 8;
-export const WHEAT_SPACING = 1.85;
-export const WHEAT_CLICK_RADIUS = 0.8;
+/**
+ * Wheat grows in one tidy field on the lawn right of the shop's right wall,
+ * behind the pond. Clumps sit on a fixed grid; a picked clump grows back on a
+ * free grid slot. Same pick/respawn/Farming rules as flax.
+ */
+export const WHEAT_SPACING = 1.3;
+export const WHEAT_CLICK_RADIUS = 0.62;
+export const WHEAT_FIELD_COLS = 5;
+export const WHEAT_FIELD_ROWS = 6;
+export const WHEAT_COUNT = WHEAT_FIELD_COLS * WHEAT_FIELD_ROWS;
+const WHEAT_FIELD_WALL_GAP = 1.7;
+const WHEAT_FIELD_POND_GAP = 1.1;
 
+/** Tilled rect for the wheat field (centre + half sizes), or null when there is no room. */
+export function wheatFieldRect(expansionIds = []) {
+  const floors = walkFloors(expansionIds);
+  const grass = gardenBox(expansionIds);
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const f of floors) {
+    maxX = Math.max(maxX, f.maxX);
+    minZ = Math.min(minZ, f.minZ);
+    maxZ = Math.max(maxZ, f.maxZ);
+  }
+  const w = (WHEAT_FIELD_COLS - 1) * WHEAT_SPACING + 1.2;
+  const d = (WHEAT_FIELD_ROWS - 1) * WHEAT_SPACING + 1.2;
+  const x0 = Math.min(maxX + WHEAT_FIELD_WALL_GAP, grass.maxX - 1 - w);
+  const pondEdge = POND.z - POND.rz - WHEAT_FIELD_POND_GAP;
+  const z1 = Math.min(maxZ + 0.6, pondEdge);
+  const z0 = z1 - d;
+  return { x: x0 + w / 2, z: (z0 + z1) / 2, hw: w / 2, hd: d / 2 };
+}
+
+/** True inside the wheat field grown by `pad`. */
+export function inWheatField(x, z, expansionIds = [], pad = 0) {
+  const r = wheatFieldRect(expansionIds);
+  return Math.abs(x - r.x) <= r.hw + pad && Math.abs(z - r.z) <= r.hd + pad;
+}
+
+/** Every grid slot of the wheat field that is not under a station, patch, or tree. */
+export function wheatFieldSlots(expansionIds = [], furniture = null) {
+  const r = wheatFieldRect(expansionIds);
+  const furn = furniture ?? defaultFurniture();
+  const trees = gardenTreeSpots(expansionIds);
+  const rocks = gardenRockSpots(expansionIds);
+  const slots = [];
+  for (let row = 0; row < WHEAT_FIELD_ROWS; row += 1) {
+    for (let col = 0; col < WHEAT_FIELD_COLS; col += 1) {
+      const x = r.x - r.hw + 0.6 + col * WHEAT_SPACING;
+      const z = r.z - r.hd + 0.6 + row * WHEAT_SPACING;
+      if (pondBlocksSpot(x, z, 0.35)) continue;
+      if (pointOnFloors(x, z, walkFloors(expansionIds), 0.4)) continue;
+      if (pointHitsTrapdoor(x, z, FLAX_TRAP_CLEAR)) continue;
+      if (trees.some((t) => Math.hypot(x - t.x, z - t.z) < TREE_CLICK_RADIUS + 0.3)) continue;
+      if (rocks.some((k) => Math.hypot(x - k.x, z - k.z) < gardenRockRadius(k.scale ?? 1) + 0.3)) continue;
+      let hit = false;
+      for (const id of FLAX_STATION_IDS) {
+        const pose = furn[id];
+        if (pose && Number.isFinite(pose.x) && Math.hypot(x - pose.x, z - pose.z) < 1.1) hit = true;
+      }
+      for (const pose of furn.displays ?? []) {
+        if (pose && Number.isFinite(pose.x) && Math.hypot(x - pose.x, z - pose.z) < 1.0) hit = true;
+      }
+      if (hit || spotOnFarmingPatch(x, z, furniture, 0.05)) continue;
+      slots.push({ x, z });
+    }
+  }
+  return slots;
+}
+
+/** Free field slots (not in `occupied`), up to `count`. Random order when an rng is given for respawns. */
 export function rollWheatSpots(expansionIds = [], opts = {}) {
-  return rollFlaxSpots(expansionIds, {
-    ...opts,
-    count: opts.count ?? WHEAT_COUNT,
-    spacing: opts.spacing ?? WHEAT_SPACING,
-  });
+  const count = Math.max(0, opts.count ?? WHEAT_COUNT);
+  const occupied = opts.occupied ?? [];
+  const free = wheatFieldSlots(expansionIds, opts.furniture ?? null).filter((slot) => (
+    !occupied.some((o) => Math.hypot(o.x - slot.x, o.z - slot.z) < 0.3)
+  ));
+  if (count < free.length && count === 1) {
+    const rng = opts.rng ?? Math.random;
+    return [free[Math.floor(rng() * free.length) % free.length]];
+  }
+  return free.slice(0, count);
 }
 
 export function pickFlaxNode(nodes, id, now, delay = FLAX_RESPAWN_SEC) {

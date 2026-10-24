@@ -39,6 +39,9 @@ import {
   FLAX_RESPAWN_SEC,
   rollFlaxSpots,
   rollWheatSpots,
+  POND,
+  wheatFieldRect,
+  inWheatField,
   WHEAT_COUNT,
   WHEAT_SPACING,
   flaxSpotBlocked,
@@ -745,24 +748,24 @@ describe('flax field', () => {
 });
 
 describe('wheat field', () => {
-  it('scatters clumps clear of flax, the fountain, and each other', () => {
-    const flax = rollFlaxSpots([], { rng: flaxRng(4) }).map((spot) => ({ ...spot, spacing: WHEAT_SPACING }));
-    const wheat = rollWheatSpots([], { rng: flaxRng(5), occupied: flax });
-    assert.equal(wheat.length, WHEAT_COUNT);
-    for (let i = 0; i < wheat.length; i += 1) {
-      const spot = wheat[i];
-      const occupied = [
-        ...flax,
-        ...wheat.filter((_, j) => j !== i).map((other) => ({ ...other, spacing: WHEAT_SPACING })),
-      ];
-      assert.equal(flaxSpotBlocked(spot.x, spot.z, [], { occupied, spacing: WHEAT_SPACING }), false);
-      assert.ok(Math.hypot(spot.x - FOUNTAIN.x, spot.z - FOUNTAIN.z) >= FOUNTAIN.apron);
-      for (const other of flax) {
-        assert.ok(Math.hypot(spot.x - other.x, spot.z - other.z) >= WHEAT_SPACING - 1e-6);
+  it('grows clumps on a tidy grid right of the shop, clear of flax, the pond, and the walls', () => {
+    for (const ex of [[], ['right'], ['back-right'], ['right', 'back', 'back-right', 'left', 'back-left']]) {
+      const flax = rollFlaxSpots(ex, { rng: flaxRng(4) });
+      const wheat = rollWheatSpots(ex, { occupied: flax });
+      assert.ok(wheat.length >= 20, `field too small for [${ex}]`);
+      assert.ok(wheat.length <= WHEAT_COUNT);
+      const rect = wheatFieldRect(ex);
+      for (const spot of wheat) {
+        assert.ok(inWheatField(spot.x, spot.z, ex));
+        assert.ok(spot.z < POND.z - POND.rz, 'behind the pond');
+        assert.equal(pointHitsShop(spot.x, spot.z, ex, 0.8), false);
       }
-      for (let j = i + 1; j < wheat.length; j += 1) {
-        assert.ok(Math.hypot(spot.x - wheat[j].x, spot.z - wheat[j].z) >= WHEAT_SPACING - 1e-6);
+      for (const other of flax) assert.equal(inWheatField(other.x, other.z, ex), false);
+      for (const tree of gardenTreeSpots(ex)) {
+        assert.equal(inWheatField(tree.x, tree.z, ex, 0.3), false, `tree on field ${tree.x},${tree.z}`);
       }
+      assert.ok(rect.x > 0, 'right side of the map');
+      assert.equal(rollWheatSpots(ex, { count: 1, occupied: wheat.slice(1) })[0].x, wheat[0].x);
     }
   });
 });

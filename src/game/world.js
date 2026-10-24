@@ -91,6 +91,7 @@ import {
   WHEAT_CLICK_RADIUS,
   WHEAT_COUNT,
   WHEAT_SPACING,
+  wheatFieldRect,
   characterGroundY,
   interiorFloors,
   OUTDOOR_GROUND_Y,
@@ -462,6 +463,9 @@ export function createWorld(canvas, state, opts = {}) {
   const flaxMeshes = new Map();
   let flaxReady = false;
   let wheatGroup = null;
+  let wheatSoil = null;
+  let wheatSoilMat = null;
+  let wheatFurrowMat = null;
   let wheatNodes = [];
   let wheatSerial = 1;
   const wheatMeshes = new Map();
@@ -1438,10 +1442,39 @@ export function createWorld(canvas, state, opts = {}) {
     }
   }
 
+  /** Tilled dirt bed with furrows under the wheat field. Visual only, walkable. */
+  function syncWheatSoil() {
+    if (!wheatGroup) return;
+    if (wheatSoil) {
+      wheatGroup.remove(wheatSoil);
+      wheatSoil.traverse((o) => { o.geometry?.dispose?.(); });
+    }
+    const r = wheatFieldRect(state.expansions ?? []);
+    wheatSoil = new THREE.Group();
+    wheatSoil.name = 'wheat-soil';
+    const soilMat = wheatSoilMat ?? (wheatSoilMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 }));
+    const furrowMat = wheatFurrowMat ?? (wheatFurrowMat = new THREE.MeshStandardMaterial({ color: 0x55391f, roughness: 1 }));
+    const bed = new THREE.Mesh(new THREE.PlaneGeometry(r.hw * 2, r.hd * 2), soilMat);
+    bed.rotation.x = -Math.PI / 2;
+    bed.position.set(r.x, OUTDOOR_GROUND_Y + 0.012, r.z);
+    bed.receiveShadow = true;
+    wheatSoil.add(bed);
+    const rows = Math.round((r.hd * 2 - 1.2) / WHEAT_SPACING) + 1;
+    for (let i = 0; i < rows; i += 1) {
+      const furrow = new THREE.Mesh(new THREE.PlaneGeometry(r.hw * 2 - 0.3, 0.32), furrowMat);
+      furrow.rotation.x = -Math.PI / 2;
+      furrow.position.set(r.x, OUTDOOR_GROUND_Y + 0.018, r.z - r.hd + 0.6 + i * WHEAT_SPACING);
+      furrow.receiveShadow = true;
+      wheatSoil.add(furrow);
+    }
+    wheatSoil.traverse((o) => { o.raycast = () => {}; });
+    wheatGroup.add(wheatSoil);
+  }
   function refillWheatField() {
     if (mining?.mode === 'pick' && mining.crop === 'wheat') stopMining();
     for (const mesh of wheatMeshes.values()) releaseWheatMesh(mesh);
     wheatMeshes.clear();
+    syncWheatSoil();
     const spots = rollWheatSpots(state.expansions ?? [], {
       furniture: state.furniture,
       occupied: livingCropSpots(flaxNodes, WHEAT_SPACING),

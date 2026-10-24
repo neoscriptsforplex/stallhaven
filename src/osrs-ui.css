@@ -139,3 +139,10 @@ button.settings-x.panel-x::after { content: ''; position: absolute; inset: -6px 
 #settings-dock.dock-fit.is-compact { padding: 8px 10px; font-size: 14px; }
 #settings-dock.dock-fit.is-compact > h2 { font-size: 1.05rem; margin-bottom: 6px; }
 #settings-dock.dock-fit.is-compact .settings-body button { padding: 5px 10px; min-height: 32px; }
+
+/* modalFit.js: every centred sheet sits in the HUD/bar band; compact below 0.8 scale. */
+.modal.modal-fit { place-items: start center; align-content: start; box-sizing: border-box; }
+.modal.modal-fit > .sheet { box-sizing: border-box; margin: 0 auto; overscroll-behavior: contain; }
+.modal.fit-tight > .sheet { padding: 8px; }
+.modal.fit-tight > .sheet > p:not(.meta):not(.craft-note) { display: none; }
+.modal.fit-tight > .sheet img, .modal.fit-tight > .sheet canvas { max-width: 64px; max-height: 64px; }

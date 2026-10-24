@@ -12,7 +12,8 @@
     "coop:server": "npm --prefix party run dev",
     "cloud:mock": "node tools/mock-supabase.mjs",
     "test:coop": "npm --prefix party test",
-    "ui-fit:build": "node scripts/build-fit-check.mjs"
+    "ui-fit:build": "node scripts/build-fit-check.mjs",
+    "ui-fit": "node scripts/ui-fit.mjs"
   },
   "engines": {
     "node": ">=20"

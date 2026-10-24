@@ -157,6 +157,7 @@ import { createXpOrb } from './xpOrb.js';
 import { fitPhoneCraft } from './phoneCraftFit.js';
 import { fitBuildDock } from './buildFit.js';
 import { fitScrollDock } from './dockFit.js';
+import { autoFitModals } from './modalFit.js';
 import {
   brightnessPercent,
   clampBrightness,
@@ -3208,6 +3209,7 @@ export function bindHud(root, state, world) {
   });
   settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
   settingsDock?.querySelector('[data-settings-x]')?.addEventListener('click', closeSettingsDock);
+  if (typeof document !== 'undefined' && typeof MutationObserver === 'function') autoFitModals(root?.ownerDocument ?? document);
   if (settingsDock) {
     // Roomy Settings: wide panel, fixed header, scrolling body capped between HUD and button bar.
     const fitSettings = () => fitScrollDock(settingsDock, { width: 560 });

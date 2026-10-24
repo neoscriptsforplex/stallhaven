@@ -29,12 +29,12 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'standing_candles', scale: 0.5, name: 'Standing Candles', category: 'Light', mount: 'floor', level: 1, gold: 300, tint: 0xe8d090, materials: { plank: 1, bronze_nails: 2 } }),
   piece({ id: 'lit_torch', name: 'Lit Torch', category: 'Light', mount: 'outdoor', level: 1, gold: 150, tint: 0xe8a040, materials: { logs: 1 } }),
   piece({ id: 'standing_torch', scale: 0.5, name: 'Standing Torch', category: 'Light', mount: 'outdoor', level: 1, gold: 200, tint: 0xd09040, materials: { logs: 1, bronze_nails: 2 } }),
-  piece({ id: 'portrait', name: 'Portrait', category: 'Wall', mount: 'wall', level: 5, gold: 400, tint: 0xc8b090, materials: { oak_plank: 1, iron_nails: 2 } }),
+  piece({ id: 'portrait', hang: true, name: 'Portrait', category: 'Wall', mount: 'wall', level: 5, gold: 400, tint: 0xc8b090, materials: { oak_plank: 1, iron_nails: 2 } }),
   piece({ id: 'cooking_shelves', name: 'Cooking Shelves', category: 'Wall', mount: 'wall', level: 12, gold: 600, tint: 0xb8874a, materials: { oak_plank: 2, iron_nails: 4 } }),
   piece({ id: 'pots_and_pans', scale: 0.5, name: 'Pots and Pans', category: 'Wall', mount: 'wall', level: 20, gold: 800, tint: 0xa0a0a8, materials: { willow_plank: 2, steel_nails: 4 } }),
   piece({ id: 'tapestry', name: 'Tapestry', category: 'Wall', mount: 'wall', level: 28, gold: 1000, tint: 0x8a3a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
   piece({ id: 'tapestry_pole', name: 'Tapestry Pole', category: 'Wall', mount: 'wall', level: 28, gold: 500, tint: 0x8a6840, materials: { oak_plank: 1, iron_nails: 4 } }),
-  piece({ id: 'landscape', name: 'Landscape', category: 'Wall', mount: 'wall', level: 35, gold: 1200, tint: 0x5a8a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
+  piece({ id: 'landscape', hang: true, name: 'Landscape', category: 'Wall', mount: 'wall', level: 35, gold: 1200, tint: 0x5a8a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
   piece({ id: 'bush', scale: 0.5, name: 'Bush', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 50, tint: 0x4a8a3a, materials: { flax: 2 } }),
   piece({ id: 'statue', name: 'Statue', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 3000, tint: 0xb0b0b8, materials: { yew_plank: 2, adamant_nails: 6 } }),
   piece({ id: 'log_pile', name: 'Log Pile', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 200, tint: 0x8a6238, materials: { logs: 4 } }),
@@ -92,6 +92,12 @@ export function constructionCategories() {
     if (!seen.includes(row.category)) seen.push(row.category);
   }
   return seen;
+}
+
+/** Wall art keeps its model height (hangs at picture height) instead of dropping to the floor. */
+export function pieceHangs(id) {
+  const row = constructionPiece(id);
+  return row?.mount === 'wall' && row.hang === true;
 }
 
 export function constructionLookId(id) {

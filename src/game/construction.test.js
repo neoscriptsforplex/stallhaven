@@ -7,6 +7,7 @@ import {
   CONSTRUCTION_GUIDE,
   CONSTRUCTION_PIECES,
   constructionPiece,
+  pieceHangs,
   constructionXpFor,
   missingMaterials,
   moveConstruction,
@@ -142,5 +143,16 @@ describe('construction trims (Luke 2026-10-24)', () => {
       assert.equal(mod.constructionPiece(id).scale, 0.5, id);
     }
     assert.equal(mod.constructionPiece('chair').scale, undefined);
+  });
+});
+
+describe('wall art', () => {
+  it('portrait and landscape are wall-only and hang at picture height', () => {
+    for (const id of ['portrait', 'landscape']) {
+      assert.equal(constructionPiece(id).mount, 'wall');
+      assert.equal(pieceHangs(id), true);
+    }
+    assert.equal(pieceHangs('cooking_shelves'), false);
+    assert.equal(pieceHangs('chair'), false);
   });
 });

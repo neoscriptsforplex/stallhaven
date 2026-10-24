@@ -1,5 +1,4 @@
-import { RECIPES } from './game/catalog.js';
-import { completeCrafts, createState, pushLog, tickMaterials, SAVE_VERSION } from './game/economy.js';
+import { completeCrafts, craftDoneMessage, createState, pushLog, tickMaterials, SAVE_VERSION } from './game/economy.js';
 import { loadModels } from './game/storage.js';
 import { bindHud } from './game/hud.js';
 import { bindUploadUI, parseModelBuffer, loadBundledPlayerScene, loadBundledRiggedPlayer, loadBundledFishingRod,
@@ -409,9 +408,9 @@ async function bootGame() {
     last = nowMs;
     tickMaterials(state, dt);
     const finished = completeCrafts(state, now);
-    for (const id of finished) {
-      pushLog(state, `Finished ${RECIPES[id].name}. Into the chest.`);
-    }
+    finished.forEach((id, i) => {
+      pushLog(state, craftDoneMessage(state, id, finished.amounts?.[i]));
+    });
     if (finished.length) world.syncDisplays();
     world.tick(dt, now);
     if (world.sfxSnapshot) sfx.frame(world.sfxSnapshot(), now);

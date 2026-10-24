@@ -1372,6 +1372,27 @@ export function craftedOutputCount(state, recipe) {
   return level >= need * RUNE_DOUBLE_LEVEL_MULT ? base * 2 : base;
 }
 
+function pluralName(name, n) {
+  if (n === 1 || !name) return name;
+  if (/s$/i.test(name)) return name;
+  if (/^pot of /i.test(name)) return name.replace(/^pot/i, (m) => `${m}s`);
+  return `${name}s`;
+}
+
+/** Log line for a finished craft, using the amount actually added. */
+export function craftDoneMessage(state, recipeId, amount) {
+  const recipe = RECIPES[recipeId];
+  if (!recipe) return '';
+  const n = Math.max(1, amount ?? craftedOutputCount(state, recipe));
+  if (recipe.category === 'rune') return `Crafted ${n} ${pluralName(recipe.name, n).replace(/ Runes?$/, (m) => m.toLowerCase())}.`;
+  if (isMaterialCraft(recipe) && MATERIALS[recipe.outputMaterial]) {
+    return `Made ${n} ${pluralName(MATERIALS[recipe.outputMaterial].name, n)}.`;
+  }
+  return n > 1
+    ? `Finished ${n} ${pluralName(recipe.name, n)}. Into the chest.`
+    : `Finished ${recipe.name}. Into the chest.`;
+}
+
 function finishOneCraft(state, recipeId) {
   const recipe = RECIPES[recipeId];
   const n = craftedOutputCount(state, recipe);
@@ -1394,6 +1415,9 @@ function finishOneCraft(state, recipeId) {
 
 export function completeCrafts(state, nowSeconds) {
   const finished = [];
+  const amounts = [];
+  // Parallel list of how many each finished craft actually added (rune doubling, batch outputs).
+  Object.defineProperty(finished, 'amounts', { value: amounts, enumerable: false });
   for (const [recipeId, startCraftState] of Object.entries(state.crafts)) {
     let craft = startCraftState;
     while (craft && nowSeconds - craft.startedAt >= craft.duration) {
@@ -1408,6 +1432,7 @@ export function completeCrafts(state, nowSeconds) {
         continue;
       }
       finished.push(recipeId);
+      amounts.push(produced);
       const remaining = (craft.left ?? 1) - 1;
       if (remaining > 0) {
         craft = {

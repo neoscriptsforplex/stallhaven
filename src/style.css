@@ -2625,6 +2625,14 @@ html.is-booting.is-scene-live #view {
   overflow: visible;
   text-overflow: clip;
 }
+@media not (pointer: coarse) { /* desktop only: message log gets ~2 lines of room and breathing space */
+  #hud .game-log {
+    box-sizing: content-box;
+    min-height: calc(2 * 1.3em);
+    padding: 7px 0;
+    margin-top: 4px;
+  }
+}
 #hud .game-log li:nth-child(2) { opacity: 0.75; }
 #hud .game-log li:nth-child(n+3) { opacity: 0.5; }
 #hud .active-craft { width: 100%; }

@@ -18,7 +18,6 @@ import {
   normalizeAppearance,
   isShelfItem,
 } from './catalog.js';
-import { MANNEQUIN_POSITIONS, MANNEQUIN_COLORS } from './mannequinMesh.js';
 import { SHOP_FURNITURE_FLOOR_Y, shopDoorOpening } from './layout.js';
 import { wornMetal, weaveCloth, woodSurface, scaleHide, checkCloth } from './surfaces.js';
 
@@ -1802,29 +1801,34 @@ function buildProceduralWallShelf() {
   return group;
 }
 
-/** Half turn shared by the mannequin form and everything worn on it. */
-export const MANNEQUIN_FACE_YAW = Math.PI;
-
 export function buildArmourStand() {
   const group = new THREE.Group();
   group.name = 'armour-stand';
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(MANNEQUIN_POSITIONS.map((v) => v * OSRS_MODEL_SCALE), 3));
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(MANNEQUIN_COLORS, 3));
-  geo.computeVertexNormals();
-  const form = addShadow(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true })));
-  form.name = 'mannequin-form';
-  // The dump's bust faces -Z, opposite every worn item and the shared +Z
-  // furniture front. A half turn here puts worn items on the bust's front.
-  form.rotation.y = MANNEQUIN_FACE_YAW;
-  group.add(form);
+  const post = woodSurface(0x3f2716, 0.88, 0.35, 1.6, 6113);
+  const oak = woodSurface(0x7a5230, 0.9, 0.7, 0.9, 4211);
+  const baseWood = woodSurface(0x4a301c, 0.9, 0.8, 0.8, 5029);
+  const pole = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 1.48, 8), post));
+  pole.position.y = 0.76;
+  group.add(pole);
+  const base = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.08, 12), baseWood));
+  base.position.y = 0.04;
+  group.add(base);
+  const hips = standBlock(MANNEQUIN_BLOCKS.hips, oak);
+  group.add(hips);
+  group.add(standBlock(MANNEQUIN_BLOCKS.shoulders, oak));
+  const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), post));
+  neck.position.y = 1.28;
+  group.add(neck);
+  const knob = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), oak));
+  knob.position.y = 1.4;
+  group.add(knob);
   group.userData.wareY = 0;
   group.userData.stand = true;
   group.userData.slots = {
     helm: { x: 0, y: 1.4, z: 0 },
     body: { x: 0, y: 0.82, z: 0 },
     legs: { x: 0, y: 0.3, z: 0 },
-    ware: { x: 0.18, y: 0.62, z: 0.3 },
+    ware: { x: 0.18, y: 0.62, z: 0.1 },
   };
   return group;
 }
@@ -1835,23 +1839,6 @@ export function buildFurniture(kind) {
   return buildDefaultTable();
 }
 
-/**
- * Shields come out of the display pose with their strap side forward; on a
- * mannequin the face must point out with the bust (+Z). Wrapped so the half
- * turn is a pure yaw around the stand's pole, whatever the base pose holds.
- */
-export function turnMannequinShield(mesh, slot) {
-  if (slot !== 'shield') return mesh;
-  const turn = new THREE.Group();
-  turn.name = 'mannequin-shield-face';
-  turn.rotation.y = Math.PI;
-  const at = mesh.position.clone();
-  mesh.position.set(-at.x, at.y, -at.z);
-  turn.add(mesh);
-  turn.userData.recipeId = mesh.userData.recipeId;
-  return turn;
-}
-
 export function slotPose(slot) {
   if (slot === 'helm') return { x: 0, y: 1.4, z: 0 };
   if (slot === 'body') return { x: 0, y: 0.82, z: 0 };
@@ -1859,8 +1846,7 @@ export function slotPose(slot) {
   if (slot === 'boots') return { x: 0, y: 0.08, z: 0.02 };
   if (slot === 'gloves') return { x: 0.24, y: 0.74, z: 0.04 };
   if (slot === 'shield') return { x: 0.46, y: 0.72, z: 0.06 };
-  // Forward of the dress-form torso (0.15 m half-depth) so weapons aren't buried.
-  return { x: 0, y: 0.62, z: 0.2 };
+  return { x: 0, y: 0.62, z: 0 };
 }
 
 /**

@@ -332,11 +332,18 @@ function buildProceduralCounter() {
   return group;
 }
 
+/**
+ * Shop display table height (m). The bundled dump is long and squat: fitted to
+ * its 1.35 m width it stood only 0.52 m tall (knee height on the 1.72 m player).
+ * Keep the footprint and stretch height to a counter-like tabletop (Luke 2026-10-24).
+ */
+export const DISPLAY_TABLE_HEIGHT = 0.84;
+
 export function buildDefaultTable() {
   const bundled = getBundledLook('table');
   if (bundled) {
     const target = buildProceduralTable();
-    return wrapBundledProp(bundled, target, { name: 'table', fit: 'xz', wareY: 'top' });
+    return wrapBundledProp(bundled, target, { name: 'table', fit: 'xz', height: DISPLAY_TABLE_HEIGHT, wareY: 'top' });
   }
   return buildProceduralTable();
 }
@@ -4999,6 +5006,15 @@ export function wrapBundledProp(source, target, opts = {}) {
       : Math.max(tsize.y, 0.0001);
   const fit = opts.fit === 'xz' ? 'xz' : opts.fit === 'max' ? 'max' : 'height';
   normalizeImported(mesh, targetSize, true, { fit });
+  if (opts.height > 0) {
+    // Height-only stretch after the footprint fit; reseat on the floor.
+    const hbox = measureVisibleBox(mesh);
+    const h = Math.max(hbox.max.y - hbox.min.y, 1e-4);
+    mesh.scale.y *= opts.height / h;
+    mesh.updateMatrixWorld(true);
+    mesh.position.y -= measureVisibleBox(mesh).min.y;
+    mesh.updateMatrixWorld(true);
+  }
   mesh.name = opts.name ?? mesh.name ?? 'prop';
   if (opts.wareY === 'top') {
     const box = measureVisibleBox(mesh);

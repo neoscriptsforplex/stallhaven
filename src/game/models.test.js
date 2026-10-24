@@ -15,6 +15,7 @@ import {
   buildChest,
   buildCounter,
   buildDefaultTable,
+  DISPLAY_TABLE_HEIGHT,
   buildShopDoor,
   setDoorOpen,
   buildGoblin,
@@ -3783,6 +3784,26 @@ describe('shop props', () => {
     const size = box.getSize(new THREE.Vector3());
     assert.ok(size.x > 1.2 && size.x < 1.6, `table should keep the pre-2× width, x=${size.x}`);
     assert.ok(size.z > 0.7 && size.z < 1.1, `table should keep the pre-2× depth, z=${size.z}`);
+  });
+
+  it('stretches a squat bundled display table to tabletop height with wares on top', () => {
+    // Same proportions as public/models/table/table.obj (251 x 96 x 128 OSRS units).
+    const dump = new THREE.Group();
+    const top = new THREE.Mesh(new THREE.BoxGeometry(251, 8, 128), new THREE.MeshBasicMaterial());
+    top.position.y = 92;
+    dump.add(top);
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(8, 88, 8), new THREE.MeshBasicMaterial());
+    leg.position.y = 44;
+    dump.add(leg);
+    const target = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.88, 0.85));
+    const table = wrapBundledProp(dump, target, { name: 'table', fit: 'xz', height: DISPLAY_TABLE_HEIGHT, wareY: 'top' });
+    const box = measureVisibleBox(table);
+    const size = box.getSize(new THREE.Vector3());
+    assert.ok(Math.abs(box.min.y) < 1e-3, `on the floor, minY=${box.min.y}`);
+    assert.ok(Math.abs(box.max.y - DISPLAY_TABLE_HEIGHT) < 1e-3, `tabletop at ${DISPLAY_TABLE_HEIGHT}, got ${box.max.y}`);
+    assert.ok(DISPLAY_TABLE_HEIGHT >= 0.75 && DISPLAY_TABLE_HEIGHT <= 0.95);
+    assert.ok(Math.abs(size.x - 1.35) < 1e-3, `width kept, x=${size.x}`);
+    assert.ok(Math.abs(table.userData.wareY - (DISPLAY_TABLE_HEIGHT + 0.02)) < 1e-3, `wares sit on the top, wareY=${table.userData.wareY}`);
   });
 
   it('scales the chest to 60% and keeps it on the floor', () => {

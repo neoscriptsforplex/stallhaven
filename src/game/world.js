@@ -194,7 +194,7 @@ const CAM_ORBIT_YAW = 0.0055;
 const CAM_ORBIT_PITCH = 0.0036;
 
 /** Still-finger hold on the canvas that opens the desktop right-click menu. */
-export const TOUCH_LONG_PRESS_MS = 2000;
+export const TOUCH_LONG_PRESS_MS = 500;
 /** Movement past this cancels the hold and starts camera orbit. */
 export const TOUCH_HOLD_MOVE_PX = 8;
 /** Second tap inside this window opens the right-click menu. */
@@ -2523,6 +2523,7 @@ export function createWorld(canvas, state, opts = {}) {
       if (touchHold !== hold || hold.fired || multiTouch) return;
       hold.fired = true;
       camDrag = null;
+      try { navigator.vibrate?.(10); } catch { /* unsupported */ }
       openCanvasContextAt({ clientX: hold.x, clientY: hold.y });
       ignorePicksUntil = performance.now() + 400;
     }, TOUCH_LONG_PRESS_MS);

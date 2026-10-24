@@ -76,7 +76,7 @@
       <button type="button" class="minimap-backdrop" data-map-dismiss tabindex="-1" aria-label="Close map"></button>
         <header class="ledger">
         <div class="minimap-wrap">
-          <canvas id="minimap" class="minimap" width="196" height="196" aria-label="Shop map. Click to walk. Scroll to zoom."></canvas>
+          <canvas id="minimap" class="minimap" width="196" height="196" aria-label="Shop map. Click or tap to walk. Scroll or use +/− to zoom."></canvas>
           <button type="button" class="minimap-toggle" data-map-toggle aria-expanded="false">Map</button>
           <button type="button" class="minimap-close" data-map-close aria-label="Close map">Close</button>
           <div class="minimap-compass">
@@ -127,6 +127,11 @@
 Use Left click (tap on phone) to move, right click (Double tap on phone) to open menus on items and upgrade them.
 Use middle mouse button or arrow keys to control the camera.
 
+On a phone:
+Tap to walk. Swipe with one finger to turn the camera, pinch to zoom.
+Long-press (half a second) or double-tap an item to open its menu.
+In crafting, tap a recipe to preview it, then press 1x, 5x or Max to craft.
+
 The Goal:
 Use the Anvil to craft items or your townsfolk.
 You will need to cut down trees outside for wood, pick flax on the grass, and mine ores in the dungeon outside.
@@ -159,7 +164,7 @@ Android: in Chrome tap the ⋮ menu, then Add to Home screen (or Install app).</
         <h2>Shop Chest</h2>
         <p class="chest-tally" id="chest-count">0 pieces waiting</p>
         <p id="chest-cap" class="meta">Level 1 · 100 slots</p>
-        <p>Crafted gear waits here. Right-click a table or shelf and choose Display item… to put a ware out. On a shelf you then pick Top Left, Top Right, Bottom Left, or Bottom Right. Armour stands still take a matching set from Place on Stand.</p>
+        <p>Crafted gear waits here. Right-click (long-press on phone) a table or shelf and choose Display item… to put a ware out. On a shelf you then pick Top Left, Top Right, Bottom Left, or Bottom Right. Armour stands still take a matching set from Place on Stand.</p>
         <div id="chest-items"></div>
         <div class="discard-confirm" data-discard-box hidden>
           <p data-discard-msg>Throw this ware away? It cannot be undone.</p>

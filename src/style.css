@@ -1724,7 +1724,12 @@ html.is-booting.is-scene-live #view {
 @media (orientation: portrait) and (pointer: coarse) and (max-aspect-ratio: 3/4) {
   :root {
     --portrait-thumb: 56px;
-    --portrait-thumb: calc(56px + env(safe-area-inset-bottom, 0px));
+    /* Bar bottom padding. iOS reports a ~34px home-indicator inset, but the indicator itself
+       is only ~5px tall near the very bottom. Padding the full inset left a ~40px empty band
+       of bar background under the buttons. Keep only what is left after 28px, min 4px:
+       34px inset -> 6px, no inset -> 4px. */
+    --bar-pad-b: max(4px, calc(env(safe-area-inset-bottom, 0px) - 28px));
+    --portrait-thumb: calc(50px + var(--bar-pad-b));
   }
 
   #save-bar {
@@ -1744,7 +1749,7 @@ html.is-booting.is-scene-live #view {
     padding:
       6px
       max(4px, env(safe-area-inset-right, 0px))
-      calc(6px + env(safe-area-inset-bottom, 0px))
+      max(4px, calc(env(safe-area-inset-bottom, 0px) - 28px))
       max(4px, env(safe-area-inset-left, 0px));
     background: var(--panel);
     border-top: 1px solid var(--line);
@@ -1813,7 +1818,8 @@ html.is-booting.is-scene-live #view {
     position: relative;
   }
 
-  #view,
+  /* #view keeps position:fixed; inset:0 so the canvas reaches the very bottom edge
+     (behind the bar and home indicator). 100dvh could stop short of it in standalone mode. */
   #boot-cover,
   #nowebgl {
     height: 100vh;

@@ -319,6 +319,12 @@ export function applyCheat(state, raw) {
     }
     return 'maxcape';
   }
+  if (code === 'maxresource') {
+    if (!state.materials) state.materials = {};
+    const cap = storageCap(state);
+    for (const id of Object.keys(MATERIALS)) state.materials[id] = cap;
+    return 'maxresource';
+  }
   if (code === 'onesmallfavour') {
     state.chefHat = true;
     return 'onesmallfavour';

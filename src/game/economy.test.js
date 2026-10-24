@@ -1836,6 +1836,13 @@ describe('shop XP', () => {
 });
 
 describe('cheat codes', () => {
+  it('maxresource fills every material to the storage cap', () => {
+    const state = createState();
+    assert.equal(applyCheat(state, 'MaxResource'), 'maxresource');
+    const values = Object.keys(MATERIALS).map((id) => state.materials[id]);
+    assert.ok(values.length > 0);
+    assert.ok(values.every((v) => v === values[0] && v > 0));
+  });
   it('applies motherlode, maxcape, onesmallfavour, and freshstart case-insensitively', () => {
     const state = createState();
     const gold = state.gold;

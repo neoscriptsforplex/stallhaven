@@ -42,10 +42,12 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'wall_plant', hang: true, wallFace: 'outside', wallY: 0.76, name: 'Wall Plant', category: 'Outdoor', mount: 'wall', level: 5, gold: 300, tint: 0x4a7a2a, materials: { plank: 2, bronze_nails: 2 } }),
   piece({ id: 'utensil_rack', hang: true, wallFace: 'inside', wallY: 0.113, name: 'Utensil Rack', category: 'Decor', mount: 'wall', level: 12, gold: 500, tint: 0x8a6a4a, materials: { oak_plank: 2, iron_nails: 4 } }),
   piece({ id: 'pot_shelf', hang: true, wallFace: 'inside', wallY: 0.231, name: 'Pot Shelf', category: 'Decor', mount: 'wall', level: 20, gold: 700, tint: 0xa0704a, materials: { oak_plank: 3, iron_nails: 6 } }),
+  piece({ id: 'window', hang: true, wallFace: 'inside', name: 'Leaded Window', category: 'Decor', mount: 'wall', level: 15, gold: 600, tint: 0x4a8a2a, materials: { oak_plank: 3, iron_nails: 4 } }),
   piece({ id: 'window_box', hang: true, wallFace: 'inside', wallY: -0.146, name: 'Window Box', category: 'Decor', mount: 'wall', level: 28, gold: 900, tint: 0x6a8a3a, materials: { oak_plank: 4, iron_nails: 6 } }),
   piece({ id: 'landscape', hang: true, name: 'Landscape', category: 'Decor', mount: 'wall', level: 35, gold: 1200, tint: 0x5a8a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
   // Outdoor-tab copies: same model, cost, level and XP as the Decor piece, outside walls only.
   piece({ id: 'lit_torch_outdoor', model: 'lit_torch', wallFace: 'outside', wallY: 1.1, roll: Math.PI / 2, scale: 0.5, name: 'Lit Torch', category: 'Outdoor', mount: 'wall', level: 1, gold: 150, tint: 0xe8a040, materials: { logs: 1 } }),
+  piece({ id: 'window_outdoor', model: 'window', hang: true, wallFace: 'outside', name: 'Leaded Window', category: 'Outdoor', mount: 'wall', level: 15, gold: 600, tint: 0x4a8a2a, materials: { oak_plank: 3, iron_nails: 4 } }),
   piece({ id: 'window_box_outdoor', model: 'window_box', hang: true, wallFace: 'outside', wallY: -0.146, name: 'Window Box', category: 'Outdoor', mount: 'wall', level: 28, gold: 900, tint: 0x6a8a3a, materials: { oak_plank: 4, iron_nails: 6 } }),
   piece({ id: 'fire_outdoor', model: 'fire', scale: 0.5, name: 'Fire', category: 'Outdoor', mount: 'outdoor', level: 5, gold: 100, tint: 0xe07030, materials: { logs: 2 } }),
   // Light-tab copies of the Decor fireplaces: same model, cost, level and XP.

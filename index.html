@@ -469,6 +469,7 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
       <h2>Settings</h2>
       <button type="button" class="ghost settings-x" data-settings-x aria-label="Close" title="Close">✕</button>
       <button type="button" class="cs-entry" data-settings-saves-open><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 19a5 5 0 0 1-.6-10A6.5 6.5 0 0 1 19 9.5a4.8 4.8 0 0 1-.5 9.5z"/></svg><b>Save files</b><small data-savefiles-summary>Import, export, backup file</small><i>›</i></button>
+      <button type="button" class="cs-entry" data-settings-sound-open><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7l-1.2-1.2a3.3 3.3 0 0 0 0-4.6zM18.6 6a8.6 8.6 0 0 1 0 12l-1.2-1.2a6.9 6.9 0 0 0 0-9.6z"/></svg><b>Sound</b><small>Master, music, UI, world, ambience</small><i>›</i></button>
       <h3>Skybox colour</h3>
       <p class="meta">Fake white clouds sit in every sky. Default is Blue.</p>
       <div class="skybox-grid" data-skybox-list>
@@ -521,6 +522,33 @@ Needs: Iron Nails ×6 (have 0) · Oak Plank ×2 (have 0)</p>
       </form>
       <p data-cheat-note class="craft-note" hidden></p>
       <button type="button" class="ghost" data-settings-close>Close</button>
+    </aside>
+
+    <aside id="sound-dock" class="cs-dock" role="dialog" aria-label="Sound" hidden>
+      <button type="button" class="cs-back" data-sound-back>‹ Settings</button><h2>Sound</h2><button type="button" class="cs-x" data-sound-close aria-label="Close">✕</button>
+      <section class="cs-sec">
+        <label class="settings-bright">Master
+          <input type="range" data-sound="master" min="0" max="100" step="5" value="100" aria-label="Master volume" />
+          <span data-sound-label="master">100%</span>
+        </label>
+        <label class="settings-bright">Music
+          <input type="range" data-sound="music" min="0" max="100" step="5" value="75" aria-label="Music volume" />
+          <span data-sound-label="music">75%</span>
+        </label>
+        <label class="settings-bright">UI
+          <input type="range" data-sound="ui" min="0" max="100" step="5" value="80" aria-label="UI volume" />
+          <span data-sound-label="ui">80%</span>
+        </label>
+        <label class="settings-bright">World
+          <input type="range" data-sound="world" min="0" max="100" step="5" value="80" aria-label="World volume" />
+          <span data-sound-label="world">80%</span>
+        </label>
+        <label class="settings-bright">Ambience
+          <input type="range" data-sound="ambience" min="0" max="100" step="5" value="30" aria-label="Ambience volume" />
+          <span data-sound-label="ambience">30%</span>
+        </label>
+        <p class="cs-help">World includes level-up and quest stingers. Ambience is the shop murmur and station loops (sawmill, furnace, range, spinning wheel). 0% mutes a channel.</p>
+      </section>
     </aside>
 
     <aside id="savefiles-dock" class="cs-dock" role="dialog" aria-label="Save files" hidden>

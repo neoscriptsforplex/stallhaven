@@ -190,3 +190,61 @@ export function createCustomerRoom({ rng = defaultRng, now = 0 } = {}) {
     },
   };
 }
+
+/** Buyers keep at least this far apart while walking in or out (metres). */
+export const BUYER_MIN_GAP = 0.8;
+/** Two buyers never spawn closer together than this (seconds). */
+export const BUYER_SPAWN_GAP = 1.5;
+/** A buyer stuck behind another longer than this walks on anyway (no deadlocks). */
+export const BUYER_MAX_WAIT = 2.5;
+
+/**
+ * Follow / wait-behind rule. `me` = { id, x, z, gx, gz } (gx/gz = next waypoint).
+ * Returns true when another buyer is within `gap` and in front of `me` along its
+ * heading. Ties (face to face) go to the lower id so exactly one of them waits.
+ * Deterministic (no rng), so every co-op client makes the same call.
+ */
+export function buyerShouldWait(me, others, gap = BUYER_MIN_GAP) {
+  const hx = me.gx - me.x;
+  const hz = me.gz - me.z;
+  const len = Math.hypot(hx, hz);
+  if (len < 1e-6) return false;
+  const ux = hx / len;
+  const uz = hz / len;
+  for (const o of others) {
+    if (!o || o.id === me.id) continue;
+    const dx = o.x - me.x;
+    const dz = o.z - me.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist >= gap) continue;
+    const ahead = dx * ux + dz * uz;
+    if (ahead <= 0.05) continue; // behind or beside: they wait for us
+    if (o.moving && Number.isFinite(o.gx) && Number.isFinite(o.gz)) {
+      // Both ahead of each other (face to face / crossing): the lower id walks on.
+      const ox = o.gx - o.x;
+      const oz = o.gz - o.z;
+      const mutual = ox * -dx + oz * -dz > 0.05 * Math.hypot(ox, oz);
+      if (mutual && me.id < o.id) continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+/** May a new buyer spawn now? Needs the spawn gap and a clear spawn point. */
+export function buyerSpawnClear(now, lastSpawnAt, spawn, others, gap = BUYER_MIN_GAP, spawnGap = BUYER_SPAWN_GAP) {
+  if (Number.isFinite(lastSpawnAt) && now - lastSpawnAt < spawnGap) return false;
+  return !others.some((o) => Math.hypot(o.x - spawn.x, o.z - spawn.z) < gap);
+}
+
+/** Nudge a standing spot (browse stop) off spots already taken by others. */
+export function freeStandSpot(spot, taken, gap = BUYER_MIN_GAP) {
+  let { x, z } = spot;
+  for (let ring = 0; ring < 8; ring += 1) {
+    if (!taken.some((t) => Math.hypot(t.x - x, t.z - z) < gap)) return { ...spot, x, z };
+    const a = ring * 2.4;
+    x = spot.x + Math.cos(a) * gap * (1 + ring * 0.15);
+    z = spot.z + Math.sin(a) * gap * (1 + ring * 0.15);
+  }
+  return { ...spot, x, z };
+}

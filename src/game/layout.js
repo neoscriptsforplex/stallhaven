@@ -2063,8 +2063,10 @@ export function pieceWallMounts(expansionIds = []) {
 }
 
 /** Snap a wall-mount Construction piece to the nearest inside or outside wall spot. */
-export function snapToPieceWall(x, z, expansionIds = [], preferRot = null) {
-  return snapToMounts(pieceWallMounts(expansionIds), x, z, preferRot);
+export function snapToPieceWall(x, z, expansionIds = [], preferRot = null, face = null) {
+  const all = pieceWallMounts(expansionIds);
+  const mounts = face ? all.filter((m) => m.face === face) : all;
+  return snapToMounts(mounts.length ? mounts : all, x, z, preferRot);
 }
 
 function wrapAngle(rad) {

@@ -124,7 +124,7 @@ describe('construction catalogue', () => {
       assert.equal(live?.lv, row.lv, row.name);
       assert.equal(live?.soon, undefined, row.name);
     }
-    assert.equal(builds.rows.some((row) => row.name === 'Wall Plant'), false);
+    assert.equal(builds.rows.some((row) => row.name === 'Wall Plant'), true);
     const withModel = ['chair', 'portrait', 'tapestry', 'lumbridge_fountain'];
     for (const id of withModel) {
       assert.equal(existsSync(join(root, id, `${id}.obj`)), true, id);
@@ -260,7 +260,7 @@ describe('place anywhere', () => {
     }
     for (const row of CONSTRUCTION_PIECES) {
       assert.ok(['outdoor', 'wall'].includes(row.mount), `${row.id} mount ${row.mount}`);
-      if (row.mount !== 'wall') continue;
+      if (row.mount !== 'wall' || row.wallFace) continue;
       const inside = snapToPieceWall(-1, -2.9, [], 0);
       assert.ok(inside.z < 0 && inside.z > -3.3 && inside.rot === 0, `${row.id} inside back wall`);
       const outside = snapToPieceWall(-3, front + 0.5, [], Math.PI);
@@ -335,4 +335,39 @@ it('every construction piece has a build thumbnail', async () => {
   for (const p of C.CONSTRUCTION_PIECES) {
     assert.ok(existsSync(new URL(`../../public/thumbs/build/${p.id.replace(/_/g, '-')}.png`, import.meta.url)), p.id);
   }
+});
+
+describe("Model Man's wall pieces", () => {
+  it('ship models, sit in the Wall tab by level, cost planks + nails + 1,000 gp per level, and keep to their wall face', async () => {
+    const { snapToPieceWall, ROOM_D } = await import('./layout.js');
+    const { constructionPiecesByLevel, constructionBuildGold, constructionXpFor, pieceWallFace } = await import('./construction.js');
+    const want = { wall_plant: ['outside', 5], utensil_rack: ['inside', 12], pot_shelf: ['inside', 20], window_box: ['inside', 28] };
+    const wall = constructionPiecesByLevel('Decor').map((r) => r.id);
+    for (const [id, [face, lv]] of Object.entries(want)) {
+      const row = constructionPiece(id);
+      assert.equal(row.mount, 'wall', id);
+      assert.equal(row.category, 'Decor', id);
+      assert.equal(row.level, lv, id);
+      assert.equal(pieceWallFace(id), face, id);
+      assert.equal(constructionBuildGold(row), lv * 1000, id);
+      assert.ok(Object.keys(row.materials).some((m) => m.endsWith('plank')), id);
+      assert.ok(Object.keys(row.materials).some((m) => m.endsWith('_nails')), id);
+      assert.ok(constructionXpFor(row) > 0, id);
+      assert.ok(wall.includes(id), id);
+      assert.equal(existsSync(join(root, id, `${id}.obj`)), true, id);
+      assert.equal(existsSync(join(root, id, `${id}.mtl`)), true, id);
+      const inside = snapToPieceWall(-1, -2.9, [], 0, face);
+      const outside = snapToPieceWall(-3, ROOM_D / 2 + 0.5, [], Math.PI, face);
+      if (face === 'inside') {
+        assert.ok(inside.z < 0 && inside.z > -3.3, `${id} inside back wall`);
+        assert.ok(outside.z < ROOM_D / 2, `${id} never snaps outside`);
+      } else {
+        assert.ok(outside.z > ROOM_D / 2 && Math.abs(outside.x) > 2.19 - 1e-6, `${id} outside, skipping door/sign/windows`);
+        assert.ok(inside.z < -ROOM_D / 2, `${id} never snaps inside`);
+      }
+    }
+    const lv = wall.map((id) => constructionPiece(id).level);
+    assert.deepEqual(lv, [...lv].sort((a, b) => a - b));
+    assert.equal(constructionPiece('cooking_shelves').mount, 'outdoor');
+  });
 });

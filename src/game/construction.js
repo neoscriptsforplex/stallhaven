@@ -19,32 +19,37 @@ export const CONSTRUCTION_PIECES = Object.freeze([
   piece({ id: 'fancy_table', scale: 2 / 3, name: 'Fancy Table', category: 'Tables', mount: 'outdoor', level: 65, gold: 800, tint: 0xc4a06a, materials: { oak_plank: 3, iron_nails: 6 } }),
   piece({ id: 'basic_bed', scale: 2 / 3, name: 'Basic Bed', category: 'Beds', mount: 'outdoor', level: 20, gold: 600, tint: 0x8a6a4a, materials: { plank: 3, bronze_nails: 4 } }),
   piece({ id: 'double_bed', scale: 2 / 3, name: 'Double Bed', category: 'Beds', mount: 'outdoor', level: 50, gold: 1500, tint: 0x6a3a4a, materials: { willow_plank: 4, steel_nails: 8 } }),
-  piece({ id: 'cabinet', scale: 2 / 3, name: 'Cabinet', category: 'Storage', mount: 'outdoor', level: 1, gold: 700, tint: 0xa08050, materials: { oak_plank: 3, iron_nails: 6 } }),
+  piece({ id: 'cabinet', scale: 2 / 3, name: 'Cabinet', category: 'Decor', mount: 'outdoor', level: 1, gold: 700, tint: 0xa08050, materials: { oak_plank: 3, iron_nails: 6 } }),
   piece({ id: 'crate', scale: 2 / 3, name: 'Crate', category: 'Storage', mount: 'outdoor', level: 1, gold: 150, tint: 0xb09060, materials: { plank: 2, bronze_nails: 2 } }),
   piece({ id: 'sacks', scale: 2 / 3, name: 'Sacks', category: 'Storage', mount: 'outdoor', level: 1, gold: 100, tint: 0xc2b48a, materials: { plank: 1 } }),
   piece({ id: 'barrel_of_fish', name: 'Barrel of Fish', category: 'Storage', mount: 'outdoor', level: 1, gold: 250, tint: 0x8a6848, materials: { plank: 2, bronze_nails: 2 } }),
   piece({ id: 'barrel_of_sticks', name: 'Barrel of Sticks', category: 'Storage', mount: 'outdoor', level: 1, gold: 200, tint: 0x7a5a32, materials: { plank: 2, bronze_nails: 2 } }),
-  piece({ id: 'old_bookshelf', name: 'Old Bookshelf', category: 'Storage', mount: 'outdoor', level: 10, gold: 900, tint: 0x6a4a30, materials: { oak_plank: 4, iron_nails: 6 } }),
+  piece({ id: 'old_bookshelf', name: 'Old Bookshelf', category: 'Decor', mount: 'outdoor', level: 10, gold: 900, tint: 0x6a4a30, materials: { oak_plank: 4, iron_nails: 6 } }),
   piece({ id: 'fire', scale: 0.5, name: 'Fire', category: 'Light', mount: 'outdoor', level: 5, gold: 100, tint: 0xe07030, materials: { logs: 2 } }),
-  piece({ id: 'fireplace', scale: 2 / 3, name: 'Fireplace', category: 'Light', mount: 'outdoor', level: 1, gold: 1200, tint: 0x8a4030, materials: { willow_plank: 2, steel_nails: 6 } }),
-  piece({ id: 'fancy_fireplace', scale: 2 / 3, name: 'Fancy Fireplace', category: 'Light', mount: 'outdoor', level: 1, gold: 2500, tint: 0xa05030, materials: { maple_plank: 3, mithril_nails: 8 } }),
-  piece({ id: 'standing_candles', scale: 2 / 3, name: 'Standing Candles', category: 'Light', mount: 'outdoor', level: 60, gold: 300, tint: 0xe8d090, materials: { plank: 1, bronze_nails: 2 } }),
-  piece({ id: 'lit_torch', wallY: 1.1, roll: Math.PI / 2, scale: 0.5, name: 'Lit Torch', category: 'Light', mount: 'wall', level: 1, gold: 150, tint: 0xe8a040, materials: { logs: 1 } }),
+  piece({ id: 'fireplace', scale: 2 / 3, name: 'Fireplace', category: 'Decor', mount: 'outdoor', level: 1, gold: 1200, tint: 0x8a4030, materials: { willow_plank: 2, steel_nails: 6 } }),
+  piece({ id: 'fancy_fireplace', scale: 2 / 3, name: 'Fancy Fireplace', category: 'Decor', mount: 'outdoor', level: 1, gold: 2500, tint: 0xa05030, materials: { maple_plank: 3, mithril_nails: 8 } }),
+  piece({ id: 'standing_candles', scale: 2 / 3, name: 'Standing Candles', category: 'Decor', mount: 'outdoor', level: 60, gold: 300, tint: 0xe8d090, materials: { plank: 1, bronze_nails: 2 } }),
+  piece({ id: 'lit_torch', wallY: 1.1, roll: Math.PI / 2, scale: 0.5, name: 'Lit Torch', category: 'Decor', mount: 'wall', level: 1, gold: 150, tint: 0xe8a040, materials: { logs: 1 } }),
   piece({ id: 'standing_torch', scale: 2 / 3, name: 'Standing Torch', category: 'Light', mount: 'outdoor', level: 1, gold: 200, tint: 0xd09040, materials: { logs: 1, bronze_nails: 2 } }),
-  piece({ id: 'portrait', hang: true, name: 'Portrait', category: 'Wall', mount: 'wall', level: 5, gold: 400, tint: 0xc8b090, materials: { oak_plank: 1, iron_nails: 2 } }),
+  piece({ id: 'portrait', hang: true, name: 'Portrait', category: 'Decor', mount: 'wall', level: 5, gold: 400, tint: 0xc8b090, materials: { oak_plank: 1, iron_nails: 2 } }),
   piece({ id: 'cooking_shelves', hw: 0.61, hd: 0.23, name: 'Cooking Shelves', category: 'Storage', mount: 'outdoor', level: 12, gold: 600, tint: 0xb8874a, materials: { oak_plank: 2, iron_nails: 4 } }),
   piece({ id: 'pots_and_pans', free: true, scale: 1 / 3, name: 'Pots and Pans', category: 'Storage', mount: 'outdoor', level: 1, gold: 0, tint: 0xa0a0a8, materials: {} }),
-  piece({ id: 'tapestry', name: 'Tapestry', category: 'Wall', mount: 'wall', level: 28, gold: 1000, tint: 0x8a3a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
-  piece({ id: 'tapestry_pole', name: 'Tapestry Pole', category: 'Storage', mount: 'outdoor', level: 28, gold: 500, tint: 0x8a6840, materials: { oak_plank: 1, iron_nails: 4 } }),
-  piece({ id: 'landscape', hang: true, name: 'Landscape', category: 'Wall', mount: 'wall', level: 35, gold: 1200, tint: 0x5a8a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
+  piece({ id: 'tapestry', name: 'Tapestry', category: 'Decor', mount: 'wall', level: 28, gold: 1000, tint: 0x8a3a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
+  piece({ id: 'tapestry_pole', name: 'Tapestry Pole', category: 'Decor', mount: 'outdoor', level: 28, gold: 500, tint: 0x8a6840, materials: { oak_plank: 1, iron_nails: 4 } }),
+  // Model Man's wall pieces (Luke approved). Back of each model sits on the wall face; wallY keeps the authored height.
+  piece({ id: 'wall_plant', hang: true, wallFace: 'outside', wallY: 0.76, name: 'Wall Plant', category: 'Decor', mount: 'wall', level: 5, gold: 300, tint: 0x4a7a2a, materials: { plank: 2, bronze_nails: 2 } }),
+  piece({ id: 'utensil_rack', hang: true, wallFace: 'inside', wallY: 0.113, name: 'Utensil Rack', category: 'Decor', mount: 'wall', level: 12, gold: 500, tint: 0x8a6a4a, materials: { oak_plank: 2, iron_nails: 4 } }),
+  piece({ id: 'pot_shelf', hang: true, wallFace: 'inside', wallY: 0.231, name: 'Pot Shelf', category: 'Decor', mount: 'wall', level: 20, gold: 700, tint: 0xa0704a, materials: { oak_plank: 3, iron_nails: 6 } }),
+  piece({ id: 'window_box', hang: true, wallFace: 'inside', wallY: -0.146, name: 'Window Box', category: 'Decor', mount: 'wall', level: 28, gold: 900, tint: 0x6a8a3a, materials: { oak_plank: 4, iron_nails: 6 } }),
+  piece({ id: 'landscape', hang: true, name: 'Landscape', category: 'Decor', mount: 'wall', level: 35, gold: 1200, tint: 0x5a8a4a, materials: { maple_plank: 2, mithril_nails: 4 } }),
   piece({ id: 'garden_bush', name: 'Garden Bush', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 120, tint: 0x4a7a2a, materials: { flax: 3 } }),
   piece({ id: 'flag_pole', scale: 0.5, name: 'Flag Pole', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 400, tint: 0xc04040, materials: { oak_plank: 2, iron_nails: 4 } }),
   piece({ id: 'statue', name: 'Statue', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 3000, tint: 0xb0b0b8, materials: { yew_plank: 2, adamant_nails: 6 } }),
   piece({ id: 'log_pile', name: 'Log Pile', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 200, tint: 0x8a6238, materials: { logs: 4 } }),
   piece({ id: 'lumbridge_fountain', name: 'Lumbride Fountain', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 4000, tint: 0x4a88b0, materials: { maple_plank: 4, mithril_nails: 8 } }),
   piece({ id: 'cannon', name: 'Cannon', category: 'Outdoor', mount: 'outdoor', level: 1, gold: 2000, tint: 0x6a6a72, materials: { steel_bar: 4 } }),
-  piece({ id: 'blacksmiths_tools', hang: true, scale: 1 / 3, name: "Blacksmiths' Tools", category: 'Workshop', mount: 'wall', level: 1, gold: 900, tint: 0x5a5a62, materials: { steel_nails: 8, willow_plank: 1 } }),
-  piece({ id: 'sink', scale: 2 / 3, name: 'Sink', category: 'Workshop', mount: 'outdoor', level: 1, gold: 700, tint: 0xc8d0d4, materials: { oak_plank: 2, iron_nails: 4 } }),
+  piece({ id: 'blacksmiths_tools', hang: true, scale: 1 / 3, name: "Blacksmiths' Tools", category: 'Decor', mount: 'wall', level: 1, gold: 900, tint: 0x5a5a62, materials: { steel_nails: 8, willow_plank: 1 } }),
+  piece({ id: 'sink', scale: 2 / 3, name: 'Sink', category: 'Decor', mount: 'outdoor', level: 1, gold: 700, tint: 0xc8d0d4, materials: { oak_plank: 2, iron_nails: 4 } }),
   piece({ id: 'bank_booth', name: 'Bank Booth', category: 'Decor', mount: 'outdoor', level: 1, gold: 2500, tint: 0x8a6848, materials: { maple_plank: 4, mithril_nails: 10 } }),
   piece({ id: 'suit_of_armour', scale: 2 / 3, name: 'Suit of Armour', category: 'Decor', mount: 'outdoor', level: 1, gold: 1800, tint: 0xb0b0c0, materials: { steel_bar: 2, steel_nails: 6 } }),
 ]);
@@ -122,6 +127,13 @@ export function constructionCategories() {
 export function pieceHangs(id) {
   const row = constructionPiece(id);
   return row?.mount === 'wall' && row.hang === true;
+}
+
+/** Wall face a wall-mount piece may use: 'inside', 'outside', or null for both. */
+export function pieceWallFace(id) {
+  const row = constructionPiece(id);
+  if (row?.mount !== 'wall') return null;
+  return row.wallFace === 'inside' || row.wallFace === 'outside' ? row.wallFace : null;
 }
 
 export function constructionLookId(id) {

@@ -144,3 +144,7 @@
 .cs-delete .cs-row>button{flex:1}
 .cs-delete .sv-danger.sv-solid:disabled{opacity:.45;cursor:not-allowed}
 .cs-delete .cs-field input:focus{outline-color:#e06a6a}
+#sound-dock{z-index:19}
+#sound-dock .settings-bright{display:flex;align-items:center;gap:8px;margin:6px 0}
+#sound-dock .settings-bright input{flex:1}
+#sound-dock .settings-bright{display:grid;grid-template-columns:70px 1fr 40px}

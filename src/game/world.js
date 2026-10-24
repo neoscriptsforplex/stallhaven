@@ -117,7 +117,7 @@ import {
   queueSlot,
   rebuildShopWalls,
 } from './nav.js';
-import { playClick } from './audio.js';
+import { playClick, playSfx } from './audio.js';
 import {
   completeTreeChop,
   ensureTreeNode,
@@ -186,7 +186,7 @@ import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 import { mountDisplayBasePose } from './craftpreview.js';
-import { browseWait, nextSpawnTime, pickBrowseStops, planCustomerSpawn, rescheduleKing } from './customerSim.js';
+import { BUYER_MAX_WAIT, browseWait, buyerShouldWait, buyerSpawnClear, freeStandSpot, nextSpawnTime, pickBrowseStops, planCustomerSpawn, rescheduleKing } from './customerSim.js';
 import { intentBus } from './intents.js';
 import { createRemoteKeepers } from './remoteKeepers.js';
 
@@ -1057,6 +1057,7 @@ export function createWorld(canvas, state, opts = {}) {
     localActivityListener?.({ mode: mode || null, yaw: shopkeeper.rotation.y });
   }
   let nextSpawnAt = FIRST_CUSTOMER_DELAY;
+  let lastBuyerSpawnAt = -Infinity;
   let firstSpawn = true;
   let customerSerial = 1;
   let pickHandler = null;
@@ -1994,6 +1995,7 @@ export function createWorld(canvas, state, opts = {}) {
   function fellChoppedTree(x, z, now) {
     const result = completeTreeChop(x, z, now);
     if (!result.felled) return false;
+    playSfx('tree_fall');
     const fallingTree = findGardenPine(x, z);
     if (startTreeTopple(fallingTree, now)) topplingTrees.add(fallingTree);
     syncTreeVisuals();
@@ -3659,7 +3661,9 @@ export function createWorld(canvas, state, opts = {}) {
   ];
 
   function browseStops() {
-    return pickBrowseStops(BROWSE_SPOTS, rng);
+    // Browse stops already claimed by other buyers are nudged aside so nobody stacks.
+    const taken = customers.flatMap((a) => (a.browsing ? a.path.slice(-1) : []));
+    return pickBrowseStops(BROWSE_SPOTS, rng).map((spot) => freeStandSpot(spot, taken));
   }
 
   function customersShown() {
@@ -3675,6 +3679,12 @@ export function createWorld(canvas, state, opts = {}) {
     if (!customersShown()) return;
     const inShop = customers.filter((actor) => actor.state !== 'leave').length;
     if (inShop >= MAX_CUSTOMERS) return;
+    // Stagger arrivals: never two buyers on the spawn point or within 1.5 s of each other.
+    const spawnAt = buyerRoute().spawn;
+    if (!buyerSpawnClear(now, lastBuyerSpawnAt, spawnAt, customers.map((a) => a.mesh.position))) {
+      nextSpawnAt = now + 0.5;
+      return;
+    }
     const kingHere = customers.some((actor) => actor.typeId === 'kingroald' && actor.state !== 'leave');
     const plan = planCustomerSpawn(state, { rng, firstSpawn, inShop, kingHere });
     if (!plan) return;
@@ -3737,6 +3747,8 @@ export function createWorld(canvas, state, opts = {}) {
     customerSerial += 1;
     actor.mesh.visible = customersShown();
     customers.push(actor);
+    lastBuyerSpawnAt = now;
+    playSfx('customer_enter');
     nextSpawnAt = nextSpawnTime(now, rng);
     if (typeId === 'kingroald') {
       pushLog(state, `King Roald arrives, seeking ${RECIPES[request.recipeId].name}.`);
@@ -3806,6 +3818,7 @@ export function createWorld(canvas, state, opts = {}) {
       actor.pendingCarry = null;
     }
     setSpeechText(actor.mesh, sold ? 'Thanks!' : farewell);
+    if (sold && typeof window !== 'undefined') window.setTimeout(() => playSfx('sale'), 320);
     if (actor.mesh.userData.ring) actor.mesh.userData.ring.visible = false;
     if (actor.typeId === 'kingroald' && customerAuthority === 'local') {
       rescheduleKing(state, rng);
@@ -3831,6 +3844,28 @@ export function createWorld(canvas, state, opts = {}) {
     actor.mesh.position.y = syncStance(actor.mesh) + Math.abs(Math.sin(now * bobHz + actor.id)) * 0.012;
   }
 
+  /** Wait behind a buyer in front (min 0.8 m), but never longer than BUYER_MAX_WAIT. */
+  function buyerHolds(actor, dt) {
+    const goal = actor.path[0];
+    if (!goal) return false;
+    const me = { id: actor.id, x: actor.mesh.position.x, z: actor.mesh.position.z, gx: goal.x, gz: goal.z };
+    const others = customers.filter((o) => o !== actor).map((o) => ({
+      id: o.id,
+      x: o.mesh.position.x,
+      z: o.mesh.position.z,
+      moving: (o.state === 'enter' || o.state === 'leave') && o.path.length > 0,
+      gx: o.path[0]?.x,
+      gz: o.path[0]?.z,
+    }));
+    if (!buyerShouldWait(me, others)) {
+      actor.heldFor = 0;
+      return false;
+    }
+    actor.heldFor = (actor.heldFor ?? 0) + dt;
+    if (actor.heldFor > BUYER_MAX_WAIT) return false;
+    return true;
+  }
+
   function updateCustomers(dt, now) {
     if (customerAuthority === 'local' && now >= nextSpawnAt) spawnCustomer(now);
     for (let i = customers.length - 1; i >= 0; i -= 1) {
@@ -3838,6 +3873,8 @@ export function createWorld(canvas, state, opts = {}) {
       if (actor.state === 'enter') {
         if (!actor.path.length) {
           settleInLine(actor, now);
+        } else if (buyerHolds(actor, dt)) {
+          holdCustomer(actor, dt, now, 1.4);
         } else if (walkToward(actor, actor.path[0], dt)) {
           actor.path.shift();
           if (!actor.path.length) settleInLine(actor, now);
@@ -3862,7 +3899,9 @@ export function createWorld(canvas, state, opts = {}) {
           dismissCustomer(actor, false);
         }
       } else if (actor.state === 'leave') {
-        if (!actor.path.length || walkToward(actor, actor.path[0], dt)) {
+        if (actor.path.length && buyerHolds(actor, dt)) {
+          holdCustomer(actor, dt, now, 1.4);
+        } else if (!actor.path.length || walkToward(actor, actor.path[0], dt)) {
           if (actor.path.length) actor.path.shift();
           if (!actor.path.length) {
             if (actor.carried) {
@@ -4267,8 +4306,27 @@ export function createWorld(canvas, state, opts = {}) {
     return true;
   }
 
+  /** Per-frame view for the sound director (src/game/sfxHooks.js). */
+  function sfxSnapshot() {
+    const pos = shopkeeper.position;
+    const indoors = sceneMode === 'shop' && pointOnFloors(pos.x, pos.z, interiorFloors(state.expansions ?? []), 0);
+    const stations = new Set();
+    for (const id of Object.keys(state.crafts ?? {})) {
+      if (RECIPES[id]) stations.add(stationForRecipe(RECIPES[id]));
+    }
+    return {
+      gold: state.gold,
+      stations: [...stations],
+      mining: mining ? { mode: mining.mode, startedAt: mining.startedAt } : null,
+      player: { x: pos.x, z: pos.z },
+      indoors,
+      sceneMode,
+    };
+  }
+
   return {
     tick,
+    sfxSnapshot,
     warmScene,
     syncDisplays,
     refreshSelection,

@@ -437,7 +437,13 @@ export function applyIntent(state, intent, ctx = {}) {
 export function createIntentBus(clock = { now: () => (typeof performance !== 'undefined' ? performance.now() / 1000 : 0) }) {
   let state = null;
   let remote = null;
+  const listeners = new Set();
   return {
+    /** fn(intent, result) after every local apply (sound effects, etc.). Returns an unsubscribe. */
+    onResult(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
     bind(nextState) {
       state = nextState;
     },
@@ -452,6 +458,9 @@ export function createIntentBus(clock = { now: () => (typeof performance !== 'un
       if (!state) return fail('no-state');
       const result = applyIntent(state, intent, { now: clock.now(), coop: Boolean(remote) && intent?.type === 'cheat' });
       if (remote && result.ok) remote(intent);
+      for (const fn of listeners) {
+        try { fn(intent, result); } catch { /* a listener must never break an action */ }
+      }
       return result;
     },
     run(intent) {

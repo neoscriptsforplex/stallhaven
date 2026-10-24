@@ -52,6 +52,7 @@ import {
   stopMusic,
   toggleLoop,
   toggleShuffle,
+  playSfx,
 } from './audio.js';
 import { deleteModel, loadModels, saveModel } from './storage.js';
 import { parseModelBuffer, validatePlayerModelFile } from './upload.js';
@@ -3309,6 +3310,7 @@ export function bindHud(root, state, world) {
   });
   heroesPanel.showAway?.();
   skills.onLevelUp((event) => {
+    playSfx('levelup');
     const unlocked = unlockNamesBetween(event.skillId, event.from, event.level, hiddenCraft);
     const extra = unlocked.length
       ? ` New: ${unlocked.slice(0, 6).join(', ')}${unlocked.length > 6 ? '…' : ''}.`

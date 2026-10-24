@@ -59,6 +59,7 @@ import { createMagicSparkles } from './magic-tree-sparkles.js';
 import { DUNGEON_LIGHT_BOOST } from './lighting.js';
 import { initRatWander, RAT_DUMP_YAW } from './rats.js';
 import { brickSurface, sootMetal, wornMetal, woodSurface } from './surfaces.js';
+import { attachAnimProp, getAnimProp } from './animProps.js';
 import { applyOsrsScale, getBundledLook, measureVisibleBox, OSRS_MODEL_SCALE, sitVisibleOnY, wrapBundledProp, wrapRiggedRat, dumpStandEuler } from './models.js';
 import { prepareDungeonRockMaterials } from './upload.js';
 import { attachSpinner } from './stationSpin.js';
@@ -1565,6 +1566,15 @@ function buildProceduralRange() {
 }
 
 export function buildCauldron() {
+  const anim = getAnimProp('cauldron');
+  if (anim) {
+    const target = buildProceduralCauldron();
+    // The GLB's bind-pose bounds equal the static 'body' (userData.fitNode):
+    // fx start inside it or at scale 0, so steam never changes the fit.
+    const mesh = wrapBundledProp(anim.scene, target, { name: 'cauldron', fit: 'max', label: 'Cauldron', wareY: 'top' });
+    attachAnimProp(mesh, 'cauldron');
+    return mesh;
+  }
   const bundled = getBundledLook('cauldron');
   if (bundled) {
     const target = buildProceduralCauldron();

@@ -177,6 +177,7 @@ import {
 import { constructionLookId, constructionPiece, pieceHangs } from './construction.js';
 import { buildCauldron, buildDungeon, buildFarmingPatch, buildFlaxPlant, buildFletchingBench, buildFurnace, buildLoom, buildPortal, buildPotterWheel, buildRange, buildRug, buildRuneField, buildSawmill, buildShop, buildSpinningWheel, buildWheatPlant, DUNGEON_BOULDERS, placeFarmingPatchMesh, tickFountainWater } from './shopbuild.js';
 import { tickPortalJelly } from './portalJelly.js';
+import { addFireLight, animPieceVisual, loadAnimProps, MAX_FIRE_LIGHTS, setCauldronBrewing, tickAnimProp } from './animProps.js';
 import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
@@ -1373,6 +1374,12 @@ export function createWorld(canvas, state, opts = {}) {
   }
 
   function pieceVisual(id) {
+    const anim = animPieceVisual(id, 0.01125 * (constructionPiece(id)?.scale ?? 1));
+    if (anim) {
+      const box = new THREE.Box3().setFromObject(anim);
+      if (Number.isFinite(box.min.y) && !pieceHangs(id)) anim.position.y -= box.min.y;
+      return anim;
+    }
     const look = getBundledLook(constructionLookId(id));
     if (look) {
       const mesh = look.clone(true);
@@ -1446,6 +1453,14 @@ export function createWorld(canvas, state, opts = {}) {
           child.receiveShadow = true;
         });
         anchor.add(visual);
+        if (visual.userData.animProp?.fireLight) {
+          let lights = 0;
+          placedGroup.traverse((child) => { if (child.isPointLight) lights += 1; });
+          if (lights < MAX_FIRE_LIGHTS) {
+            anchor.updateMatrixWorld(true);
+            addFireLight(anchor, visual);
+          }
+        }
         placedGroup.add(anchor);
       }
       anchor.userData.index = index;
@@ -3806,6 +3821,43 @@ export function createWorld(canvas, state, opts = {}) {
     }
   }
 
+  function cauldronBrewing() {
+    return Object.keys(state.crafts ?? {}).some((id) => stationForRecipe(RECIPES[id]) === 'cauldron');
+  }
+
+  function tickAnimProps(dt) {
+    if (sceneMode !== 'shop') return;
+    for (const anchor of placedGroup.children) {
+      const info = anchor.children.find((c) => c.userData?.animProp)?.userData.animProp;
+      if (info) tickAnimProp(info, dt);
+    }
+    const cauldron = fixtureMeshes.cauldron?.mesh?.userData?.animProp;
+    if (cauldron) {
+      setCauldronBrewing(cauldron, cauldronBrewing());
+      tickAnimProp(cauldron, dt);
+    }
+  }
+
+  loadAnimProps().then((ok) => {
+    if (!ok) return;
+    try {
+      const slot = fixtureMeshes.cauldron;
+      if (slot) {
+        const next = buildCauldron();
+        if (next.userData.animProp) {
+          scene.remove(slot.mesh);
+          slot.mesh = next;
+          scene.add(next);
+          applyFixturePose('cauldron');
+        }
+      }
+      while (placedGroup.children.length) placedGroup.children[0].removeFromParent();
+      syncPlacedMeshes();
+    } catch (err) {
+      console.warn('Animated props skipped:', err?.message || err);
+    }
+  });
+
   function tick(dt, now) {
     lastNow = now;
     state.playTime = (state.playTime ?? 0) + dt;
@@ -3828,6 +3880,7 @@ export function createWorld(canvas, state, opts = {}) {
     }
     tickTrees(now);
     tickTopples(now);
+    tickAnimProps(dt);
     syncDisplays();
     refreshSelection();
     const selected = displays[state.selectedDisplay];

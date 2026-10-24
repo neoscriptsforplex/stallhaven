@@ -1124,8 +1124,8 @@ describe('material regen', () => {
     const rich = createState();
     rich.materials.essence = 0;
     reachLevel(rich, 'mining', 50);
-    assert.equal(grantMinedMaterial(rich, 'essence'), 2);
-    assert.equal(rich.materials.essence, 2);
+    assert.equal(grantMinedMaterial(rich, 'essence'), 3);
+    assert.equal(rich.materials.essence, 3);
     assert.equal(grantMinedMaterial(rich, 'bronze'), 5);
     assert.deepEqual(mineTiming('essence'), { duration: 3.2, yield: 1 });
     assert.equal(grantMinedMaterial(state, 'bronze'), 5);

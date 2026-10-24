@@ -2132,7 +2132,7 @@ function requestFor(customer, recipe) {
   return recipe ? { recipeId: recipe.id, gold: recipe.price, offer: customer.offer ?? null } : null;
 }
 
-export function decideRequest(customerId, rng = Math.random, state = null, canCraft = recipeUnlocked, mode = null) {
+export function decideRequest(customerId, rng = Math.random, state = null, canCraft = recipeUnlocked, mode = null, reachable = null) {
   const customer = CUSTOMERS[customerId];
   if (customerId === 'kingroald') {
     const recipeId = mostExpensiveChestId(state);
@@ -2149,7 +2149,9 @@ export function decideRequest(customerId, rng = Math.random, state = null, canCr
     .map((id) => RECIPES[id])
     .filter(Boolean)
     .filter((recipe) => recipe.buyers?.includes(customerId))
-    .filter((recipe) => recipe.category !== 'potion' || Boolean(state?.furniture?.cauldron));
+    .filter((recipe) => (reachable
+      ? reachable(state, recipe)
+      : recipe.category !== 'potion' || Boolean(state?.furniture?.cauldron)));
   const unlocked = preferred.filter((recipe) => canCraft(state, recipe));
   const maxUnlockedPrice = unlocked.reduce((max, recipe) => Math.max(max, recipe.price ?? 0), 0);
   const maxUnlockedTier = unlocked.reduce((max, recipe) => Math.max(max, recipe.tier ?? 1), 0);

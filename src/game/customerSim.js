@@ -21,9 +21,19 @@ import {
   scheduleKingRoald,
 } from './catalog.js';
 import { defaultRng } from './rng.js';
-import { isUnlocked } from './economy.js';
+import { hasStock, isUnlocked, recipeStationOwned } from './economy.js';
 
-const canCraftNow = (state, recipe) => (state ? isUnlocked(state, recipe.id) : (recipe.tier ?? 1) <= 1);
+/** In stock already, or makeable right now (station placed and level met). */
+const canCraftNow = (state, recipe) => (state
+  ? hasStock(state, recipe.id) || isUnlocked(state, recipe.id)
+  : (recipe.tier ?? 1) <= 1);
+/**
+ * Never ask for something a locked station blocks: the item must be in stock
+ * or its station placed (a higher level is fine; that is the 1-in-5 stretch).
+ */
+const reachableNow = (state, recipe) => (state
+  ? hasStock(state, recipe.id) || recipeStationOwned(state, recipe.id)
+  : true);
 
 /**
  * Decide the next traveller. Mutates state.kingRoaldAt the same way the old
@@ -48,18 +58,21 @@ export function planCustomerSpawn(state, { rng = defaultRng, firstSpawn = false,
   const typeId = firstSpawn ? 'pilgrim' : types[Math.floor(rng() * types.length)];
   let request = null;
   let pickedType = typeId;
-  if (rng() < ASPIRE_CHANCE) {
-    request = decideRequest(typeId, rng, state, canCraftNow, 'aspire');
-  } else {
-    // About 4 in 5 travellers want something the shop can make right now.
-    const start = types.indexOf(typeId);
-    const order = firstSpawn ? [typeId] : types.map((_, i) => types[(start + i) % types.length]);
+  const start = types.indexOf(typeId);
+  // The first traveller is a pilgrim when the shop can serve one, otherwise whoever it can.
+  const order = firstSpawn
+    ? [typeId, ...types.filter((id) => id !== typeId)]
+    : types.map((_, i) => types[(start + i) % types.length]);
+  const tryAll = (mode) => {
     for (const id of order) {
-      request = decideRequest(id, rng, state, canCraftNow, 'craftable');
-      if (request) { pickedType = id; break; }
+      const r = decideRequest(id, rng, state, canCraftNow, mode, reachableNow);
+      if (r) { pickedType = id; return r; }
     }
-    if (!request) request = decideRequest(typeId, rng, state, canCraftNow);
-  }
+    return null;
+  };
+  // About 4 in 5 travellers want something the shop can make (or has) right now.
+  if (rng() < ASPIRE_CHANCE) request = tryAll('aspire');
+  else request = tryAll('craftable') ?? tryAll(null);
   const finalType = request ? pickedType : typeId;
   if (!request) return { typeId: null, request: null, usedFirst: firstSpawn };
   return { typeId: finalType, request, usedFirst: firstSpawn };

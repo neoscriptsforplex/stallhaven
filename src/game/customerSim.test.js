@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState } from './economy.js';
+import { SHOP } from './catalog.js';
+
+function placeStation(state, id) {
+  state.furniture[id] = { x: SHOP[id].x, z: SHOP[id].z, rot: 0 };
+}
 import { FIRST_CUSTOMER_DELAY, MAX_CUSTOMERS, REQUEST_WAIT } from './catalog.js';
 import { seededRng } from './rng.js';
 import { createCustomerRoom, pickBrowseStops, planCustomerSpawn, ROOM_ARRIVE_SECONDS } from './customerSim.js';
@@ -13,8 +18,11 @@ test('seeded rng repeats', () => {
 
 test('first traveller is a pilgrim with a request', () => {
   const s = createState();
+  placeStation(s, 'range');
   const plan = planCustomerSpawn(s, { rng: seededRng(1), firstSpawn: true });
   assert.equal(plan.typeId, 'pilgrim');
+  const bare = planCustomerSpawn(createState(), { rng: seededRng(1), firstSpawn: true });
+  assert.ok(bare.typeId && bare.request.recipeId, 'with no range the first traveller still wants something makeable');
   assert.ok(plan.request.recipeId);
   assert.equal(plan.usedFirst, true);
 });
@@ -38,6 +46,7 @@ test('browse stops are one or two distinct spots', () => {
 
 test('room queue spawns, caps, and times out the front traveller', () => {
   const state = createState();
+  placeStation(state, 'range'); // pilgrims only want food, so give them a range
   const room = createCustomerRoom({ rng: seededRng(5), now: 0 });
   assert.deepEqual(room.tick(state, FIRST_CUSTOMER_DELAY - 0.1), []);
   const ev = room.tick(state, FIRST_CUSTOMER_DELAY);
@@ -104,4 +113,28 @@ test('quest-only and fishing-only starting stock', async () => {
     assert.ok(!MATERIALS[id].restock && !MATERIALS[id].regenEvery, id);
   }
   for (const m of Object.values(MATERIALS)) if (m.fished || m.id.endsWith('_dhide')) assert.equal(m.start, 0, m.id);
+});
+
+test('requests never need a locked station unless the item is already in stock', async () => {
+  const { planCustomerSpawn } = await import('./customerSim.js');
+  const { createState, recipeStationOwned } = await import('./economy.js');
+  let seed = 777;
+  const rng = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const state = createState();
+  state.chest.attack_potion = 1;
+  let sawStocked = false;
+  for (let i = 0; i < 3000; i += 1) {
+    state.kingRoaldAt = Infinity;
+    const plan = planCustomerSpawn(state, { rng });
+    if (!plan?.request) continue;
+    const id = plan.request.recipeId;
+    if (id === 'attack_potion') sawStocked = true;
+    else assert.ok(recipeStationOwned(state, id), id);
+  }
+  assert.ok(sawStocked, 'a stocked potion can still be asked for with no cauldron');
+});
+
+test('trees sink so their trunks meet the lawn', async () => {
+  const { TREE_ROOT_SINK } = await import('./shopbuild.js');
+  assert.ok(TREE_ROOT_SINK >= 0.05);
 });

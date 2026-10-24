@@ -1932,7 +1932,7 @@ describe('bundled prop swaps', () => {
       tree.scale.setScalar(1 + TREE_SCALE_SPREAD);
       seatTreeOnGround(tree);
       const box = measureVisibleBox(tree);
-      assert.ok(box.min.y < -0.02 && box.min.y > -0.05, `bundled roots should sink into the grass, minY=${box.min.y}`);
+      assert.ok(box.min.y < -0.02 && box.min.y > -0.12, `bundled roots should sink into the grass, minY=${box.min.y}`);
       assert.ok(half.y > 1.4 && half.y < 3.2, `half-scale pine should stay the old size, got ${half.y}`);
       for (const axis of ['x', 'y', 'z']) {
         assert.ok(
@@ -2416,7 +2416,7 @@ describe('bundled prop swaps', () => {
     tree.scale.setScalar(1 - TREE_SCALE_SPREAD);
     seatTreeOnGround(tree);
     const box = measureVisibleBox(tree);
-    assert.ok(box.min.y < -0.02 && box.min.y > -0.05, `base should sink into the grass, minY=${box.min.y}`);
+    assert.ok(box.min.y < -0.02 && box.min.y > -0.12, `base should sink into the grass, minY=${box.min.y}`);
     assert.ok(half.y > 1.5 && half.y < 2.4, `half scale should stay the old pine, got ${half.y}`);
     for (const axis of ['x', 'y', 'z']) {
       assert.ok(
@@ -2484,7 +2484,7 @@ describe('bundled prop swaps', () => {
       const box = measureVisibleBox(pine);
       pine.rotation.y = yaw;
       pine.updateMatrixWorld(true);
-      assert.ok(box.min.y < -0.02 && box.min.y > -0.05, `placed roots should sink into the grass, minY=${box.min.y}`);
+      assert.ok(box.min.y < -0.02 && box.min.y > -0.12, `placed roots should sink into the grass, minY=${box.min.y}`);
       assert.ok(pine.userData.uniformScale >= 1 - TREE_SCALE_SPREAD - 1e-6);
       assert.ok(pine.userData.uniformScale <= 1 + TREE_SCALE_SPREAD + 1e-6);
       assert.ok(Math.abs(pine.scale.x - pine.scale.y) < 1e-6 && Math.abs(pine.scale.y - pine.scale.z) < 1e-6);
@@ -2535,7 +2535,7 @@ describe('bundled prop swaps', () => {
       tree.rotation.y = 0.4;
       seatTreeOnGround(tree);
       const box = measureVisibleBox(tree);
-      assert.ok(box.min.y < -0.02 && box.min.y > -0.05, `oak roots should sink into the grass, minY=${box.min.y}`);
+      assert.ok(box.min.y < -0.02 && box.min.y > -0.12, `oak roots should sink into the grass, minY=${box.min.y}`);
       const size = box.getSize(new THREE.Vector3());
       assert.ok(size.y > 4 && size.y < 6, `oak height ${size.y}`);
     } finally {

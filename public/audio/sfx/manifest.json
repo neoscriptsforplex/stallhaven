@@ -374,5 +374,29 @@
     "volume": 0.8,
     "loop": false,
     "use": "Fill bucket at fountain"
+  },
+  {
+    "file": "sow_seeds_01.ogg",
+    "name": "sow_seeds_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Planting seeds into farming patch"
+  },
+  {
+    "file": "sow_seeds_02.ogg",
+    "name": "sow_seeds_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Planting seeds into farming patch"
+  },
+  {
+    "file": "herb_grown_01.ogg",
+    "name": "herb_grown_01",
+    "category": "stinger",
+    "volume": 0.9,
+    "loop": false,
+    "use": "Herb fully grown shimmer"
   }
 ]

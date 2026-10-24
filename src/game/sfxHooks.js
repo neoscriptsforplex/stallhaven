@@ -23,7 +23,7 @@ const INTENT_OK = {
   placeOnDisplay: 'item_drop',
   placeFromChest: 'item_drop',
   fillStand: 'item_drop',
-  plantHerb: 'item_drop',
+  plantHerb: 'sow_seeds',
   clearDisplay: 'item_pickup',
   pickupPiece: 'item_pickup',
   harvestHerb: 'item_pickup',
@@ -75,6 +75,7 @@ export function createSfxDirector({ play, loop, rng = Math.random }) {
   let swing = null;
   let lastFishStart = null;
   let ambience = 0;
+  let herbsReady = null;
 
   function onIntent(intent, result, now) {
     const id = intentSound(intent, result);
@@ -136,6 +137,11 @@ export function createSfxDirector({ play, loop, rng = Math.random }) {
       if (lastFillStart !== m.startedAt) play('fill_bucket');
       lastFillStart = m.startedAt;
     } else lastFillStart = null;
+    // Farming: a shimmer when another herb patch finishes growing.
+    if (Number.isFinite(snap.herbsReady)) {
+      if (herbsReady != null && snap.herbsReady > herbsReady) play('herb_grown');
+      herbsReady = snap.herbsReady;
+    }
     // Hearth crackle: only near a placed Fire or fireplace, fading with distance.
     const amb = fireCrackleGain(snap.fireDist);
     if (amb !== ambience) {

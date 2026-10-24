@@ -3945,6 +3945,9 @@ export function bindHud(root, state, world) {
       if (v === 'all') b.textContent = `All (${have})`;
     });
     matDiscardBox.hidden = false;
+    // The box sits at the top of the scrolling sheet: bring it into view, or the bin looks dead when the list is scrolled.
+    try { matDiscardBox.scrollIntoView({ block: 'nearest' }); } catch { /* old browsers */ }
+    matDiscardBox.querySelector('[data-mat-discard-amt]:not([hidden])')?.focus?.({ preventScroll: true });
   }
   matDiscardBox?.addEventListener('click', (event) => {
     if (event.target.closest('[data-mat-discard-no]')) { closeMatDiscard(); return; }

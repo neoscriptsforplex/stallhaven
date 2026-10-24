@@ -60,7 +60,7 @@ describe('materials drawer', () => {
     assert.match(html, /Bronze Bar/);
     assert.equal(html.includes('Bronze Ore'), false);
     assert.equal(html.includes('data-restock'), false);
-    assert.match(html, new RegExp(`background:${tintHex(materialTint(MATERIALS.essence))}`));
+    assert.match(materialsDrawerHtml({ wheat: 1 }), new RegExp(`background:${tintHex(materialTint(MATERIALS.wheat))}`)); // no render: swatch
     assert.equal(tintHex(materialTint(MATERIALS.bronze_bar)), tintHex(METALS[0].tint));
     assert.equal(materialsDrawerHtml({ flax: 0 }), '<p class="materials-empty">No materials yet.</p>');
     assert.equal(materialsDrawerHtml({ bronze_nails: 0, dragon_nails: 0 }).includes('Nails'), false);
@@ -70,7 +70,7 @@ describe('materials drawer', () => {
     assert.match(nails, /×15/);
     assert.match(nails, /data-owned="dragon_nails"/);
     assert.match(nails, /Dragon Nails/);
-    assert.match(nails, new RegExp(`background:${tintHex(MATERIALS.bronze_nails.tint)}`));
+    assert.match(nails, /class="mat-icon" src="[^"]*item-bronze_nails\.png"/);
   });
 
   it('sits the side drawer under the top-left HUD and above the bottom bar', () => {
@@ -243,5 +243,28 @@ describe('materials drawer pointer', () => {
     assert.equal(cancel.toggle, false);
     assert.equal(cancel.arm, false);
     assert.equal(cancel.swallow, true);
+  });
+});
+
+describe('materials drawer icons and bin', () => {
+  it('shows the model render when one exists, else the colour swatch', async () => {
+    const thumbs = (await import('./materialThumbs.js')).default;
+    const withIcon = Object.keys(MATERIALS).find((id) => thumbs[id]);
+    const without = Object.keys(MATERIALS).find((id) => !thumbs[id]);
+    const html = materialsDrawerHtml({ [withIcon]: 3, ...(without ? { [without]: 2 } : {}) });
+    assert.match(html, new RegExp(`<img class="mat-icon" src="[^"]*thumbs/guide/${thumbs[withIcon].replace(':', '-')}\\.png"`));
+    if (without) assert.match(html, /class="mat-swatch"/);
+    assert.match(html, /data-mat-discard=/);
+    for (const key of Object.values(thumbs)) {
+      assert.ok(readFileSync(join(root, 'public/thumbs/guide', `${key.replace(':', '-')}.png`)).length > 100, key);
+    }
+  });
+  it('keeps the icon on narrow phones and pins the throw-away box in view', () => {
+    const css = readFileSync(join(root, 'src/style.css'), 'utf8');
+    const hud = readFileSync(join(root, 'src/game/hud.js'), 'utf8');
+    const narrow = css.slice(css.indexOf('@media (max-width: 359px)'));
+    assert.doesNotMatch(narrow.slice(0, narrow.indexOf('\n}')), /mat-icon[^{]*\{\s*display:\s*none/);
+    assert.match(css, /\.mat-discard \{[^}]*position: sticky;[^}]*top: 0;/);
+    assert.match(hud, /matDiscardBox\.scrollIntoView\(/);
   });
 });

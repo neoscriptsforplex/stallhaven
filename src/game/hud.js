@@ -154,9 +154,9 @@ import { bindHeroesPanel } from './heroesPanel.js';
 import { nextUnlockLabel, unlockNamesBetween, unlocksBetween } from './skillLevels.js';
 import { groupUnlocks, unlockListHtml } from './unlockGroups.js';
 import { createXpOrb } from './xpOrb.js';
-import { autoFit } from './fitPanel.js';
 import { fitPhoneCraft } from './phoneCraftFit.js';
 import { fitBuildDock } from './buildFit.js';
+import { fitScrollDock } from './dockFit.js';
 import {
   brightnessPercent,
   clampBrightness,
@@ -3190,7 +3190,13 @@ export function bindHud(root, state, world) {
   });
   settingsDock?.querySelector('[data-settings-close]')?.addEventListener('click', closeSettingsDock);
   settingsDock?.querySelector('[data-settings-x]')?.addEventListener('click', closeSettingsDock);
-  if (settingsDock) autoFit(settingsDock);
+  if (settingsDock) {
+    // Roomy Settings: wide panel, fixed header, scrolling body capped between HUD and button bar.
+    const fitSettings = () => fitScrollDock(settingsDock, { width: 460 });
+    new MutationObserver(() => { if (!settingsDock.hidden) fitSettings(); }).observe(settingsDock, { attributes: true, attributeFilter: ['hidden'] });
+    onLayoutChange(() => { if (!settingsDock.hidden) fitSettings(); });
+    fitSettings();
+  }
   settingsDock?.querySelector('[data-settings-unstuck]')?.addEventListener('click', () => {
     if (world.unstuck?.()) {
       pushLog(state, 'You shake yourself free.');
@@ -4078,6 +4084,8 @@ export function bindHud(root, state, world) {
     refreshAll,
     paintCrafts,
     showQuestAway: () => heroesPanel?.showAway?.(),
+    // UI-fit audit (scripts/ui-fit.mjs) opens every panel through these.
+    debugOpen: { openPotion, openUpgrade, openExpand, openPlaceDock, openMusic, openHelp, showFishPicker, openDisplayPicker, openFillPicker, openStoragePop, openBuild },
   };
 }
 

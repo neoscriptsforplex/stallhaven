@@ -59,7 +59,15 @@ export function fireCrackleGain(dist) {
   return Math.round(g * 20) / 20;
 }
 
-export function createSfxDirector({ play, loop }) {
+/** Pick-pop variants and how far into each file the pop lands (s); played that early so the pop meets the end of the pick. */
+export const PICK_POP_OFFSETS = {
+  flax: { pick_flax_01: 0.24, pick_flax_02: 0.21 },
+  wheat: { pick_wheat_01: 0.24, pick_wheat_02: 0.24 },
+};
+
+export function createSfxDirector({ play, loop, rng = Math.random }) {
+  let pickPop = null;
+  let lastFillStart = null;
   let lastGold = null;
   let goldVoicedUntil = -Infinity;
   let stations = new Set();
@@ -110,6 +118,24 @@ export function createSfxDirector({ play, loop }) {
       if (lastFishStart !== m.startedAt) play('fishing_splash');
       lastFishStart = m.startedAt;
     } else lastFishStart = null;
+    // Flax/wheat: the pop transient lands as the plant comes out at the end of the pick.
+    if (m?.mode === 'pick' && PICK_POP_OFFSETS[m.crop] && Number.isFinite(m.duration)) {
+      if (!pickPop || pickPop.startedAt !== m.startedAt) {
+        const names = Object.keys(PICK_POP_OFFSETS[m.crop]);
+        const variant = names[Math.floor(rng() * names.length) % names.length];
+        const at = m.startedAt + Math.max(0, m.duration - PICK_POP_OFFSETS[m.crop][variant]);
+        pickPop = { startedAt: m.startedAt, group: `pick_${m.crop}`, variant, at, done: false };
+      }
+      if (!pickPop.done && now >= pickPop.at) {
+        play(pickPop.group, { variant: pickPop.variant });
+        pickPop.done = true;
+      }
+    } else pickPop = null;
+    // Fountain: one fill sound per bucket-fill bar.
+    if (m?.mode === 'fill') {
+      if (lastFillStart !== m.startedAt) play('fill_bucket');
+      lastFillStart = m.startedAt;
+    } else lastFillStart = null;
     // Hearth crackle: only near a placed Fire or fireplace, fading with distance.
     const amb = fireCrackleGain(snap.fireDist);
     if (amb !== ambience) {

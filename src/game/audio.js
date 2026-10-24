@@ -691,10 +691,10 @@ function sfxAudible(channel) {
 }
 
 /** Play one random variant of a sound group ("coin", "anvil_hammer", "levelup"...). */
-export function playSfx(id, { gain = 1, force = false } = {}) {
+export function playSfx(id, { gain = 1, force = false, variant = null } = {}) {
   const variants = sfxGroups.get(id);
   if (!variants?.length) return false;
-  const pick = pickSfxVariant(variants, Math.random, sfxLastPick.get(id));
+  const pick = (variant && variants.find((v) => v.name === variant)) || pickSfxVariant(variants, Math.random, sfxLastPick.get(id));
   if (!pick || pick.loop || !sfxAudible(pick.channel)) return false;
   const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
   if (!force && sfxRetrigger(id, nowMs)) return false;

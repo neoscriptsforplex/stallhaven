@@ -7,7 +7,7 @@ import {
   channelForSfx, createRetriggerGuard, loadSoundMix, normalizeSoundMix, parseSfxManifest, pickSfxVariant,
   saveSoundMix, SHORT_SFX_GAIN, DEFAULT_SOUND_MIX,
 } from './sfx.js';
-import { createSfxDirector, fireCrackleGain, intentSound } from './sfxHooks.js';
+import { createSfxDirector, fireCrackleGain, intentSound, PICK_POP_OFFSETS } from './sfxHooks.js';
 import { buyerShouldWait, buyerSpawnClear, freeStandSpot, BUYER_MIN_GAP } from './customerSim.js';
 import { loadSfxManifest, resetSfxForTests, getSfxGroups, playSfx } from './audio.js';
 
@@ -16,8 +16,9 @@ const sfxDir = join(root, 'public/audio/sfx');
 const manifest = JSON.parse(readFileSync(join(sfxDir, 'manifest.json'), 'utf8'));
 
 describe('sfx manifest', () => {
-  it('ships all 42 sounds with OGG + MP3 files', () => {
-    assert.equal(manifest.length, 42);
+  it('ships all 47 sounds with OGG + MP3 files', () => {
+    assert.equal(manifest.length, 47);
+    assert.ok(!manifest.some((e) => /footstep/.test(e.name)));
     for (const e of manifest) {
       assert.ok(existsSync(join(sfxDir, e.file)), e.file);
       assert.ok(existsSync(join(sfxDir, 'mp3', e.file.replace('.ogg', '.mp3'))), e.file);
@@ -144,6 +145,41 @@ describe('sfx director', () => {
     assert.ok(!played.some((p) => p.startsWith('footstep')));
     assert.ok(!manifest.some((e) => e.name.startsWith('footstep')));
     assert.equal(loops.get('shop_ambience_loop'), true);
+  });
+});
+
+describe('pick and bucket sfx', () => {
+  it('ships flax/wheat/bucket variants on the world channel', () => {
+    const g = parseSfxManifest(manifest);
+    assert.equal(g.get('pick_flax').length, 2);
+    assert.equal(g.get('pick_wheat').length, 2);
+    assert.equal(g.get('fill_bucket').length, 1);
+    for (const id of ['pick_flax', 'pick_wheat', 'fill_bucket']) assert.equal(g.get(id)[0].channel, 'world');
+  });
+  for (const [crop, offsets] of Object.entries(PICK_POP_OFFSETS)) {
+    for (const [variant, off] of Object.entries(offsets)) {
+      it(`${variant} starts ${off}s before the ${crop} pick ends`, () => {
+        const played = [];
+        const idx = Object.keys(offsets).indexOf(variant);
+        const rng = () => (idx + 0.5) / Object.keys(offsets).length;
+        const d = createSfxDirector({ play: (id, o) => played.push([id, o?.variant]), loop: () => {}, rng });
+        const m = { mode: 'pick', crop, startedAt: 10, duration: 2 };
+        d.frame({ mining: m }, 10);
+        d.frame({ mining: m }, 12 - off - 0.01);
+        assert.equal(played.length, 0);
+        d.frame({ mining: m }, 12 - off + 0.001);
+        d.frame({ mining: m }, 12);
+        assert.deepEqual(played, [[`pick_${crop}`, variant]]);
+      });
+    }
+  }
+  it('fill_bucket plays once per fountain fill bar', () => {
+    const played = [];
+    const d = createSfxDirector({ play: (id) => played.push(id), loop: () => {} });
+    d.frame({ mining: { mode: 'fill', startedAt: 1, duration: 2 } }, 1);
+    d.frame({ mining: { mode: 'fill', startedAt: 1, duration: 2 } }, 2);
+    d.frame({ mining: { mode: 'fill', startedAt: 3, duration: 2 } }, 3);
+    assert.deepEqual(played, ['fill_bucket', 'fill_bucket']);
   });
 });
 

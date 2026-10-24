@@ -334,5 +334,45 @@
     "volume": 0.8,
     "loop": true,
     "use": "Shop room tone loop"
+  },
+  {
+    "file": "pick_flax_01.ogg",
+    "name": "pick_flax_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Flax pops out at end of pick animation"
+  },
+  {
+    "file": "pick_flax_02.ogg",
+    "name": "pick_flax_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Flax pops out at end of pick animation"
+  },
+  {
+    "file": "pick_wheat_01.ogg",
+    "name": "pick_wheat_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Wheat pops out at end of pick animation"
+  },
+  {
+    "file": "pick_wheat_02.ogg",
+    "name": "pick_wheat_02",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Wheat pops out at end of pick animation"
+  },
+  {
+    "file": "fill_bucket_01.ogg",
+    "name": "fill_bucket_01",
+    "category": "world",
+    "volume": 0.8,
+    "loop": false,
+    "use": "Fill bucket at fountain"
   }
 ]

@@ -4408,7 +4408,7 @@ export function createWorld(canvas, state, opts = {}) {
     return {
       gold: state.gold,
       stations: [...stations],
-      mining: mining ? { mode: mining.mode, startedAt: mining.startedAt } : null,
+      mining: mining ? { mode: mining.mode, startedAt: mining.startedAt, duration: mining.duration, crop: mining.crop } : null,
       player: { x: pos.x, z: pos.z },
       indoors,
       sceneMode,

@@ -382,6 +382,29 @@ export function createCloudSync({
       emit('cloud_signed_out', { reason: 'user', removedLocal: removeLocal });
     },
 
+    /**
+     * Delete the account and every online save, then sign out locally.
+     * Local slots stay on this device. -> { ok } | { ok:false, reason: offline|expired|unknown }
+     */
+    async deleteAccount() {
+      try {
+        await client.deleteAccount();
+      } catch (err) {
+        if (err?.offline) return { ok: false, reason: 'offline' };
+        if (err?.signedOut) return { ok: false, reason: 'expired' };
+        return { ok: false, reason: 'unknown' };
+      }
+      sync = { userId: null, slots: {}, lastSyncAt: 0 };
+      queue = { up: [], del: [] };
+      saveSync();
+      saveQueue();
+      conflicts.clear();
+      for (const k of Object.keys(status)) delete status[k];
+      emit('cloud_account_deleted', {});
+      emit('cloud_signed_out', { reason: 'deleted', removedLocal: false });
+      return { ok: true };
+    },
+
     /** Wait for queued work (tests). */
     idle: () => (running ?? Promise.resolve()).catch(() => {}),
   };

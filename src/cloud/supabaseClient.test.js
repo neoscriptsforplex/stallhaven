@@ -96,3 +96,28 @@ test('expired access token refreshes', async () => {
   assert.deepEqual(await c.listSaves(), []);
   assert.notEqual(c.session.access_token, old);
 });
+
+test('delete_my_account removes only the caller and their saves', async () => {
+  const signIn = async (email) => {
+    const c = client();
+    await c.requestLink(email, '');
+    await c.verifyCode(email, (await mailFor(email)).code);
+    return c;
+  };
+  const a = await signIn('del-a@example.com');
+  const b = await signIn('del-b@example.com');
+  await a.saveSlot({ slot: 1, data: { gold: 1 }, baseRevision: 0 });
+  await b.saveSlot({ slot: 1, data: { gold: 2 }, baseRevision: 0 });
+  await a.deleteAccount();
+  assert.equal(a.session, null);
+  const rows = await (await fetch(`${url}/mock/saves`)).json();
+  assert.deepEqual(rows.map((r) => r.data.gold), [2]);
+  assert.equal((await b.listSaves()).length, 1);
+  // Anonymous callers are refused.
+  const anon = await fetch(`${url}/rest/v1/rpc/delete_my_account`, { method: 'POST', headers: { apikey: 'anon', Authorization: 'Bearer anon' } });
+  assert.equal(anon.status, 401);
+  // An expired session reports signedOut.
+  const c = client();
+  c.setSession({ access_token: 'dead', refresh_token: 'dead', expires_at: Date.now() + 3600_000, user: { id: 'x', email: 'x@x' } });
+  await assert.rejects(c.deleteAccount(), (e) => e.signedOut === true);
+});

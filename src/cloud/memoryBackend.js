@@ -39,6 +39,12 @@ export function createMemoryCloud({ now = () => Date.now() } = {}) {
         async signOut() {
           session = null;
         },
+        async deleteAccount() {
+          fail();
+          if (!session) throw Object.assign(new Error('signed out'), { signedOut: true });
+          for (const k of [...rows.keys()]) if (k.startsWith(`${session.user.email}:`)) rows.delete(k);
+          session = null;
+        },
         async listSaves() {
           fail();
           return [...rows.entries()].filter(([k]) => k.startsWith(`${email}:`)).map(([, r]) => structuredClone(r)).sort((a, b) => a.slot - b.slot);

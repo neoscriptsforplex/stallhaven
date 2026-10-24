@@ -137,3 +137,10 @@
 .cs-toast .cs-link{margin-left:6px}
 .cs-dock[hidden],.cs-modal[hidden]{display:none}
 #savefiles-dock{z-index:19}
+
+/* Delete account: Youi's danger style (save.css .sv-danger) */
+.cs-link.cs-danger-link{display:block;margin:10px 0 0;color:#f2a3a3;text-decoration-color:#c55}
+.cs-link.cs-danger-link:hover{color:#ffb9b9}
+.cs-delete .cs-row>button{flex:1}
+.cs-delete .sv-danger.sv-solid:disabled{opacity:.45;cursor:not-allowed}
+.cs-delete .cs-field input:focus{outline-color:#e06a6a}

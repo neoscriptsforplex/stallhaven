@@ -144,7 +144,8 @@ export function mountCloud({ saves, store, autosave, sync, client, backup, emit,
       return `${head}<div class="cs-acct" data-cloud-state="signed-in"><span class="cs-ava">${esc((email[0] ?? '?').toUpperCase())}</span><span class="cs-email" title="${esc(email)}">${esc(email)}</span>${line}</div>
         <div class="cs-row"><button type="button" class="sv-ghost" data-cloud-sync-now>Sync now</button><button type="button" class="sv-ghost" data-cloud-signout>Sign out</button></div>
         <label class="cs-check"><input type="checkbox" data-cloud-signout-remove /> Also remove saves from this device</label>
-        <p class="cs-help" style="margin-top:6px">Signing out keeps your saves on this device.</p>`;
+        <p class="cs-help" style="margin-top:6px">Signing out keeps your saves on this device.</p>
+        <button type="button" class="cs-link cs-danger-link" data-cloud-delete-account>Delete account</button>`;
     }
     if (ui.view === 'link-sent') {
       const left = Math.max(0, Math.ceil((ui.resendAt - Date.now()) / 1000));
@@ -309,6 +310,8 @@ export function mountCloud({ saves, store, autosave, sync, client, backup, emit,
         saves.repaintPicker();
       });
       t.textContent = 'Syncing…';
+    } else if ('cloudDeleteAccount' in t.dataset) {
+      openDeleteAccount();
     } else if ('cloudSignout' in t.dataset) {
       signOut(Boolean(container.querySelector('[data-cloud-signout-remove]')?.checked));
     }
@@ -409,6 +412,49 @@ export function mountCloud({ saves, store, autosave, sync, client, backup, emit,
     scrim.addEventListener('click', close);
     modal.querySelector('.cs-x')?.addEventListener('click', close);
     return modal;
+  }
+
+  function openDeleteAccount() {
+    const m = openModal(`<div class="cs-modal cs-delete" role="alertdialog" aria-labelledby="cs-del-h" data-cloud-delete-dialog>
+      <h2 id="cs-del-h">Delete account?</h2><button type="button" class="cs-x" aria-label="Close">✕</button>
+      <p class="cs-p">This permanently deletes your online account <b>${esc(sync.email ?? '')}</b> and all its cloud saves. It can't be undone.</p>
+      <p class="cs-p"><b>Your saves on this device stay.</b> You can keep playing them, or sign up again later to back them up.</p>
+      <label class="cs-field"><span>Type DELETE to confirm</span><input type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" data-cloud-delete-input /></label>
+      <p class="cs-note is-err" data-cloud-delete-error role="alert" hidden></p>
+      <div class="cs-row"><button type="button" class="sv-ghost" data-cloud-delete-cancel>Cancel</button><button type="button" class="sv-danger sv-solid" data-cloud-delete-confirm disabled>Delete account</button></div>
+    </div>`);
+    const input = m.querySelector('[data-cloud-delete-input]');
+    const btn = m.querySelector('[data-cloud-delete-confirm]');
+    const err = m.querySelector('[data-cloud-delete-error]');
+    input.addEventListener('input', () => { btn.disabled = input.value.trim() !== 'DELETE'; });
+    m.querySelector('[data-cloud-delete-cancel]').addEventListener('click', closeModal);
+    btn.addEventListener('click', async () => {
+      if (input.value.trim() !== 'DELETE') return;
+      btn.disabled = true;
+      btn.textContent = 'Deleting…';
+      const res = isOffline() ? { ok: false, reason: 'offline' } : await sync.deleteAccount();
+      if (res.ok) {
+        closeModal();
+        ui.view = 'signed-out';
+        ui.error = null;
+        paintAll();
+        saves.repaintPicker();
+        toast('Account deleted. Your saves on this device are still here.');
+        return;
+      }
+      err.hidden = false;
+      if (res.reason === 'expired') {
+        err.textContent = 'Your sign-in has expired. Sign in again, then delete your account.';
+        ui.view = 'signed-out';
+        paintAll();
+        btn.textContent = 'Delete account';
+        return;
+      }
+      err.textContent = res.reason === 'offline' ? "You're offline. Connect to the internet and try again." : 'Something went wrong. Nothing was deleted, try again.';
+      btn.textContent = 'Delete account';
+      btn.disabled = false;
+    });
+    input.focus();
   }
 
   function openSignInModal() {

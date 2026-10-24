@@ -8,7 +8,7 @@
  *   POST /auth/v1/verify {type:'email', email, token}           → session
  *   POST /auth/v1/token?grant_type=refresh_token
  *   GET  /auth/v1/user, POST /auth/v1/logout
- *   GET  /rest/v1/saves, DELETE /rest/v1/saves?slot=eq.N, POST /rest/v1/rpc/save_slot
+ *   POST /rest/v1/rpc/delete_my_account, GET  /rest/v1/saves, DELETE /rest/v1/saves?slot=eq.N, POST /rest/v1/rpc/save_slot
  *
  * Row-level security is emulated: every query is filtered by the bearer token's user.
  * Test helpers (like Inbucket/Mailpit): GET /mock/mail?email=…  POST /mock/expire?email=…  POST /mock/reset
@@ -174,6 +174,13 @@ export function createMockSupabase({ rateLimit = 5, rateWindowMs = 60_000, token
       if (p === '/rest/v1/saves' && req.method === 'DELETE') {
         const m = /^eq\.(\d)$/.exec(u.searchParams.get('slot') ?? '');
         if (m) saves.delete(`${me.id}:${m[1]}`);
+        return send(res, 204, null);
+      }
+      if (p === '/rest/v1/rpc/delete_my_account' && req.method === 'POST') {
+        for (const [k, r] of saves) if (r.user_id === me.id) saves.delete(k);
+        for (const [t, v] of tokens) if (v.userId === me.id) tokens.delete(t);
+        for (const [t, id] of refresh) if (id === me.id) refresh.delete(t);
+        users.delete(me.email);
         return send(res, 204, null);
       }
       if (p === '/rest/v1/rpc/save_slot' && req.method === 'POST') {

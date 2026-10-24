@@ -198,7 +198,8 @@ import { stepRatWander } from './rats.js';
 import { dungeonMapBounds, dungeonMapFocus } from './minimap.js';
 import { applySceneLighting, clampBrightness, clampDungeonBrightness } from './lighting.js';
 import { mountDisplayBasePose } from './craftpreview.js';
-import { ghostifyPieceVisual } from './pieceGhost.js';
+import { ghostifyPieceVisual, setPlaceTint } from './pieceGhost.js';
+import { tutorialEmit } from './tutorialEvents.js';
 import { BUYER_MAX_WAIT, browseWait, buyerShouldWait, buyerSpawnClear, freeStandSpot, nextSpawnTime, pickBrowseStops, planCustomerSpawn, rescheduleKing } from './customerSim.js';
 import { intentBus } from './intents.js';
 import { createRemoteKeepers } from './remoteKeepers.js';
@@ -1013,7 +1014,36 @@ export function createWorld(canvas, state, opts = {}) {
     applyMovePose(moveTarget);
   }
 
+  /** The object the player sees while placing/moving (ghost, station, shelf, patch). */
+  function placeTintRoot(target = moveTarget) {
+    if (!target) return null;
+    if (target.id === 'piece') return pieceGhost;
+    if (target.id === 'farming_patch') return patchGhost;
+    if (target.id === 'display') return displays[target.index]?.anchor ?? null;
+    return fixtureMeshes[target.id]?.mesh ?? null;
+  }
+  let tintedRoot = null;
+  let tintKey = '';
+  /** Green on a valid spot, red when blocked (the [data-place-note] text keeps the reason). */
+  function updatePlaceTint() {
+    const root = moveTarget ? placeTintRoot() : null;
+    if (tintedRoot && tintedRoot !== root) setPlaceTint(tintedRoot, null);
+    tintedRoot = root;
+    if (!root) { tintKey = ''; return; }
+    const pose = visualPlacePose();
+    const key = pose ? `${pose.x.toFixed(3)},${pose.z.toFixed(3)},${(pose.rot ?? 0).toFixed(3)}` : 'none';
+    if (key === tintKey && root.userData.placeTint) return;
+    tintKey = key;
+    setPlaceTint(root, blockedPlaceReason(pose) ? 'blocked' : 'valid');
+  }
+  function clearPlaceTint() {
+    if (tintedRoot) setPlaceTint(tintedRoot, null);
+    tintedRoot = null;
+    tintKey = '';
+  }
+
   function clearMoveMode() {
+    clearPlaceTint();
     const kind = moveTarget ? placeKindOf(moveTarget) : null;
     const refreshGrid = kind === 'portal' || kind === 'farming_patch';
     if (kind === 'farming_patch') clearPatchGhost();
@@ -2276,6 +2306,7 @@ export function createWorld(canvas, state, opts = {}) {
         materialId: mining.materialId,
         amount: got,
       });
+      if (mining.mode !== 'chop' && mining.mode !== 'fish') tutorialEmit(`mined:${mining.materialId}`);
     }
     if (mining.mode === 'chop' && got > 0 && fellChoppedTree(mining.x, mining.z, now)) return;
     mining.startedAt = now;
@@ -2331,6 +2362,7 @@ export function createWorld(canvas, state, opts = {}) {
     moveMarker.visible = true;
     localMoveListener?.({ x: goal.x, z: goal.z, scene: sceneMode });
     pickHandler?.({ type: 'player-move' });
+    tutorialEmit('walked');
     return true;
   }
 
@@ -2624,6 +2656,7 @@ export function createWorld(canvas, state, opts = {}) {
     faceCounterCustomer(dt);
   }
 
+  let camFocus = null;
   function updateFollowCamera(dt) {
     if (camHeld.left) cam.yaw += CAM_YAW_SPEED * dt;
     if (camHeld.right) cam.yaw -= CAM_YAW_SPEED * dt;
@@ -2635,6 +2668,12 @@ export function createWorld(canvas, state, opts = {}) {
       0.95 + (shopkeeper.userData.groundY || 0),
       shopkeeper.position.z,
     );
+    // Tutorial: frame the target (narrow screens: centred on it; desktop: between it and the player). Smooth, never jumps.
+    if (camFocus) {
+      const k = camFocus.weight ?? 0.5;
+      look.x += (camFocus.x - look.x) * k;
+      look.z += (camFocus.z - look.z) * k;
+    }
     const flat = Math.cos(cam.pitch) * cam.distance;
     const desired = new THREE.Vector3(
       look.x + Math.sin(cam.yaw) * flat,
@@ -4131,6 +4170,7 @@ export function createWorld(canvas, state, opts = {}) {
     state.playTime = (state.playTime ?? 0) + dt;
     updatePlayer(dt, now);
     updateFollowCamera(dt);
+    if (moveTarget || tintedRoot) updatePlaceTint();
     dust.rotation.y += dt * 0.03;
     const positions = dust.geometry.attributes.position;
     for (let i = 0; i < positions.count; i += 1) {
@@ -4331,6 +4371,7 @@ export function createWorld(canvas, state, opts = {}) {
     shopkeeper.userData.groundY = OUTDOOR_GROUND_Y;
     shopkeeper.position.set(-4.15, OUTDOOR_GROUND_Y, 0.4);
     shopkeeper.rotation.y = Math.PI / 2;
+    tutorialEmit('enteredDungeon');
   }
 
   function exitDungeonNow() {
@@ -4352,6 +4393,7 @@ export function createWorld(canvas, state, opts = {}) {
     shopkeeper.userData.groundY = characterGroundY(shopReturnPos.x, shopReturnPos.z, state.expansions ?? []);
     shopkeeper.position.set(shopReturnPos.x, shopkeeper.userData.groundY, shopReturnPos.z);
     shopkeeper.rotation.y = Math.PI;
+    tutorialEmit('arrivedShop');
   }
 
   function ensureRuneField() {
@@ -4781,6 +4823,61 @@ export function createWorld(canvas, state, opts = {}) {
           buyerLookId: mesh?.userData?.buyerLookId ?? null,
         };
       });
+    },
+    /**
+     * Live world position of a tutorial target, from the real object:
+     * trapdoor (the garden hatch, follows expansions), bronzeRock (the dungeon boulder mesh),
+     * ladder (dungeon exit ladder mesh), furnace (the placed furnace or its placement ghost).
+     */
+    tutorialAnchor(name) {
+      const centre = (obj, fallbackY = 0.5) => {
+        if (!obj) return null;
+        obj.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(obj);
+        if (!Number.isFinite(box.min.x)) {
+          const p = obj.getWorldPosition(new THREE.Vector3());
+          return { x: p.x, y: p.y + fallbackY, z: p.z };
+        }
+        const c = box.getCenter(new THREE.Vector3());
+        return { x: c.x, y: c.y, z: c.z };
+      };
+      if (name === 'trapdoor') {
+        if (sceneMode !== 'shop') return null;
+        const hatch = gardenTrapdoorSpot(state.expansions ?? []);
+        return hatch ? { x: hatch.x, y: 0.1, z: hatch.z } : null;
+      }
+      if (name === 'bronzeRock' || name === 'ladder') {
+        if (sceneMode !== 'dungeon' || !dungeon) return null;
+        if (name === 'ladder') return centre(dungeon.ladder);
+        const i = DUNGEON_BOULDERS.findIndex((spot) => spot.id === 'bronze');
+        return centre(dungeon.boulders?.[i]);
+      }
+      if (name === 'furnace') {
+        if (sceneMode !== 'shop') return null;
+        const slot = fixtureMeshes.furnace;
+        if (!slot?.mesh?.visible) return null;
+        return centre(slot.mesh);
+      }
+      return null;
+    },
+    /** Narrow screens: keep a tutorial target framed with the player (null releases it). */
+    frameTutorialTarget(point) {
+      camFocus = point && Number.isFinite(point.x) && Number.isFinite(point.z)
+        ? { x: point.x, z: point.z, weight: Math.min(1, Math.max(0, point.weight ?? 0.5)) }
+        : null;
+    },
+    /** Rotate whatever is being placed (station, shelf, table, piece) by a quarter turn. */
+    rotatePlacing(dir = 1) {
+      if (!moveTarget) return false;
+      const pose = poseOf(moveTarget);
+      if (!pose) return false;
+      const kind = placeKindOf(moveTarget);
+      const wallPiece = kind === 'piece' && constructionPiece(moveTarget.pieceId)?.mount === 'wall';
+      if (kind === 'shelf' || wallPiece) return rotateFurniturePose(moveTarget, dir);
+      pose.rot = (pose.rot ?? FURNITURE_FORWARD) + (dir < 0 ? -1 : 1) * (Math.PI / 2);
+      applyMovePose(moveTarget);
+      tintKey = '';
+      return true;
     },
     projectToClient(x, y, z) {
       const point = new THREE.Vector3(x, y, z);

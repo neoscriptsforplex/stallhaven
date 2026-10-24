@@ -147,6 +147,16 @@ describe('construction trims (Luke 2026-10-24)', () => {
     }
     assert.equal(mod.constructionPiece('pots_and_pans').scale, 1 / 3);
     assert.equal(mod.constructionPiece('pots_and_pans').mount, 'outdoor');
+    const pots = mod.constructionPiece('pots_and_pans');
+    assert.equal(pots.free, true);
+    assert.equal(pots.level, 1);
+    assert.deepEqual({ ...pots.materials }, {});
+    assert.equal(mod.constructionBuildGold(pots), 0);
+    const s = createState(); s.gold = 0;
+    for (const k of Object.keys(s.materials)) s.materials[k] = 0;
+    assert.equal(mod.constructionPlaceBlock(s, 'pots_and_pans'), '');
+    assert.equal(mod.placeConstruction(s, 'pots_and_pans', { x: 1, z: 1, rot: 0 }), true);
+    assert.equal(s.gold, 0);
     assert.equal(mod.constructionPiece('cabinet').scale, 2 / 3);
     assert.equal(mod.constructionPiece('barrel_of_fish').scale, undefined);
     assert.equal(mod.constructionPiece('barrel_of_sticks').scale, undefined);

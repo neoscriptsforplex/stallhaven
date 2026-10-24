@@ -1815,7 +1815,6 @@ export function buildArmourStand() {
   group.add(base);
   const hips = standBlock(MANNEQUIN_BLOCKS.hips, oak);
   group.add(hips);
-  group.add(standBlock(MANNEQUIN_BLOCKS.shoulders, oak));
   const neck = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), post));
   neck.position.y = 1.28;
   group.add(neck);
@@ -1852,7 +1851,8 @@ export function slotPose(slot) {
 /**
  * The wooden boxes on the stand. BoxGeometry is centered on its position,
  * so a block's bottom face is `at` plus the geometry's min Y.
- * There is no torso block or arm poles: between the hips and the shoulders
+ * Only the hip block is built (no shoulder bar, torso or arm poles). The
+ * shoulders entry just sizes worn tops. Between the hips and the neck
  * only the central pole stands, so worn tops have nothing to poke through.
  */
 const MANNEQUIN_BLOCKS = {
